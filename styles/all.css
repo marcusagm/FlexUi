@@ -1,0 +1,317 @@
+/**
+ * Variables
+ */
+:root {
+    --primary-color: #00ffcc;
+    --secondary-color: #ffcc00;
+    --tertiary-color: #cc00ff;
+    --quaternary-color: #ff00cc;
+    --quinary-color: #00ccff;
+
+    --background-color: #222;
+    --foreground-color: #333;
+
+    --border-color: #555;
+    --text-color: #ccc;
+    --highlight-color: #00ffcc33;
+
+    --alert-color: #ff4444;
+    --success-color: #44ff44;
+    --warning-color: #ffcc44;
+    --info-color: #4444ff;
+    --font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    --font-size: 14px;
+    --border-radius: 4px;
+    --transition-duration: 0.3s;
+    --z-index-menu: 1000;
+    --z-index-submenu: 2000;
+    --z-index-panel: 500;
+    --z-index-tooltip: 3000;
+}
+
+/* Reset básico */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #222;
+    color: #ccc;
+    user-select: none;
+}
+
+/* Menu principal */
+.menu {
+    display: flex;
+    background-color: #222;
+    border-bottom: 1px solid #222;
+    z-index: 1000;
+}
+
+.menu-item {
+    position: relative;
+    padding: 6px 12px;
+    cursor: pointer;
+    color: #ccc;
+    font-size: 14px;
+}
+
+.menu-item:hover {
+    background-color: #00ffcc33;
+    color: #fff;
+}
+
+.submenu-container {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background-color: #333;
+    border-radius: 3px;
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.7);
+    list-style: none;
+    min-width: 180px;
+    z-index: 2000;
+}
+
+.menu-item:hover .submenu-container {
+    display: block;
+}
+
+.submenu {
+    padding: 6px 14px;
+    cursor: pointer;
+    color: #ccc;
+    font-size: 13px;
+    user-select: none;
+}
+
+.submenu:hover {
+    background-color: #00ffcc33;
+    color: #fff;
+}
+
+/* Container de colunas */
+.panel-container {
+    flex: 1;
+    display: flex;
+    gap: 0px;
+    padding: 3px 0 3px 0px;
+    background: #333;
+    overflow: auto;
+    width: 100vw;
+    height: calc(100vh - 36px);
+}
+
+/* Colunas */
+.column {
+    flex: 1 1 0;
+    min-width: 150px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    position: relative;
+    overflow: auto;
+}
+
+.column-create-area {
+    flex: 0 0 5px;
+    border-radius: 3px;
+    /* border: 1px dashed #00ffcc33; */
+    display: flex;
+    position: relative;
+    overflow: auto;
+}
+.column-create-area.active {
+    border: 2px dashed #00ffcc;
+    background: #00ffcc33;
+}
+
+.column.resize-left .resize-bar,
+.column.resize-right .resize-bar {
+    position: absolute;
+    top: 0;
+    width: 3px;
+    height: 100%;
+    cursor: ew-resize;
+    z-index: 5;
+}
+
+.column.resize-left .resize-bar {
+    left: 0;
+}
+
+.column.resize-right .resize-bar {
+    right: 0;
+}
+
+.resize-bar:hover {
+    background-color: #00ffcc33;
+}
+
+/* Painéis */
+.panel {
+    background-color: #3a3a3a;
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    color: #ddd;
+    position: relative;
+    min-height: 100px;
+}
+
+.panel.dragging {
+    opacity: 0.6;
+}
+
+.panel.collapsed {
+    height: 26px !important;
+    min-height: 26px;
+}
+
+.panel-header {
+    background-color: #444;
+    display: flex;
+    align-items: center;
+    padding: 4px 6px;
+    gap: 6px;
+    border-bottom: 1px solid #555;
+    user-select: none;
+}
+.panel.collapsed .panel-header {
+    border: 0;
+}
+.panel-container > .column > div:nth-last-child(1 of .panel) {
+    flex-grow: 1;
+}
+
+.move-handle {
+    width: 14px;
+    height: 14px;
+    flex: 0 0 14px;
+    cursor: grab;
+    background: url('data:image/svg+xml;utf8,<svg fill="%23999" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="5" cy="5" r="2"/><circle cx="12" cy="5" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="12" cy="19" r="2"/><circle cx="19" cy="19" r="2"/></svg>')
+        no-repeat center center;
+    background-size: 12px 12px;
+    opacity: 0.7;
+}
+
+.move-handle:active {
+    cursor: grabbing;
+}
+
+.panel-title {
+    flex-grow: 1;
+    color: #eee;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    user-select: none;
+}
+
+.collapse-btn,
+.close-btn {
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #999;
+    user-select: none;
+    border-radius: 3px;
+    background: none;
+    transition: color 0.3s, background-color 0.3s;
+}
+
+.collapse-btn[disabled],
+.close-btn[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.collapse-btn:hover:not([disabled]),
+.close-btn:hover:not([disabled]),
+.collapse-btn:focus:not([disabled]),
+.close-btn:focus:not([disabled]) {
+    color: #ccc;
+}
+
+.collapse-btn:active:not([disabled]),
+.close-btn:active:not([disabled]) {
+    color: #fff;
+}
+
+.collapse-btn::before {
+    content: "−";
+    font-size: 18px;
+    line-height: 16px;
+}
+
+.close-btn::before {
+    content: "×";
+    font-size: 18px;
+    line-height: 16px;
+}
+
+.panel-content {
+    flex-grow: 1;
+    padding: 8px;
+    font-size: 14px;
+    color: #ccc;
+    overflow: auto;
+}
+
+.resize-handle {
+    height: 3px;
+    cursor: ns-resize;
+    background: #222;
+    transition: background-color 0.2s ease-in-out;
+}
+
+.resize-handle:hover {
+    background: #00ffcc33;
+}
+
+.resize-handle:active {
+    background: #00ffcc;
+}
+.panel-container > .column > div:nth-last-child(1 of .panel) > .resize-handle {
+    display: none;
+}
+
+/* Placeholder de drop */
+.panel-placeholder {
+    height: 60px;
+    margin: 0;
+    border: 2px dashed #00ffccaa;
+    background-color: #00ffcc22;
+    border-radius: 4px;
+}
+
+/* Scrollbars */
+.panel-container::-webkit-scrollbar,
+.panel-content::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.panel-container::-webkit-scrollbar-track,
+.panel-content::-webkit-scrollbar-track {
+    background: #111;
+}
+
+.panel-container::-webkit-scrollbar-thumb,
+.panel-content::-webkit-scrollbar-thumb {
+    background: #00ffccaa;
+    border-radius: 4px;
+}

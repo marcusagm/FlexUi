@@ -1,0 +1,39 @@
+{
+    "name": "flexui",
+    "description": "Um sistema de interfaces baseado em paneis reposicionaveis",
+    "version": "1.0.0",
+    "type": "module",
+    "main": "index.html",
+    "author": "Marcus Maia",
+    "license": "MIT",
+    "keywords": [
+        "ui",
+        "dashboard",
+        "panels",
+        "interface",
+        "app"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/marcusagm/CircuitSim.git"
+    },
+    "bugs": {
+        "url": "https://github.com/marcusagm/CircuitSim/issues"
+    },
+    "homepage": "https://github.com/marcusagm/CircuitSim#readme",
+    "devDependencies": {
+        "@eslint/js": "^9.38.0",
+        "eslint": "^9.38.0",
+        "eslint-config-prettier": "^10.1.8",
+        "eslint-plugin-prettier": "^5.5.4",
+        "eslint-plugin-react": "^7.37.5",
+        "globals": "^16.4.0",
+        "prettier": "^3.6.2"
+    },
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "lint": "eslint . --ext .js",
+        "lint:fix": "eslint . --ext .js --fix",
+        "format": "prettier --write \"**/*.{js,json,md}\""
+    }
+}
