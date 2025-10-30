@@ -1,26 +1,26 @@
-/**
- * Represents a submenu item in a menu.
- * @class
- *
- * @param {string} title - The text to display for the submenu item.
- * @param {Function} action - The callback function to execute when the submenu item is clicked.
- *
- * @property {HTMLLIElement} element - The DOM element representing the submenu item.
- */
+import { MenuItem } from './MenuItem.js';
+
 export class Submenu {
     /**
-     * Creates a submenu item element with the specified title and click action.
-     * @param {string} title - The text to display for the submenu item.
-     * @param {Function} action - The callback function to execute when the submenu item is clicked.
+     * @param {Array<Object>} childrenData - Um array de objetos de dados de menu para os filhos.
+     * @param {number} parentLevel - O nível de aninhamento do item pai.
      */
-    constructor(title, action) {
-        this.element = document.createElement('li');
-        this.element.classList.add('submenu');
-        this.element.textContent = title;
-        if (typeof action === 'function') {
-            this.element.addEventListener('click', action);
-        } else {
-            console.warn('Submenu action is not a function:', action);
-        }
+    constructor(childrenData, parentLevel) {
+        this.element = document.createElement('ul');
+        this.element.classList.add('submenu-container');
+
+        // Passa o nível do pai para garantir que os filhos sejam construídos corretamente
+        this.build(childrenData, parentLevel);
+    }
+
+    build(childrenData, parentLevel) {
+        // O nível dos filhos é o nível do pai + 1
+        const childLevel = parentLevel + 1;
+
+        childrenData.forEach(itemData => {
+            // A recursão ocorre aqui, passando o nível atualizado (childLevel)
+            const subItem = new MenuItem(itemData, childLevel);
+            this.element.appendChild(subItem.element);
+        });
     }
 }

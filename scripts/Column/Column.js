@@ -160,10 +160,16 @@ export class Column {
         const lastUncollapsedPanel = uncollapsedPanels[uncollapsedPanels.length - 1];
 
         this.state.panels.forEach(panel => {
+            // 1. Remove a classe de preenchimento de todos os painéis
             panel.element.classList.remove('panel--fills-space');
+
+            // 2. O Painel é instruído a aplicar sua altura fixa ou resetar
+            // (a complexa lógica de 'ser o último' foi removida do Panel)
             panel.updateHeight();
         });
 
+        // 3. Aplica a classe de preenchimento ao último painel visível,
+        // garantindo que ele ocupe todo o espaço restante via CSS.
         if (lastUncollapsedPanel && lastUncollapsedPanel.state.height === null) {
             lastUncollapsedPanel.element.classList.add('panel--fills-space');
         }
