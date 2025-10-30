@@ -1,6 +1,6 @@
-import Panel from '../Panel/Panel.js';
+import Column from './Column.js';
 
-class ColumnCreateArea {
+export default class ColumnCreateArea {
     state = {
         container: null
     };
@@ -20,36 +20,38 @@ class ColumnCreateArea {
 
     onDragOver(e) {
         e.preventDefault();
-        if (!Panel.dragged) return;
-        Panel.placeholder.parentElement?.removeChild(Panel.placeholder);
+        const draggedPanel = this.state.container.getDraggedPanel();
+        const placeholder = this.state.container.getPlaceholder();
+        if (!draggedPanel) return;
 
+        placeholder.parentElement?.removeChild(placeholder);
         this.element.classList.add('active');
     }
 
     onDragLeave(e) {
         e.preventDefault();
-        if (!Panel.dragged) return;
+        const draggedPanel = this.state.container.getDraggedPanel();
+        if (!draggedPanel) return;
         this.element.classList.remove('active');
     }
 
     onDrop(e) {
         e.preventDefault();
-        if (!Panel.dragged) return;
+        const draggedPanel = this.state.container.getDraggedPanel();
+        if (!draggedPanel) return;
+
         this.element.classList.remove('active');
+        const oldColumn = draggedPanel.state.column;
 
-        const oldColumn = Panel.dragged.state.column;
-        Panel.dragged.element.classList.remove('dragging');
+        // Encontra o índice deste CCA no array de children
+        const index = this.state.container.state.children.indexOf(this);
 
-        const index = this.state.container.getColumnCreateAreaPosition(this);
+        // Passa o `index` para o createColumn.
+        // O container saberá que deve inserir [COL, CCA] no `index + 1`.
         const newColumn = this.state.container.createColumn(null, index);
 
-        oldColumn.removePanel(Panel.dragged);
-        newColumn.addPanel(Panel.dragged);
+        oldColumn.removePanel(draggedPanel);
+        newColumn.addPanel(draggedPanel);
         newColumn.checkPanelsCollapsed();
-
-        Panel.placeholder = null;
-        Panel.dragged = null;
     }
 }
-
-export default ColumnCreateArea;

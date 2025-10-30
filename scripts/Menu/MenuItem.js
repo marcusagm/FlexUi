@@ -1,6 +1,6 @@
 import Submenu from './Submenu.js';
 
-class MenuItem {
+export default class MenuItem {
     /**
      * Creates a new MenuItem.
      * @param {string} title - The text to display as the menu item's title.
@@ -29,5 +29,3 @@ class MenuItem {
         this.submenuContainer.appendChild(sm.element);
     }
 }
-
-export default MenuItem;

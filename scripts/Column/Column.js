@@ -1,6 +1,4 @@
-import Panel from '../Panel/Panel.js';
-
-class Column {
+export default class Column {
     state = {
         container: null,
         panels: [],
@@ -24,13 +22,18 @@ class Column {
         this.element.addEventListener('drop', this.onDrop.bind(this));
     }
 
-    addResizeBars() {
+    /**
+     * Adiciona barras de redimensionamento.
+     * @param {boolean} isLast - Indica se esta é a última coluna no container.
+     */
+    addResizeBars(isLast) {
         // remove existing bars
         this.element.querySelectorAll('.resize-bar').forEach(b => b.remove());
         this.element.classList.remove('resize-right');
-        const cols = this.state.container.state.columns;
-        const idx = cols.findIndex(c => c.element === this.element);
-        if (idx === -1 || idx === cols.length - 1) return;
+
+        // A última coluna nunca tem uma barra de redimensionamento à direita
+        if (isLast) return;
+
         this.element.classList.add('resize-right');
         const bar = document.createElement('div');
         bar.classList.add('resize-bar');
@@ -40,9 +43,14 @@ class Column {
 
     startResize(e, side) {
         const container = this.state.container;
-        const cols = container.state.columns.map(c => c.element);
+
+        // Busca a lista de colunas do array unificado
+        const columns = container.state.children.filter(c => c instanceof Column);
+        const cols = columns.map(c => c.element);
+
         const idx = cols.indexOf(this.element);
         if (cols.length === 1 || idx === cols.length - 1) return;
+
         e.preventDefault();
         const startX = e.clientX;
         const startW = this.element.offsetWidth;
@@ -50,7 +58,7 @@ class Column {
         const onMove = ev => {
             const delta = ev.clientX - startX;
             this.state.width = Math.max(150, startW + delta);
-            this.updateWidth();
+            container.updateColumnsSizes(); // Chama o update do container
         };
         const onUp = () => {
             window.removeEventListener('mousemove', onMove);
@@ -60,12 +68,12 @@ class Column {
         window.addEventListener('mouseup', onUp);
     }
 
-    updateWidth() {
-        const container = this.state.container;
-
-        const cols = container.state.columns.map(c => c.element);
-        const idx = cols.indexOf(this.element);
-        if (cols.length === 1 || idx === cols.length - 1) {
+    /**
+     * Atualiza a largura da coluna.
+     * @param {boolean} isLast - Indica se esta é a última coluna no container.
+     */
+    updateWidth(isLast) {
+        if (isLast) {
             this.element.style.flex = `1 1 auto`;
             return;
         }
@@ -76,42 +84,43 @@ class Column {
 
     onDragOver(e) {
         e.preventDefault();
-        if (!Panel.dragged) return;
-        if (Panel.placeholder.parentElement !== this.element) {
-            Panel.placeholder.parentElement?.removeChild(Panel.placeholder);
-            this.element.appendChild(Panel.placeholder);
+        const draggedPanel = this.state.container.getDraggedPanel();
+        const placeholder = this.state.container.getPlaceholder();
+        if (!draggedPanel) return;
+
+        if (placeholder.parentElement !== this.element) {
+            placeholder.parentElement?.removeChild(placeholder);
+            this.element.appendChild(placeholder);
         }
         const panels = Array.from(this.element.querySelectorAll('.panel'));
         let placed = false;
         for (const ch of panels) {
             const rect = ch.getBoundingClientRect();
             if (e.clientY < rect.top + rect.height / 2) {
-                this.element.insertBefore(Panel.placeholder, ch);
+                this.element.insertBefore(placeholder, ch);
                 placed = true;
                 break;
             }
         }
-        if (!placed) this.element.appendChild(Panel.placeholder);
+        if (!placed) this.element.appendChild(placeholder);
     }
 
     onDrop(e) {
         e.preventDefault();
-        if (!Panel.dragged) return;
+        const draggedPanel = this.state.container.getDraggedPanel();
+        const placeholder = this.state.container.getPlaceholder();
+        if (!draggedPanel) return;
 
-        const oldColumn = Panel.dragged.state.column;
-        Panel.dragged.element.classList.remove('dragging');
-
+        const oldColumn = draggedPanel.state.column;
         const childrenArray = Array.from(this.element.children);
-        const idx = childrenArray.indexOf(Panel.placeholder);
-        Panel.placeholder.remove();
+        const idx = childrenArray.indexOf(placeholder);
+
+        // Remove de todos os lugares, depois adiciona
+        placeholder.remove();
+        oldColumn.removePanel(draggedPanel);
+        this.addPanel(draggedPanel, idx);
 
         this.updatePanelsSizes();
-        oldColumn.removePanel(Panel.dragged);
-
-        this.addPanel(Panel.dragged, idx);
-
-        Panel.placeholder = null;
-        Panel.dragged = null;
     }
 
     addPanel(panel, index = null) {
@@ -133,17 +142,11 @@ class Column {
     }
 
     getPanelsCollapsed() {
-        const col = this.element;
-        return Array.from(col.children).filter(
-            c => c.classList.contains('panel') && c.classList.contains('collapsed')
-        );
+        return this.state.panels.filter(p => p.state.collapsed);
     }
 
     getPanelsUncollapsed() {
-        const col = this.element;
-        return Array.from(col.children).filter(
-            c => c.classList.contains('panel') && !c.classList.contains('collapsed')
-        );
+        return this.state.panels.filter(p => !p.state.collapsed);
     }
 
     checkPanelsCollapsed() {
@@ -151,7 +154,7 @@ class Column {
         const totalPanels = this.getTotalPanels();
 
         this.state.panels.forEach(panel => {
-            const idx = collapsed.indexOf(panel.element);
+            const idx = collapsed.indexOf(panel);
             if (totalPanels === collapsed.length && idx === collapsed.length - 1) {
                 panel.unCollapse();
                 return;
@@ -161,6 +164,8 @@ class Column {
 
     removePanel(panel) {
         const index = this.getPanelIndex(panel);
+        if (index === -1) return; // Já foi removido
+
         this.state.panels.splice(index, 1);
         this.element.removeChild(panel.element);
 
@@ -169,6 +174,7 @@ class Column {
 
         this.checkPanelsCollapsed();
         if (this.getTotalPanels() === 0) {
+            // Esta chamada continua correta
             this.state.container.deleteColumn(this);
         }
     }
@@ -181,5 +187,3 @@ class Column {
         return this.state.panels.length;
     }
 }
-
-export default Column;

@@ -1,6 +1,6 @@
 import MenuItem from './MenuItem.js';
 
-class Menu {
+export default class Menu {
     constructor(app) {
         this.app = app;
         this.element = document.createElement('div');
@@ -40,5 +40,3 @@ class Menu {
         });
     }
 }
-
-export default Menu;

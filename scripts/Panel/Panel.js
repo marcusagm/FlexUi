@@ -1,10 +1,7 @@
-import PanelHeader from './PanelHeader.js';
 import PanelContent from './PanelContent.js';
+import PanelHeader from './PanelHeader.js';
 
-class Panel {
-    static dragged = null;
-    static placeholder = null;
-
+export default class Panel {
     state = {
         column: null,
         header: null,
@@ -14,8 +11,9 @@ class Panel {
         floater: false
     };
 
-    constructor(title, content, height = null, collapsed = false) {
-        this.state.content = new PanelContent(content);
+    constructor(title, height = null, collapsed = false) {
+        // Cria um wrapper de conteúdo VAZIO
+        this.state.content = new PanelContent();
         this.state.collapsed = collapsed;
         this.element = document.createElement('div');
         this.element.classList.add('panel');
@@ -24,6 +22,8 @@ class Panel {
             this.state.height = height;
         }
         this.build();
+        // Permite que subclasses preencham o conteúdo
+        this.populateContent();
     }
 
     build() {
@@ -39,12 +39,42 @@ class Panel {
         this.updateHeight();
     }
 
+    /**
+     * Método para subclasses preencherem o conteúdo.
+     * A classe base não faz nada.
+     */
+    populateContent() {
+        // Ex: this.state.content.element.innerHTML = 'Conteúdo Padrão';
+    }
+
+    /**
+     * Define o conteúdo HTML do painel.
+     * Usado para restaurar o estado.
+     * @param {string} htmlString
+     */
+    setContent(htmlString) {
+        this.state.content.element.innerHTML = htmlString;
+    }
+
+    /**
+     * Retorna o elemento DOM do conteúdo para subclasses.
+     * @returns {HTMLElement}
+     */
+    getContentElement() {
+        return this.state.content.element;
+    }
+
+    /**
+     * Retorna o tipo de painel, usado para salvar/restaurar.
+     * @returns {string}
+     */
+    getPanelType() {
+        return 'Panel';
+    }
+
     canCollapse() {
-        // Impede que o último painel seja colapsado
-        // if( this.state.column.getPanelIndex(this) === this.state.column.getTotalPanels() - 1 ) {
-        //   return false;
-        // }
-        return this.state.column.element.querySelectorAll('.panel:not(.collapsed)').length > 1;
+        if (!this.state.column) return false;
+        return this.state.column.getPanelsUncollapsed().length > 1;
     }
 
     setParentColumn(column) {
@@ -60,7 +90,7 @@ class Panel {
             }
             this.collapse();
         }
-        this.state.column.updatePanelsSizes();
+        this.state.column?.updatePanelsSizes();
     }
 
     updateCollapse() {
@@ -89,27 +119,18 @@ class Panel {
 
     close() {
         const column = this.state.column;
-        column.removePanel(this);
+        column?.removePanel(this);
     }
 
     updateHeight() {
         if (this.state.column !== null && this.state.collapsed === false) {
             const nonCollapsed = this.state.column.getPanelsUncollapsed();
-            const idx = nonCollapsed.indexOf(this.element);
+            const idx = nonCollapsed.indexOf(this);
 
             if (idx === nonCollapsed.length - 1) {
                 this.element.style.flex = '1 0 auto';
                 return;
             }
-        }
-
-        if (
-            this.state.collapsed === false &&
-            this.state.column !== null &&
-            this.state.column.getPanelIndex(this) === this.state.column.getTotalPanels() - 1
-        ) {
-            this.element.style.flex = '1 0 auto';
-            return;
         }
         if (this.state.height === null || this.state.collapsed === true) {
             this.element.style.flex = '0 0 auto';
@@ -143,5 +164,3 @@ class Panel {
         window.addEventListener('mouseup', onUp);
     }
 }
-
-export default Panel;

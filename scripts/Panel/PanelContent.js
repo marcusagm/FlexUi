@@ -1,9 +1,9 @@
-class PanelContent {
-    constructor(content) {
+export default class PanelContent {
+    constructor(content = null) {
         this.element = document.createElement('div');
         this.element.classList.add('panel-content');
-        this.element.innerHTML = content;
+        if (content) {
+            this.element.innerHTML = content;
+        }
     }
 }
-
-export default PanelContent;
