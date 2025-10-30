@@ -2,32 +2,41 @@ import { Menu } from './Menu/Menu.js';
 import { Container } from './Container.js';
 import { TextPanel } from './Panel/TextPanel.js';
 import { ToolbarPanel } from './Panel/ToolbarPanel.js';
-import { appBus } from './EventBus.js'; // NOVO
+import { appBus } from './EventBus.js';
+import { StateService } from './StateService.js';
+import { debounce } from './Debounce.js';
 
 export class App {
+    /**
+     * Implementa o padrão Singleton explícito.
+     */
     constructor() {
+        if (App.instance) {
+            return App.instance;
+        }
         App.instance = this;
-        // MODIFICADO: O Menu não precisa mais da instância do 'app'
+
         this.menu = new Menu();
         this.container = new Container();
+        this.stateService = new StateService(this.container);
+
         document.body.append(this.menu.element, this.container.element);
 
-        this.loadState();
-        window.addEventListener('resize', () => this.onResize());
-
-        // NOVO: App agora escuta os eventos
         this.initEventListeners();
+
+        this.stateService.loadState(this.initDefault.bind(this));
     }
 
-    // NOVO
     initEventListeners() {
         appBus.on('app:add-new-panel', this.addNewPanel.bind(this));
-        appBus.on('app:save-state', this.saveState.bind(this));
-        appBus.on('app:restore-state', this.restoreState.bind(this));
+
+        appBus.on('app:reinitialize-default-layout', this.initDefault.bind(this));
+
+        this.debouncedResize = debounce(this.onResizeHandler.bind(this), 200); // 200ms de atraso
+        window.addEventListener('resize', this.debouncedResize);
     }
 
     initDefault() {
-        // ... (nenhuma mudança aqui)
         const c1 = this.container.createColumn();
         c1.addPanel(new TextPanel('Painel de Texto 1', 'Este é um painel customizado.'));
         c1.addPanel(
@@ -41,32 +50,6 @@ export class App {
         this.container.updateColumnsSizes();
     }
 
-    loadState() {
-        // ... (nenhuma mudança aqui)
-        const saved = localStorage.getItem('panel_state');
-        if (saved) {
-            try {
-                this.container.restoreFromState(JSON.parse(saved));
-            } catch (e) {
-                console.error('Falha ao carregar estado, restaurando padrão.', e);
-                this.restoreState();
-            }
-        } else {
-            this.initDefault();
-        }
-    }
-
-    saveState() {
-        localStorage.setItem('panel_state', JSON.stringify(this.container.getState()));
-        alert('Estado salvo com sucesso!');
-    }
-
-    restoreState() {
-        localStorage.removeItem('panel_state');
-        this.container.clear();
-        this.initDefault();
-    }
-
     addNewPanel() {
         const column = this.container.getFirstColumn();
         const title = `Novo Painel (${new Date().toLocaleTimeString()})`;
@@ -74,11 +57,12 @@ export class App {
         column.addPanel(panel);
     }
 
-    onResize() {
-        this.container.state.children.forEach(column => {
-            if (column.updatePanelsSizes) {
-                column.updatePanelsSizes();
-            }
+    /**
+     * Manipulador de resize chamado pelo debounce.
+     */
+    onResizeHandler() {
+        this.container.getColumns().forEach(column => {
+            column.updatePanelsSizes();
         });
     }
 }

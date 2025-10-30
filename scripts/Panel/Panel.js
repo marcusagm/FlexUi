@@ -1,6 +1,6 @@
 import { PanelContent } from './PanelContent.js';
 import { PanelHeader } from './PanelHeader.js';
-import { appBus } from '../EventBus.js'; // NOVO
+import { appBus } from '../EventBus.js';
 
 export class Panel {
     state = {
@@ -9,7 +9,8 @@ export class Panel {
         content: null,
         collapsed: false,
         height: null,
-        floater: false
+        floater: false,
+        minHeight: 100
     };
 
     constructor(title, height = null, collapsed = false) {
@@ -17,40 +18,34 @@ export class Panel {
         this.state.collapsed = collapsed;
         this.element = document.createElement('div');
         this.element.classList.add('panel');
-        // MODIFICADO: Passa a instância do painel para o header
+
         this.state.header = new PanelHeader(this, title);
         if (height !== null) {
             this.state.height = height;
         }
+
         this.build();
         this.populateContent();
-
-        // NOVO: O Painel escuta por eventos direcionados a ele
         this.initEventListeners();
     }
 
-    // NOVO
     initEventListeners() {
-        // bind(this) é crucial para manter o 'this' correto
         appBus.on('panel:close-request', this.onCloseRequest.bind(this));
         appBus.on('panel:toggle-collapse-request', this.onToggleCollapseRequest.bind(this));
     }
 
-    // NOVO: Callback para o evento
     onCloseRequest(panel) {
         if (panel === this) {
             this.close();
         }
     }
 
-    // NOVO: Callback para o evento
     onToggleCollapseRequest(panel) {
         if (panel === this) {
             this.toggleCollapse();
         }
     }
 
-    // NOVO: Limpa os ouvintes quando o painel é destruído
     destroy() {
         appBus.off('panel:close-request', this.onCloseRequest.bind(this));
         appBus.off('panel:toggle-collapse-request', this.onToggleCollapseRequest.bind(this));
@@ -70,8 +65,7 @@ export class Panel {
     }
 
     /**
-     * Método para subclasses preencherem o conteúdo.
-     * A classe base não faz nada.
+     * @abstract
      */
     populateContent() {
         // Ex: this.state.content.element.innerHTML = 'Conteúdo Padrão';
@@ -148,50 +142,45 @@ export class Panel {
     }
 
     close() {
-        // MODIFICADO: Emite um evento em vez de chamar a coluna
         appBus.emit('panel:removed', { panel: this, column: this.state.column });
-        // NOVO: Limpa seus próprios ouvintes
         this.destroy();
     }
 
     updateHeight() {
-        if (this.state.column !== null && this.state.collapsed === false) {
-            const nonCollapsed = this.state.column.getPanelsUncollapsed();
-            const idx = nonCollapsed.indexOf(this);
-
-            if (idx === nonCollapsed.length - 1) {
-                this.element.style.flex = '1 0 auto';
-                return;
-            }
-        }
-        if (this.state.height === null || this.state.collapsed === true) {
+        if (this.state.collapsed) {
+            this.element.style.height = 'auto';
             this.element.style.flex = '0 0 auto';
+            this.element.classList.add('collapsed');
             return;
         }
+
+        this.element.classList.remove('collapsed');
+
         if (this.state.height !== null) {
-            this.element.style.flex = '0 0 ' + this.state.height + 'px';
+            this.element.style.height = `${this.state.height}px`;
+            this.element.style.flex = '0 0 auto';
+        } else {
+            this.element.style.height = 'auto';
+            this.element.style.flex = '0 0 auto';
         }
     }
 
     startResize(e) {
-        const col = this.element.parentElement;
-        const nonCollapsed = Array.from(col.children).filter(
-            c => c.classList.contains('panel') && !c.classList.contains('collapsed')
-        );
-        if (nonCollapsed.length < 2) return;
         e.preventDefault();
-        const panelEl = this.element;
         const startY = e.clientY;
-        const startH = panelEl.offsetHeight;
+        const startH = this.element.offsetHeight;
+
         const onMove = ev => {
-            const newH = Math.max(100, startH + ev.clientY - startY);
-            this.state.height = newH;
-            this.updateHeight();
+            const delta = ev.clientY - startY;
+            this.state.height = Math.max(this.state.minHeight, startH + delta);
+            this.state.column?.updatePanelsSizes();
         };
+
         const onUp = () => {
             window.removeEventListener('mousemove', onMove);
             window.removeEventListener('mouseup', onUp);
         };
+
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
     }

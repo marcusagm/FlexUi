@@ -14,28 +14,21 @@ export class Column {
         this.state.width = width;
         this.initDragDrop();
 
-        // NOVO: A Coluna escuta por painéis sendo removidos
         this.initEventListeners();
     }
 
-    // NOVO
     initEventListeners() {
-        // Ouve quando um painel é removido
         appBus.on('panel:removed', this.onPanelRemoved.bind(this));
     }
 
-    // NOVO: Callback para o evento 'panel:removed'
     onPanelRemoved({ panel, column }) {
-        // Se o painel removido pertencia a esta coluna
         if (column === this) {
-            this.removePanel(panel);
+            this.removePanel(panel, true);
         }
     }
 
-    // NOVO: Limpa os ouvintes quando a coluna é destruída
     destroy() {
         appBus.off('panel:removed', this.onPanelRemoved.bind(this));
-        // Destrói também todos os painéis filhos
         [...this.state.panels].forEach(panel => panel.destroy());
     }
 
@@ -53,11 +46,9 @@ export class Column {
      * @param {boolean} isLast - Indica se esta é a última coluna no container.
      */
     addResizeBars(isLast) {
-        // remove existing bars
         this.element.querySelectorAll('.resize-bar').forEach(b => b.remove());
         this.element.classList.remove('resize-right');
 
-        // A última coluna nunca tem uma barra de redimensionamento à direita
         if (isLast) return;
 
         this.element.classList.add('resize-right');
@@ -70,7 +61,6 @@ export class Column {
     startResize(e, side) {
         const container = this.state.container;
 
-        // Busca a lista de colunas do array unificado
         const columns = container.state.children.filter(c => c instanceof Column);
         const cols = columns.map(c => c.element);
 
@@ -84,7 +74,7 @@ export class Column {
         const onMove = ev => {
             const delta = ev.clientX - startX;
             this.state.width = Math.max(150, startW + delta);
-            container.updateColumnsSizes(); // Chama o update do container
+            container.updateColumnsSizes();
         };
         const onUp = () => {
             window.removeEventListener('mousemove', onMove);
@@ -131,9 +121,6 @@ export class Column {
         if (!placed) this.element.appendChild(placeholder);
     }
 
-    // MODIFICADO: A lógica de 'onDrop' é complexa e já fala com 'container'
-    // pelo 'draggedPanel', o que é aceitável. A mudança principal é
-    // que 'oldColumn.removePanel' é agora síncrono e não mais acoplado.
     onDrop(e) {
         e.preventDefault();
         const draggedPanel = this.state.container.getDraggedPanel();
@@ -146,10 +133,7 @@ export class Column {
 
         placeholder.remove();
 
-        // MODIFICADO: Em vez de chamar removePanel de outra coluna,
-        // emitimos o evento. Mas o 'draggedPanel' já está sendo
-        // movido, então podemos simplesmente removê-lo da coluna antiga.
-        oldColumn.removePanel(draggedPanel, false); // Passa 'false' para não emitir 'empty'
+        oldColumn.removePanel(draggedPanel, true);
 
         this.addPanel(draggedPanel, idx);
         this.updatePanelsSizes();
@@ -167,10 +151,22 @@ export class Column {
         this.updatePanelsSizes();
     }
 
+    /**
+     * Atualiza o tamanho e o estado flexível dos painéis na coluna.
+     * Esta é a lógica de preenchimento de espaço.
+     */
     updatePanelsSizes() {
+        const uncollapsedPanels = this.getPanelsUncollapsed();
+        const lastUncollapsedPanel = uncollapsedPanels[uncollapsedPanels.length - 1];
+
         this.state.panels.forEach(panel => {
+            panel.element.classList.remove('panel--fills-space');
             panel.updateHeight();
         });
+
+        if (lastUncollapsedPanel && lastUncollapsedPanel.state.height === null) {
+            lastUncollapsedPanel.element.classList.add('panel--fills-space');
+        }
     }
 
     getPanelsCollapsed() {
@@ -207,10 +203,9 @@ export class Column {
         this.element.removeChild(panel.element);
         panel.setParentColumn(null);
 
-        this.updatePanelsSizes();
         this.checkPanelsCollapsed();
+        this.updatePanelsSizes();
 
-        // MODIFICADO: Emite um evento em vez de chamar o container
         if (emitEmpty && this.getTotalPanels() === 0) {
             appBus.emit('column:empty', this);
         }

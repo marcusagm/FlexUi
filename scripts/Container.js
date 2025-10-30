@@ -1,7 +1,7 @@
 import { Column } from './Column/Column.js';
 import { ColumnCreateArea } from './Column/ColumnCreateArea.js';
 import { createPanel } from './Panel/PanelFactory.js';
-import { appBus } from './EventBus.js'; // NOVO
+import { appBus } from './EventBus.js';
 
 export class Container {
     state = {
@@ -9,7 +9,6 @@ export class Container {
         children: []
     };
 
-    // Estado de Drag-and-Drop centralizado
     draggedPanel = null;
     placeholder = null;
 
@@ -19,38 +18,27 @@ export class Container {
         this.placeholder = document.createElement('div');
         this.placeholder.classList.add('panel-placeholder');
         this.clear();
-
-        // NOVO: O Container escuta os eventos de alto nível
         this.initEventListeners();
     }
 
-    // NOVO
     initEventListeners() {
-        // Ouve quando uma coluna fica vazia para poder deletá-la
         appBus.on('column:empty', this.onColumnEmpty.bind(this));
-
-        // Ouve os eventos de arrastar que vêm do PanelHeader
         appBus.on('panel:dragstart', this.onPanelDragStart.bind(this));
         appBus.on('panel:dragend', this.onPanelDragEnd.bind(this));
     }
 
-    // NOVO: Callback para o evento
     onColumnEmpty(column) {
         this.deleteColumn(column);
     }
 
-    // NOVO: Callback para o evento
     onPanelDragStart({ panel, event }) {
         this.startDrag(panel, event);
     }
 
-    // NOVO: Callback para o evento
     onPanelDragEnd() {
         this.endDrag();
     }
 
-    // --- Métodos de Gerenciamento de Drag-and-Drop ---
-    // MODIFICADO: Renomeados para onPanelDragStart/End
     startDrag(panel, e) {
         this.draggedPanel = panel;
         e.dataTransfer.setData('text/plain', '');
@@ -73,8 +61,6 @@ export class Container {
     getPlaceholder() {
         return this.placeholder;
     }
-
-    // --- Métodos de Gerenciamento de Colunas (Refatorados) ---
 
     /**
      * Atualiza as barras de redimensionamento de todas as colunas.
@@ -133,7 +119,6 @@ export class Container {
         if (index === -1) return;
         if (!(this.state.children[index] instanceof Column)) return;
 
-        // NOVO: Chama o 'destroy' da coluna para limpar seus ouvintes
         column.destroy();
 
         const columnEl = this.state.children[index].element;
@@ -177,8 +162,6 @@ export class Container {
             column.updateWidth(idx === columns.length - 1); // Passa 'isLast'
         });
     }
-
-    // --- Métodos de Estado (Save/Load) (Corretos) ---
 
     getState() {
         return this.getColumns().map(column => ({

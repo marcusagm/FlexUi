@@ -25,15 +25,14 @@ class EventBus {
      */
     off(eventName, callback) {
         if (!this.listeners.has(eventName)) {
-            return; // Ninguém ouvindo este evento
+            return;
         }
 
         const eventListeners = this.listeners.get(eventName);
-        // Filtra, mantendo todos os listeners EXCETO o callback a ser removido
         const filteredListeners = eventListeners.filter(listener => listener !== callback);
 
         if (filteredListeners.length === 0) {
-            this.listeners.delete(eventName); // Limpa se for o último
+            this.listeners.delete(eventName);
         } else {
             this.listeners.set(eventName, filteredListeners);
         }
@@ -46,15 +45,14 @@ class EventBus {
      */
     emit(eventName, ...args) {
         if (!this.listeners.has(eventName)) {
-            return; // Ninguém ouvindo, não faz nada
+            return;
         }
-        console.info('Evento:' + eventName);
+        console.info('Evento: ' + eventName);
 
         // Itera sobre uma cópia, caso um callback modifique a lista (ex: `off`)
         const listeners = [...this.listeners.get(eventName)];
         for (const callback of listeners) {
             try {
-                // Chama o callback com os argumentos passados
                 callback(...args);
             } catch (e) {
                 console.error(`Erro no ouvinte do evento "${eventName}":`, e);
@@ -70,9 +68,7 @@ class EventBus {
     once(eventName, callback) {
         // Cria um callback wrapper
         const wrapperCallback = (...args) => {
-            // 1. Chama o callback original
             callback(...args);
-            // 2. Remove a si mesmo
             this.off(eventName, wrapperCallback);
         };
         // 3. Registra o wrapper

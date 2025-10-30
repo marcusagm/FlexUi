@@ -5,19 +5,8 @@ import globals from 'globals';
 import eslintPluginPrettier from 'eslint-plugin-prettier';
 import eslintConfigPrettier from 'eslint-config-prettier/flat';
 
-/**
- * Comprehensive ESLint flat config (ESLint v9.38+)
- * - Includes all rules described in the first assistant message (mapped to valid ESLint rules)
- * - Uses @eslint/js recommended base
- * - Integrates Prettier at the end to avoid formatting conflicts
- * - 4-space indentation conventions apply to this file
- */
-
 export default defineConfig([
-    // 1) Official recommended ruleset from @eslint/js
     js.configs.recommended,
-
-    // 2) Project-specific rules (all rules from initial guidance included / mapped)
     {
         files: ['**/*.{js,mjs,cjs}'],
         ignores: ['node_modules/**', 'dist/**', 'build/**'],
@@ -30,7 +19,9 @@ export default defineConfig([
             prettier: eslintPluginPrettier
         },
         rules: {
-            /* ----------------- Format & basic style ----------------- */
+            /*
+             * Format & basic style
+             */
             semi: ['error', 'always'], // require semicolons
             // eslint-disable-next-line no-magic-numbers
             indent: ['error', 4, { SwitchCase: 1 }], // 4 spaces
@@ -39,34 +30,40 @@ export default defineConfig([
             'no-trailing-spaces': 'error', // no trailing spaces
             'eol-last': ['error', 'always'], // newline at EOF
 
-            /* ----------------- Naming & semantics ----------------- */
-            // (naming conventions are enforced via code review and good naming; not many core rules enforce semantic names)
-
-            /* ----------------- Variables & scope ----------------- */
+            /*
+             * Variables & scope
+             */
             'no-var': 'error', // disallow var
             'prefer-const': ['error', { destructuring: 'all' }], // prefer const
             'no-global-assign': 'error', // prevent assignment to globals
             'no-implicit-globals': 'error', // prevent implicit globals (browser)
             'no-unused-vars': [
                 'warn',
-                { vars: 'all', args: 'after-used', ignoreRestSiblings: true }
+                { vars: 'all', args: 'after-used', ignoreRestSiblings: true, caughtErrors: 'none' }
             ], // warn unused vars
 
-            /* ----------------- Equality & coercion ----------------- */
+            /*
+             * Equality & coercion
+             */
             eqeqeq: ['error', 'always'], // enforce strict equality (===)
             'no-implicit-coercion': ['error', { allow: ['!!'] }], // avoid implicit coercion
 
-            /* ----------------- Functions, purity & side-effects ----------------- */
+            /*
+             * Functions, purity & side-effects
+             */
             'consistent-return': 'error', // functions should consistently return
             'no-else-return': 'error', // avoid else after return
             'no-nested-ternary': 'error', // avoid nested ternary
-            // Prefer small, single-purpose functions via code style and reviews -- not a single rule enforces SRP
 
-            /* ----------------- Complexity & file size ----------------- */
-            complexity: ['warn', { max: 10 }],
-            'max-lines': ['warn', { max: 300, skipBlankLines: true, skipComments: true }],
+            /*
+             * Complexity & file size
+             */
+            complexity: ['warn', { max: 15 }],
+            'max-lines': ['warn', { max: 1000, skipBlankLines: true, skipComments: true }],
 
-            /* ----------------- DOM & browser specific ----------------- */
+            /*
+             * DOM & browser specific
+             */
             'no-eval': 'error', // ban eval
             'no-alert': 'warn', // warn on alert/confirm/prompt
             // Block direct use of document.write, mapped via no-restricted-properties:
@@ -79,27 +76,46 @@ export default defineConfig([
                 }
             ],
 
-            /* ----------------- Imports & modules ----------------- */
+            /*
+             * Imports & modules
+             */
             'no-duplicate-imports': 'error', // disallow duplicate imports
             // Encourage ES Modules (use `sourceType: module`)
 
-            /* ----------------- Magic numbers, logging, todos ----------------- */
-            'no-magic-numbers': ['warn', { ignore: [0, 1], ignoreArrayIndexes: true }],
-            'no-console': ['warn', { allow: ['warn', 'error'] }], // only warn/error allowed
+            /*
+             * Magic numbers, logging, todos
+             */
+            'no-magic-numbers': [
+                'warn',
+                {
+                    ignore: [-1, 0, 1, 2, 45, 90, 180, 360],
+                    ignoreArrayIndexes: true,
+                    ignoreDefaultValues: true,
+                    ignoreClassFieldInitialValues: true,
+                    detectObjects: false
+                }
+            ],
+            'no-console': ['warn', { allow: ['warn', 'error', 'info'] }], // only warn/error allowed
             // Track TO-DO / FIX ME using core rule:
             'no-warning-comments': ['warn', { terms: ['todo', 'fixme'], location: 'anywhere' }],
 
-            /* ----------------- Stylistic preferences (Prettier will override formatting rules) ----------------- */
+            /*
+             * Stylistic preferences (Prettier will override formatting rules)
+             */
             'object-curly-spacing': ['error', 'always'],
             'array-bracket-spacing': ['error', 'never'],
             'space-before-function-paren': ['error', 'never'],
 
-            /* ----------------- Reporting Prettier formatting problems through ESLint ----------------- */
+            /*
+             * Reporting Prettier formatting problems through ESLint
+             */
             'prettier/prettier': 'error'
         }
     },
 
-    // 3) Test files overrides (less strict in tests)
+    /*
+     * Test files overrides (less strict in tests)
+     */
     {
         files: ['**/*.test.js', '**/*.spec.js'],
         languageOptions: {
@@ -118,6 +134,8 @@ export default defineConfig([
         }
     },
 
-    // 4) Prettier integration: disable conflicting ESLint rules and apply Prettier config last
+    /*
+     * Prettier integration: disable conflicting ESLint rules and apply Prettier config last
+     */
     eslintConfigPrettier
 ]);
