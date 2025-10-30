@@ -14,6 +14,11 @@ export class Column {
         this.state.width = width;
         this.initDragDrop();
 
+        // O local onde addResizeBars é chamado deve ser verificado para garantir
+        // que painéis e resize-bars estejam na ordem desejada no DOM.
+        // Assumindo que addResizeBars existe e adiciona os elementos ao this.element.
+        // this.addResizeBars();
+
         this.initEventListeners();
     }
 
@@ -104,21 +109,38 @@ export class Column {
         const placeholder = this.state.container.getPlaceholder();
         if (!draggedPanel) return;
 
+        const oldColumn = draggedPanel.state.column;
+        const originalIndex = oldColumn.getPanelIndex(draggedPanel);
+
         if (placeholder.parentElement !== this.element) {
             placeholder.parentElement?.removeChild(placeholder);
             this.element.appendChild(placeholder);
         }
+
         const panels = Array.from(this.element.querySelectorAll('.panel'));
         let placed = false;
-        for (const ch of panels) {
+        let dropIndex = panels.length;
+
+        for (let i = 0; i < panels.length; i++) {
+            const ch = panels[i];
             const rect = ch.getBoundingClientRect();
             if (e.clientY < rect.top + rect.height / 2) {
                 this.element.insertBefore(placeholder, ch);
                 placed = true;
+                dropIndex = i;
                 break;
             }
         }
-        if (!placed) this.element.appendChild(placeholder);
+        if (!placed) {
+            this.element.appendChild(placeholder);
+        }
+        const isSameColumn = oldColumn === this;
+        const isOriginalPosition = dropIndex === originalIndex;
+        const isBelowGhost = dropIndex === originalIndex + 1;
+
+        if (isSameColumn && (isOriginalPosition || isBelowGhost)) {
+            placeholder.remove();
+        }
     }
 
     onDrop(e) {
@@ -128,48 +150,89 @@ export class Column {
         if (!draggedPanel) return;
 
         const oldColumn = draggedPanel.state.column;
-        const childrenArray = Array.from(this.element.children);
-        const idx = childrenArray.indexOf(placeholder);
+
+        if (placeholder.parentElement !== this.element) {
+            const originalIndex = oldColumn.getPanelIndex(draggedPanel);
+
+            draggedPanel.state.height = null;
+            oldColumn.updatePanelsSizes();
+            return;
+        }
+
+        const allChildren = Array.from(this.element.children);
+        let panelIndex = 0;
+        for (const child of allChildren) {
+            if (child === placeholder) {
+                break;
+            }
+            if (child.classList.contains('panel')) {
+                panelIndex++;
+            }
+        }
+
+        const originalIndex = oldColumn.getPanelIndex(draggedPanel);
 
         placeholder.remove();
 
-        oldColumn.removePanel(draggedPanel, true);
+        if (
+            oldColumn === this &&
+            (panelIndex === originalIndex || panelIndex === originalIndex + 1)
+        ) {
+            draggedPanel.state.height = null;
+            oldColumn.updatePanelsSizes();
+            return;
+        }
 
-        this.addPanel(draggedPanel, idx);
-        this.updatePanelsSizes();
+        draggedPanel.state.height = null;
+
+        oldColumn.removePanel(draggedPanel, true);
+        this.addPanel(draggedPanel, panelIndex);
     }
 
+    /**
+     * Adiciona um painel à coluna.
+     */
     addPanel(panel, index = null) {
         if (index === null) {
             this.state.panels.push(panel);
             this.element.appendChild(panel.element);
         } else {
             this.state.panels.splice(index, 0, panel);
-            this.element.insertBefore(panel.element, this.element.children[index]);
+
+            const nextSiblingPanel = this.state.panels[index + 1];
+            const nextSiblingElement = nextSiblingPanel ? nextSiblingPanel.element : null;
+
+            this.element.insertBefore(panel.element, nextSiblingElement);
         }
         panel.setParentColumn(this);
+
+        if (this.getTotalPanels() === 1) {
+            panel.state.height = null;
+        }
+        this.checkPanelsCollapsed();
         this.updatePanelsSizes();
     }
 
     /**
-     * Atualiza o tamanho e o estado flexível dos painéis na coluna.
-     * Esta é a lógica de preenchimento de espaço.
+     * Gerencia a lógica de preenchimento de espaço (flex: 1).
+     * Garante que o último painel visível sempre preencha o espaço (height=null).
      */
     updatePanelsSizes() {
         const uncollapsedPanels = this.getPanelsUncollapsed();
         const lastUncollapsedPanel = uncollapsedPanels[uncollapsedPanels.length - 1];
 
         this.state.panels.forEach(panel => {
-            // 1. Remove a classe de preenchimento de todos os painéis
             panel.element.classList.remove('panel--fills-space');
+        });
 
-            // 2. O Painel é instruído a aplicar sua altura fixa ou resetar
-            // (a complexa lógica de 'ser o último' foi removida do Panel)
+        if (lastUncollapsedPanel) {
+            lastUncollapsedPanel.state.height = null;
+        }
+
+        this.state.panels.forEach(panel => {
             panel.updateHeight();
         });
 
-        // 3. Aplica a classe de preenchimento ao último painel visível,
-        // garantindo que ele ocupe todo o espaço restante via CSS.
         if (lastUncollapsedPanel && lastUncollapsedPanel.state.height === null) {
             lastUncollapsedPanel.element.classList.add('panel--fills-space');
         }
@@ -183,31 +246,28 @@ export class Column {
         return this.state.panels.filter(p => !p.state.collapsed);
     }
 
+    /**
+     * Garante que a coluna nunca esteja totalmente colapsada.
+     */
     checkPanelsCollapsed() {
-        const collapsed = this.getPanelsCollapsed();
-        const totalPanels = this.getTotalPanels();
+        const uncollapsed = this.getPanelsUncollapsed().length;
+        const total = this.getTotalPanels();
 
-        this.state.panels.forEach(panel => {
-            const idx = collapsed.indexOf(panel);
-            if (totalPanels === collapsed.length && idx === collapsed.length - 1) {
-                panel.unCollapse();
-                return;
-            }
-        });
+        if (uncollapsed === 0 && total > 0) {
+            this.state.panels[total - 1].unCollapse();
+        }
     }
 
-    /**
-     * Remove o painel do estado e DOM desta coluna.
-     * @param {Panel} panel - O painel a ser removido.
-     * @param {boolean} [emitEmpty=true] - Se deve emitir 'column:empty' se ficar vazia.
-     */
     removePanel(panel, emitEmpty = true) {
         const index = this.getPanelIndex(panel);
         if (index === -1) return;
 
         this.state.panels.splice(index, 1);
-        this.element.removeChild(panel.element);
         panel.setParentColumn(null);
+
+        if (this.element.contains(panel.element)) {
+            this.element.removeChild(panel.element);
+        }
 
         this.checkPanelsCollapsed();
         this.updatePanelsSizes();

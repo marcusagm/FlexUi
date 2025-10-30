@@ -18,6 +18,7 @@ export class Container {
         this.placeholder = document.createElement('div');
         this.placeholder.classList.add('panel-placeholder');
         this.clear();
+
         this.initEventListeners();
     }
 
@@ -94,11 +95,9 @@ export class Container {
             const targetElement = this.element.children[insertionIndex] || null;
 
             if (targetElement) {
-                // Insere antes do próximo elemento
                 this.element.insertBefore(column.element, targetElement);
                 this.element.insertBefore(newCCA.element, targetElement);
             } else {
-                // O alvo era o último CCA, então apenas anexa
                 this.element.appendChild(column.element);
                 this.element.appendChild(newCCA.element);
             }
@@ -131,9 +130,6 @@ export class Container {
         this.updateAllResizeBars();
     }
 
-    /**
-     * Retorna todas as instâncias de Coluna.
-     */
     getColumns() {
         return this.state.children.filter(c => c instanceof Column);
     }
@@ -144,7 +140,6 @@ export class Container {
 
     getFirstColumn() {
         const columns = this.getColumns();
-        // Se não houver colunas, cria uma (que também criará um par [COL, CCA])
         return columns[0] || this.createColumn();
     }
 
@@ -180,10 +175,8 @@ export class Container {
         this.clear(); // Começa com [CCA0]
 
         state.forEach(colData => {
-            // Chama createColumn(width, null) que anexa [COL, CCA]
             const column = this.createColumn(colData.width);
 
-            // Lógica de restauração de painel (sem alteração)
             colData.panels.forEach(panelData => {
                 if (panelData.height === undefined || panelData.height === '') {
                     panelData.height = null;
@@ -201,11 +194,9 @@ export class Container {
             });
         });
 
-        // Ajusta a largura das colunas restauradas
         const columns = this.getColumns();
         columns.forEach((col, idx) => {
             if (idx < state.length - 1) {
-                // A última coluna é flexível
                 col.element.style.flex = `0 0 ${state[idx].width}px`;
             }
         });

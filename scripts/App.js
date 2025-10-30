@@ -7,9 +7,6 @@ import { StateService } from './StateService.js';
 import { debounce } from './Debounce.js';
 
 export class App {
-    /**
-     * Implementa o padrão Singleton explícito.
-     */
     constructor() {
         if (App.instance) {
             return App.instance;
@@ -18,6 +15,7 @@ export class App {
 
         this.menu = new Menu();
         this.container = new Container();
+
         this.stateService = new StateService(this.container);
 
         document.body.append(this.menu.element, this.container.element);
@@ -27,6 +25,7 @@ export class App {
         this.stateService.loadState(this.initDefault.bind(this));
     }
 
+    // NOVO
     initEventListeners() {
         appBus.on('app:add-new-panel', this.addNewPanel.bind(this));
 
