@@ -1,8 +1,9 @@
-import MenuItem from './MenuItem.js';
+import { MenuItem } from './MenuItem.js';
+import { appBus } from '../EventBus.js'; // NOVO
 
-export default class Menu {
-    constructor(app) {
-        this.app = app;
+export class Menu {
+    // MODIFICADO: Não precisa mais do 'app'
+    constructor() {
         this.element = document.createElement('div');
         this.element.classList.add('menu');
         this.build();
@@ -15,7 +16,8 @@ export default class Menu {
                 actions: [
                     {
                         title: 'Adicionar novo painel',
-                        fn: () => this.app.addNewPanel()
+                        // MODIFICADO: Emite um evento
+                        fn: () => appBus.emit('app:add-new-panel')
                     }
                 ]
             },
@@ -24,11 +26,13 @@ export default class Menu {
                 actions: [
                     {
                         title: 'Salvar estado atual',
-                        fn: () => this.app.saveState()
+                        // MODIFICADO: Emite um evento
+                        fn: () => appBus.emit('app:save-state')
                     },
                     {
                         title: 'Restaurar estado',
-                        fn: () => this.app.restoreState()
+                        // MODIFICADO: Emite um evento
+                        fn: () => appBus.emit('app:restore-state')
                     }
                 ]
             }

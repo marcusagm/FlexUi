@@ -1,13 +1,13 @@
-import Panel from './Panel.js';
-import TextPanel from './TextPanel.js';
-import ToolbarPanel from './ToolbarPanel.js';
+import { Panel } from './Panel.js';
+import { TextPanel } from './TextPanel.js';
+import { ToolbarPanel } from './ToolbarPanel.js';
 
 /**
  * Cria uma instância de Painel baseada nos dados salvos.
  * @param {object} panelData - O objeto de estado salvo para o painel.
  * @returns {Panel} Uma instância da subclasse de Painel correta.
  */
-export default function createPanel(panelData) {
+export function createPanel(panelData) {
     const { type, title, height, collapsed } = panelData;
 
     switch (type) {

@@ -1,6 +1,4 @@
-import Column from './Column.js';
-
-export default class ColumnCreateArea {
+export class ColumnCreateArea {
     state = {
         container: null
     };

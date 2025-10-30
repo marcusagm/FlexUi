@@ -1,6 +1,6 @@
-import Panel from './Panel.js';
+import { Panel } from './Panel.js';
 
-export default class TextPanel extends Panel {
+export class TextPanel extends Panel {
     constructor(title, initialText, height = null, collapsed = false) {
         super(title, height, collapsed);
         // O construtor base chama this.populateContent(),

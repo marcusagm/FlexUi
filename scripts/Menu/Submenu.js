@@ -7,7 +7,7 @@
  *
  * @property {HTMLLIElement} element - The DOM element representing the submenu item.
  */
-export default class Submenu {
+export class Submenu {
     /**
      * Creates a submenu item element with the specified title and click action.
      * @param {string} title - The text to display for the submenu item.

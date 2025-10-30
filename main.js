@@ -1,4 +1,4 @@
-import App from './scripts/App.js';
+import { App } from './scripts/App.js';
 
 window.addEventListener('DOMContentLoaded', () => {
     try {

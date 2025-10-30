@@ -1,7 +1,8 @@
-import PanelContent from './PanelContent.js';
-import PanelHeader from './PanelHeader.js';
+import { PanelContent } from './PanelContent.js';
+import { PanelHeader } from './PanelHeader.js';
+import { appBus } from '../EventBus.js'; // NOVO
 
-export default class Panel {
+export class Panel {
     state = {
         column: null,
         header: null,
@@ -12,18 +13,47 @@ export default class Panel {
     };
 
     constructor(title, height = null, collapsed = false) {
-        // Cria um wrapper de conteúdo VAZIO
         this.state.content = new PanelContent();
         this.state.collapsed = collapsed;
         this.element = document.createElement('div');
         this.element.classList.add('panel');
+        // MODIFICADO: Passa a instância do painel para o header
         this.state.header = new PanelHeader(this, title);
         if (height !== null) {
             this.state.height = height;
         }
         this.build();
-        // Permite que subclasses preencham o conteúdo
         this.populateContent();
+
+        // NOVO: O Painel escuta por eventos direcionados a ele
+        this.initEventListeners();
+    }
+
+    // NOVO
+    initEventListeners() {
+        // bind(this) é crucial para manter o 'this' correto
+        appBus.on('panel:close-request', this.onCloseRequest.bind(this));
+        appBus.on('panel:toggle-collapse-request', this.onToggleCollapseRequest.bind(this));
+    }
+
+    // NOVO: Callback para o evento
+    onCloseRequest(panel) {
+        if (panel === this) {
+            this.close();
+        }
+    }
+
+    // NOVO: Callback para o evento
+    onToggleCollapseRequest(panel) {
+        if (panel === this) {
+            this.toggleCollapse();
+        }
+    }
+
+    // NOVO: Limpa os ouvintes quando o painel é destruído
+    destroy() {
+        appBus.off('panel:close-request', this.onCloseRequest.bind(this));
+        appBus.off('panel:toggle-collapse-request', this.onToggleCollapseRequest.bind(this));
     }
 
     build() {
@@ -118,8 +148,10 @@ export default class Panel {
     }
 
     close() {
-        const column = this.state.column;
-        column?.removePanel(this);
+        // MODIFICADO: Emite um evento em vez de chamar a coluna
+        appBus.emit('panel:removed', { panel: this, column: this.state.column });
+        // NOVO: Limpa seus próprios ouvintes
+        this.destroy();
     }
 
     updateHeight() {

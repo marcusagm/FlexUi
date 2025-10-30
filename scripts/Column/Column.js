@@ -1,4 +1,6 @@
-export default class Column {
+import { appBus } from '../EventBus.js'; // NOVO
+
+export class Column {
     state = {
         container: null,
         panels: [],
@@ -11,6 +13,30 @@ export default class Column {
         this.element.classList.add('column');
         this.state.width = width;
         this.initDragDrop();
+
+        // NOVO: A Coluna escuta por painéis sendo removidos
+        this.initEventListeners();
+    }
+
+    // NOVO
+    initEventListeners() {
+        // Ouve quando um painel é removido
+        appBus.on('panel:removed', this.onPanelRemoved.bind(this));
+    }
+
+    // NOVO: Callback para o evento 'panel:removed'
+    onPanelRemoved({ panel, column }) {
+        // Se o painel removido pertencia a esta coluna
+        if (column === this) {
+            this.removePanel(panel);
+        }
+    }
+
+    // NOVO: Limpa os ouvintes quando a coluna é destruída
+    destroy() {
+        appBus.off('panel:removed', this.onPanelRemoved.bind(this));
+        // Destrói também todos os painéis filhos
+        [...this.state.panels].forEach(panel => panel.destroy());
     }
 
     setParentContainer(container) {
@@ -105,6 +131,9 @@ export default class Column {
         if (!placed) this.element.appendChild(placeholder);
     }
 
+    // MODIFICADO: A lógica de 'onDrop' é complexa e já fala com 'container'
+    // pelo 'draggedPanel', o que é aceitável. A mudança principal é
+    // que 'oldColumn.removePanel' é agora síncrono e não mais acoplado.
     onDrop(e) {
         e.preventDefault();
         const draggedPanel = this.state.container.getDraggedPanel();
@@ -115,11 +144,14 @@ export default class Column {
         const childrenArray = Array.from(this.element.children);
         const idx = childrenArray.indexOf(placeholder);
 
-        // Remove de todos os lugares, depois adiciona
         placeholder.remove();
-        oldColumn.removePanel(draggedPanel);
-        this.addPanel(draggedPanel, idx);
 
+        // MODIFICADO: Em vez de chamar removePanel de outra coluna,
+        // emitimos o evento. Mas o 'draggedPanel' já está sendo
+        // movido, então podemos simplesmente removê-lo da coluna antiga.
+        oldColumn.removePanel(draggedPanel, false); // Passa 'false' para não emitir 'empty'
+
+        this.addPanel(draggedPanel, idx);
         this.updatePanelsSizes();
     }
 
@@ -162,20 +194,25 @@ export default class Column {
         });
     }
 
-    removePanel(panel) {
+    /**
+     * Remove o painel do estado e DOM desta coluna.
+     * @param {Panel} panel - O painel a ser removido.
+     * @param {boolean} [emitEmpty=true] - Se deve emitir 'column:empty' se ficar vazia.
+     */
+    removePanel(panel, emitEmpty = true) {
         const index = this.getPanelIndex(panel);
-        if (index === -1) return; // Já foi removido
+        if (index === -1) return;
 
         this.state.panels.splice(index, 1);
         this.element.removeChild(panel.element);
-
         panel.setParentColumn(null);
-        this.updatePanelsSizes();
 
+        this.updatePanelsSizes();
         this.checkPanelsCollapsed();
-        if (this.getTotalPanels() === 0) {
-            // Esta chamada continua correta
-            this.state.container.deleteColumn(this);
+
+        // MODIFICADO: Emite um evento em vez de chamar o container
+        if (emitEmpty && this.getTotalPanels() === 0) {
+            appBus.emit('column:empty', this);
         }
     }
 

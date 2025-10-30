@@ -1,6 +1,6 @@
-import Panel from './Panel.js';
+import { Panel } from './Panel.js';
 
-export default class ToolbarPanel extends Panel {
+export class ToolbarPanel extends Panel {
     constructor(title, height = null, collapsed = false) {
         // super() chama this.populateContent() automaticamente
         super(title, height, collapsed);

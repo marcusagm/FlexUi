@@ -1,8 +1,9 @@
-import Column from './Column/Column.js';
-import ColumnCreateArea from './Column/ColumnCreateArea.js';
-import createPanel from './Panel/PanelFactory.js';
+import { Column } from './Column/Column.js';
+import { ColumnCreateArea } from './Column/ColumnCreateArea.js';
+import { createPanel } from './Panel/PanelFactory.js';
+import { appBus } from './EventBus.js'; // NOVO
 
-export default class Container {
+export class Container {
     state = {
         // Estrutura: [CCA0, COL1, CCA1, COL2, CCA2, ...]
         children: []
@@ -15,17 +16,41 @@ export default class Container {
     constructor() {
         this.element = document.createElement('div');
         this.element.classList.add('panel-container');
-
-        // Placeholder para o "arrastar"
         this.placeholder = document.createElement('div');
         this.placeholder.classList.add('panel-placeholder');
-
-        // Inicializa o container com a primeira área de criação
         this.clear();
+
+        // NOVO: O Container escuta os eventos de alto nível
+        this.initEventListeners();
+    }
+
+    // NOVO
+    initEventListeners() {
+        // Ouve quando uma coluna fica vazia para poder deletá-la
+        appBus.on('column:empty', this.onColumnEmpty.bind(this));
+
+        // Ouve os eventos de arrastar que vêm do PanelHeader
+        appBus.on('panel:dragstart', this.onPanelDragStart.bind(this));
+        appBus.on('panel:dragend', this.onPanelDragEnd.bind(this));
+    }
+
+    // NOVO: Callback para o evento
+    onColumnEmpty(column) {
+        this.deleteColumn(column);
+    }
+
+    // NOVO: Callback para o evento
+    onPanelDragStart({ panel, event }) {
+        this.startDrag(panel, event);
+    }
+
+    // NOVO: Callback para o evento
+    onPanelDragEnd() {
+        this.endDrag();
     }
 
     // --- Métodos de Gerenciamento de Drag-and-Drop ---
-    // (Nenhuma mudança nesta seção)
+    // MODIFICADO: Renomeados para onPanelDragStart/End
     startDrag(panel, e) {
         this.draggedPanel = panel;
         e.dataTransfer.setData('text/plain', '');
@@ -104,31 +129,18 @@ export default class Container {
      * Exclui uma coluna e seu CCA subsequente.
      */
     deleteColumn(column) {
-        // Encontra a coluna no array unificado
         const index = this.state.children.indexOf(column);
+        if (index === -1) return;
+        if (!(this.state.children[index] instanceof Column)) return;
 
-        if (index === -1) {
-            console.warn('Tentativa de excluir coluna que não foi encontrada.', column);
-            return;
-        }
+        // NOVO: Chama o 'destroy' da coluna para limpar seus ouvintes
+        column.destroy();
 
-        // Garante que o item no índice é uma Coluna (e não o CCA inicial)
-        if (!(this.state.children[index] instanceof Column)) {
-            console.error('Tentativa de excluir item que não é uma coluna.', column);
-            return;
-        }
-
-        // Remove a Coluna (no índice) e o ColumnCreateArea (no índice + 1)
         const columnEl = this.state.children[index].element;
         const createAreaEl = this.state.children[index + 1].element;
-
-        // 1. Remove do DOM
         if (columnEl) this.element.removeChild(columnEl);
         if (createAreaEl) this.element.removeChild(createAreaEl);
-
-        // 2. Remove do Estado (2 itens)
         this.state.children.splice(index, 2);
-
         column.setParentContainer(null);
         this.updateColumnsSizes();
         this.updateAllResizeBars();

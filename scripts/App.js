@@ -1,37 +1,48 @@
-import Menu from './Menu/Menu.js';
-import Container from './Container.js';
-import TextPanel from './Panel/TextPanel.js';
-import ToolbarPanel from './Panel/ToolbarPanel.js';
+import { Menu } from './Menu/Menu.js';
+import { Container } from './Container.js';
+import { TextPanel } from './Panel/TextPanel.js';
+import { ToolbarPanel } from './Panel/ToolbarPanel.js';
+import { appBus } from './EventBus.js'; // NOVO
 
-export default class App {
+export class App {
     constructor() {
         App.instance = this;
-        this.menu = new Menu(this);
+        // MODIFICADO: O Menu não precisa mais da instância do 'app'
+        this.menu = new Menu();
         this.container = new Container();
         document.body.append(this.menu.element, this.container.element);
+
         this.loadState();
         window.addEventListener('resize', () => this.onResize());
+
+        // NOVO: App agora escuta os eventos
+        this.initEventListeners();
+    }
+
+    // NOVO
+    initEventListeners() {
+        appBus.on('app:add-new-panel', this.addNewPanel.bind(this));
+        appBus.on('app:save-state', this.saveState.bind(this));
+        appBus.on('app:restore-state', this.restoreState.bind(this));
     }
 
     initDefault() {
-        // Usa os novos painéis customizados
+        // ... (nenhuma mudança aqui)
         const c1 = this.container.createColumn();
         c1.addPanel(new TextPanel('Painel de Texto 1', 'Este é um painel customizado.'));
         c1.addPanel(
             new TextPanel('Painel de Texto 2', 'O conteúdo é gerenciado pela subclasse.', 200)
         );
-
         const c2 = this.container.createColumn();
         c2.addPanel(new ToolbarPanel('Barra de Ferramentas'));
-        c2.addPanel(new TextPanel('Painel 3', 'Mais um painel de texto.', null, true)); // collapsed
-
+        c2.addPanel(new TextPanel('Painel 3', 'Mais um painel de texto.', null, true));
         const c3 = this.container.createColumn();
         c3.addPanel(new TextPanel('Painel 4', 'Conteúdo do painel 4.'));
-
         this.container.updateColumnsSizes();
     }
 
     loadState() {
+        // ... (nenhuma mudança aqui)
         const saved = localStorage.getItem('panel_state');
         if (saved) {
             try {
@@ -64,8 +75,10 @@ export default class App {
     }
 
     onResize() {
-        this.container.state.columns.forEach(column => {
-            column.updatePanelsSizes();
+        this.container.state.children.forEach(column => {
+            if (column.updatePanelsSizes) {
+                column.updatePanelsSizes();
+            }
         });
     }
 }
