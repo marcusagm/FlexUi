@@ -58,11 +58,9 @@ export class Panel {
         return this.state.header ? this.state.header.element.offsetHeight : 0;
     }
 
-    // NOVO: Calcula a altura mínima total do painel (Conteúdo Mínimo + Altura do Header).
+    // Calcula a altura mínima total do painel (Conteúdo Mínimo + Altura do Header).
     getMinPanelHeight() {
         const headerHeight = this.getHeaderHeight();
-        // Usamos Math.max para garantir que o minHeight do conteúdo seja pelo menos 0,
-        // caso alguém o defina como negativo.
         return Math.max(0, this.state.minHeight) + headerHeight;
     }
 
@@ -106,7 +104,6 @@ export class Panel {
         }
 
         this.updateCollapse();
-        this.updateHeight();
     }
 
     /**
@@ -208,7 +205,7 @@ export class Panel {
 
         this.element.classList.remove('collapsed');
 
-        // FIX CRÍTICO: Aplica min-height aqui na inicialização e atualização
+        // Aplica min-height aqui na inicialização e atualização
         const minPanelHeight = this.getMinPanelHeight();
         this.element.style.minHeight = `${minPanelHeight}px`;
 

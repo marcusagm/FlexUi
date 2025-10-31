@@ -9,6 +9,7 @@ export class Container {
         children: []
     };
 
+    // Estado de Drag-and-Drop centralizado
     draggedPanel = null;
     placeholder = null;
 
@@ -19,27 +20,37 @@ export class Container {
         this.placeholder.classList.add('panel-placeholder');
         this.clear();
 
+        // NOVO: O Container escuta os eventos de alto nível
         this.initEventListeners();
     }
 
+    // NOVO
     initEventListeners() {
+        // Ouve quando uma coluna fica vazia para poder deletá-la
         appBus.on('column:empty', this.onColumnEmpty.bind(this));
+
+        // Ouve os eventos de arrastar que vêm do PanelHeader
         appBus.on('panel:dragstart', this.onPanelDragStart.bind(this));
         appBus.on('panel:dragend', this.onPanelDragEnd.bind(this));
     }
 
+    // NOVO: Callback para o evento
     onColumnEmpty(column) {
         this.deleteColumn(column);
     }
 
+    // NOVO: Callback para o evento
     onPanelDragStart({ panel, event }) {
         this.startDrag(panel, event);
     }
 
+    // NOVO: Callback para o evento
     onPanelDragEnd() {
         this.endDrag();
     }
 
+    // --- Métodos de Gerenciamento de Drag-and-Drop ---
+    // MODIFICADO: Renomeados para onPanelDragStart/End
     startDrag(panel, e) {
         this.draggedPanel = panel;
         e.dataTransfer.setData('text/plain', '');
@@ -62,6 +73,8 @@ export class Container {
     getPlaceholder() {
         return this.placeholder;
     }
+
+    // --- Métodos de Gerenciamento de Colunas (Refatorados) ---
 
     /**
      * Atualiza as barras de redimensionamento de todas as colunas.
@@ -95,9 +108,11 @@ export class Container {
             const targetElement = this.element.children[insertionIndex] || null;
 
             if (targetElement) {
+                // Insere antes do próximo elemento
                 this.element.insertBefore(column.element, targetElement);
                 this.element.insertBefore(newCCA.element, targetElement);
             } else {
+                // O alvo era o último CCA, então apenas anexa
                 this.element.appendChild(column.element);
                 this.element.appendChild(newCCA.element);
             }
@@ -118,6 +133,7 @@ export class Container {
         if (index === -1) return;
         if (!(this.state.children[index] instanceof Column)) return;
 
+        // NOVO: Chama o 'destroy' da coluna para limpar seus ouvintes
         column.destroy();
 
         const columnEl = this.state.children[index].element;
@@ -130,6 +146,9 @@ export class Container {
         this.updateAllResizeBars();
     }
 
+    /**
+     * Retorna todas as instâncias de Coluna.
+     */
     getColumns() {
         return this.state.children.filter(c => c instanceof Column);
     }
@@ -140,6 +159,7 @@ export class Container {
 
     getFirstColumn() {
         const columns = this.getColumns();
+        // Se não houver colunas, cria uma (que também criará um par [COL, CCA])
         return columns[0] || this.createColumn();
     }
 
@@ -158,14 +178,16 @@ export class Container {
         });
     }
 
+    // --- Métodos de Estado (Save/Load) (Corrigidos) ---
+
     getState() {
         return this.getColumns().map(column => ({
             width: column.state.width,
             panels: column.state.panels.map(panel => ({
                 type: panel.getPanelType(),
-                title: panel.state.header.state.title,
+                title: panel.state.title,
                 content: panel.state.content.element.innerHTML,
-                height: panel.state.height,
+                height: panel.state.height, // Valor salvo em startResize
                 collapsed: panel.state.collapsed
             }))
         }));
@@ -176,27 +198,35 @@ export class Container {
 
         state.forEach(colData => {
             const column = this.createColumn(colData.width);
+            const panelsToRestore = []; // Array temporário para painéis
 
+            // 1. Constrói todos os painéis e define seus estados (height/collapsed)
             colData.panels.forEach(panelData => {
                 if (panelData.height === undefined || panelData.height === '') {
                     panelData.height = null;
                 }
                 const panel = createPanel(panelData);
                 panel.setContent(panelData.content);
-                panel.state.height = panelData.height;
+                panel.state.height = panelData.height; // Aplica a altura salva (FIX CRÍTICO)
                 panel.state.collapsed = panelData.collapsed;
-                panel.updateCollapse();
-                column.addPanel(panel);
+                panel.updateCollapse(); // Isso já chama updateHeight e aplica minHeight
+
+                panelsToRestore.push(panel);
             });
 
-            column.state.panels.forEach(panel => {
-                panel.updateHeight();
-            });
+            // 2. FIX CRÍTICO: Adiciona todos os painéis de uma vez,
+            // chamando updatePanelsSizes SOMENTE no final,
+            // garantindo que as alturas fixas sejam respeitadas.
+            if (panelsToRestore.length > 0) {
+                column.addPanelsBulk(panelsToRestore);
+            }
         });
 
+        // Ajusta a largura das colunas restauradas
         const columns = this.getColumns();
         columns.forEach((col, idx) => {
             if (idx < state.length - 1) {
+                // A última coluna é flexível
                 col.element.style.flex = `0 0 ${state[idx].width}px`;
             }
         });
