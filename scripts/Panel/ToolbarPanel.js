@@ -2,8 +2,13 @@ import { Panel } from './Panel.js';
 
 export class ToolbarPanel extends Panel {
     constructor(title, height = null, collapsed = false) {
-        // super() chama this.populateContent() automaticamente
-        super(title, height, collapsed);
+        // PASSANDO A CONFIGURAÇÃO PARA O CONSTRUTOR BASE (FIX CRÍTICO)
+        super(title, height, collapsed, {
+            closable: false,
+            collapsible: false,
+            movable: false,
+            minHeight: 50
+        });
     }
 
     /**
@@ -32,16 +37,7 @@ export class ToolbarPanel extends Panel {
         return 'ToolbarPanel';
     }
 
-    /**
-     * Ao restaurar o estado, o setContent() do painel base
-     * irá sobrescrever o conteúdo.
-     * Para painéis como este, que se autoconstroem,
-     * podemos sobrescrever setContent() para não fazer nada.
-     */
     setContent(htmlString) {
         // Não faz nada. O painel se recria sozinho.
-        // Se quiséssemos salvar o *estado* dos botões,
-        // o `getState` e `restoreState` seriam mais complexos.
-        // Para este exemplo, apenas recriamos o padrão.
     }
 }

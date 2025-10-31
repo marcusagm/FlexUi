@@ -1,7 +1,5 @@
 # Tasks
 
-- [ ] Conferir código da pasta de um outro projeto chamdo AppUI.
-
 ## Layout
 
 - [x] Deve ter o tema escuro, semelhante ao photoshop.
@@ -22,7 +20,7 @@
     - Salvar estado atual: Salva no local store o estado atual do container guardando as informações das colunas e paineis, como quais paineis são, posição e tamanho.
     - Restaurar estado: Volta para o estado inicial da interface.
 
-- [ ] Permitir submenus multi nível
+- [x] Permitir submenus multi nível
 
 ## Paineis
 
@@ -39,9 +37,9 @@
 - [x] A altura mínima do painel é de 100px caso não esteja colapsado.
 - [x] Ao fechar um painel ele deve ser removido por completo.
 - [ ] Agrupar paineis em abas
-- [ ] Possibilitar proibir paineis de serem fechados
-- [ ] Possibilitar proibir paineis de serem colapsados
-- [ ] Permitir Paineis sem título
+- [x] Possibilitar proibir paineis de serem fechados
+- [x] Possibilitar proibir paineis de serem colapsados
+- [x] Permitir Paineis sem título
 - [ ] Paineis flutuantes
 - [ ] Permitir transformar paineis flutuantes em fixos
 - [ ] Permitir agrupamento de paineis flutuantes

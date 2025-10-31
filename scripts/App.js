@@ -46,6 +46,7 @@ export class App {
         c2.addPanel(new TextPanel('Painel 3', 'Mais um painel de texto.', null, true));
         const c3 = this.container.createColumn();
         c3.addPanel(new TextPanel('Painel 4', 'Conteúdo do painel 4.'));
+        c3.addPanel(new ToolbarPanel());
         this.container.updateColumnsSizes();
     }
 

@@ -10,16 +10,40 @@ export class Panel {
         collapsed: false,
         height: null,
         floater: false,
-        minHeight: 100
+        minHeight: 100, // minHeight representa a altura mínima do CONTEÚDO
+        closable: true,
+        collapsible: true,
+        movable: true,
+        hasTitle: true,
+        title: null
     };
 
-    constructor(title, height = null, collapsed = false) {
+    constructor(title, height = null, collapsed = false, config = {}) {
+        // 1. APLICA CONFIGURAÇÃO
+        Object.assign(this.state, config);
+
         this.state.content = new PanelContent();
         this.state.collapsed = collapsed;
         this.element = document.createElement('div');
         this.element.classList.add('panel');
 
-        this.state.header = new PanelHeader(this, title);
+        const panelTitle = title !== undefined && title !== null ? String(title) : '';
+        this.state.hasTitle = panelTitle.length > 0;
+        this.state.title = panelTitle;
+
+        // 2. CRIAÇÃO CONDICIONAL DO HEADER
+        if (
+            this.state.movable ||
+            this.state.hasTitle ||
+            this.state.collapsible ||
+            this.state.closable
+        ) {
+            this.state.header = new PanelHeader(this, panelTitle);
+        } else {
+            this.state.header = null;
+            this.element.classList.add('panel--no-header');
+        }
+
         if (height !== null) {
             this.state.height = height;
         }
@@ -27,6 +51,19 @@ export class Panel {
         this.build();
         this.populateContent();
         this.initEventListeners();
+    }
+
+    // Calcula a altura do cabeçalho (0 se não houver).
+    getHeaderHeight() {
+        return this.state.header ? this.state.header.element.offsetHeight : 0;
+    }
+
+    // NOVO: Calcula a altura mínima total do painel (Conteúdo Mínimo + Altura do Header).
+    getMinPanelHeight() {
+        const headerHeight = this.getHeaderHeight();
+        // Usamos Math.max para garantir que o minHeight do conteúdo seja pelo menos 0,
+        // caso alguém o defina como negativo.
+        return Math.max(0, this.state.minHeight) + headerHeight;
     }
 
     initEventListeners() {
@@ -55,11 +92,19 @@ export class Panel {
         this.resizeHandle = document.createElement('div');
         this.resizeHandle.classList.add('resize-handle');
         this.resizeHandle.addEventListener('mousedown', this.startResize.bind(this));
-        this.element.append(
-            this.state.header.element,
-            this.state.content.element,
-            this.resizeHandle
-        );
+
+        // ADIÇÃO CONDICIONAL DO HEADER
+        if (this.state.header) {
+            this.element.appendChild(this.state.header.element);
+        }
+
+        this.element.append(this.state.content.element, this.resizeHandle);
+
+        // Adiciona classe para desabilitar o movimento no CSS, se não for movível
+        if (!this.state.movable) {
+            this.element.classList.add('panel--not-movable');
+        }
+
         this.updateCollapse();
         this.updateHeight();
     }
@@ -96,16 +141,19 @@ export class Panel {
         return 'Panel';
     }
 
-    canCollapse() {
-        if (!this.state.column) return false;
-        return this.state.column.getPanelsUncollapsed().length > 1;
-    }
-
     setParentColumn(column) {
         this.state.column = column;
     }
 
+    canCollapse() {
+        if (!this.state.column) return false;
+        if (!this.state.collapsible) return false;
+        return this.state.column.getPanelsUncollapsed().length > 1;
+    }
+
     toggleCollapse() {
+        if (!this.state.collapsible) return;
+
         if (this.state.collapsed) {
             this.unCollapse();
         } else {
@@ -142,24 +190,35 @@ export class Panel {
     }
 
     close() {
+        if (!this.state.closable) return;
+
         appBus.emit('panel:removed', { panel: this, column: this.state.column });
         this.destroy();
     }
 
     updateHeight() {
         if (this.state.collapsed) {
+            // Colapsado: altura automática (só o header)
             this.element.style.height = 'auto';
             this.element.style.flex = '0 0 auto';
             this.element.classList.add('collapsed');
+            this.element.style.minHeight = 'auto'; // Reset minHeight quando colapsado
             return;
         }
 
         this.element.classList.remove('collapsed');
 
+        // FIX CRÍTICO: Aplica min-height aqui na inicialização e atualização
+        const minPanelHeight = this.getMinPanelHeight();
+        this.element.style.minHeight = `${minPanelHeight}px`;
+
         if (this.state.height !== null) {
+            // Altura fixa definida: usa a altura e não cresce
             this.element.style.height = `${this.state.height}px`;
             this.element.style.flex = '0 0 auto';
         } else {
+            // Altura dinâmica: permite que o CSS decida se a classe 'panel--fills-space'
+            // deve fazer o painel crescer, mas por padrão é 'auto'.
             this.element.style.height = 'auto';
             this.element.style.flex = '0 0 auto';
         }
@@ -170,9 +229,12 @@ export class Panel {
         const startY = e.clientY;
         const startH = this.element.offsetHeight;
 
+        // Usa o novo método auxiliar para o limite
+        const minPanelHeight = this.getMinPanelHeight();
+
         const onMove = ev => {
             const delta = ev.clientY - startY;
-            this.state.height = Math.max(this.state.minHeight, startH + delta);
+            this.state.height = Math.max(minPanelHeight, startH + delta);
             this.state.column?.updatePanelsSizes();
         };
 

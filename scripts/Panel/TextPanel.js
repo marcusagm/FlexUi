@@ -2,10 +2,9 @@ import { Panel } from './Panel.js';
 
 export class TextPanel extends Panel {
     constructor(title, initialText, height = null, collapsed = false) {
-        super(title, height, collapsed);
-        // O construtor base chama this.populateContent(),
-        // mas podemos adicionar lógica extra aqui ou
-        // simplesmente definir o conteúdo inicial.
+        // Passa a configuração vazia {} como 4º argumento (FIX CRÍTICO)
+        super(title, height, collapsed, {});
+
         this.getContentElement().textContent = initialText;
     }
 
