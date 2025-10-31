@@ -5,6 +5,9 @@ import { ToolbarPanel } from './Panel/ToolbarPanel.js';
 import { appBus } from './EventBus.js';
 import { StateService } from './StateService.js';
 import { debounce } from './Debounce.js';
+import { appNotifications } from './Services/Notification.js';
+import { NotificationUIListener } from './Services/NotificationUIListener.js';
+import { TranslationService } from './Services/TranslationService.js';
 
 export class App {
     constructor() {
@@ -23,6 +26,9 @@ export class App {
         this.initEventListeners();
 
         this.stateService.loadState(this.initDefault.bind(this));
+
+        const uiListener = new NotificationUIListener(document.body);
+        uiListener.listen(appNotifications);
     }
 
     // NOVO
@@ -48,6 +54,9 @@ export class App {
         c3.addPanel(new TextPanel('Painel 4', 'Conteúdo do painel 4.'));
         c3.addPanel(new ToolbarPanel());
         this.container.updateColumnsSizes();
+
+        const i18n = TranslationService.getInstance();
+        appNotifications.success(i18n.translate('appstate.restore'));
     }
 
     addNewPanel() {

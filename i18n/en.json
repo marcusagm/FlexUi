@@ -1,0 +1,22 @@
+{
+    "greetings": {
+        "hello": "Hello, {name}!"
+    },
+    "actions": {
+        "cancel": "Cancel",
+        "save": "Save"
+    },
+    "appstate": {
+        "save": "Workspace saved!",
+        "restore": "Workspace restored!"
+    },
+    "panels": {
+        "menu": "Panels",
+        "add": "New panel"
+    },
+    "workspace": {
+        "menu": "Workspace",
+        "save": "Save workspace",
+        "restore": "Restore workspace"
+    }
+}

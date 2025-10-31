@@ -1,0 +1,235 @@
+/* === 1. Containers === */
+/* Posiciona os containers em locais fixos */
+.notification-container {
+    position: fixed;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    max-width: 350px; /* Largura máxima do toast */
+}
+
+/* Espaçamento entre notificações */
+.notification-container .notification {
+    margin-bottom: 10px;
+}
+
+/* Posições */
+.notification-container--top-right {
+    top: 20px;
+    right: 20px;
+}
+.notification-container--top-left {
+    top: 20px;
+    left: 20px;
+}
+.notification-container--top-center {
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+.notification-container--bottom-right {
+    bottom: 20px;
+    right: 20px;
+}
+.notification-container--bottom-left {
+    bottom: 20px;
+    left: 20px;
+}
+.notification-container--bottom-center {
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+/* === 2. Notificação Base (Toast/Snackbar) === */
+.notification {
+    display: flex;
+    align-items: flex-start; /* Alinha ícone e conteúdo */
+    background: #333;
+    color: white;
+    padding: 15px;
+    border-radius: 5px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    min-width: 280px;
+}
+
+/* === 3. Variantes (Toast vs Snackbar) === */
+/* Apenas um exemplo; podem ser iguais ou diferentes */
+.notification--toast {
+    /* Estilo padrão (acima) */
+}
+.notification--snackbar {
+    /* Snackbars geralmente ficam embaixo e são mais largos */
+    min-width: 320px;
+    background: #222;
+}
+
+/* === 4. Tipos (Cores) === */
+.notification--info {
+    background: #007bff;
+    color: white;
+}
+.notification--success {
+    background: #28a745;
+    color: white;
+}
+.notification--warning {
+    background: #ffc107;
+    color: #333;
+}
+.notification--danger {
+    background: #dc3545;
+    color: white;
+}
+
+/* === 5. Elementos Internos === */
+.notification__icon-wrapper {
+    margin-right: 12px;
+    font-size: 1.2em; /* Torna o ícone um pouco maior */
+    padding-top: 2px; /* Alinhamento vertical */
+}
+
+.notification__content {
+    flex-grow: 1; /* Ocupa o espaço restante */
+}
+
+.notification__message {
+    margin: 0;
+    padding: 0;
+    line-height: 1.4;
+}
+
+.notification__buttons {
+    display: flex;
+    justify-content: flex-end; /* Alinha botões à direita */
+    margin-top: 10px;
+}
+
+.notification__button {
+    background: transparent;
+    border: none;
+    color: inherit; /* Herda a cor do tipo (ex: branco no 'danger') */
+    font-weight: bold;
+    text-transform: uppercase;
+    padding: 5px 10px;
+    margin-left: 8px;
+    cursor: pointer;
+    opacity: 0.8;
+}
+
+/* Destaque para botões OK/Cancel */
+.notification__button--ok,
+.notification__button--cancel {
+    opacity: 1;
+}
+
+.notification__button:hover {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.notification--warning .notification__button {
+    color: #333; /* Garante legibilidade no fundo amarelo */
+}
+.notification--warning .notification__button:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.notification__close-button {
+    background: transparent;
+    border: none;
+    color: inherit;
+    font-size: 1.5em;
+    line-height: 0.5;
+    padding: 5px;
+    margin-left: 10px;
+    cursor: pointer;
+    opacity: 0.7;
+}
+.notification__close-button:hover {
+    opacity: 1;
+}
+
+/* === 6. Animações === */
+.notification {
+    transition:
+        opacity 0.3s ease,
+        transform 0.3s ease;
+    opacity: 0;
+    transform: translateY(20px);
+}
+
+.notification-container--top-center .notification,
+.notification-container--top-left .notification,
+.notification-container--top-right .notification {
+    transform: translateY(-20px);
+}
+
+/* Estado de entrada */
+.notification.is-entering {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Estado de saída */
+.notification.is-exiting {
+    opacity: 0;
+    transform: translateY(20px); /* Ou de volta para cima, dependendo da posição */
+}
+
+/* =================================================================== */
+/* == ÍCONES DE NOTIFICAÇÃO (SVG MASK)                             == */
+/* =================================================================== */
+
+/**
+ * Classe base para todos os ícones.
+ * Define o tamanho e usa a cor do texto (currentColor) como a cor
+ * de preenchimento do ícone.
+ */
+.icon {
+    display: inline-block;
+    /* Tamanho do ícone. Use 'em' para escalar com o font-size do pai */
+    width: 1.2em;
+    height: 1.2em;
+    vertical-align: middle;
+
+    /* Cor do ícone - herda a cor do texto (ex: 'color: white') */
+    background-color: currentColor;
+
+    /* Propriedades da Máscara (o SVG define a forma) */
+    -webkit-mask-size: 100% 100%;
+    mask-size: 100% 100%;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
+}
+
+/**
+ * Define a FORMA de cada ícone usando um SVG embutido como máscara.
+ * O 'fill' no SVG não importa, pois estamos usando-o como máscara.
+ */
+
+/* Ícone INFO: (Círculo com 'i') */
+.icon-info-circle {
+    -webkit-mask-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z'/%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z'/%3E%3C/svg%3E");
+}
+
+/* Ícone SUCCESS: (Círculo com 'check') */
+.icon-check-circle {
+    -webkit-mask-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM9.29 16.29L5.7 12.7c-.39-.39-.39-1.02 0-1.41.39-.39 1.02-.39 1.41 0L10 14.17l6.88-6.88c.39-.39 1.02-.39 1.41 0 .39.39.39 1.02 0 1.41l-7.59 7.59c-.38.39-1.02.39-1.41 0z'/%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM9.29 16.29L5.7 12.7c-.39-.39-.39-1.02 0-1.41.39-.39 1.02-.39 1.41 0L10 14.17l6.88-6.88c.39-.39 1.02-.39 1.41 0 .39.39.39 1.02 0 1.41l-7.59 7.59c-.38.39-1.02.39-1.41 0z'/%3E%3C/svg%3E");
+}
+
+/* Ícone WARNING: (Triângulo com '!') */
+.icon-warning-triangle {
+    -webkit-mask-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z'/%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z'/%3E%3C/svg%3E");
+}
+
+/* Ícone DANGER/ERROR: (Círculo com 'X') */
+.icon-error-circle {
+    -webkit-mask-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z'/%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z'/%3E%3C/svg%3E");
+}

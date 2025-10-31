@@ -1,0 +1,22 @@
+{
+    "greetings": {
+        "hello": "Bem-vindo, {name}!"
+    },
+    "actions": {
+        "cancel": "Cancelar",
+        "save": "Salvar"
+    },
+    "appstate": {
+        "save": "Área de trabalho salva!",
+        "restore": "Área de trabalho restaurada!"
+    },
+    "panels": {
+        "menu": "Painéis",
+        "add": "Novo painel"
+    },
+    "workspace": {
+        "menu": "Area de trabalho",
+        "save": "Salvar",
+        "restore": "Restaurar"
+    }
+}

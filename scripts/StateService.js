@@ -1,4 +1,6 @@
 import { appBus } from './EventBus.js';
+import { appNotifications } from './Services/Notification.js';
+import { TranslationService } from './Services/TranslationService.js';
 
 /**
  * Serviço responsável por persistir e restaurar o estado do PanelContainer.
@@ -47,7 +49,8 @@ export class StateService {
     saveState() {
         const stateData = this.container.getState();
         localStorage.setItem(this.STORAGE_KEY, JSON.stringify(stateData));
-        alert('Estado salvo com sucesso!'); // Feedback simples para o usuário
+        const i18n = TranslationService.getInstance();
+        appNotifications.success(i18n.translate('appstate.save'));
     }
 
     /**
