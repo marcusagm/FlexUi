@@ -1,6 +1,4 @@
-/* styles/layout/container.css */
-
-.panel-container {
+.container {
     flex: 1;
     display: flex;
     gap: 0px;
@@ -11,7 +9,7 @@
     height: calc(100vh - 36px);
 }
 
-.panel-placeholder {
+.container__placeholder {
     height: 60px;
     margin: 0;
     border: 2px dashed #00ffccaa;
@@ -19,7 +17,7 @@
     border-radius: 4px;
 }
 
-.column-create-area {
+.container__drop-area {
     flex: 0 0 5px;
     border-radius: 3px;
     /* border: 1px dashed #00ffcc33; */
@@ -27,7 +25,7 @@
     position: relative;
     overflow: auto;
 }
-.column-create-area.active {
+.container__drop-area--active {
     border: 2px dashed #00ffcc;
     background: #00ffcc33;
 }

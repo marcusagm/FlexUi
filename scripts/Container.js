@@ -25,9 +25,9 @@ export class Container {
 
     constructor() {
         this.element = document.createElement('div');
-        this.element.classList.add('panel-container');
+        this.element.classList.add('container');
         this.placeholder = document.createElement('div');
-        this.placeholder.classList.add('panel-placeholder');
+        this.placeholder.classList.add('container__placeholder');
         this.clear();
 
         this.initEventListeners();

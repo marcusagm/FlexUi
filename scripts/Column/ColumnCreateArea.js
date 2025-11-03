@@ -19,7 +19,7 @@ export class ColumnCreateArea {
     constructor(container) {
         this.state.container = container;
         this.element = document.createElement('div');
-        this.element.classList.add('column-create-area');
+        this.element.classList.add('container__drop-area');
         this.initDragDrop();
     }
 
@@ -36,12 +36,12 @@ export class ColumnCreateArea {
         if (!draggedItem) return;
 
         placeholder.parentElement?.removeChild(placeholder);
-        this.element.classList.add('active');
+        this.element.classList.add('container__drop-area--active');
     }
 
     onDragLeave(e) {
         e.preventDefault();
-        this.element.classList.remove('active');
+        this.element.classList.remove('container__drop-area--active');
     }
 
     onDrop(e) {
@@ -53,7 +53,7 @@ export class ColumnCreateArea {
             return;
         }
 
-        this.element.classList.remove('active');
+        this.element.classList.remove('container__drop-area--active');
         const oldColumn = draggedItem.state.column;
 
         const index = Array.from(this.state.container.element.children).indexOf(this.element);
