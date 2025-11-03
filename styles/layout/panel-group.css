@@ -1,0 +1,173 @@
+/* styles/layout/panel-group.css */
+
+.flexui-panel-group {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    border-bottom: 1px solid var(--flexui-border-color);
+    overflow: hidden; /* Garante que o conteúdo não vaze */
+}
+
+/* Modificador para o último painel preencher o espaço */
+.panel-group.panel--fills-space {
+    flex-grow: 1;
+    flex-shrink: 1;
+    flex-basis: auto; /* Permite que ele cresça e encolha */
+    height: auto !important; /* Sobrescreve a altura fixa */
+}
+
+/* Modificador para painel recolhido */
+.panel-group--collapsed {
+    flex-grow: 0 !important;
+    flex-shrink: 0 !important;
+    height: var(--header-height) !important;
+    min-height: var(--header-height) !important;
+}
+
+/* Alça de redimensionamento vertical do grupo */
+.panel-group-resize-handle {
+    position: absolute;
+    bottom: -4px;
+    left: 0;
+    width: 100%;
+    height: 8px;
+    cursor: row-resize;
+    z-index: 10;
+    transition: background-color 0.2s;
+}
+
+.panel-group-resize-handle:hover {
+    background-color: var(--flexui-handle-color-hover);
+}
+
+/* --- Cabeçalho do Grupo de Painel --- */
+.panel-group-header {
+    display: flex;
+    align-items: center;
+    height: var(--header-height);
+    background-color: var(--flexui-bg-color-light);
+    border-bottom: 1px solid var(--flexui-border-color);
+    flex-shrink: 0;
+    min-height: var(--header-height); /* Garante a altura mínima */
+}
+
+/* Alça de movimento (Drag Handle) */
+.panel-group-header .move-handle {
+    width: 20px;
+    flex: 0 0 20px; /* Não cresce, não encolhe, base de 20px */
+    height: 100%;
+    cursor: move;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--flexui-text-color-dark);
+}
+
+.panel-group-header .move-handle:hover {
+    color: var(--flexui-text-color);
+}
+
+/* Cabeçalho simples (1 aba) */
+.simple-header {
+    display: flex;
+    align-items: center;
+    padding: 0 5px;
+    font-weight: bold;
+    flex: 1 1 auto;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+/* Container das Abas (2+ abas) */
+.tab-container {
+    display: flex;
+    flex: 1 1 auto;
+    overflow: hidden;
+    height: 100%;
+    position: relative;
+}
+
+.tab-list {
+    display: flex;
+    flex-shrink: 0; /* Permite que a lista seja maior que o container */
+    height: 100%;
+    transition: transform 0.2s ease-out;
+}
+
+.tab-item {
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    background-color: var(--flexui-tab-bg);
+    border-right: 1px solid var(--flexui-border-color);
+    cursor: pointer;
+    white-space: nowrap;
+    font-size: 10px; /* Regra 7.1 */
+}
+
+.tab-item:hover {
+    background-color: var(--flexui-tab-bg-hover);
+}
+
+.tab-item--active {
+    background-color: var(--flexui-tab-bg-active);
+    font-weight: bold;
+}
+
+.tab-title {
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis; /* Regra 7.1 */
+    padding-right: 5px;
+}
+
+.tab-close-btn {
+    width: 14px;
+    height: 14px;
+    border: none;
+    background: transparent;
+    color: var(--flexui-text-color-dark);
+    cursor: pointer;
+    border-radius: 3px;
+    flex-shrink: 0; /* Regra 7.2 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tab-close-btn:hover {
+    background-color: var(--flexui-accent-color);
+    color: white;
+}
+
+/* Botões de controle (Scroll de Abas e Colapso/Fechar Grupo) */
+.panel-group-controls {
+    display: flex;
+    align-items: center;
+    padding: 0 5px;
+}
+
+.tab-scroll-btn,
+.panel-group-btn {
+    width: 20px;
+    height: 20px;
+    border: none;
+    background-color: transparent;
+    color: var(--flexui-text-color-dark);
+    cursor: pointer;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tab-scroll-btn:hover,
+.panel-group-btn:hover {
+    background-color: var(--flexui-button-bg-hover);
+    color: var(--flexui-text-color);
+}
+
+.tab-scroll-btn.hidden {
+    display: none;
+}

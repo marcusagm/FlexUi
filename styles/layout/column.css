@@ -1,0 +1,28 @@
+/* styles/layout/column.css */
+
+.flexui-column {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    position: relative;
+    border-right: 1px solid var(--flexui-border-color);
+}
+
+.flexui-column:last-of-type {
+    border-right: none;
+}
+
+.column-resize-handle {
+    position: absolute;
+    right: -4px;
+    top: 0;
+    width: 8px;
+    height: 100%;
+    cursor: col-resize;
+    z-index: 10;
+    transition: background-color 0.2s;
+}
+
+.column-resize-handle:hover {
+    background-color: var(--flexui-handle-color-hover);
+}

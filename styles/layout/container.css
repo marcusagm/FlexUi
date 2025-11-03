@@ -1,0 +1,33 @@
+/* styles/layout/container.css */
+
+.flexui-container {
+    display: flex;
+    flex: 1 1 auto;
+    overflow: hidden;
+    position: relative;
+}
+
+/* Placeholder global para drag-and-drop */
+.flexui-placeholder {
+    background-color: var(--flexui-placeholder-bg);
+    border: 1px dashed var(--flexui-placeholder-border);
+    position: absolute;
+    z-index: 1000;
+    pointer-events: none;
+    transition: all 0.1s ease;
+}
+
+/* Área de criação de coluna (vãos) */
+.column-create-area {
+    flex: 0 0 10px;
+    position: relative;
+    transition: background-color 0.2s ease;
+}
+
+.column-create-area:hover {
+    background-color: var(--flexui-handle-color-hover);
+}
+
+.column-create-area.active {
+    background-color: var(--flexui-placeholder-bg) !important;
+}

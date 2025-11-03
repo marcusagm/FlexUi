@@ -1,0 +1,70 @@
+/* styles/core.css */
+
+/* Variáveis Globais de Tema */
+:root {
+    --flexui-bg-color: #2a2a2a;
+    --flexui-bg-color-light: #3a3a3a;
+    --flexui-bg-color-lighter: #4a4a4a;
+    --flexui-border-color: #1e1e1e;
+    --flexui-text-color: #cccccc;
+    --flexui-text-color-dark: #999999;
+    --flexui-accent-color: #007acc;
+    --flexui-accent-color-hover: #0099e6;
+
+    --flexui-tab-bg: #2d2d2d;
+    --flexui-tab-bg-active: #3f3f3f;
+    --flexui-tab-bg-hover: #4a4a4a;
+
+    --flexui-handle-color: #4a4a4a;
+    --flexui-handle-color-hover: #007acc;
+
+    --flexui-placeholder-bg: rgba(0, 122, 204, 0.3);
+    --flexui-placeholder-border: #007acc;
+
+    --flexui-button-bg: #3c3c3c;
+    --flexui-button-bg-hover: #4c4c4c;
+    --flexui-button-border: #555555;
+
+    --header-height: 30px;
+}
+
+/* Estilos Base */
+html, body {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background-color: var(--flexui-bg-color);
+    color: var(--flexui-text-color);
+    display: flex;
+    flex-direction: column;
+    font-size: 12px;
+}
+
+/* Classe Utilitária Global */
+.dragging {
+    cursor: grabbing !important;
+    user-select: none !important;
+}
+
+/* Estilos de Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--flexui-handle-color);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--flexui-accent-color-hover);
+}
+
+::-webkit-scrollbar-track {
+    background: var(--flexui-bg-color-light);
+}

@@ -1,0 +1,58 @@
+/* styles/components/menu.css */
+
+.menu-bar {
+    display: flex;
+    background-color: var(--flexui-bg-color-lighter);
+    height: var(--header-height);
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--flexui-border-color);
+    position: relative;
+    z-index: 1000;
+}
+
+.menu-item {
+    position: relative;
+    list-style: none;
+    padding: 0 10px;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.menu-item:hover {
+    background-color: var(--flexui-accent-color);
+}
+
+.menu-item.disabled {
+    color: var(--flexui-text-color-dark);
+    cursor: not-allowed;
+}
+
+.menu-item.disabled:hover {
+    background-color: transparent;
+}
+
+.submenu-container {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background-color: var(--flexui-bg-color-lighter);
+    border: 1px solid var(--flexui-border-color);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    min-width: 200px;
+    padding: 5px 0;
+}
+
+/* Estilos de submenu aninhado */
+.menu-item .submenu-container {
+    top: -6px; /* Ajuste para alinhar com o item pai */
+    left: 100%;
+}
+
+.menu-item .menu-item {
+    padding: 8px 15px;
+    width: 100%;
+    height: auto;
+}
