@@ -8,8 +8,23 @@
     overflow: auto;
 }
 
-.column.resize-left .resize-bar,
-.column.resize-right .resize-bar {
+.column__resize-handle {
+    height: 3px;
+    cursor: ns-resize;
+    background: transparent;
+    transition: background-color 0.2s ease-in-out;
+}
+
+.column__resize-handle:hover {
+    background: #00ffcc33;
+}
+
+.column__resize-handle:active {
+    background: #00ffcc;
+}
+
+.column--resize-left .column__resize-handle,
+.column--resize-right .column__resize-handle {
     position: absolute;
     top: 0;
     width: 3px;
@@ -18,10 +33,10 @@
     z-index: 5;
 }
 
-.column.resize-left .resize-bar {
+.column--resize-left .column__resize-handle {
     left: 0;
 }
 
-.column.resize-right .resize-bar {
+.column--resize-right .column__resize-handle {
     right: 0;
 }

@@ -47,10 +47,6 @@ body {
     user-select: none !important;
 }
 
-.resize-bar:hover {
-    background-color: #00ffcc33;
-}
-
 ::-webkit-scrollbar {
     width: 8px;
     height: 8px;

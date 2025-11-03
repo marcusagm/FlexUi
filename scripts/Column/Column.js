@@ -128,14 +128,14 @@ export class Column {
      * @param {boolean} isLast - Indicates if this is the last column in the container.
      */
     addResizeBars(isLast) {
-        this.element.querySelectorAll('.resize-bar').forEach(b => b.remove());
-        this.element.classList.remove('resize-right');
+        this.element.querySelectorAll('.column__resize-handle').forEach(b => b.remove());
+        this.element.classList.remove('column--resize-right');
 
         if (isLast) return;
 
-        this.element.classList.add('resize-right');
+        this.element.classList.add('column--resize-right');
         const bar = document.createElement('div');
-        bar.classList.add('resize-bar');
+        bar.classList.add('column__resize-handle');
         this.element.appendChild(bar);
         bar.addEventListener('mousedown', e => this.startResize(e));
     }
