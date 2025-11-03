@@ -9,7 +9,7 @@ export class PanelHeader {
         this.panel = panel;
         this.state.title = title;
         this.element = document.createElement('div');
-        this.element.classList.add('panel-header');
+        this.element.classList.add('panel__header');
         this.build();
     }
 
@@ -17,7 +17,7 @@ export class PanelHeader {
         // --- 1. Move Handle
         if (this.panel.state.movable) {
             this.moveHandle = document.createElement('div');
-            this.moveHandle.classList.add('move-handle');
+            this.moveHandle.classList.add('panel__move-handle');
             this.moveHandle.draggable = true;
             this.moveHandle.addEventListener('dragstart', this.onDragStart.bind(this));
             this.moveHandle.addEventListener('dragend', this.onDragEnd.bind(this));
@@ -29,21 +29,21 @@ export class PanelHeader {
         // --- 2. Title
         if (this.panel.state.hasTitle) {
             this.titleEl = document.createElement('div');
-            this.titleEl.classList.add('panel-title');
+            this.titleEl.classList.add('panel__title');
             this.titleEl.textContent = this.state.title;
             this.element.appendChild(this.titleEl);
         }
 
         // FIX DE LAYOUT: Elemento espaçador (header-spacer)
         this.spacerEl = document.createElement('div');
-        this.spacerEl.classList.add('header-spacer');
+        this.spacerEl.classList.add('panel__header-spacer');
         this.element.appendChild(this.spacerEl);
 
         // --- 3. Collapse Button
         if (this.panel.state.collapsible) {
             this.collapseBtn = document.createElement('button');
             this.collapseBtn.type = 'button';
-            this.collapseBtn.classList.add('collapse-btn');
+            this.collapseBtn.classList.add('panel__collapse-btn');
             this.collapseBtn.addEventListener('click', () => {
                 appBus.emit('panel:toggle-collapse-request', this.panel);
             });
@@ -55,7 +55,7 @@ export class PanelHeader {
         if (this.panel.state.closable) {
             this.closeBtn = document.createElement('button');
             this.closeBtn.type = 'button';
-            this.closeBtn.classList.add('close-btn');
+            this.closeBtn.classList.add('panel__close-btn');
             this.closeBtn.addEventListener('click', () => {
                 appBus.emit('panel:close-request', this.panel);
             });
@@ -74,3 +74,4 @@ export class PanelHeader {
         this.moveHandle.style.cursor = 'grab';
     }
 }
+

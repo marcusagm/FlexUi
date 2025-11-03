@@ -8,26 +8,25 @@
     position: relative;
 }
 
-.panel-group {
+/* .panel-group {
 
-}
+} */
 
-.panel-group-child {
+.panel-group__child {
     border: none;
     border-radius: 0;
 }
 
-.panel.dragging {
+.panel--dragging {
     opacity: 0.6;
 }
 
-.panel.collapsed {
+.panel--collapsed {
     height: 26px !important;
     min-height: 26px !important;
 }
 
-/* .panel-header (agora usado pelo PanelGroupHeader ou pelo Panel filho) */
-.panel-header {
+.panel__header {
     background-color: #444;
     display: flex;
     align-items: center;
@@ -35,19 +34,18 @@
     gap: 6px;
     border-bottom: 1px solid #555;
     user-select: none;
-    height: 26px; /* Altura fixa do header */
-    flex-shrink: 0; /* Impede que o header encolha */
+    height: 26px;
+    flex-shrink: 0;
 }
-.panel.collapsed .panel-header {
+.panel--collapsed .panel__header {
     border: 0;
 }
 
-/* Regra de preenchimento (agora aplicada ao PanelGroup) */
 .panel-group.panel--fills-space {
     flex-grow: 1;
 }
 
-.move-handle {
+.panel__move-handle {
     width: 14px;
     height: 14px;
     flex: 0 0 14px;
@@ -58,14 +56,14 @@
     opacity: 0.7;
 }
 
-.move-handle:active {
+.panel__move-handle:active {
     cursor: grabbing;
 }
 
-.panel-title {
+.panel__title {
     flex-grow: 1;
     color: #eee;
-    font-size: 14px; /* O tamanho da aba é controlado por .tab-item */
+    font-size: 14px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -73,16 +71,16 @@
     min-width: 10px;
 }
 
-.header-spacer {
+.panel__header-spacer {
     flex-grow: 100;
     min-width: 5px;
 }
 
-.collapse-btn,
-.close-btn {
+.panel__collapse-btn,
+.panel__close-btn {
     width: 16px;
     height: 16px;
-    flex: 0 0 16px; /* CORREÇÃO: Garante largura fixa no flexbox */
+    flex: 0 0 16px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -98,52 +96,51 @@
     padding: 0;
 }
 
-.collapse-btn[disabled],
-.close-btn[disabled] {
+.panel__collapse-btn[disabled],
+.panel__close-btn[disabled] {
     opacity: 0.5;
     cursor: not-allowed;
 }
 
-.collapse-btn:hover:not([disabled]),
-.close-btn:hover:not([disabled]),
-.collapse-btn:focus:not([disabled]),
-.close-btn:focus:not([disabled]) {
+.panel__collapse-btn:hover:not([disabled]),
+.panel__close-btn:hover:not([disabled]),
+.panel__collapse-btn:focus:not([disabled]),
+.panel__close-btn:focus:not([disabled]) {
     color: #ccc;
 }
 
-.collapse-btn:active:not([disabled]),
-.close-btn:active:not([disabled]) {
+.panel__collapse-btn:active:not([disabled]),
+.panel__close-btn:active:not([disabled]) {
     color: #fff;
 }
 
-.collapse-btn::before {
+.panel__collapse-btn::before {
     content: '−';
     font-size: 18px;
     line-height: 16px;
 }
 
-.close-btn::before {
+.panel__close-btn::before {
     content: '×';
     font-size: 18px;
     line-height: 16px;
 }
 
-.resize-handle {
+.panel-group__resize-handle {
     height: 3px;
     cursor: ns-resize;
     background: #222;
     transition: background-color 0.2s ease-in-out;
 }
 
-.resize-handle:hover {
+.panel-group__resize-handle:hover {
     background: #00ffcc33;
 }
 
-.resize-handle:active {
+.panel-group__resize-handle:active {
     background: #00ffcc;
 }
-/* Oculta o resize-handle do último item (que é o .panel--fills-space) */
-.panel-group.panel--fills-space > .resize-handle {
+.panel-group.panel--fills-space > .panel-group__resize-handle {
     display: none;
 }
 
@@ -152,97 +149,82 @@
     height: auto !important;
 }
 
-/* ESTILOS PARA NOVOS REQUISITOS (movable, no-header) */
-
-/* Estilo para painéis não movíveis (remove o cursor grab) */
-.panel--not-movable .panel-header {
-    cursor: default; /* Remove o cursor de drag */
+.panel--not-movable .panel__header {
+    cursor: default;
 }
 
-.panel--not-movable .move-handle {
+.panel--not-movable .panel__move-handle {
     display: none;
 }
 
-
-/* Move Handle do Grupo (Fica à esquerda) */
-.panel-group-header .move-handle {
+.panel-group__header .panel-group__move-handle {
     height: 100%;
-    width: 20px; /* CORREÇÃO */
-    flex: 0 0 20px; /* CORREÇÃO */
+    width: 20px;
+    flex: 0 0 20px;
     cursor: grab;
-    /* (A imagem de fundo do .move-handle global ainda se aplica) */
 }
 
-.panel-group-header .move-handle:active {
+.panel-group__header .panel-group__move-handle:active {
     cursor: grabbing;
     background-color: #00ffcc;
 }
 
-
-.panel-group-header {
+.panel-group__header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0; /* Remove padding padrão do header */
-    border-bottom: 1px solid #444; /* Linha divisória da Tab Bar */
-    height: 26px; /* Altura fixa da barra de abas */
-    flex-shrink: 0; /* Não permite que a barra de abas encolha */
+    padding: 0;
+    border-bottom: 1px solid #444;
+    height: 26px;
+    flex-shrink: 0;
 }
 
-
-
-/* Contêiner das Abas */
-.tab-container {
+.panel-group__tab-container {
     display: flex;
     flex-grow: 1;
-    overflow-x: auto; /* Permite rolar se houver muitas abas */
+    overflow-x: auto;
     white-space: nowrap;
     height: 100%;
-    /* Esconde a barra de rolagem do contêiner de abas */
-    scrollbar-width: none; /* Firefox */
+    scrollbar-width: none;
     align-items: center;
 }
-.tab-container::-webkit-scrollbar {
-    display: none; /* Chrome, Safari, Opera */
+.panel-group__tab-container::-webkit-scrollbar {
+    display: none;
 }
 
-/* Aba Individual */
-.tab-item {
+.panel-group__tab {
     display: flex;
     align-items: center;
     padding: 0;
     height: 100%;
-    /* min-width: 80px; Requisito */
-    max-width: 250px; /* Evita que uma aba única fique muito grande */
+    max-width: 250px;
     border-right: 1px solid #333;
     background-color: #3a3a3a;
     color: #999;
-    font-size: 10px; /* Requisito */
+    font-size: 10px;
     cursor: pointer;
     white-space: nowrap;
 }
-.tab-item:hover {
+.panel-group__tab:hover {
     background-color: #4f4f4f;
     color: #ccc;
 }
-.tab-item.active {
+.panel-group__tab--active {
     background-color: #3a3a3a;
     border-bottom: 2px solid var(--primary-color, #00ffcc);
     color: #fff;
 }
 
-/* Wrapper do Título da Aba (Para Bug 1: Ellipsis) */
-.tab-title {
-    flex-grow: 1; /* Permite que o título cresça */
-    flex-shrink: 1; /* Permite que o título encolha */
+.panel-group__tab-title {
+    flex-grow: 1;
+    flex-shrink: 1;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     padding: 0 5px;
 }
 
-/* Botão de Fechar (X) na Aba */
-.tab-close-btn {
+.panel-group__tab-close {
     font-size: 16px;
     line-height: 1;
     margin-left: 0px;
@@ -255,14 +237,13 @@
     border: none;
     cursor: pointer;
 }
-.tab-close-btn:hover {
+.panel-group__tab-close:hover {
     color: #fff;
     background-color: #555;
     border-radius: 2px;
 }
 
-/* Botões de Scroll (Esquerda/Direita) */
-.tab-scroll-btn {
+.panel-group__tab-scroll {
     background: none;
     color: #ccc;
     border: none;
@@ -272,58 +253,50 @@
     z-index: 10;
     flex-shrink: 0;
 }
-.tab-scroll-btn:hover {
+.panel-group__tab-scroll:hover {
     background: #00ffcc33;
     color: #fff;
 }
-.tab-scroll-btn.left {
+.panel-group__tab-scroll--left {
     border-right: 1px solid #333;
 }
-.tab-scroll-btn.right {
+.panel-group__tab-scroll--right {
     border-left: 1px solid #333;
 }
 
-/* Cabeçalho quando há apenas 1 aba (modo simples) */
-.panel-group-header.simple-header {
-    /* padding: 4px 6px;
-    gap: 6px; */
+/* .panel-group__header--simple {
+} */
+.panel-group__header--simple .panel-group__tab-container {
+    flex-grow: 0;
 }
-.panel-group-header.simple-header .tab-container {
-    flex-grow: 0; /* Não cresce, apenas contém o título */
-}
-.panel-group-header.simple-header .tab-item {
+.panel-group__header--simple .panel-group__tab {
     background: transparent;
     border: none;
     min-width: 0;
     padding: 0;
-    font-size: 14px; /* Restaura o font-size original */
+    font-size: 14px;
     color: #eee;
 }
-.panel-group-header.simple-header .tab-item .tab-close-btn {
-    display: none; /* Botão de fechar do grupo é usado */
+.panel-group__header--simple .panel-group__tab .panel-group__tab-close {
 }
-/* No modo simples, o .panel-title (real) está dentro do .tab-item */
-.panel-group-header.simple-header .panel-title {
+.panel-group__header--simple .panel-group__title-simple {
     flex-grow: 1;
     min-width: 10px;
 }
 
-/* Contêiner do Conteúdo do Grupo */
-.panel-group-content {
+.panel-group__content {
     flex-grow: 1;
-    /* padding: 8px; (Removido para que o painel filho controle seu padding) */
     font-size: 14px;
     color: #ccc;
     overflow: auto;
     min-height: 20px;
 
-    /* Garante que o painel filho preencha o espaço */
     display: flex;
     flex-direction: column;
 }
-/* O painel filho deve preencher o contentContainer */
-.panel-group-content > .panel-group-child {
+.panel-group__content > .panel-group__child {
     flex-grow: 1;
     border: none;
     border-radius: 0;
 }
+

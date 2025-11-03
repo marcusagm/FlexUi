@@ -28,7 +28,7 @@ export class PanelGroup {
         Object.assign(this.state, config);
 
         this.state.contentContainer = document.createElement('div');
-        this.state.contentContainer.classList.add('panel-group-content');
+        this.state.contentContainer.classList.add('panel-group__content');
 
         this.state.collapsed = collapsed;
         this.element = document.createElement('div');
@@ -92,7 +92,7 @@ export class PanelGroup {
 
     build() {
         this.resizeHandle = document.createElement('div');
-        this.resizeHandle.classList.add('resize-handle');
+        this.resizeHandle.classList.add('panel-group__resize-handle');
         this.resizeHandle.addEventListener('mousedown', this.startResize.bind(this));
 
         this.element.append(
@@ -147,7 +147,7 @@ export class PanelGroup {
 
     collapse() {
         this.state.collapsed = true;
-        this.element.classList.add('collapsed');
+        this.element.classList.add('panel--collapsed');
         this.state.contentContainer.style.display = 'none';
         this.resizeHandle.style.display = 'none';
         this.updateHeight();
@@ -155,7 +155,7 @@ export class PanelGroup {
 
     unCollapse() {
         this.state.collapsed = false;
-        this.element.classList.remove('collapsed');
+        this.element.classList.remove('panel--collapsed');
         this.state.contentContainer.style.display = '';
         this.resizeHandle.style.display = '';
         this.updateHeight();
@@ -172,7 +172,7 @@ export class PanelGroup {
         if (this.state.collapsed) {
             this.element.style.height = 'auto';
             this.element.style.flex = '0 0 auto';
-            this.element.classList.add('collapsed');
+            this.element.classList.add('panel--collapsed');
             this.element.style.minHeight = 'auto';
 
             if (this.state.header) {
@@ -181,7 +181,7 @@ export class PanelGroup {
             return;
         }
 
-        this.element.classList.remove('collapsed');
+        this.element.classList.remove('panel--collapsed');
 
         const minPanelHeight = this.getMinPanelHeight();
         this.element.style.minHeight = `${minPanelHeight}px`;
@@ -243,6 +243,8 @@ export class PanelGroup {
         this.state.column?.updatePanelGroupsSizes();
     }
 
+
+
     removePanel(panel) {
         const index = this.state.panels.indexOf(panel);
         if (index === -1) return;
@@ -295,3 +297,4 @@ export class PanelGroup {
         appBus.emit('dragstart', { item: this, event: e });
     }
 }
+

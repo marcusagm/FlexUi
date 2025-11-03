@@ -4,7 +4,6 @@ import { Modal } from '../Services/Modal.js';
 
 export class ToolbarPanel extends Panel {
     constructor(title, height = null, collapsed = false) {
-        // PASSANDO A CONFIGURAÇÃO PARA O CONSTRUTOR BASE (FIX CRÍTICO)
         super(title, height, collapsed, {
             closable: false,
             collapsible: false,
@@ -18,7 +17,7 @@ export class ToolbarPanel extends Panel {
      */
     populateContent() {
         const contentEl = this.getContentElement();
-        contentEl.classList.add('toolbar'); // Adiciona classe para estilização
+        contentEl.classList.add('panel__content--toolbar');
 
         const btn1 = document.createElement('button');
         btn1.textContent = 'Ferramenta 1';
@@ -53,3 +52,4 @@ export class ToolbarPanel extends Panel {
         // Não faz nada. O painel se recria sozinho.
     }
 }
+

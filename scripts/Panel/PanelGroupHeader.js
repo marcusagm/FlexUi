@@ -8,14 +8,14 @@ export class PanelGroupHeader {
     constructor(panelGroup) {
         this.panelGroup = panelGroup;
         this.element = document.createElement('div');
-        this.element.classList.add('panel-group-header');
+        this.element.classList.add('panel-group__header');
         this.build();
     }
 
     build() {
         // 1. Move Handle (para o GRUPO)
         this.moveHandle = document.createElement('div');
-        this.moveHandle.classList.add('move-handle');
+        this.moveHandle.classList.add('panel-group__move-handle', 'panel__move-handle');
         this.moveHandle.draggable = true;
         this.moveHandle.addEventListener('dragstart', this.onDragStart.bind(this));
         this.moveHandle.addEventListener('dragend', this.onDragEnd.bind(this));
@@ -24,29 +24,29 @@ export class PanelGroupHeader {
         // 2. Botão de Scroll Esquerda
         this.scrollLeftBtn = document.createElement('button');
         this.scrollLeftBtn.type = 'button';
-        this.scrollLeftBtn.classList.add('tab-scroll-btn', 'left');
+        this.scrollLeftBtn.classList.add('panel-group__tab-scroll', 'panel-group__tab-scroll--left');
         this.scrollLeftBtn.textContent = '<';
         this.scrollLeftBtn.style.display = 'none';
 
         // 3. Contêiner das Abas
         this.tabContainer = document.createElement('div');
-        this.tabContainer.classList.add('tab-container');
+        this.tabContainer.classList.add('panel-group__tab-container');
 
         // 4. Botão de Scroll Direita
         this.scrollRightBtn = document.createElement('button');
         this.scrollRightBtn.type = 'button';
-        this.scrollRightBtn.classList.add('tab-scroll-btn', 'right');
+        this.scrollRightBtn.classList.add('panel-group__tab-scroll', 'panel-group__tab-scroll--right');
         this.scrollRightBtn.textContent = '>';
         this.scrollRightBtn.style.display = 'none';
 
         // 5. Espaçador
         this.spacerEl = document.createElement('div');
-        this.spacerEl.classList.add('header-spacer');
+        this.spacerEl.classList.add('panel__header-spacer');
 
         // 6. Botão de Colapso (para o GRUPO)
         this.collapseBtn = document.createElement('button');
         this.collapseBtn.type = 'button';
-        this.collapseBtn.classList.add('collapse-btn');
+        this.collapseBtn.classList.add('panel-group__collapse-btn', 'panel__collapse-btn');
         this.collapseBtn.addEventListener('click', () => {
             appBus.emit('panel:toggle-collapse-request', this.panelGroup);
         });
@@ -54,7 +54,7 @@ export class PanelGroupHeader {
         // 7. Botão de Fechar (para o GRUPO)
         this.closeBtn = document.createElement('button');
         this.closeBtn.type = 'button';
-        this.closeBtn.classList.add('close-btn');
+        this.closeBtn.classList.add('panel-group__close-btn', 'panel__close-btn');
         this.closeBtn.addEventListener('click', () => {
             appBus.emit('panel:close-request', this.panelGroup);
         });
@@ -88,12 +88,13 @@ export class PanelGroupHeader {
         // Se houver apenas 1 painel, age como um cabeçalho simples
         if (panels.length === 1) {
             const panel = panels[0];
-            this.element.classList.add('simple-header');
+            this.element.classList.add('panel-group__header--simple');
 
             const titleEl = document.createElement('div');
-            titleEl.classList.add('panel-title');
+            titleEl.classList.add('panel__title', 'panel-group__title-simple');
             titleEl.textContent = panel.state.title || 'Sem Título';
             this.tabContainer.appendChild(titleEl);
+
 
             // Atualiza os botões do grupo com base no painel filho
             // (Req 1) Lendo do panelGroup, que leu do filho
@@ -102,7 +103,7 @@ export class PanelGroupHeader {
             this.moveHandle.style.display = this.panelGroup.state.movable ? '' : 'none';
         } else {
             // Se houver múltiplas abas
-            this.element.classList.remove('simple-header');
+            this.element.classList.remove('panel-group__header--simple');
 
             panels.forEach(panel => {
                 this.tabContainer.appendChild(this.createTabElement(panel, activePanel));
@@ -123,23 +124,26 @@ export class PanelGroupHeader {
     // Cria um elemento de aba
     createTabElement(panel, activePanel) {
         const tab = document.createElement('div');
-        tab.classList.add('tab-item');
+        tab.classList.add('panel-group__tab');
         tab.dataset.panelId = panel.id;
 
         if (panel === activePanel) {
-            tab.classList.add('active');
+            tab.classList.add('panel-group__tab--active');
         }
 
+
         const titleSpan = document.createElement('span');
-        titleSpan.classList.add('tab-title');
+        titleSpan.classList.add('panel-group__tab-title');
         titleSpan.textContent = panel.state.title || 'Sem Título';
         tab.appendChild(titleSpan);
+
+
 
         // Botão de fechar (X) na aba
         if (panel.state.closable) {
             const closeTabBtn = document.createElement('button');
             closeTabBtn.type = 'button';
-            closeTabBtn.classList.add('tab-close-btn');
+            closeTabBtn.classList.add('panel-group__tab-close');
             closeTabBtn.textContent = '×';
             closeTabBtn.addEventListener('click', e => {
                 e.stopPropagation(); // Evita a mudança de aba
@@ -182,3 +186,4 @@ export class PanelGroupHeader {
         this.moveHandle.style.cursor = 'grab';
     }
 }
+

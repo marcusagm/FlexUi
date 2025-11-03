@@ -1,19 +1,18 @@
-.panel-content {
+.panel__content {
     flex-grow: 1;
     padding: 8px;
     font-size: 14px;
     color: #ccc;
     overflow: auto;
-    /* Min-height de segurança para a área de conteúdo */
     min-height: 20px;
 }
 
-.panel-content.toolbar {
+.panel__content--toolbar {
     display: flex;
     gap: 4px;
     flex-wrap: wrap;
 }
-.panel-content.toolbar button {
+.panel__content--toolbar button {
     background-color: #555;
     color: #eee;
     border: 1px solid #666;
@@ -22,7 +21,8 @@
     cursor: pointer;
     font-size: 12px;
 }
-.panel-content.toolbar button:hover {
+.panel__content--toolbar button:hover {
     background-color: #00ffcc33;
     border-color: #00ffcc;
 }
+

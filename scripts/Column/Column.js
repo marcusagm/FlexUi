@@ -128,6 +128,8 @@ export class Column {
      * @param {boolean} isLast - Indicates if this is the last column in the container.
      */
     addResizeBars(isLast) {
+        // Esta função usa 'column__resize-handle' e 'column--resize-right'
+        // da refatoração BEM anterior (Column.js), que está correta.
         this.element.querySelectorAll('.column__resize-handle').forEach(b => b.remove());
         this.element.classList.remove('column--resize-right');
 
@@ -412,7 +414,7 @@ export class Column {
             if (child === element) {
                 break;
             }
-            if (this.state.panelGroups.some(p => p.element === child)) {
+            if (this.state.panelGroups.some(p => p.element === child) && child.classList.contains('panel-group')) {
                 panelIndex++;
             }
         }
@@ -426,3 +428,4 @@ export class Column {
         return this.state.panelGroups.length;
     }
 }
+

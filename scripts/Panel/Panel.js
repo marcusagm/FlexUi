@@ -24,7 +24,7 @@ export class Panel {
         this.state.content = new PanelContent();
 
         this.element = document.createElement('div');
-        this.element.classList.add('panel', 'panel-group-child'); // É um filho de grupo
+        this.element.classList.add('panel', 'panel-group__child'); // É um filho de grupo
 
         const panelTitle = title !== undefined && title !== null ? String(title) : '';
         this.state.hasTitle = panelTitle.length > 0;
@@ -111,3 +111,4 @@ export class Panel {
         this.element.style.flex = '1 1 auto';
     }
 }
+
