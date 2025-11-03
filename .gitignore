@@ -92,3 +92,7 @@ notes.txt
 old/
 others.js
 
+
+#Google Drive
+.tmp*
+Icon?
