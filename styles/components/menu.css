@@ -1,58 +1,84 @@
-/* styles/components/menu.css */
-
-.menu-bar {
+/* Menu principal */
+.menu {
     display: flex;
-    background-color: var(--flexui-bg-color-lighter);
-    height: var(--header-height);
-    flex-shrink: 0;
-    border-bottom: 1px solid var(--flexui-border-color);
-    position: relative;
+    background-color: #222;
+    border-bottom: 1px solid #222;
     z-index: 1000;
 }
 
+/* Item de menu geral */
 .menu-item {
     position: relative;
+    cursor: pointer;
+    color: #ccc;
+    font-size: 14px;
     list-style: none;
-    padding: 0 10px;
-    height: 100%;
+
+    /* Regra de Layout Geral */
     display: flex;
     align-items: center;
-    cursor: pointer;
-    font-size: 13px;
 }
 
-.menu-item:hover {
-    background-color: var(--flexui-accent-color);
+/* Itens de Nível 1 (Top Level) */
+.menu > .menu-item {
+    padding: 6px 12px;
+    justify-content: flex-start; /* Alinha o texto à esquerda */
 }
 
-.menu-item.disabled {
-    color: var(--flexui-text-color-dark);
-    cursor: not-allowed;
+/* Item de submenu (Nível 2+) */
+.submenu-container .menu-item {
+    padding: 4px 12px;
+    /* Faz com que o título e a seta sejam separados */
+    justify-content: space-between;
 }
 
-.menu-item.disabled:hover {
-    background-color: transparent;
+/* Estilo para a seta (APENAS em itens com has-submenu) */
+.menu-arrow {
+    flex-shrink: 0;
+    margin-left: 10px;
+    font-size: 10px;
+    color: #ccc;
+    /* Garante que a seta só apareça em submenus (Nível 2+) */
+    display: none;
 }
 
+/* Seta visível em submenus que possuem a classe has-submenu */
+.submenu-container .menu-item.has-submenu .menu-arrow {
+    display: inline;
+}
+
+.menu-item:hover,
+.menu-item.open {
+    background-color: #00ffcc33;
+    color: #fff;
+}
+
+/* O contêiner do submenu */
 .submenu-container {
+    display: none;
     position: absolute;
+    background-color: #333;
+    border-radius: 3px;
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.7);
+    list-style: none;
+    min-width: 180px;
+    z-index: 2000;
+    padding: 4px 0;
+}
+
+/* REGRAS DE POSICIONAMENTO */
+
+/* Submenus de Nível 1 (Abaixo da barra principal) */
+.menu > .menu-item.open > .submenu-container {
+    display: block;
     top: 100%;
     left: 0;
-    background-color: var(--flexui-bg-color-lighter);
-    border: 1px solid var(--flexui-border-color);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-    min-width: 200px;
-    padding: 5px 0;
 }
 
-/* Estilos de submenu aninhado */
-.menu-item .submenu-container {
-    top: -6px; /* Ajuste para alinhar com o item pai */
+/* Submenus de Nível 2+ (Sub-submenus, aninhados à direita) */
+.submenu-container .menu-item.open > .submenu-container {
+    display: block;
+    top: -4px;
     left: 100%;
-}
-
-.menu-item .menu-item {
-    padding: 8px 15px;
-    width: 100%;
-    height: auto;
+    border-top-left-radius: 0;
 }

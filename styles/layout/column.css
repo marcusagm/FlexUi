@@ -1,28 +1,27 @@
-/* styles/layout/column.css */
-
-.flexui-column {
+.column {
+    flex: 1 1 0;
+    min-width: 150px;
     display: flex;
     flex-direction: column;
-    height: 100%;
+    gap: 3px;
     position: relative;
-    border-right: 1px solid var(--flexui-border-color);
+    overflow: auto;
 }
 
-.flexui-column:last-of-type {
-    border-right: none;
-}
-
-.column-resize-handle {
+.column.resize-left .resize-bar,
+.column.resize-right .resize-bar {
     position: absolute;
-    right: -4px;
     top: 0;
-    width: 8px;
+    width: 3px;
     height: 100%;
-    cursor: col-resize;
-    z-index: 10;
-    transition: background-color 0.2s;
+    cursor: ew-resize;
+    z-index: 5;
 }
 
-.column-resize-handle:hover {
-    background-color: var(--flexui-handle-color-hover);
+.column.resize-left .resize-bar {
+    left: 0;
+}
+
+.column.resize-right .resize-bar {
+    right: 0;
 }

@@ -1,3 +1,198 @@
+/**
+ * Variables
+ */
+:root {
+    --primary-color: #00ffcc;
+    --secondary-color: #ffcc00;
+    --tertiary-color: #cc00ff;
+    --quaternary-color: #ff00cc;
+    --quinary-color: #00ccff;
+
+    --background-color: #222;
+    --foreground-color: #333;
+
+    --border-color: #555;
+    --text-color: #ccc;
+    --highlight-color: #00ffcc33;
+
+    --alert-color: #ff4444;
+    --success-color: #44ff44;
+    --warning-color: #ffcc44;
+    --info-color: #4444ff;
+    --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    --font-size: 14px;
+    --border-radius: 4px;
+    --transition-duration: 0.3s;
+    --z-index-menu: 1000;
+    --z-index-submenu: 2000;
+    --z-index-panel: 500;
+    --z-index-tooltip: 3000;
+}
+
+/* Reset básico */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #222;
+    color: #ccc;
+    user-select: none;
+}
+
+/* Menu principal */
+.menu {
+    display: flex;
+    background-color: #222;
+    border-bottom: 1px solid #222;
+    z-index: 1000;
+}
+
+/* Item de menu geral */
+.menu-item {
+    position: relative;
+    cursor: pointer;
+    color: #ccc;
+    font-size: 14px;
+    list-style: none;
+
+    /* Regra de Layout Geral */
+    display: flex;
+    align-items: center;
+}
+
+/* Itens de Nível 1 (Top Level) */
+.menu > .menu-item {
+    padding: 6px 12px;
+    justify-content: flex-start; /* Alinha o texto à esquerda */
+}
+
+/* Item de submenu (Nível 2+) */
+.submenu-container .menu-item {
+    padding: 4px 12px;
+    /* Faz com que o título e a seta sejam separados */
+    justify-content: space-between;
+}
+
+/* Estilo para a seta (APENAS em itens com has-submenu) */
+.menu-arrow {
+    flex-shrink: 0;
+    margin-left: 10px;
+    font-size: 10px;
+    color: #ccc;
+    /* Garante que a seta só apareça em submenus (Nível 2+) */
+    display: none;
+}
+
+/* Seta visível em submenus que possuem a classe has-submenu */
+.submenu-container .menu-item.has-submenu .menu-arrow {
+    display: inline;
+}
+
+.menu-item:hover,
+.menu-item.open {
+    background-color: #00ffcc33;
+    color: #fff;
+}
+
+/* O contêiner do submenu */
+.submenu-container {
+    display: none;
+    position: absolute;
+    background-color: #333;
+    border-radius: 3px;
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.7);
+    list-style: none;
+    min-width: 180px;
+    z-index: 2000;
+    padding: 4px 0;
+}
+
+/* REGRAS DE POSICIONAMENTO */
+
+/* Submenus de Nível 1 (Abaixo da barra principal) */
+.menu > .menu-item.open > .submenu-container {
+    display: block;
+    top: 100%;
+    left: 0;
+}
+
+/* Submenus de Nível 2+ (Sub-submenus, aninhados à direita) */
+.submenu-container .menu-item.open > .submenu-container {
+    display: block;
+    top: -4px;
+    left: 100%;
+    border-top-left-radius: 0;
+}
+
+/* --- ESTILOS DE COMPONENTES DE PAINEL --- */
+
+/* Container de colunas */
+.panel-container {
+    flex: 1;
+    display: flex;
+    gap: 0px;
+    padding: 3px 0 3px 0px;
+    background: #333;
+    overflow: auto;
+    width: 100vw;
+    height: calc(100vh - 36px);
+}
+
+/* Colunas */
+.column {
+    flex: 1 1 0;
+    min-width: 150px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    position: relative;
+    overflow: auto;
+}
+
+.column-create-area {
+    flex: 0 0 5px;
+    border-radius: 3px;
+    /* border: 1px dashed #00ffcc33; */
+    display: flex;
+    position: relative;
+    overflow: auto;
+}
+.column-create-area.active {
+    border: 2px dashed #00ffcc;
+    background: #00ffcc33;
+}
+
+.column.resize-left .resize-bar,
+.column.resize-right .resize-bar {
+    position: absolute;
+    top: 0;
+    width: 3px;
+    height: 100%;
+    cursor: ew-resize;
+    z-index: 5;
+}
+
+.column.resize-left .resize-bar {
+    left: 0;
+}
+
+.column.resize-right .resize-bar {
+    right: 0;
+}
+
+.resize-bar:hover {
+    background-color: #00ffcc33;
+}
+
+/* Painéis (Classe base para Panel e PanelGroup) */
 .panel {
     background-color: #3a3a3a;
     border-radius: 4px;
@@ -6,13 +201,13 @@
     overflow: hidden;
     color: #ddd;
     position: relative;
+    /* min-height REMOVIDO: Controlado via JS */
 }
-
 .panel-group {
-
+    /* Esta é a classe principal na coluna */
 }
-
 .panel-group-child {
+    /* Esta é a classe para o painel *dentro* do grupo */
     border: none;
     border-radius: 0;
 }
@@ -128,6 +323,16 @@
     line-height: 16px;
 }
 
+.panel-content {
+    flex-grow: 1;
+    padding: 8px;
+    font-size: 14px;
+    color: #ccc;
+    overflow: auto;
+    /* Min-height de segurança para a área de conteúdo */
+    min-height: 20px;
+}
+
 .resize-handle {
     height: 3px;
     cursor: ns-resize;
@@ -147,6 +352,52 @@
     display: none;
 }
 
+/* Placeholder de drop */
+.panel-placeholder {
+    height: 60px;
+    margin: 0;
+    border: 2px dashed #00ffccaa;
+    background-color: #00ffcc22;
+    border-radius: 4px;
+}
+
+/* Scrollbars */
+.panel-container::-webkit-scrollbar,
+.panel-content::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.panel-container::-webkit-scrollbar-track,
+.panel-content::-webkit-scrollbar-track {
+    background: #111;
+}
+
+.panel-container::-webkit-scrollbar-thumb,
+.panel-content::-webkit-scrollbar-thumb {
+    background: #00ffccaa;
+    border-radius: 4px;
+}
+
+/* --- ESTILOS PARA PAINÉIS CUSTOMIZADOS (Exemplo) --- */
+.panel-content.toolbar {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+.panel-content.toolbar button {
+    background-color: #555;
+    color: #eee;
+    border: 1px solid #666;
+    padding: 4px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+}
+.panel-content.toolbar button:hover {
+    background-color: #00ffcc33;
+    border-color: #00ffcc;
+}
 .panel--fills-space {
     flex: 1 0 auto !important;
     height: auto !important;
@@ -163,6 +414,18 @@
     display: none;
 }
 
+/* --- ESTILOS PARA PANEL GROUP (Agrupamento por Abas) --- */
+
+/* O HEADER DO GRUPO (Tab Bar) */
+.panel-group-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0; /* Remove padding padrão do header */
+    border-bottom: 1px solid #444; /* Linha divisória da Tab Bar */
+    height: 26px; /* Altura fixa da barra de abas */
+    flex-shrink: 0; /* Não permite que a barra de abas encolha */
+}
 
 /* Move Handle do Grupo (Fica à esquerda) */
 .panel-group-header .move-handle {
@@ -177,19 +440,6 @@
     cursor: grabbing;
     background-color: #00ffcc;
 }
-
-
-.panel-group-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0; /* Remove padding padrão do header */
-    border-bottom: 1px solid #444; /* Linha divisória da Tab Bar */
-    height: 26px; /* Altura fixa da barra de abas */
-    flex-shrink: 0; /* Não permite que a barra de abas encolha */
-}
-
-
 
 /* Contêiner das Abas */
 .tab-container {

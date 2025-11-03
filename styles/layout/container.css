@@ -1,33 +1,33 @@
 /* styles/layout/container.css */
 
-.flexui-container {
+.panel-container {
+    flex: 1;
     display: flex;
-    flex: 1 1 auto;
-    overflow: hidden;
-    position: relative;
+    gap: 0px;
+    padding: 3px 0 3px 0px;
+    background: #333;
+    overflow: auto;
+    width: 100vw;
+    height: calc(100vh - 36px);
 }
 
-/* Placeholder global para drag-and-drop */
-.flexui-placeholder {
-    background-color: var(--flexui-placeholder-bg);
-    border: 1px dashed var(--flexui-placeholder-border);
-    position: absolute;
-    z-index: 1000;
-    pointer-events: none;
-    transition: all 0.1s ease;
+.panel-placeholder {
+    height: 60px;
+    margin: 0;
+    border: 2px dashed #00ffccaa;
+    background-color: #00ffcc22;
+    border-radius: 4px;
 }
 
-/* Área de criação de coluna (vãos) */
 .column-create-area {
-    flex: 0 0 10px;
+    flex: 0 0 5px;
+    border-radius: 3px;
+    /* border: 1px dashed #00ffcc33; */
+    display: flex;
     position: relative;
-    transition: background-color 0.2s ease;
+    overflow: auto;
 }
-
-.column-create-area:hover {
-    background-color: var(--flexui-handle-color-hover);
-}
-
 .column-create-area.active {
-    background-color: var(--flexui-placeholder-bg) !important;
+    border: 2px dashed #00ffcc;
+    background: #00ffcc33;
 }

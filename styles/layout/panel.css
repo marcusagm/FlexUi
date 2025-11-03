@@ -1,31 +1,28 @@
-/* styles/layout/panel.css */
-
-/* O contêiner de conteúdo do grupo que hospeda o painel ativo */
-.panel-group-content {
-    flex: 1 1 auto;
-    position: relative;
-    overflow: auto; /* Permite scroll no conteúdo do painel */
-    background-color: var(--flexui-bg-color);
-}
-
-/* O 'Panel' em si. Oculta os painéis inativos.
-  O JS move o painel ativo para dentro de .panel-group-content.
-*/
-.panel-group-content > .panel {
-    display: flex; /* Regra 8.4 */
-    flex-direction: column;
-    flex: 1 1 auto; /* Regra 8.4 */
-    height: 100%;
-    width: 100%;
-}
-
-.panel-group-content > .panel:not(.active) {
-    display: none;
-}
-
-/* O contêiner de conteúdo real dentro do painel */
 .panel-content {
-    flex: 1 1 auto;
-    padding: 10px;
+    flex-grow: 1;
+    padding: 8px;
+    font-size: 14px;
+    color: #ccc;
     overflow: auto;
+    /* Min-height de segurança para a área de conteúdo */
+    min-height: 20px;
+}
+
+.panel-content.toolbar {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+.panel-content.toolbar button {
+    background-color: #555;
+    color: #eee;
+    border: 1px solid #666;
+    padding: 4px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+}
+.panel-content.toolbar button:hover {
+    background-color: #00ffcc33;
+    border-color: #00ffcc;
 }
