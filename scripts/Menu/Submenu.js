@@ -3,7 +3,7 @@ import { MenuItem } from './MenuItem.js';
 export class Submenu {
     constructor(childrenData, parentLevel) {
         this.element = document.createElement('ul');
-        this.element.classList.add('submenu-container');
+        this.element.classList.add('menu__submenu');
         this.build(childrenData, parentLevel);
     }
 
@@ -16,3 +16,4 @@ export class Submenu {
         });
     }
 }
+

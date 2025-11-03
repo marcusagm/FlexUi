@@ -1,60 +1,53 @@
-/* Menu principal */
 .menu {
     display: flex;
     background-color: #222;
     border-bottom: 1px solid #222;
-    z-index: 1000;
+    z-index: 100;
 }
 
-/* Item de menu geral */
-.menu-item {
+.menu__item {
     position: relative;
     cursor: pointer;
     color: #ccc;
     font-size: 14px;
     list-style: none;
-
-    /* Regra de Layout Geral */
     display: flex;
     align-items: center;
 }
 
-/* Itens de Nível 1 (Top Level) */
-.menu > .menu-item {
-    padding: 6px 12px;
-    justify-content: flex-start; /* Alinha o texto à esquerda */
+.menu__title {
+    flex-grow: 1;
 }
 
-/* Item de submenu (Nível 2+) */
-.submenu-container .menu-item {
+.menu > .menu__item {
+    padding: 6px 12px;
+    justify-content: flex-start;
+}
+
+.menu__submenu .menu__item {
     padding: 4px 12px;
-    /* Faz com que o título e a seta sejam separados */
     justify-content: space-between;
 }
 
-/* Estilo para a seta (APENAS em itens com has-submenu) */
-.menu-arrow {
+.menu__arrow {
     flex-shrink: 0;
     margin-left: 10px;
     font-size: 10px;
     color: #ccc;
-    /* Garante que a seta só apareça em submenus (Nível 2+) */
     display: none;
 }
 
-/* Seta visível em submenus que possuem a classe has-submenu */
-.submenu-container .menu-item.has-submenu .menu-arrow {
+.menu__submenu .menu__item--has-submenu .menu__arrow {
     display: inline;
 }
 
-.menu-item:hover,
-.menu-item.open {
+.menu__item:hover,
+.menu__item--open {
     background-color: #00ffcc33;
     color: #fff;
 }
 
-/* O contêiner do submenu */
-.submenu-container {
+.menu__submenu {
     display: none;
     position: absolute;
     background-color: #333;
@@ -66,19 +59,16 @@
     padding: 4px 0;
 }
 
-/* REGRAS DE POSICIONAMENTO */
-
-/* Submenus de Nível 1 (Abaixo da barra principal) */
-.menu > .menu-item.open > .submenu-container {
+.menu > .menu__item--open > .menu__submenu {
     display: block;
     top: 100%;
     left: 0;
 }
 
-/* Submenus de Nível 2+ (Sub-submenus, aninhados à direita) */
-.submenu-container .menu-item.open > .submenu-container {
+.menu__submenu .menu__item--open > .menu__submenu {
     display: block;
     top: -4px;
     left: 100%;
     border-top-left-radius: 0;
 }
+

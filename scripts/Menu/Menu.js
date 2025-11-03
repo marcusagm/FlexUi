@@ -34,6 +34,10 @@ export class Menu {
                     {
                         title: i18n.translate('workspace.restore'),
                         fn: () => appBus.emit('app:restore-state')
+                    },
+                    {
+                        title: i18n.translate('workspace.reset'),
+                        fn: () => appBus.emit('app:reset-state')
                     }
                 ]
             }
@@ -44,7 +48,6 @@ export class Menu {
         const items = this.getMenuData();
 
         items.forEach(itemData => {
-            // Passa o nível 1 para o MenuItem
             const mi = new MenuItem(itemData, 1);
             this.element.appendChild(mi.element);
         });
@@ -61,19 +64,21 @@ export class Menu {
     }
 
     closeAllMenus() {
-        this.element.querySelectorAll('.menu-item.open').forEach(item => {
-            item.classList.remove('open');
+        this.element.querySelectorAll('.menu__item--open').forEach(item => {
+            item.classList.remove('menu__item--open');
         });
     }
 
     closeSiblings(target) {
-        target.parentElement.querySelectorAll('.menu-item.open').forEach(sibling => {
+        target.parentElement.querySelectorAll('.menu__item--open').forEach(sibling => {
             if (sibling !== target) {
-                sibling.classList.remove('open');
-                sibling.querySelectorAll('.menu-item.open').forEach(descendant => {
-                    descendant.classList.remove('open');
+                sibling.classList.remove('menu__item--open');
+                sibling.querySelectorAll('.menu__item--open').forEach(descendant => {
+                    descendant.classList.remove('menu__item--open');
                 });
             }
         });
     }
 }
+
+

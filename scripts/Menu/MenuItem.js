@@ -2,32 +2,28 @@ import { Submenu } from './Submenu.js';
 import { appBus } from '../EventBus.js';
 
 export class MenuItem {
-    /**
-     * @param {Object} itemData - Objeto contendo { title, fn, children }.
-     * @param {number} [level=1] - O nível de aninhamento do item (1 = Top Level, 2+ = Submenu).
-     */
     constructor(itemData, level = 1) {
         this.itemData = itemData;
-        this.level = level; // Armazena o nível
+        this.level = level;
         this.element = document.createElement('li');
-        this.element.classList.add('menu-item');
+        this.element.classList.add('menu__item');
 
         this.title = document.createElement('div');
-        this.title.classList.add('menu-title');
+        this.title.classList.add('menu__title');
         this.title.textContent = itemData.title;
 
         this.element.appendChild(this.title);
 
         if (itemData.children && itemData.children.length > 0) {
             this.arrow = document.createElement('span');
-            this.arrow.classList.add('menu-arrow');
+            this.arrow.classList.add('menu__arrow');
             this.arrow.textContent = '▶';
 
             this.element.appendChild(this.arrow);
 
             this.submenu = new Submenu(itemData.children, this.level + 1);
             this.element.appendChild(this.submenu.element);
-            this.element.classList.add('has-submenu');
+            this.element.classList.add('menu__item--has-submenu');
         }
 
         this.initListeners();
@@ -50,13 +46,13 @@ export class MenuItem {
 
     handleTopLevelHover(e) {
         const menuContainer = this.element.parentElement;
-        const isAnyTopLevelOpen = menuContainer.querySelector('.menu-item.open');
+        const isAnyTopLevelOpen = menuContainer.querySelector('.menu__item--open');
 
         if (isAnyTopLevelOpen) {
             e.stopPropagation();
-            if (!this.element.classList.contains('open')) {
+            if (!this.element.classList.contains('menu__item--open')) {
                 appBus.emit('menu:close-siblings', this.element);
-                this.element.classList.add('open');
+                this.element.classList.add('menu__item--open');
             }
         }
     }
@@ -65,18 +61,18 @@ export class MenuItem {
         e.stopPropagation();
 
         appBus.emit('menu:close-siblings', this.element);
-        this.element.classList.toggle('open');
+        this.element.classList.toggle('menu__item--open');
     }
 
     handleSubmenuHover(e) {
         e.stopPropagation();
 
-        this.element.parentElement.querySelectorAll('.menu-item.open').forEach(sibling => {
+        this.element.parentElement.querySelectorAll('.menu__item--open').forEach(sibling => {
             if (sibling !== this.element) {
-                sibling.classList.remove('open');
+                sibling.classList.remove('menu__item--open');
             }
         });
-        this.element.classList.add('open');
+        this.element.classList.add('menu__item--open');
     }
 
     handleClick(e) {
@@ -87,3 +83,5 @@ export class MenuItem {
         appBus.emit('menu:item-selected');
     }
 }
+
+

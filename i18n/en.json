@@ -8,7 +8,9 @@
     },
     "appstate": {
         "save": "Workspace saved!",
-        "restore": "Workspace restored!"
+        "restore": "Workspace restored!",
+        "restore_fail": "Failed to restore workspace (corrupted data).",
+        "no_save": "No saved workspace found."
     },
     "panels": {
         "menu": "Panels",
@@ -17,6 +19,7 @@
     "workspace": {
         "menu": "Workspace",
         "save": "Save workspace",
-        "restore": "Restore workspace"
+        "restore": "Restore workspace",
+        "reset": "Reset to default"
     }
 }

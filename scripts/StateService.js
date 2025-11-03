@@ -11,14 +11,13 @@ export class StateService {
         this.container = container;
         this.STORAGE_KEY = 'panel_state';
 
-        // O StateService escuta os eventos de persistência
         this.initEventListeners();
     }
 
     initEventListeners() {
         appBus.on('app:save-state', this.saveState.bind(this));
-        // Note: restoreState apenas remove o estado e pede ao App para re-inicializar
-        appBus.on('app:restore-state', this.restoreState.bind(this));
+        appBus.on('app:restore-state', this.restoreSavedState.bind(this));
+        appBus.on('app:reset-state', this.resetDefaultState.bind(this));
     }
 
     /**
@@ -29,7 +28,6 @@ export class StateService {
         const saved = localStorage.getItem(this.STORAGE_KEY);
         if (saved) {
             try {
-                // Usa o método restoreFromState do Container
                 this.container.restoreFromState(JSON.parse(saved));
             } catch (e) {
                 console.error(
@@ -54,13 +52,31 @@ export class StateService {
     }
 
     /**
-     * Remove o estado do localStorage e solicita ao App para limpar/re-inicializar.
+     * Carrega o estado salvo do localStorage e o aplica.
      */
-    restoreState() {
+    restoreSavedState() {
+        const saved = localStorage.getItem(this.STORAGE_KEY);
+        const i18n = TranslationService.getInstance();
+
+        if (saved) {
+            try {
+                this.container.restoreFromState(JSON.parse(saved));
+                appNotifications.success(i18n.translate('appstate.restore'));
+            } catch (e) {
+                console.error('Falha ao carregar estado do localStorage (dados corrompidos).', e);
+                appNotifications.danger(i18n.translate('appstate.restore_fail'));
+            }
+        } else {
+            appNotifications.info(i18n.translate('appstate.no_save'));
+        }
+    }
+
+    /**
+     * Remove o estado do localStorage e solicita ao App para limpar/re-inicializar (Reset).
+     */
+    resetDefaultState() {
         localStorage.removeItem(this.STORAGE_KEY);
         this.container.clear();
-
-        // Solicita ao App.js que recrie o layout padrão
         appBus.emit('app:reinitialize-default-layout');
     }
 }
