@@ -1,5 +1,6 @@
 import { Panel } from './Panel.js';
 import { appNotifications } from '../Services/Notification.js';
+import { Modal } from '../Services/Modal.js';
 
 export class ToolbarPanel extends Panel {
     constructor(title, height = null, collapsed = false) {
@@ -31,7 +32,17 @@ export class ToolbarPanel extends Panel {
         btn3.textContent = 'Salvar';
         btn3.onclick = () => appNotifications.warning('Clicou em Salvar');
 
-        contentEl.append(btn1, btn2, btn3);
+        const btn4 = document.createElement('button');
+        btn4.textContent = 'Preferencias';
+        btn4.onclick = () => {
+            Modal.open({
+                title: 'Preferências',
+                content: 'Teste de janela modal mostrando uma tela para editar preferências.',
+                footerText: 'Texto de rodapé'
+            });
+        };
+
+        contentEl.append(btn1, btn2, btn3, btn4);
     }
 
     getPanelType() {

@@ -1,0 +1,572 @@
+/* ========================================================================
+ * FILE: modal.css (FINAL VERSION)
+ * * DESCRIPTION:
+ * This file contains all BEM-compliant styles for the ModalService.
+ * It uses CSS Custom Properties (variables) for easy theming (light/dark)
+ * and customization.
+ *
+ * JAVASCRIPT DEPENDENCY:
+ * The `_animationDuration` variable in ModalService.js should be
+ * set to match `--modal-transition-duration` (e.g., 250ms).
+ * ======================================================================== */
+
+/* ========================================================================
+ * SECTION: THEME VARIABLES
+ * * Define all customizable properties here.
+ * Defaults are for the "Light Theme".
+ * ======================================================================== */
+:root {
+    /* -- Sizing & Spacing -- */
+    --modal-window-radius: 8px;
+    --modal-button-radius: 6px;
+    --modal-padding-small: 16px;
+    --modal-padding-large: 24px;
+    --modal-transition-duration: 0.25s;
+
+    /* -- Light Theme Colors -- */
+    --modal-bg: #ffffff;
+    --modal-text: #333333;
+    --modal-title-text: #111111;
+    --modal-icon-color: #555555;
+    --modal-icon-hover-color: #000000;
+    --modal-border-color: #eeeeee;
+    --modal-footer-bg: #f9f9f9;
+
+    /* -- Backdrop -- */
+    --modal-backdrop-bg: rgba(0, 0, 0, 0.5);
+    --modal-backdrop-blur-bg: rgba(0, 0, 0, 0.2);
+    --modal-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+
+    /* -- Components: Buttons -- */
+    --modal-btn-primary-bg: #007aff;
+    --modal-btn-primary-text: #ffffff;
+    --modal-btn-primary-hover-bg: #0056b3;
+
+    --modal-btn-secondary-bg: #6c757d;
+    --modal-btn-secondary-text: #ffffff;
+    --modal-btn-secondary-hover-bg: #5a6268;
+
+    /* -- Components: Inputs (Prompt) -- */
+    --modal-input-bg: #ffffff;
+    --modal-input-text: #222222;
+    --modal-input-border: #cccccc;
+
+    /* -- Components: Spinner -- */
+    --modal-spinner-track: #f3f3f3;
+    --modal-spinner-thumb: #3498db;
+}
+
+/* ========================================================================
+ * SECTION: DARK THEME OVERRIDES
+ *
+ * Automatically applies if the user's OS preference is dark.
+ * Also applies if you manually add `data-theme="dark"` to <html> or <body>.
+ * ======================================================================== */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --modal-bg: #2d2d2d;
+        --modal-text: #eeeeee;
+        --modal-title-text: #ffffff;
+        --modal-icon-color: #bbbbbb;
+        --modal-icon-hover-color: #ffffff;
+        --modal-border-color: #444444;
+        --modal-footer-bg: #252525;
+
+        --modal-backdrop-bg: rgba(0, 0, 0, 0.7);
+        --modal-backdrop-blur-bg: rgba(0, 0, 0, 0.3);
+        --modal-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+
+        --modal-btn-primary-bg: #007aff;
+        --modal-btn-primary-text: #ffffff;
+        --modal-btn-primary-hover-bg: #0056b3;
+
+        --modal-btn-secondary-bg: #5a6268;
+        --modal-btn-secondary-text: #eeeeee;
+        --modal-btn-secondary-hover-bg: #495057;
+
+        --modal-input-bg: #444444;
+        --modal-input-text: #eeeeee;
+        --modal-input-border: #666666;
+
+        --modal-spinner-track: #555555;
+        --modal-spinner-thumb: #3498db;
+    }
+}
+
+/* Allow manual theme override */
+[data-theme='dark'] {
+    --modal-bg: #2d2d2d;
+    --modal-text: #eeeeee;
+    --modal-title-text: #ffffff;
+    --modal-icon-color: #bbbbbb;
+    --modal-icon-hover-color: #ffffff;
+    --modal-border-color: #444444;
+    --modal-footer-bg: #252525;
+    --modal-backdrop-bg: rgba(0, 0, 0, 0.7);
+    --modal-backdrop-blur-bg: rgba(0, 0, 0, 0.3);
+    --modal-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    --modal-btn-primary-bg: #007aff;
+    --modal-btn-primary-text: #ffffff;
+    --modal-btn-primary-hover-bg: #0056b3;
+    --modal-btn-secondary-bg: #5a6268;
+    --modal-btn-secondary-text: #eeeeee;
+    --modal-btn-secondary-hover-bg: #495057;
+    --modal-input-bg: #444444;
+    --modal-input-text: #eeeeee;
+    --modal-input-border: #666666;
+    --modal-spinner-track: #555555;
+    --modal-spinner-thumb: #3498db;
+}
+
+/* ========================================================================
+ * SECTION: MODAL CONTAINER (SERVICE)
+ * ======================================================================== */
+
+/* --- Block: modal-container --- */
+.modal-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1000;
+    display: none;
+    pointer-events: none; /* Allows clicks through when no modal is active */
+}
+/* Modifier: modal-container--is-open */
+.modal-container--is-open {
+    display: block;
+    pointer-events: all;
+}
+
+/* --- Element: modal__backdrop --- */
+.modal__backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: var(--modal-backdrop-bg);
+    opacity: 0;
+    transition: opacity var(--modal-transition-duration) ease-out;
+    pointer-events: all;
+}
+/* Modifier: modal__backdrop--blur */
+.modal__backdrop--blur {
+    background-color: var(--modal-backdrop-blur-bg);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+}
+/* Modifier: modal__backdrop--none */
+.modal__backdrop--none {
+    background-color: transparent;
+}
+.modal-container--is-open .modal__backdrop {
+    opacity: 1;
+}
+
+/* ========================================================================
+ * SECTION: MODAL WINDOW (INSTANCE)
+ * ======================================================================== */
+
+/* --- Block: modal --- */
+.modal {
+    position: absolute;
+    background-color: var(--modal-bg);
+    box-shadow: var(--modal-shadow);
+    color: var(--modal-text);
+    display: flex;
+    flex-direction: column;
+    opacity: 0;
+    pointer-events: all;
+    overflow: hidden;
+    transition:
+        opacity var(--modal-transition-duration) ease-out,
+        transform var(--modal-transition-duration) ease-out;
+}
+
+/* --- Modifiers: modal (State) --- */
+.modal--is-visible {
+    opacity: 1;
+    /* Target transform is set by position modifiers */
+}
+.modal--is-hidden {
+    opacity: 0;
+    pointer-events: none;
+    display: none;
+}
+.modal--is-leaving {
+    opacity: 0;
+    /* Leaving transform is set by position modifiers */
+}
+
+/* --- Modifiers: modal (Position) --- */
+
+/* Position: center (default) */
+.modal--position-center {
+    top: 50%;
+    left: 50%;
+    border-radius: var(--modal-window-radius);
+    max-height: 90vh;
+    /* Start animation state (set by JS) */
+    /* transform: translate(-50%, -50%) scale(0.95); */
+}
+.modal--position-center.modal--is-visible {
+    transform: translate(-50%, -50%) scale(1);
+}
+.modal--position-center.modal--is-leaving {
+    transform: translate(-50%, -50%) scale(0.95);
+}
+
+/* Position: right (drawer) */
+.modal--position-right {
+    top: 0;
+    right: 0;
+    height: 100vh;
+    max-height: 100vh;
+    transform: translateX(100%);
+}
+.modal--position-right.modal--is-visible {
+    transform: translateX(0);
+}
+.modal--position-right.modal--is-leaving {
+    transform: translateX(100%);
+}
+
+/* Position: left (drawer) */
+.modal--position-left {
+    top: 0;
+    left: 0;
+    height: 100vh;
+    max-height: 100vh;
+    transform: translateX(-100%);
+}
+.modal--position-left.modal--is-visible {
+    transform: translateX(0);
+}
+.modal--position-left.modal--is-leaving {
+    transform: translateX(-100%);
+}
+
+/* Position: top */
+.modal--position-top {
+    top: 0;
+    left: 0;
+    width: 100vw;
+    max-height: 50vh;
+    transform: translateY(-100%);
+}
+.modal--position-top.modal--is-visible {
+    transform: translateY(0);
+}
+.modal--position-top.modal--is-leaving {
+    transform: translateY(-100%);
+}
+
+/* Position: bottom */
+.modal--position-bottom {
+    bottom: 0;
+    left: 0;
+    width: 100vw;
+    max-height: 90vh;
+    top: auto; /* Override 'center' default */
+    transform: translateY(100%);
+}
+.modal--position-bottom.modal--is-visible {
+    transform: translateY(0);
+}
+.modal--position-bottom.modal--is-leaving {
+    transform: translateY(100%);
+}
+
+/* --- Modifiers: modal (Sizing) --- */
+
+/* Size rules for 'center' */
+.modal--position-center.modal--size-auto {
+    width: auto;
+    max-width: 90vw;
+}
+.modal--position-center.modal--size-small {
+    width: 400px;
+    max-width: 90vw;
+}
+.modal--position-center.modal--size-medium {
+    width: 600px;
+    max-width: 90vw;
+}
+.modal--position-center.modal--size-large {
+    width: 900px;
+    max-width: 90vw;
+}
+
+/* Size rules for 'right' / 'left' drawers (controls width) */
+.modal--position-right.modal--size-auto,
+.modal--position-left.modal--size-auto {
+    width: auto;
+    max-width: 90vw;
+}
+.modal--position-right.modal--size-small,
+.modal--position-left.modal--size-small {
+    width: 320px;
+    max-width: 90vw;
+}
+.modal--position-right.modal--size-medium,
+.modal--position-left.modal--size-medium {
+    width: 480px;
+    max-width: 90vw;
+}
+.modal--position-right.modal--size-large,
+.modal--position-left.modal--size-large {
+    width: 600px;
+    max-width: 90vw;
+}
+
+/* Size rules for 'top' / 'bottom' (controls height) */
+.modal--position-top.modal--size-auto,
+.modal--position-bottom.modal--size-auto {
+    height: auto;
+}
+.modal--position-top.modal--size-small,
+.modal--position-bottom.modal--size-small {
+    height: 30vh;
+    max-height: 30vh;
+}
+.modal--position-top.modal--size-medium,
+.modal--position-bottom.modal--size-medium {
+    height: 50vh;
+    max-height: 50vh;
+}
+.modal--position-top.modal--size-large,
+.modal--position-bottom.modal--size-large {
+    height: 75vh;
+    max-height: 75vh;
+}
+
+/* Fullscreen (applies to all positions) */
+.modal--size-fullscreen {
+    width: 100vw;
+    height: 100vh;
+    max-height: 100vh;
+    top: 0;
+    left: 0;
+    right: auto;
+    bottom: auto;
+    transform: none !important; /* Override all position transforms */
+    border-radius: 0;
+}
+
+/* ========================================================================
+ * SECTION: MODAL ELEMENTS (Header, Content, Footer)
+ * ======================================================================== */
+
+/* --- Element: modal__header --- */
+.modal__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--modal-padding-small) var(--modal-padding-large);
+    border-bottom: 1px solid var(--modal-border-color);
+    flex-shrink: 0; /* Prevents header from shrinking */
+}
+/* Modifier: modal__header--draggable */
+.modal__header--draggable {
+    cursor: move;
+}
+
+/* --- Element: modal__nav --- */
+/* Wrapper for title + back button */
+.modal__nav {
+    display: flex;
+    align-items: center;
+}
+
+/* --- Element: modal__title --- */
+.modal__title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0;
+    border-bottom: none;
+    padding-bottom: 0;
+    color: var(--modal-title-text);
+}
+
+/* --- Element: modal__back-button --- */
+.modal__back-button {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 1.5rem;
+    margin-right: 12px;
+    padding: 0 4px;
+    line-height: 1;
+    color: var(--modal-icon-color);
+    transition: color 0.2s;
+}
+.modal__back-button:hover {
+    color: var(--modal-icon-hover-color);
+}
+
+/* --- Element: modal__close-button --- */
+.modal__close-button {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 1.5rem;
+    padding: 0;
+    line-height: 1;
+    color: var(--modal-icon-color);
+    font-weight: bold;
+    transition: color 0.2s;
+}
+.modal__close-button:hover {
+    color: var(--modal-icon-hover-color);
+}
+
+/* --- Element: modal__content --- */
+.modal__content {
+    padding: var(--modal-padding-large);
+    flex-grow: 1; /* Allows content to fill space */
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* --- Element: modal__footer --- */
+.modal__footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--modal-padding-small) var(--modal-padding-large);
+    border-top: 1px solid var(--modal-border-color);
+    background-color: var(--modal-footer-bg);
+    flex-shrink: 0; /* Prevents footer from shrinking */
+}
+
+/* --- Element: modal__footer-text --- */
+.modal__footer-text {
+    font-size: 0.875rem;
+    color: var(--modal-text);
+    opacity: 0.7;
+}
+
+/* --- Element: modal__footer-buttons --- */
+.modal__footer-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+/* ========================================================================
+ * SECTION: MODAL COMPONENTS (Buttons, Prompts, Spinner)
+ * ======================================================================== */
+
+/* --- Element: modal__button (Base) --- */
+.modal__button {
+    border: none;
+    padding: 8px 14px;
+    border-radius: var(--modal-button-radius);
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    margin: 4px;
+    transition: background-color 0.2s;
+
+    /* Default to secondary style */
+    background-color: var(--modal-btn-secondary-bg);
+    color: var(--modal-btn-secondary-text);
+}
+.modal__button:hover {
+    background-color: var(--modal-btn-secondary-hover-bg);
+}
+
+/* Modifier: modal__button--primary */
+.modal__button--primary {
+    background-color: var(--modal-btn-primary-bg);
+    color: var(--modal-btn-primary-text);
+}
+.modal__button--primary:hover {
+    background-color: var(--modal-btn-primary-hover-bg);
+}
+/* Modifier: modal__button--secondary (explicit) */
+.modal__button--secondary {
+    background-color: var(--modal-btn-secondary-bg);
+    color: var(--modal-btn-secondary-text);
+}
+.modal__button--secondary:hover {
+    background-color: var(--modal-btn-secondary-hover-bg);
+}
+
+/* --- Elements for Presets --- */
+.modal__prompt {
+    display: flex;
+    flex-direction: column;
+}
+.modal__prompt-label {
+    margin-bottom: 8px;
+}
+.modal__prompt-input {
+    padding: 8px;
+    border: 1px solid var(--modal-input-border);
+    background-color: var(--modal-input-bg);
+    color: var(--modal-input-text);
+    border-radius: 4px;
+    font-size: 1rem;
+}
+.modal__prompt-input:focus {
+    outline: 2px solid var(--modal-btn-primary-bg);
+    border-color: transparent;
+}
+
+/* --- Element: modal__spinner --- */
+.modal__spinner {
+    border: 4px solid var(--modal-spinner-track);
+    border-top: 4px solid var(--modal-spinner-thumb);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: modal-spin 1s linear infinite;
+    margin: 40px auto; /* Center spinner in content area */
+}
+@keyframes modal-spin {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+/* ========================================================================
+ * SECTION: GLOBAL STATE & RESPONSIVENESS
+ * ======================================================================== */
+
+/* --- Global State Class --- */
+/* Applied to <body> when any modal is open */
+.modal-scroll-lock {
+    overflow: hidden;
+}
+
+/* --- Responsiveness --- */
+@media (max-width: 640px) {
+    /* Make drawers wider on mobile */
+    .modal--position-right.modal--size-small,
+    .modal--position-left.modal--size-small,
+    .modal--position-right.modal--size-medium,
+    .modal--position-left.modal--size-medium {
+        width: 90vw;
+    }
+
+    /* Make centered modals simpler */
+    .modal--position-center.modal--size-small,
+    .modal--position-center.modal--size-medium {
+        width: 95vw;
+        max-width: 95vw;
+    }
+
+    /* Reduce padding on mobile */
+    .modal__content {
+        padding: var(--modal-padding-small);
+    }
+    .modal__header,
+    .modal__footer {
+        padding: 12px var(--modal-padding-small);
+    }
+}
