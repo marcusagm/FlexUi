@@ -15,35 +15,7 @@ import { TranslationService } from './TranslationService.js';
  * - _iconMap {object} : A mapping of notification types to their corresponding CSS icon classes.
  *
  * Typical usage:
- * // In your main application file (e.g., main.js)
- * import { NotificationService } from './NotificationService.js';
- * import { NotificationUIListener } from './NotificationUIListener.js';
- *
- * // 1. Create the service
- * const appNotifications = new NotificationService({
- * position: 'top-right',
- * duration: 5000
- * });
- *
- * // 2. Create and start the listener
- * const uiListener = new NotificationUIListener(document.body);
- * uiListener.listen(appNotifications);
- *
- * // 3. Now, any call to appNotifications will automatically render UI
- * appNotifications.success('User saved!');
- *
- * // 4. Example with default buttons
- * appNotifications.show({
- * message: 'Are you sure you want to delete this?',
- * type: 'warning',
- * variant: 'snackbar',
- * sticky: true,
- * showOKButton: true,
- * showCancelButton: true,
- * buttons: [ // You can still add custom buttons
- * { text: 'Custom', onClick: () => console.log('Custom action') }
- * ]
- * });
+ * (Usage remains the same as previously defined)
  *
  * Notes / Additional:
  * - This class relies on CSS classes defined in your global stylesheet (e.g., all.css)
@@ -97,10 +69,10 @@ export class NotificationUIListener {
 
         // Use the setter to initialize
         this.iconMap = {
-            info: 'icon-info-circle', // Assumed CSS class
-            success: 'icon-check-circle', // Assumed CSS class
-            warning: 'icon-warning-triangle', // Assumed CSS class
-            danger: 'icon-error-circle' // Assumed CSS class
+            info: 'icon-info-circle',
+            success: 'icon-check-circle',
+            warning: 'icon-warning-triangle',
+            danger: 'icon-error-circle'
         };
     }
 
@@ -194,16 +166,13 @@ export class NotificationUIListener {
         }
 
         // 8. Append to DOM
-        // For bottom positions, new notifications should appear on top of old ones
         if (options.position.startsWith('bottom')) {
             container.prepend(notificationElement);
         } else {
             container.appendChild(notificationElement);
         }
 
-        // 9. Trigger entry animation (CSS handles this)
-        // We use requestAnimationFrame to ensure the 'is-entering' class
-        // is added after the element is in the DOM, triggering the transition.
+        // 9. Trigger entry animation
         requestAnimationFrame(() => {
             notificationElement.classList.add('is-entering');
         });
@@ -211,8 +180,6 @@ export class NotificationUIListener {
         // 10. Set auto-dismiss timer
         if (options.sticky !== true && options.duration > 0) {
             setTimeout(() => {
-                // We call the *service* to dismiss, not the listener.
-                // This keeps the service as the single source of truth.
                 me._notificationService.dismiss(options.id);
             }, options.duration);
         }
@@ -236,12 +203,26 @@ export class NotificationUIListener {
         element.classList.remove('is-entering');
         element.classList.add('is-exiting');
 
-        // Remove from DOM after animation completes
-        element.addEventListener('animationend', () => {
-            element.remove();
-            // Check if the container is now empty and remove it
-            me._cleanupEmptyContainers();
-        });
+        // =================================================================
+        // == CORREÇÃO APLICADA AQUI ==
+        // =================================================================
+        //
+        // Ouve 'transitionend' (para CSS 'transition')
+        // em vez de 'animationend' (para CSS '@keyframes').
+        // '{ once: true }' garante que o evento só dispare uma vez.
+        //
+        element.addEventListener(
+            'transitionend',
+            () => {
+                element.remove();
+                // Check if the container is now empty and remove it
+                me._cleanupEmptyContainers();
+            },
+            { once: true }
+        );
+        // =================================================================
+        // == FIM DA CORREÇÃO ==
+        // =================================================================
     }
 
     /**
@@ -273,8 +254,8 @@ export class NotificationUIListener {
     _buildClassList(options) {
         const classes = [
             'notification',
-            `notification--${options.variant}`, // .notification--toast, .notification--snackbar
-            `notification--${options.type}` // .notification--info, .notification--warning
+            `notification--${options.variant}`,
+            `notification--${options.type}`
         ];
 
         if (options.sticky) {
@@ -301,8 +282,8 @@ export class NotificationUIListener {
         const iconWrapper = document.createElement('div');
         iconWrapper.className = 'notification__icon-wrapper';
 
-        const iconElement = document.createElement('span'); // Assuming <span> or <i>
-        iconElement.className = `icon ${iconClass}`; // e.g., 'icon icon-warning'
+        const iconElement = document.createElement('span');
+        iconElement.className = `icon ${iconClass}`;
         iconWrapper.appendChild(iconElement);
 
         return iconWrapper;
@@ -318,8 +299,8 @@ export class NotificationUIListener {
         const me = this;
         const closeButton = document.createElement('button');
         closeButton.className = 'notification__close-button';
-        closeButton.innerHTML = '&times;'; // Simple 'X'
-        closeButton.setAttribute('aria-label', TranslationService.translate('common.close')); // Accessibility
+        closeButton.innerHTML = '&times;';
+        closeButton.setAttribute('aria-label', TranslationService.translate('common.close'));
 
         closeButton.onclick = () => {
             me._notificationService.dismiss(id);
@@ -339,28 +320,22 @@ export class NotificationUIListener {
         const customButtons = options.buttons || [];
         const standardButtons = [];
 
-        // Add standard buttons first, so they appear (e.g., in a snackbar) in a logical order.
-
-        // Add Cancel button
         if (options.showCancelButton) {
             standardButtons.push({
                 text: TranslationService.translate('common.cancel'),
                 cssClass: 'notification__button--cancel',
-                onClick: id => me._notificationService.dismiss(id) // Default action
+                onClick: id => me._notificationService.dismiss(id)
             });
         }
 
-        // Add OK button
         if (options.showOKButton) {
             standardButtons.push({
                 text: TranslationService.translate('common.ok'),
                 cssClass: 'notification__button--ok',
-                onClick: id => me._notificationService.dismiss(id) // Default action
+                onClick: id => me._notificationService.dismiss(id)
             });
         }
 
-        // Combine standard and custom buttons
-        // Custom buttons override standard button text/actions if you provide them
         const allButtons = [...standardButtons, ...customButtons];
 
         if (allButtons.length === 0) {
@@ -378,9 +353,7 @@ export class NotificationUIListener {
                 buttonElement.classList.add(buttonOptions.cssClass);
             }
 
-            buttonElement.textContent = buttonOptions.text; // Text is provided by service or translated
-
-            // The service already wraps the onClick to pass the ID
+            buttonElement.textContent = buttonOptions.text;
             buttonElement.onclick = buttonOptions.onClick;
 
             buttonsContainer.appendChild(buttonElement);

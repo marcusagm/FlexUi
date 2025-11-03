@@ -1,4 +1,5 @@
 import { Panel } from './Panel.js';
+import { appNotifications } from '../Services/Notification.js';
 
 export class ToolbarPanel extends Panel {
     constructor(title, height = null, collapsed = false) {
@@ -20,15 +21,15 @@ export class ToolbarPanel extends Panel {
 
         const btn1 = document.createElement('button');
         btn1.textContent = 'Ferramenta 1';
-        btn1.onclick = () => alert('Clicou na Ferramenta 1');
+        btn1.onclick = () => appNotifications.info('Clicou na Ferramenta 1');
 
         const btn2 = document.createElement('button');
         btn2.textContent = 'Editar';
-        btn2.onclick = () => alert('Clicou em Editar');
+        btn2.onclick = () => appNotifications.success('Clicou em Editar');
 
         const btn3 = document.createElement('button');
         btn3.textContent = 'Salvar';
-        btn3.onclick = () => alert('Clicou em Salvar');
+        btn3.onclick = () => appNotifications.warning('Clicou em Salvar');
 
         contentEl.append(btn1, btn2, btn3);
     }
