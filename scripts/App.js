@@ -2,6 +2,7 @@ import { Menu } from './Menu/Menu.js';
 import { Container } from './Container.js';
 import { TextPanel } from './Panel/TextPanel.js';
 import { ToolbarPanel } from './Panel/ToolbarPanel.js';
+import { PanelGroup } from './Panel/PanelGroup.js';
 import { appBus } from './EventBus.js';
 import { StateService } from './StateService.js';
 import { debounce } from './Debounce.js';
@@ -31,7 +32,6 @@ export class App {
         uiListener.listen(appNotifications);
     }
 
-    // NOVO
     initEventListeners() {
         appBus.on('app:add-new-panel', this.addNewPanel.bind(this));
 
@@ -43,16 +43,43 @@ export class App {
 
     initDefault() {
         const c1 = this.container.createColumn();
-        c1.addPanel(new TextPanel('Painel de Texto 1', 'Este é um painel customizado.'));
-        c1.addPanel(
-            new TextPanel('Painel de Texto 2', 'O conteúdo é gerenciado pela subclasse.', 200)
+        const group = new PanelGroup(
+            new TextPanel('Painel de Texto 1', 'Este é um painel customizado.')
         );
+        group.addPanel(new TextPanel('Aba um', 'este é o conteudo da aba'));
+        group.addPanel(
+            new TextPanel('Aba Um título muito grande para teste', 'abs 2 este é o conteudo da aba')
+        );
+
+        // (Req 3.1) Renomeado de addPanel para addPanelGroup
+        c1.addPanelGroup(group);
+        c1.addPanelGroup(
+            // (Req 3.1)
+            new PanelGroup(
+                new TextPanel('Painel de Texto 2', 'O conteúdo é gerenciado pela subclasse.', 200)
+            )
+        );
+
         const c2 = this.container.createColumn();
-        c2.addPanel(new ToolbarPanel('Barra de Ferramentas'));
-        c2.addPanel(new TextPanel('Painel 3', 'Mais um painel de texto.', null, true));
+        c2.addPanelGroup(new PanelGroup(new ToolbarPanel('Barra de Ferramentas'))); // (Req 3.1)
+        c2.addPanelGroup(
+            // (Req 3.1)
+            new PanelGroup(
+                new TextPanel('Painel 3', 'Mais um painel de texto.', null),
+                null, // Altura do Grupo
+                true // Grupo colapsado
+            )
+        );
+
         const c3 = this.container.createColumn();
-        c3.addPanel(new TextPanel('Painel 4', 'Conteúdo do painel 4.'));
-        c3.addPanel(new ToolbarPanel());
+        c3.addPanelGroup(new PanelGroup(new TextPanel('Painel 4', 'Conteúdo do painel 4.'))); // (Req 3.1)
+        c3.addPanelGroup(
+            // (Req 3.1)
+            new PanelGroup(
+                new ToolbarPanel() // Toolbar sem título
+            )
+        );
+
         this.container.updateColumnsSizes();
 
         const i18n = TranslationService.getInstance();
@@ -63,7 +90,11 @@ export class App {
         const column = this.container.getFirstColumn();
         const title = `Novo Painel (${new Date().toLocaleTimeString()})`;
         const panel = new TextPanel(title, 'Conteúdo do novo painel.');
-        column.addPanel(panel);
+        // Envolve o novo painel em um novo grupo
+        const panelGroup = new PanelGroup(panel);
+
+        // (Req 3.1) Renomeado de addPanel para addPanelGroup
+        column.addPanelGroup(panelGroup);
     }
 
     /**
@@ -71,7 +102,8 @@ export class App {
      */
     onResizeHandler() {
         this.container.getColumns().forEach(column => {
-            column.updatePanelsSizes();
+            // (Req 3.3) Renomeado de updatePanelsSizes para updatePanelGroupsSizes
+            column.updatePanelGroupsSizes();
         });
     }
 }

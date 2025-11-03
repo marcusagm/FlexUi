@@ -1,28 +1,66 @@
+/* === ARQUIVO: PanelFactory.js === */
 import { Panel } from './Panel.js';
 import { TextPanel } from './TextPanel.js';
 import { ToolbarPanel } from './ToolbarPanel.js';
+import { PanelGroup } from './PanelGroup.js';
 
 /**
- * Cria uma instância de Painel baseada nos dados salvos.
- * @param {object} panelData - O objeto de estado salvo para o painel.
- * @returns {Panel} Uma instância da subclasse de Painel correta.
+ * Cria uma instância de PAINEL (filho) baseada no tipo.
  */
-export function createPanel(panelData) {
-    const { type, title, height, collapsed } = panelData;
+function createPanel(panelData) {
+    const { type, title, height, config } = panelData;
 
+    let panel;
     switch (type) {
         case 'TextPanel':
-            // O conteúdo será definido por setContent() no PanelContainer
-            return new TextPanel(title, '', height, collapsed);
-
+            panel = new TextPanel(title, '', height, config);
+            break;
         case 'ToolbarPanel':
-            // O conteúdo é recriado pela classe, setContent() não é necessário
-            // mas o faremos mesmo assim para consistência.
-            return new ToolbarPanel(title, height, collapsed);
-
-        case 'Panel':
+            panel = new ToolbarPanel(title, height, config);
+            break;
         default:
-            // Painel base genérico
-            return new Panel(title, height, collapsed);
+            panel = new Panel(title, height, config);
+            break;
     }
+
+    // Restaura propriedades salvas
+    panel.id = panelData.id || panel.id;
+    panel.setContent(panelData.content);
+    panel.state.height = panelData.height;
+
+    return panel;
+}
+
+/**
+ * Cria uma instância de PANELGROUP a partir do estado salvo.
+ */
+export function createPanelGroupFromState(groupData) {
+    let firstPanel = null;
+    const panelsToRestore = [];
+
+    groupData.panels.forEach(panelData => {
+        const panel = createPanel(panelData);
+        panelsToRestore.push(panel);
+
+        if (panel.id === groupData.activePanelId) {
+            firstPanel = panel; // O painel ativo deve ser o primeiro
+        }
+    });
+
+    if (!firstPanel && panelsToRestore.length > 0) {
+        firstPanel = panelsToRestore[0]; // Backup
+    }
+
+    if (firstPanel) {
+        const group = new PanelGroup(firstPanel, groupData.height, groupData.collapsed);
+
+        // Adiciona os painéis restantes (abas)
+        panelsToRestore.forEach(panel => {
+            if (panel !== firstPanel) {
+                group.addPanel(panel, false); // Adiciona sem tornar ativo
+            }
+        });
+        return group;
+    }
+    return null; // Retorna nulo se o grupo estava vazio
 }

@@ -1,54 +1,131 @@
-import { appBus } from '../EventBus.js'; // NOVO
+import { appBus } from '../EventBus.js';
+import { PanelGroup } from '../Panel/PanelGroup.js';
 
+/**
+ * Description:
+ * Manages a single vertical column in the container. It holds and organizes
+ * PanelGroups, manages horizontal resizing, and handles the drag/drop
+ * logic for reordering PanelGroups within itself or creating new ones when
+ * a Panel (tab) is dropped onto it.
+ *
+ * Properties summary:
+ * - state {object} : Internal state management.
+ * - container {Container} : The parent Container instance.
+ * - panelGroups {Array<PanelGroup>} : (Req 3.1) The list of PanelGroups this column holds.
+ * - width {number|null} : The user-defined width of the column in pixels.
+ * - _minWidth {number} : (Req 5) The minimum width the column can be resized to.
+ *
+ * Typical usage:
+ * const column = new Column(myContainer);
+ * const panelGroup = new PanelGroup(new TextPanel('Title'));
+ * column.addPanelGroup(panelGroup);
+ *
+ * Notes / Additional:
+ * - This class only contains PanelGroups.
+ * - It emits 'column:empty' when its last PanelGroup is removed.
+ */
 export class Column {
+    /**
+     * @type {object}
+     * @private
+     */
     state = {
         container: null,
-        panels: [],
+        panelGroups: [],
         width: null
     };
 
+    /**
+     * The minimum width in pixels for horizontal resizing.
+     * @type {number}
+     * @private
+     */
+    _minWidth;
+
+    /**
+     * @param {Container} container - The parent container instance.
+     * @param {number|null} [width=null] - The initial width of the column.
+     */
     constructor(container, width = null) {
+        this.minWidth = 150;
         this.state.container = container;
+        this.state.width = width;
+
         this.element = document.createElement('div');
         this.element.classList.add('column');
-        this.state.width = width;
+
         this.initDragDrop();
-
-        // O local onde addResizeBars é chamado deve ser verificado para garantir
-        // que painéis e resize-bars estejam na ordem desejada no DOM.
-        // Assumindo que addResizeBars existe e adiciona os elementos ao this.element.
-        // this.addResizeBars();
-
         this.initEventListeners();
     }
 
-    initEventListeners() {
-        appBus.on('panel:removed', this.onPanelRemoved.bind(this));
+    /**
+     * @param {number} width
+     */
+    set minWidth(width) {
+        const sanitizedWidth = Number(width);
+        if (isNaN(sanitizedWidth) || sanitizedWidth < 0) {
+            console.warn(`Column: Invalid minWidth "${width}". Must be a non-negative number.`);
+            this._minWidth = 0;
+            return;
+        }
+        this._minWidth = sanitizedWidth;
     }
 
-    onPanelRemoved({ panel, column }) {
-        if (column === this) {
-            this.removePanel(panel, true);
+    /**
+     * @returns {number}
+     */
+    get minWidth() {
+        return this._minWidth;
+    }
+
+    // --- Concrete Methods ---
+
+    /**
+     * Initializes event listeners for the EventBus.
+     */
+    initEventListeners() {
+        appBus.on('panelgroup:removed', this.onPanelGroupRemoved.bind(this));
+    }
+
+    /**
+     * Handles the removal of a PanelGroup triggered by the EventBus.
+     * @param {object} eventData - The event data.
+     * @param {PanelGroup} eventData.panel - The PanelGroup instance being removed.
+     * @param {Column} eventData.column - The Column it is being removed from.
+     */
+    onPanelGroupRemoved({ panel, column }) {
+        if (column === this && panel instanceof PanelGroup) {
+            this.removePanelGroup(panel, true);
         }
     }
 
+    /**
+     * Cleans up event listeners when the column is destroyed.
+     */
     destroy() {
-        appBus.off('panel:removed', this.onPanelRemoved.bind(this));
-        [...this.state.panels].forEach(panel => panel.destroy());
+        appBus.off('panelgroup:removed', this.onPanelGroupRemoved.bind(this));
+        [...this.state.panelGroups].forEach(panel => panel.destroy());
     }
 
+    /**
+     * Sets the parent container reference.
+     * @param {Container} container - The parent container instance.
+     */
     setParentContainer(container) {
         this.state.container = container;
     }
 
+    /**
+     * Initializes native drag-and-drop event listeners for the column element.
+     */
     initDragDrop() {
         this.element.addEventListener('dragover', this.onDragOver.bind(this));
         this.element.addEventListener('drop', this.onDrop.bind(this));
     }
 
     /**
-     * Adiciona barras de redimensionamento.
-     * @param {boolean} isLast - Indica se esta é a última coluna no container.
+     * Adds the horizontal resize bar to the column.
+     * @param {boolean} isLast - Indicates if this is the last column in the container.
      */
     addResizeBars(isLast) {
         this.element.querySelectorAll('.resize-bar').forEach(b => b.remove());
@@ -60,25 +137,30 @@ export class Column {
         const bar = document.createElement('div');
         bar.classList.add('resize-bar');
         this.element.appendChild(bar);
-        bar.addEventListener('mousedown', e => this.startResize(e, 'right'));
+        bar.addEventListener('mousedown', e => this.startResize(e));
     }
 
-    startResize(e, side) {
-        const container = this.state.container;
+    /**
+     * Handles the start of a horizontal resize drag.
+     * @param {MouseEvent} e - The mousedown event.
+     */
+    startResize(e) {
+        const me = this;
+        const container = me.state.container;
 
         const columns = container.state.children.filter(c => c instanceof Column);
         const cols = columns.map(c => c.element);
 
-        const idx = cols.indexOf(this.element);
+        const idx = cols.indexOf(me.element);
         if (cols.length === 1 || idx === cols.length - 1) return;
 
         e.preventDefault();
         const startX = e.clientX;
-        const startW = this.element.offsetWidth;
+        const startW = me.element.offsetWidth;
 
         const onMove = ev => {
             const delta = ev.clientX - startX;
-            this.state.width = Math.max(150, startW + delta);
+            me.state.width = Math.max(me.minWidth, startW + delta);
             container.updateColumnsSizes();
         };
         const onUp = () => {
@@ -90,261 +172,257 @@ export class Column {
     }
 
     /**
-     * Atualiza a largura da coluna.
-     * @param {boolean} isLast - Indica se esta é a última coluna no container.
+     * Updates the CSS flex-basis (width) of the column.
+     * @param {boolean} isLast - Indicates if this is the last column.
      */
     updateWidth(isLast) {
         if (isLast) {
             this.element.style.flex = `1 1 auto`;
-            return;
         }
         if (this.state.width !== null) {
             this.element.style.flex = `0 0 ${this.state.width}px`;
         }
+        this.updatePanelGroupsSizes();
     }
 
+    /**
+     * Handles the dragover event for managing the placeholder or group target.
+     * @param {DragEvent} e
+     */
     onDragOver(e) {
         e.preventDefault();
-        const draggedPanel = this.state.container.getDraggedPanel();
+        const draggedItem = this.state.container.getDragged();
         const placeholder = this.state.container.getPlaceholder();
-        if (!draggedPanel) return;
-
-        const oldColumn = draggedPanel.state.column;
-        const originalIndex = oldColumn.getPanelIndex(draggedPanel);
-
-        // 1. Garante que o placeholder esteja nesta coluna
-        if (placeholder.parentElement !== this.element) {
-            placeholder.parentElement?.removeChild(placeholder);
-            this.element.appendChild(placeholder);
-        }
-
-        const panels = Array.from(this.element.querySelectorAll('.panel'));
-        let placed = false;
-        let dropIndex = panels.length; // Índice de destino padrão (final da coluna)
-
-        // 2. Encontra o índice de drop e posiciona o placeholder
-        for (let i = 0; i < panels.length; i++) {
-            const ch = panels[i];
-            const rect = ch.getBoundingClientRect();
-            if (e.clientY < rect.top + rect.height / 2) {
-                this.element.insertBefore(placeholder, ch);
-                placed = true;
-                dropIndex = i;
-                break;
-            }
-        }
-        if (!placed) {
-            this.element.appendChild(placeholder);
-            // dropIndex permanece como panels.length (final da coluna)
-        }
-
-        // 3. LÓGICA CRÍTICA: Esconder o placeholder se for na posição original
-        // Esta é a mesma verificação usada no onDrop para prevenir movimentos indesejados.
-        const isSameColumn = oldColumn === this;
-        const isOriginalPosition = dropIndex === originalIndex;
-        const isBelowGhost = dropIndex === originalIndex + 1;
-
-        if (isSameColumn && (isOriginalPosition || isBelowGhost)) {
-            // Se o painel está sendo solto em sua área original, escondemos o placeholder.
-            // Para escondê-lo, vamos temporariamente removê-lo da coluna.
-            placeholder.remove();
-        }
-        // Se não estiver na posição original, ele já foi inserido acima (passos 1 e 2).
-    }
-
-    onDrop(e) {
-        e.preventDefault();
-        const draggedPanel = this.state.container.getDraggedPanel();
-        const placeholder = this.state.container.getPlaceholder();
-        if (!draggedPanel) return;
-
-        const oldColumn = draggedPanel.state.column;
-
-        // Se o placeholder não estiver na coluna, significa que o drop foi na área original
-        // e o placeholder foi removido em onDragOver. Fazemos a limpeza e saímos.
-        if (placeholder.parentElement !== this.element) {
-            // Este caso só ocorre se o drop for feito na área "original" após onDragOver ter removido o ghost
-            const originalIndex = oldColumn.getPanelIndex(draggedPanel);
-
-            // Replicamos a lógica de saída do onDrop para garantir que o layout seja atualizado
-            draggedPanel.state.height = null;
-            oldColumn.updatePanelsSizes();
-            return;
-        }
-
-        // Se o placeholder está aqui, continuamos com o cálculo e a movimentação
-
-        // FIX CRÍTICO 1: Calcula o índice lógico do painel (ignorando resize-bar).
-        const allChildren = Array.from(this.element.children);
-        let panelIndex = 0;
-        for (const child of allChildren) {
-            if (child === placeholder) {
-                break; // Paramos de contar painéis ao encontrar o placeholder
-            }
-            if (child.classList.contains('panel')) {
-                panelIndex++; // Contamos apenas os painéis
-            }
-        }
-
-        // RECUPERAÇÃO DO ÍNDICE ORIGINAL:
-        const originalIndex = oldColumn.getPanelIndex(draggedPanel);
+        if (!draggedItem) return;
 
         placeholder.remove();
 
-        // FIX CRÍTICO 2: Prevenir movimentos redundantes/indesejados dentro da mesma coluna.
-        if (
-            oldColumn === this &&
-            (panelIndex === originalIndex || panelIndex === originalIndex + 1)
-        ) {
-            // Drop no local original: cancela o movimento.
-            draggedPanel.state.height = null;
-            oldColumn.updatePanelsSizes();
+        if (draggedItem instanceof PanelGroup) {
+            const oldColumn = draggedItem.state.column;
+            const originalIndex = oldColumn ? oldColumn.getPanelGroupIndex(draggedItem) : -1;
+
+            let placed = false;
+            let dropIndex = this.state.panelGroups.length;
+
+            for (let i = 0; i < this.state.panelGroups.length; i++) {
+                const targetGroup = this.state.panelGroups[i];
+                const targetElement = targetGroup.element;
+                const rect = targetElement.getBoundingClientRect();
+
+                if (draggedItem === targetGroup) continue;
+
+                if (e.clientY < rect.top + rect.height / 2) {
+                    this.element.insertBefore(placeholder, targetElement);
+                    placed = true;
+                    dropIndex = i;
+                    break;
+                }
+            }
+            if (!placed) {
+                this.element.appendChild(placeholder);
+            }
+
+            const isSameColumn = oldColumn === this;
+            const isOriginalPosition = dropIndex === originalIndex;
+            const isBelowGhost = dropIndex === originalIndex + 1;
+
+            if (isSameColumn && (isOriginalPosition || isBelowGhost)) {
+                placeholder.remove();
+            }
+        }
+    }
+
+    /**
+     * Handles the drop event for reordering or creating PanelGroups.
+     * @param {DragEvent} e
+     */
+    onDrop(e) {
+        e.preventDefault();
+        const draggedItem = this.state.container.getDragged();
+        const placeholder = this.state.container.getPlaceholder();
+
+        if (!draggedItem || !(draggedItem instanceof PanelGroup)) {
+            if (draggedItem) this.state.container.endDrag();
             return;
         }
 
-        // Se o painel for movido:
+        const oldColumn = draggedItem.state.column;
 
-        // FIX DE MOVIMENTAÇÃO: Ao mover, sempre resetamos a altura.
-        draggedPanel.state.height = null;
-
-        // Remove da coluna antiga (emite 'column:empty' se ficar vazia)
-        oldColumn.removePanel(draggedPanel, true);
-
-        // Passa o índice lógico calculado
-        this.addPanel(draggedPanel, panelIndex);
-    }
-
-    /**
-     * Adiciona múltiplos painéis à coluna de uma só vez, tipicamente usado na restauração de estado.
-     * Posterga a chamada de updatePanelsSizes para o final, para evitar resets de altura.
-     * @param {Array<Panel>} panels - Lista de instâncias de Panel já inicializadas.
-     */
-    addPanelsBulk(panels) {
-        panels.forEach(panel => {
-            this.state.panels.push(panel);
-            this.element.appendChild(panel.element);
-            panel.setParentColumn(this);
-        });
-
-        // 1. Verifica o estado de colapso da coluna (para garantir que um painel esteja aberto).
-        this.checkPanelsCollapsed();
-
-        // 2. Garante que o layout seja refeito, UMA VEZ, após todos serem adicionados.
-        // O updatePanelsSizes irá garantir que o último painel uncollapsed fique com height: null.
-        this.updatePanelsSizes();
-    }
-
-    /**
-     * Adiciona um painel à coluna.
-     */
-    addPanel(panel, index = null) {
-        if (index === null) {
-            this.state.panels.push(panel);
-            this.element.appendChild(panel.element);
-        } else {
-            this.state.panels.splice(index, 0, panel);
-
-            // FIX CRÍTICO: Usa a lista de painéis (a fonte de verdade) para determinar o próximo irmão.
-            const nextSiblingPanel = this.state.panels[index + 1];
-            const nextSiblingElement = nextSiblingPanel ? nextSiblingPanel.element : null;
-
-            // Insere o painel antes do próximo painel encontrado (ou no final se for null).
-            this.element.insertBefore(panel.element, nextSiblingElement);
+        if (placeholder.parentElement !== this.element) {
+            if (oldColumn === this) {
+                oldColumn.updatePanelGroupsSizes();
+                this.state.container.endDrag();
+                return;
+            }
         }
-        panel.setParentColumn(this);
 
-        // REMOVIDO: LÓGICA INCORRETA DE RESET DE ALTURA PARA O PRIMEIRO PAINEL
-        // Esta lógica é AGORA tratada corretamente em updatePanelsSizes, onde deve estar.
-        // if (this.getTotalPanels() === 1) {
-        //     panel.state.height = null;
-        // }
+        const allChildren = Array.from(this.element.children);
+        let panelIndex = 0;
+        for (const child of allChildren) {
+            if (child === placeholder) break;
+            if (child.classList.contains('panel-group')) {
+                panelIndex++;
+            }
+        }
 
-        // 1. Verifica o estado de colapso da coluna.
-        this.checkPanelsCollapsed();
+        placeholder.remove();
 
-        // 2. Garante que o layout seja refeito, UMA VEZ.
-        this.updatePanelsSizes();
+        if (oldColumn) {
+            const originalIndex = oldColumn.getPanelGroupIndex(draggedItem);
+            if (
+                oldColumn === this &&
+                (panelIndex === originalIndex || panelIndex === originalIndex + 1)
+            ) {
+                oldColumn.updatePanelGroupsSizes();
+                this.state.container.endDrag();
+                return;
+            }
+        }
+
+        draggedItem.state.height = null;
+        if (oldColumn) {
+            oldColumn.removePanelGroup(draggedItem, true);
+        }
+        this.addPanelGroup(draggedItem, panelIndex);
+
+        this.state.container.endDrag();
     }
 
     /**
-     * Gerencia a lógica de preenchimento de espaço (flex: 1).
-     * Garante que o último painel visível sempre preencha o espaço (height=null).
+     * Adds multiple PanelGroups at once (used for state restoration).
+     * @param {Array<PanelGroup>} panelGroups
      */
-    updatePanelsSizes() {
-        const uncollapsedPanels = this.getPanelsUncollapsed();
-        const lastUncollapsedPanel = uncollapsedPanels[uncollapsedPanels.length - 1];
+    addPanelGroupsBulk(panelGroups) {
+        panelGroups.forEach(panelGroup => {
+            this.state.panelGroups.push(panelGroup);
+            this.element.appendChild(panelGroup.element);
+            panelGroup.setParentColumn(this);
+        });
+        this.checkPanelsGroupsCollapsed();
+        this.updatePanelGroupsSizes();
+    }
 
-        // 1. PREPARAÇÃO: Limpa a classe de todos
-        this.state.panels.forEach(panel => {
+    /**
+     * Adds a single PanelGroup to the column at a specific index.
+     * @param {PanelGroup} panelGroup
+     * @param {number|null} [index=null]
+     */
+    addPanelGroup(panelGroup, index = null) {
+        if (index === null) {
+            this.state.panelGroups.push(panelGroup);
+            this.element.appendChild(panelGroup.element);
+        } else {
+            this.state.panelGroups.splice(index, 0, panelGroup);
+            const nextSiblingPanel = this.state.panelGroups[index + 1];
+            const nextSiblingElement = nextSiblingPanel ? nextSiblingPanel.element : null;
+            this.element.insertBefore(panelGroup.element, nextSiblingElement);
+        }
+        panelGroup.setParentColumn(this);
+        this.checkPanelsGroupsCollapsed();
+        this.updatePanelGroupsSizes();
+    }
+
+    updatePanelGroupsSizes() {
+        const uncollapsedPanelGroups = this.getPanelGroupsUncollapsed();
+        const lastUncollapsedPanelGroup = uncollapsedPanelGroups[uncollapsedPanelGroups.length - 1];
+
+        this.state.panelGroups.forEach(panel => {
             panel.element.classList.remove('panel--fills-space');
         });
 
-        // 2. Ação Crítica: Se houver um último painel visível, force seu estado de altura para NULO.
-        if (lastUncollapsedPanel) {
-            lastUncollapsedPanel.state.height = null;
+        if (lastUncollapsedPanelGroup) {
+            lastUncollapsedPanelGroup.state.height = null;
         }
 
-        // 3. APLICAR ALTURAS NO DOM: Itera e aplica a altura do estado para todos.
-        this.state.panels.forEach(panel => {
-            // Isto respeita a altura fixa dos demais e aplica 'auto' (null) ao último.
+        this.state.panelGroups.forEach(panel => {
             panel.updateHeight();
         });
 
-        // 4. APLICAÇÃO FINAL: Adicionar a classe de preenchimento
-        if (lastUncollapsedPanel && lastUncollapsedPanel.state.height === null) {
-            lastUncollapsedPanel.element.classList.add('panel--fills-space');
+        if (lastUncollapsedPanelGroup && lastUncollapsedPanelGroup.state.height === null) {
+            lastUncollapsedPanelGroup.element.classList.add('panel--fills-space');
         }
-    }
-
-    getPanelsCollapsed() {
-        return this.state.panels.filter(p => p.state.collapsed);
-    }
-
-    getPanelsUncollapsed() {
-        return this.state.panels.filter(p => !p.state.collapsed);
     }
 
     /**
-     * Garante que a coluna nunca esteja totalmente colapsada.
+     * @returns {Array<PanelGroup>}
      */
-    checkPanelsCollapsed() {
-        const uncollapsed = this.getPanelsUncollapsed().length;
-        const total = this.getTotalPanels();
+    getPanelGroupsCollapsed() {
+        return this.state.panelGroups.filter(p => p.state.collapsed);
+    }
+
+    /**
+     * @returns {Array<PanelGroup>}
+     */
+    getPanelGroupsUncollapsed() {
+        return this.state.panelGroups.filter(p => !p.state.collapsed);
+    }
+
+    /**
+     * (Req 8) Ensures at least one PanelGroup is visible.
+     */
+    checkPanelsGroupsCollapsed() {
+        const uncollapsed = this.getPanelGroupsUncollapsed().length;
+        const total = this.getTotalPanelGroups();
 
         if (uncollapsed === 0 && total > 0) {
-            // Se todos estiverem colapsados, força o último a descolapsar
-            this.state.panels[total - 1].unCollapse();
+            this.state.panelGroups[total - 1].unCollapse();
         }
     }
 
-    removePanel(panel, emitEmpty = true) {
-        const index = this.getPanelIndex(panel);
+    /**
+     * Removes a PanelGroup from the column.
+     * @param {PanelGroup} panelGroup
+     * @param {boolean} [emitEmpty=true] - Whether to emit 'column:empty'.
+     */
+    removePanelGroup(panelGroup, emitEmpty = true) {
+        const index = this.getPanelGroupIndex(panelGroup);
         if (index === -1) return;
 
-        this.state.panels.splice(index, 1);
-        panel.setParentColumn(null);
+        this.state.panelGroups.splice(index, 1);
+        panelGroup.setParentColumn(null);
 
-        if (this.element.contains(panel.element)) {
-            this.element.removeChild(panel.element);
+        if (this.element.contains(panelGroup.element)) {
+            this.element.removeChild(panelGroup.element);
         }
 
-        // 1. Verifica se a coluna está totalmente colapsada e força um painel a abrir
-        this.checkPanelsCollapsed();
+        this.checkPanelsGroupsCollapsed();
+        this.updatePanelGroupsSizes();
 
-        // 2. Atualiza o layout
-        this.updatePanelsSizes();
-
-        // 3. Emite o evento de remoção de coluna se estiver vazia
-        if (emitEmpty && this.getTotalPanels() === 0) {
+        if (emitEmpty && this.getTotalPanelGroups() === 0) {
             appBus.emit('column:empty', this);
         }
     }
 
-    getPanelIndex(panel) {
-        return this.state.panels.findIndex(p => p === panel);
+    /**
+     * @param {PanelGroup} panelGroup
+     * @returns {number}
+     */
+    getPanelGroupIndex(panelGroup) {
+        return this.state.panelGroups.findIndex(p => p === panelGroup);
     }
 
-    getTotalPanels() {
-        return this.state.panels.length;
+    /**
+     * @param {HTMLElement} element
+     * @returns {number}
+     */
+    getPanelGroupIndexByElement(element) {
+        const allChildren = Array.from(this.element.children);
+        let panelIndex = 0;
+        for (const child of allChildren) {
+            if (child === element) {
+                break;
+            }
+            if (this.state.panelGroups.some(p => p.element === child)) {
+                panelIndex++;
+            }
+        }
+        return panelIndex;
+    }
+
+    /**
+     * @returns {number}
+     */
+    getTotalPanelGroups() {
+        return this.state.panelGroups.length;
     }
 }

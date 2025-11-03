@@ -79,7 +79,8 @@
 ## Outros
 
 - [ ] Barra de status
-- [ ] Prompts de mensagens
+- [x] Sistemas de notificação
+- [x] Sistema de tradução
 - [ ] Bloqueio da tela abaixo
 - [ ] Telas de confirmação
 - [ ] Sistema de atalhos de teclado

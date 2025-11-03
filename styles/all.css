@@ -192,7 +192,7 @@ body {
     background-color: #00ffcc33;
 }
 
-/* Painéis */
+/* Painéis (Classe base para Panel e PanelGroup) */
 .panel {
     background-color: #3a3a3a;
     border-radius: 4px;
@@ -201,7 +201,15 @@ body {
     overflow: hidden;
     color: #ddd;
     position: relative;
-    /* min-height REMOVIDO: Controlado via JS com base em this.state.minHeight */
+    /* min-height REMOVIDO: Controlado via JS */
+}
+.panel-group {
+    /* Esta é a classe principal na coluna */
+}
+.panel-group-child {
+    /* Esta é a classe para o painel *dentro* do grupo */
+    border: none;
+    border-radius: 0;
 }
 
 .panel.dragging {
@@ -213,6 +221,7 @@ body {
     min-height: 26px !important;
 }
 
+/* .panel-header (agora usado pelo PanelGroupHeader ou pelo Panel filho) */
 .panel-header {
     background-color: #444;
     display: flex;
@@ -221,11 +230,15 @@ body {
     gap: 6px;
     border-bottom: 1px solid #555;
     user-select: none;
+    height: 26px; /* Altura fixa do header */
+    flex-shrink: 0; /* Impede que o header encolha */
 }
 .panel.collapsed .panel-header {
     border: 0;
 }
-.panel-container > .column > div:nth-last-child(1 of .panel) {
+
+/* Regra de preenchimento (agora aplicada ao PanelGroup) */
+.panel-group.panel--fills-space {
     flex-grow: 1;
 }
 
@@ -247,7 +260,7 @@ body {
 .panel-title {
     flex-grow: 1;
     color: #eee;
-    font-size: 14px;
+    font-size: 14px; /* O tamanho da aba é controlado por .tab-item */
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -255,7 +268,6 @@ body {
     min-width: 10px;
 }
 
-/* NOVO: Elemento que preenche o espaço e empurra os botões para a direita */
 .header-spacer {
     flex-grow: 100;
     min-width: 5px;
@@ -265,6 +277,7 @@ body {
 .close-btn {
     width: 16px;
     height: 16px;
+    flex: 0 0 16px; /* CORREÇÃO: Garante largura fixa no flexbox */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -276,10 +289,8 @@ body {
     transition:
         color 0.3s,
         background-color 0.3s;
-    /* --- MELHORIA DE ACESSIBILIDADE --- */
     border: none;
     padding: 0;
-    /* ------------------------------------------ */
 }
 
 .collapse-btn[disabled],
@@ -336,7 +347,8 @@ body {
 .resize-handle:active {
     background: #00ffcc;
 }
-.panel-container > .column > div:nth-last-child(1 of .panel) > .resize-handle {
+/* Oculta o resize-handle do último item (que é o .panel--fills-space) */
+.panel-group.panel--fills-space > .resize-handle {
     display: none;
 }
 
@@ -400,4 +412,168 @@ body {
 
 .panel--not-movable .move-handle {
     display: none;
+}
+
+/* --- ESTILOS PARA PANEL GROUP (Agrupamento por Abas) --- */
+
+/* O HEADER DO GRUPO (Tab Bar) */
+.panel-group-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0; /* Remove padding padrão do header */
+    border-bottom: 1px solid #444; /* Linha divisória da Tab Bar */
+    height: 26px; /* Altura fixa da barra de abas */
+    flex-shrink: 0; /* Não permite que a barra de abas encolha */
+}
+
+/* Move Handle do Grupo (Fica à esquerda) */
+.panel-group-header .move-handle {
+    height: 100%;
+    width: 20px; /* CORREÇÃO */
+    flex: 0 0 20px; /* CORREÇÃO */
+    cursor: grab;
+    /* (A imagem de fundo do .move-handle global ainda se aplica) */
+}
+
+.panel-group-header .move-handle:active {
+    cursor: grabbing;
+    background-color: #00ffcc;
+}
+
+/* Contêiner das Abas */
+.tab-container {
+    display: flex;
+    flex-grow: 1;
+    overflow-x: auto; /* Permite rolar se houver muitas abas */
+    white-space: nowrap;
+    height: 100%;
+    /* Esconde a barra de rolagem do contêiner de abas */
+    scrollbar-width: none; /* Firefox */
+    align-items: center;
+}
+.tab-container::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+}
+
+/* Aba Individual */
+.tab-item {
+    display: flex;
+    align-items: center;
+    padding: 0;
+    height: 100%;
+    /* min-width: 80px; Requisito */
+    max-width: 250px; /* Evita que uma aba única fique muito grande */
+    border-right: 1px solid #333;
+    background-color: #3a3a3a;
+    color: #999;
+    font-size: 10px; /* Requisito */
+    cursor: pointer;
+    white-space: nowrap;
+}
+.tab-item:hover {
+    background-color: #4f4f4f;
+    color: #ccc;
+}
+.tab-item.active {
+    background-color: #3a3a3a;
+    border-bottom: 2px solid var(--primary-color, #00ffcc);
+    color: #fff;
+}
+
+/* Wrapper do Título da Aba (Para Bug 1: Ellipsis) */
+.tab-title {
+    flex-grow: 1; /* Permite que o título cresça */
+    flex-shrink: 1; /* Permite que o título encolha */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 0 5px;
+}
+
+/* Botão de Fechar (X) na Aba */
+.tab-close-btn {
+    font-size: 16px;
+    line-height: 1;
+    margin-left: 0px;
+    color: #999;
+    padding: 2px;
+
+    flex-shrink: 0;
+
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+.tab-close-btn:hover {
+    color: #fff;
+    background-color: #555;
+    border-radius: 2px;
+}
+
+/* Botões de Scroll (Esquerda/Direita) */
+.tab-scroll-btn {
+    background: none;
+    color: #ccc;
+    border: none;
+    padding: 0 4px;
+    height: 100%;
+    cursor: pointer;
+    z-index: 10;
+    flex-shrink: 0;
+}
+.tab-scroll-btn:hover {
+    background: #00ffcc33;
+    color: #fff;
+}
+.tab-scroll-btn.left {
+    border-right: 1px solid #333;
+}
+.tab-scroll-btn.right {
+    border-left: 1px solid #333;
+}
+
+/* Cabeçalho quando há apenas 1 aba (modo simples) */
+.panel-group-header.simple-header {
+    /* padding: 4px 6px;
+    gap: 6px; */
+}
+.panel-group-header.simple-header .tab-container {
+    flex-grow: 0; /* Não cresce, apenas contém o título */
+}
+.panel-group-header.simple-header .tab-item {
+    background: transparent;
+    border: none;
+    min-width: 0;
+    padding: 0;
+    font-size: 14px; /* Restaura o font-size original */
+    color: #eee;
+}
+.panel-group-header.simple-header .tab-item .tab-close-btn {
+    display: none; /* Botão de fechar do grupo é usado */
+}
+/* No modo simples, o .panel-title (real) está dentro do .tab-item */
+.panel-group-header.simple-header .panel-title {
+    flex-grow: 1;
+    min-width: 10px;
+}
+
+/* Contêiner do Conteúdo do Grupo */
+.panel-group-content {
+    flex-grow: 1;
+    /* padding: 8px; (Removido para que o painel filho controle seu padding) */
+    font-size: 14px;
+    color: #ccc;
+    overflow: auto;
+    min-height: 20px;
+
+    /* Garante que o painel filho preencha o espaço */
+    display: flex;
+    flex-direction: column;
+}
+/* O painel filho deve preencher o contentContainer */
+.panel-group-content > .panel-group-child {
+    flex-grow: 1;
+    border: none;
+    border-radius: 0;
 }
