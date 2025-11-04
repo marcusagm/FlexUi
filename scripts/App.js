@@ -9,12 +9,18 @@ import { debounce } from './Debounce.js';
 import { appNotifications } from './Services/Notification/Notification.js';
 import { NotificationUIListener } from './Services/Notification/NotificationUIListener.js';
 import { TranslationService } from './Services/TranslationService.js';
+import { createPanelGroupFromState } from './Panel/PanelFactory.js';
 import { DragDropService } from './Services/DND/DragDropService.js';
-// (NOVO) Importa as estratégias
 import { ColumnDropStrategy } from './Services/DND/ColumnDropStrategy.js';
 import { CreateAreaDropStrategy } from './Services/DND/CreateAreaDropStrategy.js';
 
 export class App {
+    /**
+     * Chave de armazenamento principal para o layout.
+     * @type {string}
+     */
+    STORAGE_KEY = 'panel_state';
+
     constructor() {
         if (App.instance) {
             return App.instance;
@@ -24,9 +30,8 @@ export class App {
         this.menu = new Menu();
         this.container = new Container();
 
-        this.stateService = new StateService(this.container);
+        this.stateService = StateService.getInstance();
 
-        // (ALTERADO) Inicializa o DragDropService e injeta as estratégias
         const dds = DragDropService.getInstance();
         dds.registerStrategy('column', new ColumnDropStrategy());
         dds.registerStrategy('create-area', new CreateAreaDropStrategy());
@@ -34,8 +39,7 @@ export class App {
         document.body.append(this.menu.element, this.container.element);
 
         this.initEventListeners();
-
-        this.stateService.loadState(this.initDefault.bind(this));
+        this.loadInitialLayout();
 
         const uiListener = new NotificationUIListener(document.body);
         uiListener.listen(appNotifications);
@@ -44,10 +48,109 @@ export class App {
     initEventListeners() {
         appBus.on('app:add-new-panel', this.addNewPanel.bind(this));
 
-        appBus.on('app:reinitialize-default-layout', this.initDefault.bind(this));
+        appBus.on('app:reinitialize-default-layout', this.resetLayout.bind(this, true));
 
-        this.debouncedResize = debounce(this.onResizeHandler, 200); // 200ms de atraso
+        appBus.on('app:save-state', this.saveLayout.bind(this));
+        appBus.on('app:restore-state', this.restoreLayout.bind(this));
+        appBus.on('app:reset-state', this.resetLayout.bind(this, false));
+
+        this.debouncedResize = debounce(this.onResizeHandler.bind(this), 200);
         window.addEventListener('resize', this.debouncedResize);
+    }
+
+    loadInitialLayout() {
+        const data = this.stateService.loadState(this.STORAGE_KEY);
+        if (data) {
+            this.restoreFromState(data);
+        } else {
+            this.initDefault();
+        }
+    }
+
+    saveLayout() {
+        const stateData = this.getState();
+        this.stateService.saveState(this.STORAGE_KEY, stateData);
+
+        const i18n = TranslationService.getInstance();
+        appNotifications.success(i18n.translate('appstate.save'));
+    }
+
+    restoreLayout() {
+        const data = this.stateService.loadState(this.STORAGE_KEY);
+        const i18n = TranslationService.getInstance();
+
+        if (data) {
+            this.restoreFromState(data);
+            appNotifications.success(i18n.translate('appstate.restore'));
+        } else {
+            appNotifications.info(i18n.translate('appstate.no_save'));
+        }
+    }
+
+    resetLayout(silent = false) {
+        this.stateService.clearState(this.STORAGE_KEY);
+        this.container.clear();
+        this.initDefault();
+
+        if (!silent) {
+            const i18n = TranslationService.getInstance();
+            appNotifications.success(i18n.translate('appstate.restore'));
+        }
+    }
+
+    /**
+     * Serializa o estado atual do layout do container.
+     * @returns {Array<object>} O estado serializado.
+     */
+    getState() {
+        return this.container.getColumns().map(column => ({
+            width: column.state.width,
+            panelGroups: column.state.panelGroups.map(group => ({
+                height: group.state.height,
+                collapsed: group.state.collapsed,
+                activePanelId: group.state.activePanel ? group.state.activePanel.id : null,
+                panels: group.state.panels.map(panel => ({
+                    id: panel.id,
+                    type: panel.getPanelType(),
+                    title: panel.state.title,
+                    content: panel.state.content.element.innerHTML,
+                    height: panel.state.height,
+                    closable: panel.state.closable,
+                    movable: panel.state.movable
+                }))
+            }))
+        }));
+    }
+
+    /**
+     * Restaura o layout do container a partir de um estado salvo.
+     * @param {Array<object>} state - O estado serializado.
+     */
+    restoreFromState(state) {
+        this.container.clear();
+
+        state.forEach(colData => {
+            const column = this.container.createColumn(colData.width);
+            const groupsToRestore = [];
+
+            colData.panelGroups.forEach(groupData => {
+                const group = createPanelGroupFromState(groupData);
+                if (group) {
+                    groupsToRestore.push(group);
+                }
+            });
+
+            if (groupsToRestore.length > 0) {
+                column.addPanelGroupsBulk(groupsToRestore);
+            }
+        });
+
+        const columns = this.container.getColumns();
+        columns.forEach((col, idx) => {
+            if (idx < state.length - 1) {
+                col.element.style.flex = `0 0 ${state[idx].width}px`;
+            }
+        });
     }
 
     initDefault() {
@@ -64,49 +167,33 @@ export class App {
             false
         );
 
-        // (Req 3.1) Renomeado de addPanel para addPanelGroup
         c1.addPanelGroup(group);
         c1.addPanelGroup(
-            // (Req 3.1)
             new PanelGroup(
                 new TextPanel('Painel de Texto 2', 'O conteúdo é gerenciado pela subclasse.', 200)
             )
         );
 
         const c2 = this.container.createColumn();
-        c2.addPanelGroup(new PanelGroup(new ToolbarPanel('Barra de Ferramentas'))); // (Req 3.1)
+        c2.addPanelGroup(new PanelGroup(new ToolbarPanel('Barra de Ferramentas')));
         c2.addPanelGroup(
-            // (Req 3.1)
-            new PanelGroup(
-                new TextPanel('Painel 3', 'Mais um painel de texto.', null),
-                null, // Altura do Grupo
-                true // Grupo colapsado
-            )
+            new PanelGroup(new TextPanel('Painel 3', 'Mais um painel de texto.', null), null, true)
         );
 
         const c3 = this.container.createColumn();
-        c3.addPanelGroup(new PanelGroup(new TextPanel('Painel 4', 'Conteúdo do painel 4.'))); // (Req 3.1)
-        c3.addPanelGroup(
-            // (Req 3.1)
-            new PanelGroup(
-                new ToolbarPanel() // Toolbar sem título
-            )
-        );
+        c3.addPanelGroup(new PanelGroup(new TextPanel('Painel 4', 'Conteúdo do painel 4.')));
+        c3.addPanelGroup(new PanelGroup(new ToolbarPanel()));
 
         this.container.updateColumnsSizes();
-
-        const i18n = TranslationService.getInstance();
-        appNotifications.success(i18n.translate('appstate.restore'));
     }
 
     addNewPanel() {
         const column = this.container.getFirstColumn();
         const title = `Novo Painel (${new Date().toLocaleTimeString()})`;
         const panel = new TextPanel(title, 'Conteúdo do novo painel.');
-        // Envolve o novo painel em um novo grupo
+
         const panelGroup = new PanelGroup(panel);
 
-        // (Req 3.1) Renomeado de addPanel para addPanelGroup
         column.addPanelGroup(panelGroup);
     }
 
@@ -115,7 +202,6 @@ export class App {
      */
     onResizeHandler() {
         this.container.getColumns().forEach(column => {
-            // (Req 3.3) Renomeado de updatePanelsSizes para updatePanelGroupsSizes
             column.updatePanelGroupsSizes();
         });
     }

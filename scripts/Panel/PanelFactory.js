@@ -41,27 +41,19 @@ export function createPanelGroupFromState(groupData) {
     groupData.panels.forEach(panelData => {
         const panel = createPanel(panelData);
         panelsToRestore.push(panel);
-
-        // if (panel.id === groupData.activePanelId) {
-        //     firstPanel = panel; // O painel ativo deve ser o primeiro
-        // }
     });
 
-    // if (!firstPanel && panelsToRestore.length > 0) {
-    firstPanel = panelsToRestore[0]; // Backup
-    // }
+    if (panelsToRestore.length > 0) {
+        firstPanel = panelsToRestore[0];
+    }
 
-    // if (firstPanel) {
-    const group = new PanelGroup(firstPanel, groupData.height, groupData.collapsed);
+    if (firstPanel) {
+        const group = new PanelGroup(firstPanel, groupData.height, groupData.collapsed);
 
-    // Adiciona os painéis restantes (abas)
-    panelsToRestore.forEach(panel => {
-        // if (panel !== firstPanel) {
-        console.log(panel.id === groupData.activePanelId);
-        group.addPanel(panel, panel.id === groupData.activePanelId); // Adiciona sem tornar ativo
-        // }
-    });
-    return group;
-    // }
+        panelsToRestore.forEach(panel => {
+            group.addPanel(panel, panel.id === groupData.activePanelId);
+        });
+        return group;
+    }
     return null; // Retorna nulo se o grupo estava vazio
 }

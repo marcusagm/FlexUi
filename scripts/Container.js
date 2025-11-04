@@ -1,8 +1,6 @@
 import { Column } from './Column/Column.js';
 import { ColumnCreateArea } from './Column/ColumnCreateArea.js';
-import { createPanelGroupFromState } from './Panel/PanelFactory.js';
 import { appBus } from './EventBus.js';
-import { DragDropService } from './Services/DND/DragDropService.js';
 
 /**
  * Description:
@@ -122,53 +120,6 @@ export class Container {
         const columns = this.getColumns();
         columns.forEach((column, idx) => {
             column.updateWidth(idx === columns.length - 1);
-        });
-    }
-
-    getState() {
-        return this.getColumns().map(column => ({
-            width: column.state.width,
-            panelGroups: column.state.panelGroups.map(group => ({
-                height: group.state.height,
-                collapsed: group.state.collapsed,
-                activePanelId: group.state.activePanel ? group.state.activePanel.id : null,
-                panels: group.state.panels.map(panel => ({
-                    id: panel.id,
-                    type: panel.getPanelType(),
-                    title: panel.state.title,
-                    content: panel.state.content.element.innerHTML,
-                    height: panel.state.height,
-                    closable: panel.state.closable,
-                    movable: panel.state.movable
-                }))
-            }))
-        }));
-    }
-
-    restoreFromState(state) {
-        this.clear();
-
-        state.forEach(colData => {
-            const column = this.createColumn(colData.width);
-            const groupsToRestore = [];
-
-            colData.panelGroups.forEach(groupData => {
-                const group = createPanelGroupFromState(groupData);
-                if (group) {
-                    groupsToRestore.push(group);
-                }
-            });
-
-            if (groupsToRestore.length > 0) {
-                column.addPanelGroupsBulk(groupsToRestore);
-            }
-        });
-
-        const columns = this.getColumns();
-        columns.forEach((col, idx) => {
-            if (idx < state.length - 1) {
-                col.element.style.flex = `0 0 ${state[idx].width}px`;
-            }
         });
     }
 
