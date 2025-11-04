@@ -10,6 +10,9 @@ import { appNotifications } from './Services/Notification.js';
 import { NotificationUIListener } from './Services/NotificationUIListener.js';
 import { TranslationService } from './Services/TranslationService.js';
 import { DragDropService } from './Services/DragDropService.js';
+// (NOVO) Importa as estratégias
+import { ColumnDropStrategy } from './Services/DND/ColumnDropStrategy.js';
+import { CreateAreaDropStrategy } from './Services/DND/CreateAreaDropStrategy.js';
 
 export class App {
     constructor() {
@@ -22,7 +25,11 @@ export class App {
         this.container = new Container();
 
         this.stateService = new StateService(this.container);
-        DragDropService.getInstance();
+
+        // (ALTERADO) Inicializa o DragDropService e injeta as estratégias
+        const dds = DragDropService.getInstance();
+        dds.registerStrategy('column', new ColumnDropStrategy(dds));
+        dds.registerStrategy('create-area', new CreateAreaDropStrategy(dds));
 
         document.body.append(this.menu.element, this.container.element);
 

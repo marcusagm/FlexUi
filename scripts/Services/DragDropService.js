@@ -13,10 +13,13 @@ import { PanelGroup } from '../Panel/PanelGroup.js';
  * - _draggedItem {PanelGroup | null} : The actual PanelGroup instance being dragged.
  * - _placeholder {HTMLElement} : The shared DOM element used to show drop locations.
  * - _isDragging {boolean} : Flag indicating if a D&D operation is active.
+ * - _strategyRegistry {Map} : (NOVO) Armazena as estratégias de soltura (Strategy Pattern).
  *
  * Typical usage:
  * // In App.js (to initialize):
- * DragDropService.getInstance();
+ * const dds = DragDropService.getInstance();
+ * dds.registerStrategy('column', new ColumnDropStrategy(dds));
+ * dds.registerStrategy('create-area', new CreateAreaDropStrategy(dds));
  *
  * // In Drop Zones (e.g., Column.js):
  * onDragOver(e) {
@@ -50,6 +53,13 @@ export class DragDropService {
     _isDragging = false;
 
     /**
+     * (NOVO) Registro para o Strategy Pattern.
+     * @type {Map<string, object>}
+     * @private
+     */
+    _strategyRegistry = new Map();
+
+    /**
      * Private constructor for Singleton pattern.
      * @private
      */
@@ -78,6 +88,36 @@ export class DragDropService {
     // --- API Pública ---
 
     /**
+     * (NOVO) Registra uma estratégia de D&D para um tipo de zona de soltura.
+     * (Injeção de Dependência)
+     * @param {string} dropZoneType - O identificador (ex: 'column').
+     * @param {object} strategyInstance - A instância da classe de estratégia.
+     */
+    registerStrategy(dropZoneType, strategyInstance) {
+        if (!dropZoneType) {
+            console.warn('DragDropService: Tentativa de registrar estratégia sem dropZoneType.');
+            return;
+        }
+        if (
+            !strategyInstance ||
+            (typeof strategyInstance.handleDrop !== 'function' &&
+                typeof strategyInstance.handleDragOver !== 'function')
+        ) {
+            console.warn(`DragDropService: Estratégia inválida para "${dropZoneType}".`);
+            return;
+        }
+        this._strategyRegistry.set(dropZoneType, strategyInstance);
+    }
+
+    /**
+     * (NOVO) Remove o registro de uma estratégia.
+     * @param {string} dropZoneType - O identificador (ex: 'column').
+     */
+    unregisterStrategy(dropZoneType) {
+        this._strategyRegistry.delete(dropZoneType);
+    }
+
+    /**
      * Returns the PanelGroup instance currently being dragged.
      * @returns {import('../Panel/PanelGroup.js').PanelGroup | null}
      */
@@ -102,141 +142,52 @@ export class DragDropService {
     }
 
     /**
-     * Handles the logic for a drag operation moving over a drop zone.
-     * (Lógica movida de Column.js e ColumnCreateArea.js)
+     * (REFATORADO) Deleta a lógica para a estratégia registrada.
      * @param {DragEvent} e - The native drag event.
      * @param {Column | ColumnCreateArea} dropZone - The drop zone instance (this).
      */
     handleDragOver(e, dropZone) {
         const draggedItem = this.getDraggedItem();
-        const placeholder = this.getPlaceholder();
         if (!draggedItem) return;
 
-        // Lógica comum: remover placeholder de qualquer outro lugar
-        placeholder.remove();
+        // 1. Lógica comum: remover placeholder de qualquer outro lugar
+        // (Movido para cá, pois ColumnCreateArea também precisa disso)
+        this.getPlaceholder().remove();
 
-        // Lógica específica da Drop Zone
-        if (dropZone.dropZoneType === 'column') {
-            // Lógica copiada de Column.onDragOver
-            if (draggedItem instanceof PanelGroup) {
-                const oldColumn = draggedItem.state.column;
-                const originalIndex = oldColumn ? oldColumn.getPanelGroupIndex(draggedItem) : -1;
-
-                let placed = false;
-                let dropIndex = dropZone.state.panelGroups.length;
-
-                for (let i = 0; i < dropZone.state.panelGroups.length; i++) {
-                    const targetGroup = dropZone.state.panelGroups[i];
-                    const targetElement = targetGroup.element;
-                    const rect = targetElement.getBoundingClientRect();
-
-                    if (draggedItem === targetGroup) continue;
-
-                    if (e.clientY < rect.top + rect.height / 2) {
-                        dropZone.element.insertBefore(placeholder, targetElement);
-                        placed = true;
-                        dropIndex = i;
-                        break;
-                    }
-                }
-                if (!placed) {
-                    dropZone.element.appendChild(placeholder);
-                }
-
-                const isSameColumn = oldColumn === dropZone;
-                const isOriginalPosition = dropIndex === originalIndex;
-                const isBelowGhost = dropIndex === originalIndex + 1;
-
-                if (isSameColumn && (isOriginalPosition || isBelowGhost)) {
-                    placeholder.remove();
-                }
-            }
-        } else if (dropZone.dropZoneType === 'create-area') {
-            // Lógica copiada de ColumnCreateArea.onDragOver
-            dropZone.element.classList.add('container__drop-area--active');
+        // 2. Delegar para a estratégia específica
+        const strategy = this._strategyRegistry.get(dropZone.dropZoneType);
+        if (strategy && strategy.handleDragOver) {
+            strategy.handleDragOver(e, dropZone);
         }
     }
 
     /**
-     * Handles the logic for a drag operation leaving a drop zone.
-     * (Lógica movida de ColumnCreateArea.js)
+     * (REFATORADO) Deleta a lógica para a estratégia registrada.
      * @param {DragEvent} e - The native drag event.
      * @param {Column | ColumnCreateArea} dropZone - The drop zone instance (this).
      */
     handleDragLeave(e, dropZone) {
-        if (dropZone.dropZoneType === 'create-area') {
-            // Lógica copiada de ColumnCreateArea.onDragLeave
-            dropZone.element.classList.remove('container__drop-area--active');
+        const strategy = this._strategyRegistry.get(dropZone.dropZoneType);
+        if (strategy && strategy.handleDragLeave) {
+            strategy.handleDragLeave(e, dropZone);
         }
     }
 
     /**
-     * Handles the logic for a drop operation on a drop zone.
-     * (Lógica movida de Column.js e ColumnCreateArea.js)
+     * (REFATORADO) Deleta a lógica para a estratégia registrada.
      * @param {DragEvent} e - The native drag event.
      * @param {Column | ColumnCreateArea} dropZone - The drop zone instance (this).
      */
     handleDrop(e, dropZone) {
         const draggedItem = this.getDraggedItem();
-        const placeholder = this.getPlaceholder();
-
         if (!draggedItem || !(draggedItem instanceof PanelGroup)) {
             return;
         }
 
-        // Lógica específica da Drop Zone
-        if (dropZone.dropZoneType === 'column') {
-            // Lógica copiada de Column.onDrop
-            const oldColumn = draggedItem.state.column;
-
-            if (placeholder.parentElement !== dropZone.element) {
-                if (oldColumn === dropZone) {
-                    oldColumn.updatePanelGroupsSizes();
-                    return;
-                }
-            }
-
-            const allChildren = Array.from(dropZone.element.children);
-            let panelIndex = 0;
-            for (const child of allChildren) {
-                if (child === placeholder) break;
-                if (child.classList.contains('panel-group')) {
-                    panelIndex++;
-                }
-            }
-
-            placeholder.remove();
-
-            if (oldColumn) {
-                const originalIndex = oldColumn.getPanelGroupIndex(draggedItem);
-                if (
-                    oldColumn === dropZone &&
-                    (panelIndex === originalIndex || panelIndex === originalIndex + 1)
-                ) {
-                    oldColumn.updatePanelGroupsSizes();
-                    return;
-                }
-            }
-
-            draggedItem.state.height = null;
-            if (oldColumn) {
-                oldColumn.removePanelGroup(draggedItem, true);
-            }
-            dropZone.addPanelGroup(draggedItem, panelIndex);
-        } else if (dropZone.dropZoneType === 'create-area') {
-            // Lógica copiada de ColumnCreateArea.onDrop
-            dropZone.element.classList.remove('container__drop-area--active');
-            const oldColumn = draggedItem.state.column;
-
-            const index = Array.from(dropZone.state.container.element.children).indexOf(
-                dropZone.element
-            );
-            const newColumn = dropZone.state.container.createColumn(null, index);
-
-            if (oldColumn) {
-                oldColumn.removePanelGroup(draggedItem, true);
-            }
-            newColumn.addPanelGroup(draggedItem);
+        // Delegar para a estratégia específica
+        const strategy = this._strategyRegistry.get(dropZone.dropZoneType);
+        if (strategy && strategy.handleDrop) {
+            strategy.handleDrop(e, dropZone);
         }
     }
 
