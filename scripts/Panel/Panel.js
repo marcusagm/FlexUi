@@ -1,4 +1,3 @@
-/* === NOVO ARQUIVO: Panel.js === */
 import { PanelContent } from './PanelContent.js';
 import { appBus } from '../EventBus.js';
 
@@ -110,5 +109,53 @@ export class Panel {
         this.element.style.height = 'auto';
         this.element.style.flex = '1 1 auto';
     }
-}
 
+    // --- Serialização ---
+
+    /**
+     * Serializa o estado do painel para um objeto JSON.
+     * Classes filhas (ex: TextPanel) devem sobrescrever este método
+     * para adicionar dados específicos (ex: 'content').
+     * @returns {object} Um objeto JSON-friendly representando o estado.
+     */
+    toJSON() {
+        return {
+            id: this.id,
+            type: this.getPanelType(),
+            title: this.state.title,
+            height: this.state.height, // Altura preferida
+            // Salva as configurações de estado (config)
+            config: {
+                closable: this.state.closable,
+                collapsible: this.state.collapsible,
+                movable: this.state.movable,
+                minHeight: this.state.minHeight
+            }
+            // 'content' é salvo por subclasses (ex: TextPanel)
+        };
+    }
+
+    /**
+     * Restaura o estado do painel a partir de um objeto JSON.
+     * Este método é chamado pelo PanelFactory.
+     * @param {object} data - O objeto de estado serializado.
+     */
+    fromJSON(data) {
+        if (data.id) {
+            this.id = data.id;
+        }
+        if (data.height !== undefined) {
+            this.state.height = data.height;
+        }
+        if (data.title !== undefined) {
+            this.state.title = data.title;
+        }
+
+        // Restaura as configurações de estado
+        if (data.config) {
+            Object.assign(this.state, data.config);
+        }
+
+        // 'content' é restaurado por subclasses
+    }
+}

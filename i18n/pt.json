@@ -8,6 +8,7 @@
     },
     "appstate": {
         "save": "Área de trabalho salva!",
+        "reset": "Área de trabalho restaurada para a padrão!",
         "restore": "Área de trabalho restaurada!",
         "restore_fail": "Falha ao restaurar área de trabalho (dados corrompidos).",
         "no_save": "Nenhuma área de trabalho salva encontrada."

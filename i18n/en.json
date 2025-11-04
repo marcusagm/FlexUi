@@ -8,6 +8,7 @@
     },
     "appstate": {
         "save": "Workspace saved!",
+        "reset": "Workspace restored to default!",
         "restore": "Workspace restored!",
         "restore_fail": "Failed to restore workspace (corrupted data).",
         "no_save": "No saved workspace found."

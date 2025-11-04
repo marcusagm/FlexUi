@@ -377,7 +377,10 @@ export class Column {
             if (child === element) {
                 break;
             }
-            if (this.state.panelGroups.some(p => p.element === child) && child.classList.contains('panel-group')) {
+            if (
+                this.state.panelGroups.some(p => p.element === child) &&
+                child.classList.contains('panel-group')
+            ) {
                 panelIndex++;
             }
         }
@@ -390,5 +393,35 @@ export class Column {
     getTotalPanelGroups() {
         return this.state.panelGroups.length;
     }
-}
 
+    /**
+     * Serializa o estado da coluna para um objeto JSON.
+     * Este método chama .toJSON() em todos os PanelGroups filhos.
+     * @returns {object} Um objeto JSON-friendly representando o estado.
+     */
+    toJSON() {
+        return {
+            width: this.state.width,
+            panelGroups: this.state.panelGroups
+                .filter(group => group instanceof PanelGroup)
+                .map(group => group.toJSON())
+        };
+    }
+
+    /**
+     * Restaura o estado *primitivo* da coluna a partir de um objeto JSON.
+     * Este método NÃO restaura os PanelGroups filhos; isso é feito
+     * pelo App.js (que chama addPanelGroupsBulk).
+     * @param {object} data - O objeto de estado serializado.
+     */
+    fromJSON(data) {
+        if (data.width !== undefined) {
+            this.state.width = data.width;
+        }
+
+        // Atualiza a aparência visual com base no estado restaurado
+        // O 'isLast' será tratado pelo 'updateColumnsSizes' do Container
+        // após todas as colunas serem restauradas.
+        this.updateWidth(false);
+    }
+}

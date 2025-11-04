@@ -452,4 +452,55 @@ export class PanelGroup {
         if (!this.state.movable) return;
         appBus.emit('dragstart', { item: this, event: e });
     }
+
+    /**
+     * Serializa o estado do grupo para um objeto JSON.
+     * Este método chama .toJSON() em todos os painéis filhos.
+     * @returns {object} Um objeto JSON-friendly representando o estado.
+     */
+    toJSON() {
+        return {
+            id: this.id,
+            type: this.getPanelType(),
+            height: this.state.height,
+            collapsed: this.state.collapsed,
+            activePanelId: this.state.activePanel ? this.state.activePanel.id : null,
+            // Configurações de estado do grupo
+            config: {
+                closable: this.state.closable,
+                collapsible: this.state.collapsible,
+                movable: this.state.movable,
+                minHeight: this.state.minHeight
+            },
+            // Serializa os painéis (abas) filhos
+            panels: this.state.panels.map(panel => panel.toJSON())
+        };
+    }
+
+    /**
+     * Restaura o estado *primitivo* do grupo a partir de um objeto JSON.
+     * Este método NÃO restaura os painéis filhos; isso é feito
+     * pelo PanelFactory (que chama addPanel e setActive).
+     * @param {object} data - O objeto de estado serializado.
+     */
+    fromJSON(data) {
+        if (data.id) {
+            this.id = data.id;
+        }
+        if (data.height !== undefined) {
+            this.state.height = data.height;
+        }
+        if (data.collapsed !== undefined) {
+            this.state.collapsed = data.collapsed;
+        }
+
+        // Restaura as configurações de estado
+        if (data.config) {
+            Object.assign(this.state, data.config);
+        }
+
+        // Aplica o estado visual (altura, colapso)
+        this.updateHeight();
+        this.updateCollapse();
+    }
 }

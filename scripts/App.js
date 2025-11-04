@@ -9,7 +9,6 @@ import { debounce } from './Debounce.js';
 import { appNotifications } from './Services/Notification/Notification.js';
 import { NotificationUIListener } from './Services/Notification/NotificationUIListener.js';
 import { TranslationService } from './Services/TranslationService.js';
-import { createPanelGroupFromState } from './Panel/PanelFactory.js';
 import { DragDropService } from './Services/DND/DragDropService.js';
 import { ColumnDropStrategy } from './Services/DND/ColumnDropStrategy.js';
 import { CreateAreaDropStrategy } from './Services/DND/CreateAreaDropStrategy.js';
@@ -61,14 +60,14 @@ export class App {
     loadInitialLayout() {
         const data = this.stateService.loadState(this.STORAGE_KEY);
         if (data) {
-            this.restoreFromState(data);
+            this.container.fromJSON(data);
         } else {
             this.initDefault();
         }
     }
 
     saveLayout() {
-        const stateData = this.getState();
+        const stateData = this.container.toJSON();
         this.stateService.saveState(this.STORAGE_KEY, stateData);
 
         const i18n = TranslationService.getInstance();
@@ -80,7 +79,7 @@ export class App {
         const i18n = TranslationService.getInstance();
 
         if (data) {
-            this.restoreFromState(data);
+            this.container.fromJSON(data);
             appNotifications.success(i18n.translate('appstate.restore'));
         } else {
             appNotifications.info(i18n.translate('appstate.no_save'));
@@ -94,63 +93,8 @@ export class App {
 
         if (!silent) {
             const i18n = TranslationService.getInstance();
-            appNotifications.success(i18n.translate('appstate.restore'));
+            appNotifications.success(i18n.translate('appstate.reset'));
         }
-    }
-
-    /**
-     * Serializa o estado atual do layout do container.
-     * @returns {Array<object>} O estado serializado.
-     */
-    getState() {
-        return this.container.getColumns().map(column => ({
-            width: column.state.width,
-            panelGroups: column.state.panelGroups.map(group => ({
-                height: group.state.height,
-                collapsed: group.state.collapsed,
-                activePanelId: group.state.activePanel ? group.state.activePanel.id : null,
-                panels: group.state.panels.map(panel => ({
-                    id: panel.id,
-                    type: panel.getPanelType(),
-                    title: panel.state.title,
-                    content: panel.state.content.element.innerHTML,
-                    height: panel.state.height,
-                    closable: panel.state.closable,
-                    movable: panel.state.movable
-                }))
-            }))
-        }));
-    }
-
-    /**
-     * Restaura o layout do container a partir de um estado salvo.
-     * @param {Array<object>} state - O estado serializado.
-     */
-    restoreFromState(state) {
-        this.container.clear();
-
-        state.forEach(colData => {
-            const column = this.container.createColumn(colData.width);
-            const groupsToRestore = [];
-
-            colData.panelGroups.forEach(groupData => {
-                const group = createPanelGroupFromState(groupData);
-                if (group) {
-                    groupsToRestore.push(group);
-                }
-            });
-
-            if (groupsToRestore.length > 0) {
-                column.addPanelGroupsBulk(groupsToRestore);
-            }
-        });
-
-        const columns = this.container.getColumns();
-        columns.forEach((col, idx) => {
-            if (idx < state.length - 1) {
-                col.element.style.flex = `0 0 ${state[idx].width}px`;
-            }
-        });
     }
 
     initDefault() {
