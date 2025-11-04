@@ -1,4 +1,5 @@
 import { PanelGroup } from '../Panel/PanelGroup.js';
+import { DragDropService } from '../Services/DragDropService.js'; // IMPORTADO
 
 /**
  * Description:
@@ -31,8 +32,9 @@ export class ColumnCreateArea {
 
     onDragOver(e) {
         e.preventDefault();
-        const draggedItem = this.state.container.getDragged();
-        const placeholder = this.state.container.getPlaceholder();
+
+        const draggedItem = DragDropService.getInstance().getDraggedItem();
+        const placeholder = DragDropService.getInstance().getPlaceholder();
         if (!draggedItem) return;
 
         placeholder.parentElement?.removeChild(placeholder);
@@ -46,10 +48,10 @@ export class ColumnCreateArea {
 
     onDrop(e) {
         e.preventDefault();
-        const draggedItem = this.state.container.getDragged();
+
+        const draggedItem = DragDropService.getInstance().getDraggedItem();
 
         if (!draggedItem || !(draggedItem instanceof PanelGroup)) {
-            if (draggedItem) this.state.container.endDrag();
             return;
         }
 
@@ -63,7 +65,6 @@ export class ColumnCreateArea {
             oldColumn.removePanelGroup(draggedItem, true);
         }
         newColumn.addPanelGroup(draggedItem);
-
-        this.state.container.endDrag();
     }
 }
+

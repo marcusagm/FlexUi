@@ -2,78 +2,36 @@ import { Column } from './Column/Column.js';
 import { ColumnCreateArea } from './Column/ColumnCreateArea.js';
 import { createPanelGroupFromState } from './Panel/PanelFactory.js';
 import { appBus } from './EventBus.js';
+import { DragDropService } from './Services/DragDropService.js';
 
 /**
  * Description:
  * O contêiner principal da aplicação. Gerencia o layout das Colunas (Column)
  * e das Áreas de Criação de Coluna (ColumnCreateArea).
- * Também é o proprietário do estado global de arrastar e soltar (drag-and-drop).
+ * Delega o estado de D&D ao DragDropService.
  *
  * Properties summary:
  * - state {object} : Gerencia os filhos (`[CCA, Col, CCA, ...]`).
- * - draggedItem {PanelGroup|null} : (Req 6) O item sendo arrastado.
- * - placeholder {HTMLElement} : O elemento visual de drop.
  */
 export class Container {
     state = {
         children: []
     };
 
-    // (Req 6) Renomeado de draggedPanel para draggedItem
-    draggedItem = null;
-    placeholder = null;
-
     constructor() {
         this.element = document.createElement('div');
         this.element.classList.add('container');
-        this.placeholder = document.createElement('div');
-        this.placeholder.classList.add('container__placeholder');
-        this.clear();
 
+        this.clear();
         this.initEventListeners();
     }
 
     initEventListeners() {
         appBus.on('column:empty', this.onColumnEmpty.bind(this));
-
-        appBus.on('dragstart', this.onDragStart.bind(this));
-        appBus.on('dragend', this.onDragEnd.bind(this));
     }
 
     onColumnEmpty(column) {
         this.deleteColumn(column);
-    }
-
-    onDragStart({ item, event }) {
-        this.startDrag(item, event);
-    }
-
-    onDragEnd() {
-        this.endDrag();
-    }
-
-    startDrag(item, e) {
-        this.draggedItem = item;
-        e.dataTransfer.setData('text/plain', '');
-        e.dataTransfer.dropEffect = 'move';
-        item.element.classList.add('dragging');
-        this.placeholder.style.height = `${item.element.offsetHeight}px`;
-        e.dataTransfer.setDragImage(item.element, 20, 20);
-    }
-
-    endDrag() {
-        this.placeholder.remove();
-        this.draggedItem?.element.classList.remove('dragging');
-
-        this.draggedItem = null;
-    }
-
-    getDragged() {
-        return this.draggedItem;
-    }
-
-    getPlaceholder() {
-        return this.placeholder;
     }
 
     /**

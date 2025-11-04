@@ -9,6 +9,7 @@ import { debounce } from './Debounce.js';
 import { appNotifications } from './Services/Notification.js';
 import { NotificationUIListener } from './Services/NotificationUIListener.js';
 import { TranslationService } from './Services/TranslationService.js';
+import { DragDropService } from './Services/DragDropService.js';
 
 export class App {
     constructor() {
@@ -21,6 +22,7 @@ export class App {
         this.container = new Container();
 
         this.stateService = new StateService(this.container);
+        DragDropService.getInstance();
 
         document.body.append(this.menu.element, this.container.element);
 

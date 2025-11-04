@@ -7,18 +7,18 @@
     --flexui-border-color: #1e1e1e;
     --flexui-text-color: #cccccc;
     --flexui-text-color-dark: #999999;
-    --flexui-accent-color: #007acc;
-    --flexui-accent-color-hover: #0099e6;
+    --flexui-accent-color: #00ffcc;
+    --flexui-accent-color-hover: #00ffccaa;
 
     --flexui-tab-bg: #2d2d2d;
     --flexui-tab-bg-active: #3f3f3f;
     --flexui-tab-bg-hover: #4a4a4a;
 
     --flexui-handle-color: #4a4a4a;
-    --flexui-handle-color-hover: #007acc;
+    --flexui-handle-color-hover: #00ffcc;
 
-    --flexui-placeholder-bg: rgba(0, 122, 204, 0.3);
-    --flexui-placeholder-border: #007acc;
+    --flexui-placeholder-bg: #00ffcc22;
+    --flexui-placeholder-border: #00ffccaa;
 
     --flexui-button-bg: #3c3c3c;
     --flexui-button-bg-hover: #4c4c4c;

@@ -1,5 +1,6 @@
 import { appBus } from '../EventBus.js';
 import { PanelGroup } from '../Panel/PanelGroup.js';
+import { DragDropService } from '../Services/DragDropService.js'; // IMPORTADO
 
 /**
  * Description:
@@ -128,8 +129,6 @@ export class Column {
      * @param {boolean} isLast - Indicates if this is the last column in the container.
      */
     addResizeBars(isLast) {
-        // Esta função usa 'column__resize-handle' e 'column--resize-right'
-        // da refatoração BEM anterior (Column.js), que está correta.
         this.element.querySelectorAll('.column__resize-handle').forEach(b => b.remove());
         this.element.classList.remove('column--resize-right');
 
@@ -193,8 +192,9 @@ export class Column {
      */
     onDragOver(e) {
         e.preventDefault();
-        const draggedItem = this.state.container.getDragged();
-        const placeholder = this.state.container.getPlaceholder();
+
+        const draggedItem = DragDropService.getInstance().getDraggedItem();
+        const placeholder = DragDropService.getInstance().getPlaceholder();
         if (!draggedItem) return;
 
         placeholder.remove();
@@ -240,11 +240,11 @@ export class Column {
      */
     onDrop(e) {
         e.preventDefault();
-        const draggedItem = this.state.container.getDragged();
-        const placeholder = this.state.container.getPlaceholder();
+
+        const draggedItem = DragDropService.getInstance().getDraggedItem();
+        const placeholder = DragDropService.getInstance().getPlaceholder();
 
         if (!draggedItem || !(draggedItem instanceof PanelGroup)) {
-            if (draggedItem) this.state.container.endDrag();
             return;
         }
 
@@ -253,7 +253,6 @@ export class Column {
         if (placeholder.parentElement !== this.element) {
             if (oldColumn === this) {
                 oldColumn.updatePanelGroupsSizes();
-                this.state.container.endDrag();
                 return;
             }
         }
@@ -276,7 +275,6 @@ export class Column {
                 (panelIndex === originalIndex || panelIndex === originalIndex + 1)
             ) {
                 oldColumn.updatePanelGroupsSizes();
-                this.state.container.endDrag();
                 return;
             }
         }
@@ -286,8 +284,6 @@ export class Column {
             oldColumn.removePanelGroup(draggedItem, true);
         }
         this.addPanelGroup(draggedItem, panelIndex);
-
-        this.state.container.endDrag();
     }
 
     /**
