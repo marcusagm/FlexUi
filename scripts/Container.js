@@ -90,7 +90,6 @@ export class Container {
         if (columnEl) this.element.removeChild(columnEl);
         if (createAreaEl) this.element.removeChild(createAreaEl);
         this.state.children.splice(index, 2);
-        column.setParentContainer(null);
         this.updateColumnsSizes();
         this.updateAllResizeBars();
     }

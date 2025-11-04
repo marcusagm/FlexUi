@@ -46,7 +46,7 @@ export class App {
 
         appBus.on('app:reinitialize-default-layout', this.initDefault.bind(this));
 
-        this.debouncedResize = debounce(this.onResizeHandler.bind(this), 200); // 200ms de atraso
+        this.debouncedResize = debounce(this.onResizeHandler, 200); // 200ms de atraso
         window.addEventListener('resize', this.debouncedResize);
     }
 

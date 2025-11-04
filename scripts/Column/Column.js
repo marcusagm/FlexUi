@@ -1,29 +1,22 @@
 import { appBus } from '../EventBus.js';
 import { PanelGroup } from '../Panel/PanelGroup.js';
 import { DragDropService } from '../Services/DND/DragDropService.js';
+import { throttleRAF } from '../ThrottleRAF.js'; // 1. IMPORTAR
 
 /**
  * Description:
  * Manages a single vertical column in the container. It holds and organizes
- * PanelGroups, manages horizontal resizing, and handles the drag/drop
- * logic for reordering PanelGroups within itself or creating new ones when
- * a Panel (tab) is dropped onto it.
+ * PanelGroups, manages horizontal resizing, and delegates drag/drop logic.
  *
  * Properties summary:
  * - state {object} : Internal state management.
- * - container {Container} : The parent Container instance.
- * - panelGroups {Array<PanelGroup>} : (Req 3.1) The list of PanelGroups this column holds.
- * - width {number|null} : The user-defined width of the column in pixels.
- * - _minWidth {number} : (Req 5) The minimum width the column can be resized to.
+ * - _minWidth {number} : The minimum width the column can be resized to.
+ * - _throttledUpdate {function} : (NOVO) A versão throttled da função de update.
  *
  * Typical usage:
  * const column = new Column(myContainer);
  * const panelGroup = new PanelGroup(new TextPanel('Title'));
  * column.addPanelGroup(panelGroup);
- *
- * Notes / Additional:
- * - This class only contains PanelGroups.
- * - It emits 'column:empty' when its last PanelGroup is removed.
  */
 export class Column {
     /**
@@ -44,28 +37,42 @@ export class Column {
     _minWidth;
 
     /**
+     * (NOVO) A versão throttled (com rAF) da função de atualização.
+     * @type {function | null}
+     * @private
+     */
+    _throttledUpdate = null;
+
+    /**
      * @param {Container} container - The parent container instance.
      * @param {number|null} [width=null] - The initial width of the column.
      */
     constructor(container, width = null) {
-        this.minWidth = 150;
-        this.state.container = container;
+        this.setMinWidth(150); // Padrão
+        this.setParentContainer(container); // Define o container
         this.state.width = width;
 
         this.element = document.createElement('div');
         this.element.classList.add('column');
+        this.dropZoneType = 'column'; // Identificador para DND
 
-        // ADICIONADO: Identificador de Drop Zone
-        this.dropZoneType = 'column';
+        // 2. INICIALIZAR O THROTTLE
+        // Criamos a função throttled uma vez e a reutilizamos.
+        // Ligamos (bind) o 'this.state.container' para garantir o contexto correto.
+        this.setThrottledUpdate(
+            throttleRAF(this.state.container.updateColumnsSizes.bind(this.state.container))
+        );
 
         this.initDragDrop();
         this.initEventListeners();
     }
 
+    // --- Getters / Setters ---
+
     /**
      * @param {number} width
      */
-    set minWidth(width) {
+    setMinWidth(width) {
         const sanitizedWidth = Number(width);
         if (isNaN(sanitizedWidth) || sanitizedWidth < 0) {
             console.warn(`Column: Invalid minWidth "${width}". Must be a non-negative number.`);
@@ -78,8 +85,36 @@ export class Column {
     /**
      * @returns {number}
      */
-    get minWidth() {
+    getMinWidth() {
         return this._minWidth;
+    }
+
+    /**
+     * (NOVO) Define a função de atualização throttled.
+     * @param {function} throttledFunction
+     */
+    setThrottledUpdate(throttledFunction) {
+        this._throttledUpdate = throttledFunction;
+    }
+
+    /**
+     * (NOVO) Obtém a função de atualização throttled.
+     * @returns {function}
+     */
+    getThrottledUpdate() {
+        return this._throttledUpdate;
+    }
+
+    /**
+     * Sets the parent container reference.
+     * @param {Container} container - The parent container instance.
+     */
+    setParentContainer(container) {
+        if (!container) {
+            console.warn('Column: setParentContainer received a null container.');
+            return;
+        }
+        this.state.container = container;
     }
 
     // --- Concrete Methods ---
@@ -108,15 +143,10 @@ export class Column {
      */
     destroy() {
         appBus.off('panelgroup:removed', this.onPanelGroupRemoved.bind(this));
-        [...this.state.panelGroups].forEach(panel => panel.destroy());
-    }
+        // Cancela qualquer frame de animação pendente
+        this.getThrottledUpdate()?.cancel();
 
-    /**
-     * Sets the parent container reference.
-     * @param {Container} container - The parent container instance.
-     */
-    setParentContainer(container) {
-        this.state.container = container;
+        [...this.state.panelGroups].forEach(panel => panel.destroy());
     }
 
     /**
@@ -164,18 +194,30 @@ export class Column {
 
         const onMove = ev => {
             const delta = ev.clientX - startX;
-            me.state.width = Math.max(me.minWidth, startW + delta);
-            container.updateColumnsSizes();
+            me.state.width = Math.max(me.getMinWidth(), startW + delta);
+
+            // 3. APLICAR O THROTTLE
+            // Em vez de chamar container.updateColumnsSizes() diretamente...
+            me.getThrottledUpdate()();
         };
+
         const onUp = () => {
             window.removeEventListener('mousemove', onMove);
             window.removeEventListener('mouseup', onUp);
+
+            // 4. LIMPAR E GARANTIR O ESTADO FINAL
+            // Cancela qualquer frame pendente...
+            me.getThrottledUpdate()?.cancel();
+            // E executa uma atualização final para garantir que o último
+            // estado de 'width' seja aplicado.
+            container.updateColumnsSizes();
         };
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
     }
 
     /**
+     * (ATUALIZADO - Correção de Bug)
      * Updates the CSS flex-basis (width) of the column.
      * @param {boolean} isLast - Indicates if this is the last column.
      */
@@ -185,6 +227,8 @@ export class Column {
         } else if (this.state.width !== null) {
             this.element.style.flex = `0 0 ${this.state.width}px`;
         }
+        // (A chamada de updatePanelGroupsSizes permanece, pois é necessária
+        // para atualizar os botões de scroll das abas)
         this.updatePanelGroupsSizes();
     }
 
@@ -193,7 +237,6 @@ export class Column {
      * @param {DragEvent} e
      */
     onDragOver(e) {
-        // ALTERADO: Delega ao serviço
         e.preventDefault();
         DragDropService.getInstance().handleDragOver(e, this);
     }
@@ -203,7 +246,6 @@ export class Column {
      * @param {DragEvent} e
      */
     onDrop(e) {
-        // ALTERADO: Delega ao serviço
         e.preventDefault();
         DragDropService.getInstance().handleDrop(e, this);
     }
@@ -242,12 +284,15 @@ export class Column {
         this.updatePanelGroupsSizes();
     }
 
+    /**
+     * Recalcula os tamanhos (flex) de todos os PanelGroups filhos.
+     */
     updatePanelGroupsSizes() {
         const uncollapsedPanelGroups = this.getPanelGroupsUncollapsed();
         const lastUncollapsedPanelGroup = uncollapsedPanelGroups[uncollapsedPanelGroups.length - 1];
 
         this.state.panelGroups.forEach(panel => {
-            panel.element.classList.remove('panel--fills-space');
+            panel.element.classList.remove('panel-group--fills-space');
         });
 
         if (lastUncollapsedPanelGroup) {
@@ -259,7 +304,7 @@ export class Column {
         });
 
         if (lastUncollapsedPanelGroup && lastUncollapsedPanelGroup.state.height === null) {
-            lastUncollapsedPanelGroup.element.classList.add('panel--fills-space');
+            lastUncollapsedPanelGroup.element.classList.add('panel-group--fills-space');
         }
     }
 
@@ -278,7 +323,7 @@ export class Column {
     }
 
     /**
-     * (Req 8) Ensures at least one PanelGroup is visible.
+     * Ensures at least one PanelGroup is visible.
      */
     checkPanelsGroupsCollapsed() {
         const uncollapsed = this.getPanelGroupsUncollapsed().length;
@@ -346,3 +391,4 @@ export class Column {
         return this.state.panelGroups.length;
     }
 }
+

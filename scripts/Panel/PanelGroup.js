@@ -1,7 +1,26 @@
 import { PanelGroupHeader } from './PanelGroupHeader.js';
 import { appBus } from '../EventBus.js';
+import { throttleRAF } from '../ThrottleRAF.js'; // 1. IMPORTAR
 
+/**
+ * Description:
+ * Manages a group of Panel (tabs) within a Column. This is the main
+ * "widget" that the user sees and interacts with (drag, collapse, resize).
+ *
+ * Properties summary:
+ * - state {object} : Internal state management.
+ * - _throttledUpdate {function} : (NOVO) A versão throttled da função de update.
+ *
+ * Typical usage:
+ * const panel = new TextPanel('My Tab');
+ * const group = new PanelGroup(panel);
+ * column.addPanelGroup(group);
+ */
 export class PanelGroup {
+    /**
+     * @type {object}
+     * @private
+     */
     state = {
         column: null,
         header: null,
@@ -22,8 +41,24 @@ export class PanelGroup {
         title: null
     };
 
+    /**
+     * @type {string}
+     */
     id = Math.random().toString(36).substring(2, 9) + Date.now();
 
+    /**
+     * (NOVO) A versão throttled (com rAF) da função de atualização.
+     * @type {function | null}
+     * @private
+     */
+    _throttledUpdate = null;
+
+    /**
+     * @param {Panel} initialPanel - The first panel (tab) to add.
+     * @param {number|null} [height=null] - The initial height of the group.
+     * @param {boolean} [collapsed=false] - The initial collapsed state.
+     * @param {object} [config={}] - Configuration overrides for the group.
+     */
     constructor(initialPanel, height = null, collapsed = false, config = {}) {
         Object.assign(this.state, config);
 
@@ -33,7 +68,7 @@ export class PanelGroup {
         this.state.collapsed = collapsed;
         this.element = document.createElement('div');
         this.element.classList.add('panel-group');
-        this.element.classList.add('panel');
+        this.element.classList.add('panel'); // (BEM) Herda estilos do 'panel'
 
         this.state.header = new PanelGroupHeader(this);
 
@@ -44,12 +79,40 @@ export class PanelGroup {
         this.build();
         this.addPanel(initialPanel, true);
         this.initEventListeners();
+
+        // 2. INICIALIZAR THROTTLE (COMO NULO)
+        // A função throttled será criada em setParentColumn()
+        this.setThrottledUpdate(null);
     }
 
+    // --- Getters / Setters ---
+
+    /**
+     * (NOVO) Define a função de atualização throttled.
+     * @param {function | null} throttledFunction
+     */
+    setThrottledUpdate(throttledFunction) {
+        this._throttledUpdate = throttledFunction;
+    }
+
+    /**
+     * (NOVO) Obtém a função de atualização throttled.
+     * @returns {function | null}
+     */
+    getThrottledUpdate() {
+        return this._throttledUpdate;
+    }
+
+    /**
+     * @returns {number}
+     */
     getHeaderHeight() {
         return this.state.header ? this.state.header.element.offsetHeight : 0;
     }
 
+    /**
+     * @returns {number}
+     */
     getMinPanelHeight() {
         const headerHeight = this.getHeaderHeight();
         const activeMinHeight = this.state.activePanel
@@ -59,37 +122,81 @@ export class PanelGroup {
         return Math.max(this.state.minHeight, activeMinHeight) + headerHeight;
     }
 
+    /**
+     * (ATUALIZADO) Define a coluna pai e inicializa a função throttled.
+     * @param {Column} column - The parent column instance.
+     */
+    setParentColumn(column) {
+        this.state.column = column;
+
+        // 3. (ATUALIZADO) Cria a função throttled quando a coluna é definida.
+        if (column) {
+            this.setThrottledUpdate(
+                throttleRAF(column.updatePanelGroupsSizes.bind(column))
+            );
+        } else {
+            this.setThrottledUpdate(null);
+        }
+    }
+
+    // --- Concrete Methods ---
+
+    /**
+     * Initializes event listeners for the EventBus.
+     */
     initEventListeners() {
         appBus.on('panel:group-child-close-request', this.onChildCloseRequest.bind(this));
         appBus.on('panel:close-request', this.onCloseRequest.bind(this));
         appBus.on('panel:toggle-collapse-request', this.onToggleCollapseRequest.bind(this));
     }
 
+    /**
+     * Handles the request to close a child Panel (tab).
+     * @param {object} eventData
+     */
     onChildCloseRequest({ panel, group }) {
         if (group === this && this.state.panels.includes(panel)) {
             this.removePanel(panel);
         }
     }
 
+    /**
+     * Handles the request to close this entire PanelGroup.
+     * @param {Panel | PanelGroup} panel
+     */
     onCloseRequest(panel) {
         if (panel === this) {
             this.close();
         }
     }
 
+    /**
+     * Handles the request to toggle the collapse state of this PanelGroup.
+     * @param {Panel | PanelGroup} panel
+     */
     onToggleCollapseRequest(panel) {
         if (panel === this) {
             this.toggleCollapse();
         }
     }
 
+    /**
+     * Cleans up event listeners when the group is destroyed.
+     */
     destroy() {
         appBus.off('panel:group-child-close-request', this.onChildCloseRequest.bind(this));
         appBus.off('panel:close-request', this.onCloseRequest.bind(this));
         appBus.off('panel:toggle-collapse-request', this.onToggleCollapseRequest.bind(this));
+
+        // Cancela qualquer frame de animação pendente
+        this.getThrottledUpdate()?.cancel();
+
         this.state.panels.forEach(p => p.destroy());
     }
 
+    /**
+     * Builds the DOM structure of the PanelGroup.
+     */
     build() {
         this.resizeHandle = document.createElement('div');
         this.resizeHandle.classList.add('panel-group__resize-handle');
@@ -108,14 +215,16 @@ export class PanelGroup {
         this.updateCollapse();
     }
 
+    /**
+     * @returns {string}
+     */
     getPanelType() {
         return 'PanelGroup';
     }
 
-    setParentColumn(column) {
-        this.state.column = column;
-    }
-
+    /**
+     * @returns {boolean}
+     */
     canCollapse() {
         if (!this.state.column) return false;
         if (!this.state.collapsible) return false;
@@ -123,6 +232,9 @@ export class PanelGroup {
         return this.state.column.getPanelGroupsUncollapsed().length > 1;
     }
 
+    /**
+     * Toggles the collapse state of the group.
+     */
     toggleCollapse() {
         if (!this.state.collapsible) return;
 
@@ -137,6 +249,9 @@ export class PanelGroup {
         this.state.column?.updatePanelGroupsSizes();
     }
 
+    /**
+     * Applies the correct visibility state based on state.collapsed.
+     */
     updateCollapse() {
         if (this.state.collapsed) {
             this.collapse();
@@ -145,6 +260,9 @@ export class PanelGroup {
         }
     }
 
+    /**
+     * Hides the content and applies collapsed styles.
+     */
     collapse() {
         this.state.collapsed = true;
         this.element.classList.add('panel--collapsed');
@@ -153,6 +271,9 @@ export class PanelGroup {
         this.updateHeight();
     }
 
+    /**
+     * Shows the content and removes collapsed styles.
+     */
     unCollapse() {
         this.state.collapsed = false;
         this.element.classList.remove('panel--collapsed');
@@ -161,6 +282,9 @@ export class PanelGroup {
         this.updateHeight();
     }
 
+    /**
+     * Closes the entire PanelGroup and notifies the column.
+     */
     close() {
         if (!this.state.closable) return;
 
@@ -168,6 +292,9 @@ export class PanelGroup {
         this.destroy();
     }
 
+    /**
+     * Updates the CSS height/flex properties based on the current state.
+     */
     updateHeight() {
         if (this.state.collapsed) {
             this.element.style.height = 'auto';
@@ -199,28 +326,52 @@ export class PanelGroup {
         }
     }
 
+    /**
+     * (ATUALIZADO) Handles the start of a vertical resize drag.
+     * @param {MouseEvent} e - The mousedown event.
+     */
     startResize(e) {
         e.preventDefault();
+        const me = this;
         const startY = e.clientY;
-        const startH = this.element.offsetHeight;
+        const startH = me.element.offsetHeight;
 
-        const minPanelHeight = this.getMinPanelHeight();
+        const minPanelHeight = me.getMinPanelHeight();
 
         const onMove = ev => {
             const delta = ev.clientY - startY;
-            this.state.height = Math.max(minPanelHeight, startH + delta);
-            this.state.column?.updatePanelGroupsSizes();
+            me.state.height = Math.max(minPanelHeight, startH + delta);
+
+            // 4. APLICAR O THROTTLE
+            // Em vez de chamar me.state.column?.updatePanelGroupsSizes() diretamente...
+            const updater = me.getThrottledUpdate();
+            if (updater) {
+                updater();
+            }
         };
 
         const onUp = () => {
             window.removeEventListener('mousemove', onMove);
             window.removeEventListener('mouseup', onUp);
+
+            // 5. LIMPAR E GARANTIR O ESTADO FINAL
+            const updater = me.getThrottledUpdate();
+            if (updater) {
+                updater.cancel();
+            }
+            // Executa uma atualização final
+            me.state.column?.updatePanelGroupsSizes();
         };
 
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
     }
 
+    /**
+     * Adds a new Panel (tab) to this group.
+     * @param {Panel} panel - The panel instance to add.
+     * @param {boolean} [makeActive=true] - Whether to make this new panel active.
+     */
     addPanel(panel, makeActive = true) {
         if (this.state.panels.includes(panel)) {
             if (makeActive) this.setActive(panel);
@@ -243,8 +394,10 @@ export class PanelGroup {
         this.state.column?.updatePanelGroupsSizes();
     }
 
-
-
+    /**
+     * Removes a Panel (tab) from this group.
+     * @param {Panel} panel - The panel instance to remove.
+     */
     removePanel(panel) {
         const index = this.state.panels.indexOf(panel);
         if (index === -1) return;
@@ -270,6 +423,10 @@ export class PanelGroup {
         this.state.column?.updatePanelGroupsSizes();
     }
 
+    /**
+     * Sets a specific Panel (tab) as the active, visible one.
+     * @param {Panel} panel - The panel instance to activate.
+     */
     setActive(panel) {
         if (!panel) return;
 
@@ -290,7 +447,8 @@ export class PanelGroup {
     }
 
     /**
-     * Chamado pelo PanelGroupHeader (move-handle)
+     * Legacy/proxy drag start event from the header.
+     * @param {DragEvent} e
      */
     onDragStart(e) {
         if (!this.state.movable) return;

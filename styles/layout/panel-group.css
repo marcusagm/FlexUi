@@ -41,7 +41,7 @@
     border: 0;
 }
 
-.panel-group.panel--fills-space {
+.panel-group.panel-group--fills-space {
     flex-grow: 1;
 }
 
@@ -140,10 +140,11 @@
 .panel-group__resize-handle:active {
     background: #00ffcc;
 }
-.panel-group.panel--fills-space > .panel-group__resize-handle {
+.panel-group.panel-group--fills-space > .panel-group__resize-handle {
     display: none;
 }
 
+.panel-group--fills-space,
 .panel--fills-space {
     flex: 1 0 auto !important;
     height: auto !important;
