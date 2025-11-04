@@ -1,7 +1,6 @@
 import { Column } from './Column/Column.js';
 import { ColumnCreateArea } from './Column/ColumnCreateArea.js';
 import { appBus } from './EventBus.js';
-import { createPanelGroupFromState } from './Panel/PanelFactory.js';
 
 /**
  * Description:
@@ -167,24 +166,6 @@ export class Container {
             // 2. Restaura o estado primitivo da Coluna (seu 'width')
             // (Este método fromJSON foi o que definimos na etapa anterior)
             column.fromJSON(colData);
-
-            // 3. Prepara a hidratação dos filhos (PanelGroups)
-            const groupsToRestore = [];
-            if (colData.panelGroups) {
-                colData.panelGroups.forEach(groupData => {
-                    // 4. Usa o PanelFactory para recriar o PanelGroup e seus Panels
-                    // (Esta função precisa ser importada no topo do Container.js)
-                    const group = createPanelGroupFromState(groupData);
-                    if (group) {
-                        groupsToRestore.push(group);
-                    }
-                });
-            }
-
-            // 5. Adiciona os grupos hidratados à coluna
-            if (groupsToRestore.length > 0) {
-                column.addPanelGroupsBulk(groupsToRestore);
-            }
         });
 
         // 6. Atualiza o layout (barras de redimensionamento e flex)

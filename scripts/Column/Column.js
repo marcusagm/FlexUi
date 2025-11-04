@@ -1,7 +1,8 @@
 import { appBus } from '../EventBus.js';
+// (NOVO) PanelGroup é importado para ser instanciado no fromJSON
 import { PanelGroup } from '../Panel/PanelGroup.js';
 import { DragDropService } from '../Services/DND/DragDropService.js';
-import { throttleRAF } from '../ThrottleRAF.js'; // 1. IMPORTAR
+import { throttleRAF } from '../ThrottleRAF.js';
 
 /**
  * Description:
@@ -11,7 +12,7 @@ import { throttleRAF } from '../ThrottleRAF.js'; // 1. IMPORTAR
  * Properties summary:
  * - state {object} : Internal state management.
  * - _minWidth {number} : The minimum width the column can be resized to.
- * - _throttledUpdate {function} : (NOVO) A versão throttled da função de update.
+ * - _throttledUpdate {function} : A versão throttled da função de update.
  *
  * Typical usage:
  * const column = new Column(myContainer);
@@ -37,7 +38,7 @@ export class Column {
     _minWidth;
 
     /**
-     * (NOVO) A versão throttled (com rAF) da função de atualização.
+     * A versão throttled (com rAF) da função de atualização.
      * @type {function | null}
      * @private
      */
@@ -56,9 +57,7 @@ export class Column {
         this.element.classList.add('column');
         this.dropZoneType = 'column'; // Identificador para DND
 
-        // 2. INICIALIZAR O THROTTLE
-        // Criamos a função throttled uma vez e a reutilizamos.
-        // Ligamos (bind) o 'this.state.container' para garantir o contexto correto.
+        // Inicializa o throttle
         this.setThrottledUpdate(
             throttleRAF(this.state.container.updateColumnsSizes.bind(this.state.container))
         );
@@ -90,7 +89,7 @@ export class Column {
     }
 
     /**
-     * (NOVO) Define a função de atualização throttled.
+     * Define a função de atualização throttled.
      * @param {function} throttledFunction
      */
     setThrottledUpdate(throttledFunction) {
@@ -98,7 +97,7 @@ export class Column {
     }
 
     /**
-     * (NOVO) Obtém a função de atualização throttled.
+     * Obtém a função de atualização throttled.
      * @returns {function}
      */
     getThrottledUpdate() {
@@ -196,8 +195,7 @@ export class Column {
             const delta = ev.clientX - startX;
             me.state.width = Math.max(me.getMinWidth(), startW + delta);
 
-            // 3. APLICAR O THROTTLE
-            // Em vez de chamar container.updateColumnsSizes() diretamente...
+            // Aplicar o throttle
             me.getThrottledUpdate()();
         };
 
@@ -205,11 +203,9 @@ export class Column {
             window.removeEventListener('mousemove', onMove);
             window.removeEventListener('mouseup', onUp);
 
-            // 4. LIMPAR E GARANTIR O ESTADO FINAL
-            // Cancela qualquer frame pendente...
+            // Limpar e garantir o estado final
             me.getThrottledUpdate()?.cancel();
-            // E executa uma atualização final para garantir que o último
-            // estado de 'width' seja aplicado.
+            // E executa uma atualização final
             container.updateColumnsSizes();
         };
         window.addEventListener('mousemove', onMove);
@@ -217,7 +213,6 @@ export class Column {
     }
 
     /**
-     * (ATUALIZADO - Correção de Bug)
      * Updates the CSS flex-basis (width) of the column.
      * @param {boolean} isLast - Indicates if this is the last column.
      */
@@ -227,8 +222,6 @@ export class Column {
         } else if (this.state.width !== null) {
             this.element.style.flex = `0 0 ${this.state.width}px`;
         }
-        // (A chamada de updatePanelGroupsSizes permanece, pois é necessária
-        // para atualizar os botões de scroll das abas)
         this.updatePanelGroupsSizes();
     }
 
@@ -336,7 +329,6 @@ export class Column {
 
     /**
      * Removes a PanelGroup from the column.
-     * @param {PanelGroup} panelGroup
      * @param {boolean} [emitEmpty=true] - Whether to emit 'column:empty'.
      */
     removePanelGroup(panelGroup, emitEmpty = true) {
@@ -394,6 +386,8 @@ export class Column {
         return this.state.panelGroups.length;
     }
 
+    // --- Serialização ---
+
     /**
      * Serializa o estado da coluna para um objeto JSON.
      * Este método chama .toJSON() em todos os PanelGroups filhos.
@@ -409,19 +403,38 @@ export class Column {
     }
 
     /**
-     * Restaura o estado *primitivo* da coluna a partir de um objeto JSON.
-     * Este método NÃO restaura os PanelGroups filhos; isso é feito
-     * pelo App.js (que chama addPanelGroupsBulk).
+     * (ALTERADO) Restaura o estado da coluna E de seus PanelGroups filhos.
      * @param {object} data - O objeto de estado serializado.
      */
     fromJSON(data) {
+        // 1. Restaurar estado primitivo (lógica existente)
         if (data.width !== undefined) {
             this.state.width = data.width;
         }
 
-        // Atualiza a aparência visual com base no estado restaurado
-        // O 'isLast' será tratado pelo 'updateColumnsSizes' do Container
-        // após todas as colunas serem restauradas.
+        // 2. (NOVO) Hidratar PanelGroups Filhos
+        const groupsToRestore = [];
+        if (data.panelGroups && Array.isArray(data.panelGroups)) {
+            data.panelGroups.forEach(groupData => {
+                // 2a. Instancia um PanelGroup "vazio".
+                // (Depende da Etapa 3, onde o construtor do PanelGroup
+                //  foi alterado para aceitar initialPanel = null)
+                const group = new PanelGroup();
+
+                // 2b. Delega a hidratação (incluindo painéis filhos)
+                //     para o próprio PanelGroup.
+                group.fromJSON(groupData);
+
+                groupsToRestore.push(group);
+            });
+        }
+
+        // 3. Adiciona os grupos hidratados à coluna
+        if (groupsToRestore.length > 0) {
+            this.addPanelGroupsBulk(groupsToRestore);
+        }
+
+        // 4. Aplica o estado visual (lógica existente)
         this.updateWidth(false);
     }
 }

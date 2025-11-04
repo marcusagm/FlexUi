@@ -1,59 +1,130 @@
-/* === ARQUIVO: PanelFactory.js === */
 import { Panel } from './Panel.js';
-import { TextPanel } from './TextPanel.js';
-import { ToolbarPanel } from './ToolbarPanel.js';
-import { PanelGroup } from './PanelGroup.js';
 
 /**
- * Cria uma instância de PAINEL (filho) baseada no tipo.
+ * Description:
+ * A Singleton factory and registry for creating Panel instances.
+ * This class uses the Abstract Factory and Registry patterns.
+ * Panel types (like TextPanel, ToolbarPanel) must be registered
+ * by the application (e.g., in App.js) before they can be created.
+ *
+ * Properties summary:
+ * - _instance {PanelFactory | null} : The private static instance for the Singleton.
+ * - _registry {Map<string, Panel>} : The registry mapping typeName strings to Panel classes.
+ *
+ * Typical usage:
+ * // In App.js (on init):
+ * const factory = PanelFactory.getInstance();
+ * factory.registerPanelType('TextPanel', TextPanel);
+ * factory.registerPanelType('ToolbarPanel', ToolbarPanel);
+ *
+ * // In PanelGroup.fromJSON (during hydration):
+ * const panel = PanelFactory.getInstance().createPanel(panelData);
  */
-function createPanel(panelData) {
-    const { type, title, height, config } = panelData;
+export class PanelFactory {
+    /**
+     * @type {PanelFactory | null}
+     * @private
+     */
+    static _instance = null;
 
-    let panel;
-    switch (type) {
-        case 'TextPanel':
-            panel = new TextPanel(title, '', height, config);
-            break;
-        case 'ToolbarPanel':
-            panel = new ToolbarPanel(title, height, config);
-            break;
-        default:
-            panel = new Panel(title, height, config);
-            break;
+    /**
+     * @type {Map<string, typeof Panel>}
+     * @private
+     */
+    _registry;
+
+    /**
+     * Private constructor for Singleton pattern.
+     * @private
+     */
+    constructor() {
+        if (PanelFactory._instance) {
+            console.warn('PanelFactory instance already exists. Use getInstance().');
+            return PanelFactory._instance;
+        }
+        this.setRegistry(new Map());
+        PanelFactory._instance = this;
     }
 
-    // Restaura propriedades salvas
-    panel.id = panelData.id || panel.id;
-    panel.setContent(panelData.content);
-    panel.state.height = panelData.height;
+    // -------------------------------------------------------------------
+    // Getters / Setters
+    // -------------------------------------------------------------------
 
-    return panel;
-}
-
-/**
- * Cria uma instância de PANELGROUP a partir do estado salvo.
- */
-export function createPanelGroupFromState(groupData) {
-    let firstPanel = null;
-    const panelsToRestore = [];
-
-    groupData.panels.forEach(panelData => {
-        const panel = createPanel(panelData);
-        panelsToRestore.push(panel);
-    });
-
-    if (panelsToRestore.length > 0) {
-        firstPanel = panelsToRestore[0];
+    /**
+     * @returns {Map<string, typeof Panel>}
+     */
+    getRegistry() {
+        return this._registry;
     }
 
-    if (firstPanel) {
-        const group = new PanelGroup(firstPanel, groupData.height, groupData.collapsed);
-
-        panelsToRestore.forEach(panel => {
-            group.addPanel(panel, panel.id === groupData.activePanelId);
-        });
-        return group;
+    /**
+     * @param {Map<string, typeof Panel>} map
+     */
+    setRegistry(map) {
+        if (!(map instanceof Map)) {
+            console.warn('PanelFactory: Invalid registry provided. Must be a Map.');
+            this._registry = new Map();
+            return;
+        }
+        this._registry = map;
     }
-    return null; // Retorna nulo se o grupo estava vazio
+
+    // -------------------------------------------------------------------
+    // Concrete Methods
+    // -------------------------------------------------------------------
+
+    /**
+     * Gets the single instance of the PanelFactory.
+     * @returns {PanelFactory}
+     */
+    static getInstance() {
+        if (!PanelFactory._instance) {
+            PanelFactory._instance = new PanelFactory();
+        }
+        return PanelFactory._instance;
+    }
+
+    /**
+     * Registers a Panel class constructor against a string identifier.
+     * @param {string} typeName - The string identifier (e.g., 'TextPanel').
+     * @param {typeof Panel} panelClass - The class constructor (e.g., TextPanel).
+     */
+    registerPanelType(typeName, panelClass) {
+        const me = this;
+        if (!typeName || !panelClass) {
+            console.warn('PanelFactory: registerPanelType requires a typeName and panelClass.');
+            return;
+        }
+        me.getRegistry().set(typeName, panelClass);
+    }
+
+    /**
+     * Creates and hydrates a Panel instance based on its type and saved data.
+     * This is the core factory method used during deserialization (fromJSON).
+     *
+     * @param {object} panelData - The serialized data object for the panel (from toJSON).
+     * @returns {Panel | null} An instantiated and hydrated Panel, or null if data is invalid.
+     */
+    createPanel(panelData) {
+        const me = this;
+        if (!panelData || !panelData.type) {
+            console.warn(
+                'PanelFactory: createPanel failed, invalid panelData or missing type.',
+                panelData
+            );
+            return null;
+        }
+
+        const PanelClass = me.getRegistry().get(panelData.type) || Panel;
+
+        // 1. Instancia a classe correta
+        // Passa 'config' (se existir) para o construtor base do Panel
+        const panel = new PanelClass(panelData.title, panelData.height, panelData.config || {});
+
+        // 2. Hidrata a instância com os dados salvos (ID, etc.)
+        // O método fromJSON é responsável por restaurar o estado interno.
+        panel.fromJSON(panelData);
+
+        return panel;
+    }
 }

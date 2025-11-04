@@ -1,5 +1,6 @@
 import { Menu } from './Menu/Menu.js';
 import { Container } from './Container.js';
+import { Panel } from './Panel/Panel.js';
 import { TextPanel } from './Panel/TextPanel.js';
 import { ToolbarPanel } from './Panel/ToolbarPanel.js';
 import { PanelGroup } from './Panel/PanelGroup.js';
@@ -12,6 +13,7 @@ import { TranslationService } from './Services/TranslationService.js';
 import { DragDropService } from './Services/DND/DragDropService.js';
 import { ColumnDropStrategy } from './Services/DND/ColumnDropStrategy.js';
 import { CreateAreaDropStrategy } from './Services/DND/CreateAreaDropStrategy.js';
+import { PanelFactory } from './Panel/PanelFactory.js';
 
 export class App {
     /**
@@ -34,6 +36,11 @@ export class App {
         const dds = DragDropService.getInstance();
         dds.registerStrategy('column', new ColumnDropStrategy());
         dds.registerStrategy('create-area', new CreateAreaDropStrategy());
+
+        const factory = PanelFactory.getInstance();
+        factory.registerPanelType('Panel', Panel);
+        factory.registerPanelType('TextPanel', TextPanel);
+        factory.registerPanelType('ToolbarPanel', ToolbarPanel);
 
         document.body.append(this.menu.element, this.container.element);
 
