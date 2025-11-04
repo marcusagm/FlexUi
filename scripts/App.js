@@ -55,9 +55,13 @@ export class App {
         const group = new PanelGroup(
             new TextPanel('Painel de Texto 1', 'Este é um painel customizado.')
         );
-        group.addPanel(new TextPanel('Aba um', 'este é o conteudo da aba'));
+        group.addPanel(new TextPanel('Aba um', 'este é o conteudo da aba'), false);
         group.addPanel(
-            new TextPanel('Aba Um título muito grande para teste', 'abs 2 este é o conteudo da aba')
+            new TextPanel(
+                'Aba Um título muito grande para teste',
+                'abs 2 este é o conteudo da aba'
+            ),
+            false
         );
 
         // (Req 3.1) Renomeado de addPanel para addPanelGroup

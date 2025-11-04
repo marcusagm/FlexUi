@@ -131,9 +131,7 @@ export class PanelGroup {
 
         // 3. (ATUALIZADO) Cria a função throttled quando a coluna é definida.
         if (column) {
-            this.setThrottledUpdate(
-                throttleRAF(column.updatePanelGroupsSizes.bind(column))
-            );
+            this.setThrottledUpdate(throttleRAF(column.updatePanelGroupsSizes.bind(column)));
         } else {
             this.setThrottledUpdate(null);
         }
@@ -372,7 +370,7 @@ export class PanelGroup {
      * @param {Panel} panel - The panel instance to add.
      * @param {boolean} [makeActive=true] - Whether to make this new panel active.
      */
-    addPanel(panel, makeActive = true) {
+    addPanel(panel, makeActive = false) {
         if (this.state.panels.includes(panel)) {
             if (makeActive) this.setActive(panel);
             return;
@@ -455,4 +453,3 @@ export class PanelGroup {
         appBus.emit('dragstart', { item: this, event: e });
     }
 }
-
