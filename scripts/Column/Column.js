@@ -182,8 +182,7 @@ export class Column {
     updateWidth(isLast) {
         if (isLast) {
             this.element.style.flex = `1 1 auto`;
-        }
-        if (this.state.width !== null) {
+        } else if (this.state.width !== null) {
             this.element.style.flex = `0 0 ${this.state.width}px`;
         }
         this.updatePanelGroupsSizes();
