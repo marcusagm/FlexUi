@@ -1,5 +1,5 @@
 import { PanelGroup } from '../Panel/PanelGroup.js';
-import { DragDropService } from '../Services/DragDropService.js'; // IMPORTADO
+import { DragDropService } from '../Services/DragDropService.js';
 
 /**
  * Description:
@@ -21,6 +21,10 @@ export class ColumnCreateArea {
         this.state.container = container;
         this.element = document.createElement('div');
         this.element.classList.add('container__drop-area');
+
+        // ADICIONADO: Identificador de Drop Zone
+        this.dropZoneType = 'create-area';
+
         this.initDragDrop();
     }
 
@@ -30,41 +34,33 @@ export class ColumnCreateArea {
         this.element.addEventListener('drop', this.onDrop.bind(this));
     }
 
+    /**
+     * Handles the dragover event by delegating to the DragDropService.
+     * @param {DragEvent} e
+     */
     onDragOver(e) {
+        // ALTERADO: Delega ao serviço
         e.preventDefault();
-
-        const draggedItem = DragDropService.getInstance().getDraggedItem();
-        const placeholder = DragDropService.getInstance().getPlaceholder();
-        if (!draggedItem) return;
-
-        placeholder.parentElement?.removeChild(placeholder);
-        this.element.classList.add('container__drop-area--active');
+        DragDropService.getInstance().handleDragOver(e, this);
     }
 
+    /**
+     * Handles the dragleave event by delegating to the DragDropService.
+     * @param {DragEvent} e
+     */
     onDragLeave(e) {
+        // ALTERADO: Delega ao serviço
         e.preventDefault();
-        this.element.classList.remove('container__drop-area--active');
+        DragDropService.getInstance().handleDragLeave(e, this);
     }
 
+    /**
+     * Handles the drop event by delegating to the DragDropService.
+     * @param {DragEvent} e
+     */
     onDrop(e) {
+        // ALTERADO: Delega ao serviço
         e.preventDefault();
-
-        const draggedItem = DragDropService.getInstance().getDraggedItem();
-
-        if (!draggedItem || !(draggedItem instanceof PanelGroup)) {
-            return;
-        }
-
-        this.element.classList.remove('container__drop-area--active');
-        const oldColumn = draggedItem.state.column;
-
-        const index = Array.from(this.state.container.element.children).indexOf(this.element);
-        const newColumn = this.state.container.createColumn(null, index);
-
-        if (oldColumn) {
-            oldColumn.removePanelGroup(draggedItem, true);
-        }
-        newColumn.addPanelGroup(draggedItem);
+        DragDropService.getInstance().handleDrop(e, this);
     }
 }
-

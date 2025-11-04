@@ -1,6 +1,6 @@
 import { appBus } from '../EventBus.js';
 import { PanelGroup } from '../Panel/PanelGroup.js';
-import { DragDropService } from '../Services/DragDropService.js'; // IMPORTADO
+import { DragDropService } from '../Services/DragDropService.js';
 
 /**
  * Description:
@@ -54,6 +54,9 @@ export class Column {
 
         this.element = document.createElement('div');
         this.element.classList.add('column');
+
+        // ADICIONADO: Identificador de Drop Zone
+        this.dropZoneType = 'column';
 
         this.initDragDrop();
         this.initEventListeners();
@@ -187,103 +190,23 @@ export class Column {
     }
 
     /**
-     * Handles the dragover event for managing the placeholder or group target.
+     * Handles the dragover event by delegating to the DragDropService.
      * @param {DragEvent} e
      */
     onDragOver(e) {
+        // ALTERADO: Delega ao serviço
         e.preventDefault();
-
-        const draggedItem = DragDropService.getInstance().getDraggedItem();
-        const placeholder = DragDropService.getInstance().getPlaceholder();
-        if (!draggedItem) return;
-
-        placeholder.remove();
-
-        if (draggedItem instanceof PanelGroup) {
-            const oldColumn = draggedItem.state.column;
-            const originalIndex = oldColumn ? oldColumn.getPanelGroupIndex(draggedItem) : -1;
-
-            let placed = false;
-            let dropIndex = this.state.panelGroups.length;
-
-            for (let i = 0; i < this.state.panelGroups.length; i++) {
-                const targetGroup = this.state.panelGroups[i];
-                const targetElement = targetGroup.element;
-                const rect = targetElement.getBoundingClientRect();
-
-                if (draggedItem === targetGroup) continue;
-
-                if (e.clientY < rect.top + rect.height / 2) {
-                    this.element.insertBefore(placeholder, targetElement);
-                    placed = true;
-                    dropIndex = i;
-                    break;
-                }
-            }
-            if (!placed) {
-                this.element.appendChild(placeholder);
-            }
-
-            const isSameColumn = oldColumn === this;
-            const isOriginalPosition = dropIndex === originalIndex;
-            const isBelowGhost = dropIndex === originalIndex + 1;
-
-            if (isSameColumn && (isOriginalPosition || isBelowGhost)) {
-                placeholder.remove();
-            }
-        }
+        DragDropService.getInstance().handleDragOver(e, this);
     }
 
     /**
-     * Handles the drop event for reordering or creating PanelGroups.
+     * Handles the drop event by delegating to the DragDropService.
      * @param {DragEvent} e
      */
     onDrop(e) {
+        // ALTERADO: Delega ao serviço
         e.preventDefault();
-
-        const draggedItem = DragDropService.getInstance().getDraggedItem();
-        const placeholder = DragDropService.getInstance().getPlaceholder();
-
-        if (!draggedItem || !(draggedItem instanceof PanelGroup)) {
-            return;
-        }
-
-        const oldColumn = draggedItem.state.column;
-
-        if (placeholder.parentElement !== this.element) {
-            if (oldColumn === this) {
-                oldColumn.updatePanelGroupsSizes();
-                return;
-            }
-        }
-
-        const allChildren = Array.from(this.element.children);
-        let panelIndex = 0;
-        for (const child of allChildren) {
-            if (child === placeholder) break;
-            if (child.classList.contains('panel-group')) {
-                panelIndex++;
-            }
-        }
-
-        placeholder.remove();
-
-        if (oldColumn) {
-            const originalIndex = oldColumn.getPanelGroupIndex(draggedItem);
-            if (
-                oldColumn === this &&
-                (panelIndex === originalIndex || panelIndex === originalIndex + 1)
-            ) {
-                oldColumn.updatePanelGroupsSizes();
-                return;
-            }
-        }
-
-        draggedItem.state.height = null;
-        if (oldColumn) {
-            oldColumn.removePanelGroup(draggedItem, true);
-        }
-        this.addPanelGroup(draggedItem, panelIndex);
+        DragDropService.getInstance().handleDrop(e, this);
     }
 
     /**
@@ -424,4 +347,3 @@ export class Column {
         return this.state.panelGroups.length;
     }
 }
-
