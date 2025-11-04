@@ -1,5 +1,5 @@
 import { PanelGroup } from '../Panel/PanelGroup.js';
-import { DragDropService } from '../Services/DragDropService.js';
+import { DragDropService } from '../Services/DND/DragDropService.js';
 
 /**
  * Description:

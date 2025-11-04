@@ -1,5 +1,5 @@
 import { appBus } from './EventBus.js';
-import { appNotifications } from './Services/Notification.js';
+import { appNotifications } from './Services/Notification/Notification.js';
 import { TranslationService } from './Services/TranslationService.js';
 
 /**

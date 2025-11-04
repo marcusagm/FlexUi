@@ -1,4 +1,4 @@
-import { TranslationService } from './TranslationService.js';
+import { TranslationService } from '../TranslationService.js';
 
 /**
  * Description:

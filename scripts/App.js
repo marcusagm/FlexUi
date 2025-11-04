@@ -6,10 +6,10 @@ import { PanelGroup } from './Panel/PanelGroup.js';
 import { appBus } from './EventBus.js';
 import { StateService } from './StateService.js';
 import { debounce } from './Debounce.js';
-import { appNotifications } from './Services/Notification.js';
-import { NotificationUIListener } from './Services/NotificationUIListener.js';
+import { appNotifications } from './Services/Notification/Notification.js';
+import { NotificationUIListener } from './Services/Notification/NotificationUIListener.js';
 import { TranslationService } from './Services/TranslationService.js';
-import { DragDropService } from './Services/DragDropService.js';
+import { DragDropService } from './Services/DND/DragDropService.js';
 // (NOVO) Importa as estratégias
 import { ColumnDropStrategy } from './Services/DND/ColumnDropStrategy.js';
 import { CreateAreaDropStrategy } from './Services/DND/CreateAreaDropStrategy.js';

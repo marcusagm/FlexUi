@@ -2,7 +2,7 @@ import { Column } from './Column/Column.js';
 import { ColumnCreateArea } from './Column/ColumnCreateArea.js';
 import { createPanelGroupFromState } from './Panel/PanelFactory.js';
 import { appBus } from './EventBus.js';
-import { DragDropService } from './Services/DragDropService.js';
+import { DragDropService } from './Services/DND/DragDropService.js';
 
 /**
  * Description:

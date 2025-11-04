@@ -1,5 +1,4 @@
-import { appBus } from '../EventBus.js';
-import { PanelGroup } from '../Panel/PanelGroup.js';
+import { appBus } from '../../EventBus.js';
 
 /**
  * Description:
@@ -35,7 +34,7 @@ export class DragDropService {
     static _instance = null;
 
     /**
-     * @type {import('../Panel/PanelGroup.js').PanelGroup | null}
+     * @type {object | null}
      * @private
      */
     _draggedItem = null;
@@ -119,7 +118,7 @@ export class DragDropService {
 
     /**
      * Returns the PanelGroup instance currently being dragged.
-     * @returns {import('../Panel/PanelGroup.js').PanelGroup | null}
+     * @returns {object | null}
      */
     getDraggedItem() {
         return this._draggedItem;
@@ -144,7 +143,7 @@ export class DragDropService {
     /**
      * (REFATORADO) Deleta a lógica para a estratégia registrada.
      * @param {DragEvent} e - The native drag event.
-     * @param {Column | ColumnCreateArea} dropZone - The drop zone instance (this).
+     * @param {object} dropZone - The drop zone instance (this).
      */
     handleDragOver(e, dropZone) {
         const draggedItem = this.getDraggedItem();
@@ -179,12 +178,6 @@ export class DragDropService {
      * @param {Column | ColumnCreateArea} dropZone - The drop zone instance (this).
      */
     handleDrop(e, dropZone) {
-        const draggedItem = this.getDraggedItem();
-        if (!draggedItem || !(draggedItem instanceof PanelGroup)) {
-            return;
-        }
-
-        // Delegar para a estratégia específica
         const strategy = this._strategyRegistry.get(dropZone.dropZoneType);
         if (strategy && strategy.handleDrop) {
             strategy.handleDrop(e, dropZone, this._draggedItem, this._placeholder);
