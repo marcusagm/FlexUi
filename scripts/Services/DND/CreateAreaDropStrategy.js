@@ -10,20 +10,12 @@ import { PanelGroup } from '../../Panel/PanelGroup.js';
  */
 export class CreateAreaDropStrategy {
     /**
-     * @param {DragDropService} dragDropService - A instância do serviço principal.
-     */
-    constructor(dragDropService) {
-        this.dds = dragDropService;
-    }
-
-    /**
      * Manipula a lógica de 'dragover' específica para áreas de criação.
      * (Lógica movida do DragDropService)
      * @param {DragEvent} e - O evento nativo.
      * @param {ColumnCreateArea} dropZone - A instância da Área.
      */
-    handleDragOver(e, dropZone) {
-        // Lógica copiada de ColumnCreateArea.onDragOver
+    handleDragOver(e, dropZone, draggedItem, placeholder) {
         dropZone.element.classList.add('container__drop-area--active');
     }
 
@@ -33,8 +25,7 @@ export class CreateAreaDropStrategy {
      * @param {DragEvent} e - O evento nativo.
      * @param {ColumnCreateArea} dropZone - A instância da Área.
      */
-    handleDragLeave(e, dropZone) {
-        // Lógica copiada de ColumnCreateArea.onDragLeave
+    handleDragLeave(e, dropZone, draggedItem, placeholder) {
         dropZone.element.classList.remove('container__drop-area--active');
     }
 
@@ -44,9 +35,7 @@ export class CreateAreaDropStrategy {
      * @param {DragEvent} e - O evento nativo.
      * @param {ColumnCreateArea} dropZone - A instância da Área.
      */
-    handleDrop(e, dropZone) {
-        const draggedItem = this.dds.getDraggedItem();
-
+    handleDrop(e, dropZone, draggedItem, placeholder) {
         if (!draggedItem || !(draggedItem instanceof PanelGroup)) {
             return;
         }

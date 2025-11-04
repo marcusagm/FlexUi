@@ -28,8 +28,8 @@ export class App {
 
         // (ALTERADO) Inicializa o DragDropService e injeta as estratégias
         const dds = DragDropService.getInstance();
-        dds.registerStrategy('column', new ColumnDropStrategy(dds));
-        dds.registerStrategy('create-area', new CreateAreaDropStrategy(dds));
+        dds.registerStrategy('column', new ColumnDropStrategy());
+        dds.registerStrategy('create-area', new CreateAreaDropStrategy());
 
         document.body.append(this.menu.element, this.container.element);
 

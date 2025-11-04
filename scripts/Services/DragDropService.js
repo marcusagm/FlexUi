@@ -157,7 +157,7 @@ export class DragDropService {
         // 2. Delegar para a estratégia específica
         const strategy = this._strategyRegistry.get(dropZone.dropZoneType);
         if (strategy && strategy.handleDragOver) {
-            strategy.handleDragOver(e, dropZone);
+            strategy.handleDragOver(e, dropZone, this._draggedItem, this._placeholder);
         }
     }
 
@@ -169,7 +169,7 @@ export class DragDropService {
     handleDragLeave(e, dropZone) {
         const strategy = this._strategyRegistry.get(dropZone.dropZoneType);
         if (strategy && strategy.handleDragLeave) {
-            strategy.handleDragLeave(e, dropZone);
+            strategy.handleDragLeave(e, dropZone, this._draggedItem, this._placeholder);
         }
     }
 
@@ -187,7 +187,7 @@ export class DragDropService {
         // Delegar para a estratégia específica
         const strategy = this._strategyRegistry.get(dropZone.dropZoneType);
         if (strategy && strategy.handleDrop) {
-            strategy.handleDrop(e, dropZone);
+            strategy.handleDrop(e, dropZone, this._draggedItem, this._placeholder);
         }
     }
 
