@@ -1,6 +1,5 @@
 import { PanelGroupHeader } from './PanelGroupHeader.js';
 import { appBus } from '../EventBus.js';
-// import { throttleRAF } from '../ThrottleRAF.js'; // Removido (Correto)
 import { PanelFactory } from './PanelFactory.js';
 
 /**
@@ -63,7 +62,7 @@ export class PanelGroup {
         this.state.collapsed = collapsed;
         this.element = document.createElement('div');
         this.element.classList.add('panel-group');
-        this.element.classList.add('panel'); // (BEM) Herda estilos do 'panel'
+        this.element.classList.add('panel');
 
         this.state.header = new PanelGroupHeader(this);
 
@@ -79,8 +78,6 @@ export class PanelGroup {
 
         this.initEventListeners();
     }
-
-    // --- Getters / Setters ---
 
     /**
      * @returns {number}
@@ -108,8 +105,6 @@ export class PanelGroup {
     setParentColumn(column) {
         this.state.column = column;
     }
-
-    // --- Concrete Methods ---
 
     /**
      * Initializes event listeners for the EventBus.
@@ -188,27 +183,31 @@ export class PanelGroup {
     }
 
     /**
+     * Verifica se este painel pode ser recolhido.
+     * Ele não pode ser recolhido se for o último painel visível na coluna.
      * @returns {boolean}
      */
     canCollapse() {
         if (!this.state.column) return false;
         if (!this.state.collapsible) return false;
-        return true;
+
+        const uncollapsedGroups = this.state.column.getPanelGroupsUncollapsed();
+        return uncollapsedGroups.length > 1 || this.state.collapsed;
     }
 
     /**
      * Toggles the collapse state and requests a layout update.
      */
     toggleCollapse() {
-        if (!this.state.collapsible) return;
-
         if (this.state.collapsed) {
             this.unCollapse();
         } else {
+            if (!this.canCollapse()) {
+                return;
+            }
             this.collapse();
         }
 
-        // (CORRIGIDO) Usa o wrapper de segurança
         this.requestLayoutUpdate();
     }
 
@@ -305,7 +304,6 @@ export class PanelGroup {
             const delta = ev.clientY - startY;
             me.state.height = Math.max(minPanelHeight, startH + delta);
 
-            // (CORRIGIDO) Usa o wrapper de segurança
             me.requestLayoutUpdate();
         };
 
@@ -313,7 +311,6 @@ export class PanelGroup {
             window.removeEventListener('mousemove', onMove);
             window.removeEventListener('mouseup', onUp);
 
-            // (CORRIGIDO) Usa o wrapper de segurança
             me.requestLayoutUpdate();
         };
 
@@ -344,9 +341,8 @@ export class PanelGroup {
         this.state.header.updateTabs();
 
         if (makeActive || this.state.panels.length === 1) {
-            this.setActive(panel); // setActive também chama requestLayoutUpdate
+            this.setActive(panel);
         } else {
-            // (CORRIGIDO) Usa o wrapper de segurança
             this.requestLayoutUpdate();
         }
     }
@@ -373,10 +369,9 @@ export class PanelGroup {
 
         if (panel === this.state.activePanel) {
             const newActive = this.state.panels[index] || this.state.panels[index - 1];
-            this.setActive(newActive); // setActive chama requestLayoutUpdate
+            this.setActive(newActive);
         } else {
             this.state.header.updateTabs();
-            // (CORRIGIDO) Usa o wrapper de segurança
             this.requestLayoutUpdate();
         }
     }
@@ -402,29 +397,17 @@ export class PanelGroup {
         this.state.title = panel.state.title;
         this.state.header.updateTabs();
 
-        // (CORRIGIDO) Usa o wrapper de segurança
         this.requestLayoutUpdate();
     }
 
     /**
-     * (NOVO) Emite um evento para o LayoutService APENAS se a coluna pai existir.
+     * Emite um evento para o LayoutService APENAS se a coluna pai existir.
      */
     requestLayoutUpdate() {
         if (this.state.column) {
             appBus.emit('layout:changed', { source: this });
         }
     }
-
-    /**
-     * Legacy/proxy drag start event from the header.
-     * @param {DragEvent} e
-     */
-    onDragStart(e) {
-        if (!this.state.movable) return;
-        appBus.emit('dragstart', { item: this, event: e });
-    }
-
-    // --- Serialização ---
 
     /**
      * Serializa o estado do grupo para um objeto JSON.
