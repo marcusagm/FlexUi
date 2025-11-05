@@ -1,14 +1,40 @@
 /* styles/core.css */
+/**
+ * Palettes
+ * Blue Darkmode - https://coolors.co/1f2020-2e2e2e-353535-3c3c3c-32465a-1c5a96-1164b4-246bce
+ * Grays - https://coolors.co/palette/131316-1c1c21-26262c-2f3037-393a41-4b4c52-5b5c62-6a6b70
+ * Grays - https://coolors.co/palette/2e3440-3b4252-434c5e-4c566a
+ * Grays - https://coolors.co/palette/f8f9fa-e9ecef-dee2e6-ced4da-adb5bd-6c757d-495057-343a40-212529
+ */
 
 :root {
-    --flexui-bg-color: #2a2a2a;
-    --flexui-bg-color-light: #3a3a3a;
-    --flexui-bg-color-lighter: #4a4a4a;
-    --flexui-border-color: #1e1e1e;
-    --flexui-text-color: #cccccc;
+    --flexui-primary-color: rgb(28, 90, 150);
+    --flexui-primary-color-hover: rgb(17, 100, 180);
+    --flexui-primary-color-active: rgb(36, 107, 206);
+    --flexui-primary-color-inactive: rgb(50, 70, 90);
+
+    --flexui-primary-color-opacity: rgba(28, 89, 150, 0.85);
+    --flexui-primary-color-hover-opacity: rgba(17, 100, 180, 0.85);
+    --flexui-primary-color-active-opacity: rgba(36, 107, 206, 0.85);
+    --flexui-primary-color-inactive-opacity: rgba(50, 70, 90, 0.85);
+
+    --flexui-gray-light: rgb(60, 60, 60);
+    --flexui-gray: rgb(53, 53, 53);
+    --flexui-gray-dark: rgb(46, 46, 46);
+    --flexui-gray-darker: #1f2020;
+
+    --flexui-bg-color: var(--flexui-gray-darker);
+    --flexui-bg-color-light: var(--flexui-gray-dark);
+    --flexui-bg-color-lighter: var(--flexui-gray);
+
+    --flexui-border-color: color-mix(in srgb, var(--flexui-gray-light) 100%, #000 0.3);
+    --flexui-border-radius: 5px;
+
+    --flexui-text-color: #ccc;
+    --flexui-text-color-light: #fff;
     --flexui-text-color-dark: #999999;
-    --flexui-accent-color: #00ffcc;
-    --flexui-accent-color-hover: #00ffccaa;
+    --flexui-text-font: 'Nunito', Tahoma, Arial, sans-serif;
+    --flexui-text-size: 12px;
 
     --flexui-tab-bg: #2d2d2d;
     --flexui-tab-bg-active: #3f3f3f;
@@ -27,19 +53,20 @@
     --header-height: 30px;
 }
 
-html, body {
+html,
+body {
     height: 100%;
     width: 100%;
     overflow: hidden;
 }
 
 body {
-    font-family: Arial, sans-serif;
+    font-family: var(--flexui-text-font);
     background-color: var(--flexui-bg-color);
     color: var(--flexui-text-color);
     display: flex;
     flex-direction: column;
-    font-size: 12px;
+    font-size: var(--flexui-text-size);
 }
 
 .dragging {
@@ -53,12 +80,15 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-    background: var(--flexui-handle-color);
-    border-radius: 4px;
+    background: var(--flexui-primary-color-inactive);
+    border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: var(--flexui-accent-color-hover);
+    background: var(--flexui-primary-color-hover);
+}
+::-webkit-scrollbar-thumb:active {
+    background: var(--flexui-primary-color-active);
 }
 
 ::-webkit-scrollbar-track {

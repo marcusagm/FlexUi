@@ -1,10 +1,11 @@
 .panel__content {
     flex-grow: 1;
     padding: 8px;
-    font-size: 14px;
-    color: #ccc;
+    font-size: 1em;
+    color: var(--flexui-text-color);
     overflow: auto;
     min-height: 20px;
+    background: var(--flexui-gray);
 }
 
 .panel__content--toolbar {
@@ -13,16 +14,15 @@
     flex-wrap: wrap;
 }
 .panel__content--toolbar button {
-    background-color: #555;
-    color: #eee;
-    border: 1px solid #666;
+    background-color: var(--flexui-gray-light);
+    color: var(--flexui-text-color);
+    border: 1px solid var(--flexui-border-color);
     padding: 4px 8px;
-    border-radius: 3px;
+    border-radius: var(--flexui-border-radius);
     cursor: pointer;
-    font-size: 12px;
+    font-size: 0.85em;
 }
 .panel__content--toolbar button:hover {
-    background-color: #00ffcc33;
-    border-color: #00ffcc;
+    background-color: var(--flexui-primary-color-hover);
+    border-color: var(--flexui-primary-color-active);
 }
-
