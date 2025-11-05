@@ -23,6 +23,12 @@ export class App {
      */
     STORAGE_KEY = 'panel_state';
 
+    /**
+     * Armazena o objeto de workspace carregado (incluindo nome e layout)
+     * @type {object | null}
+     */
+    currentWorkspace = null;
+
     constructor() {
         if (App.instance) {
             return App.instance;
@@ -48,10 +54,18 @@ export class App {
         document.body.append(this.menu.element, this.container.element);
 
         this.initEventListeners();
-        this.loadInitialLayout();
+        // this.loadInitialLayout(); // REMOVIDO: A inicialização agora é async e chamada pelo main.js
 
         const uiListener = new NotificationUIListener(document.body);
         uiListener.listen(appNotifications);
+    }
+
+    /**
+     * (NOVO) Inicializa a aplicação, carregando o layout assincronamente.
+     * Deve ser chamado pelo main.js.
+     */
+    async init() {
+        await this.loadInitialLayout();
     }
 
     initEventListeners() {
@@ -63,82 +77,90 @@ export class App {
         appBus.on('app:restore-state', this.restoreLayout.bind(this));
         appBus.on('app:reset-state', this.resetLayout.bind(this, false));
 
-        this.debouncedResize = debounce(this.onResizeHandler.bind(this), 200);
+        const debounceDelay = 200;
+        this.debouncedResize = debounce(this.onResizeHandler.bind(this), debounceDelay);
         window.addEventListener('resize', this.debouncedResize);
     }
 
-    loadInitialLayout() {
-        const data = this.stateService.loadState(this.STORAGE_KEY);
-        if (data) {
-            this.container.fromJSON(data);
+    /**
+     * (MODIFICADO) Carrega o layout inicial do StateService (localStorage ou JSON).
+     */
+    async loadInitialLayout() {
+        const workspaceData = await this.stateService.loadState(this.STORAGE_KEY);
+
+        if (workspaceData && workspaceData.layout) {
+            // Armazena o objeto de workspace completo (com nome e layout)
+            this.currentWorkspace = workspaceData;
+            // Passa apenas os dados de layout para o container
+            this.container.fromJSON(workspaceData.layout);
         } else {
-            this.initDefault();
+            // Isso só deve acontecer se o default.json falhar ao carregar
+            console.error(
+                'App: Falha crítica ao carregar o layout. Nenhum dado de workspace foi encontrado.'
+            );
+            appNotifications.danger(
+                'Falha crítica ao carregar o layout. O arquivo default.json pode estar faltando.'
+            );
         }
     }
 
+    /**
+     * (MODIFICADO) Salva o estado do layout atual no objeto de workspace.
+     */
     saveLayout() {
-        const stateData = this.container.toJSON();
-        this.stateService.saveState(this.STORAGE_KEY, stateData);
+        // 1. Pega os dados de layout atuais do container
+        const layoutData = this.container.toJSON();
+
+        // 2. Atualiza o objeto de workspace em memória
+        if (this.currentWorkspace) {
+            this.currentWorkspace.layout = layoutData;
+        } else {
+            // Fallback caso a inicialização tenha falhado
+            console.warn(
+                'App.saveLayout: currentWorkspace é nulo. Criando novo objeto de workspace.'
+            );
+            this.currentWorkspace = {
+                name: 'Workspace Salvo (Fallback)', // Nome padrão
+                layout: layoutData
+            };
+        }
+
+        // 3. Salva o objeto de workspace completo (com nome e layout) no localStorage
+        this.stateService.saveState(this.STORAGE_KEY, this.currentWorkspace);
 
         const i18n = TranslationService.getInstance();
         appNotifications.success(i18n.translate('appstate.save'));
     }
 
-    restoreLayout() {
-        const data = this.stateService.loadState(this.STORAGE_KEY);
-        const i18n = TranslationService.getInstance();
+    /**
+     * (MODIFICADO) Restaura o layout salvo no localStorage (ou o padrão se não houver).
+     */
+    async restoreLayout() {
+        this.container.clear();
+        // Recarrega do StateService (que vai ler o localStorage ou o default.json)
+        await this.loadInitialLayout();
 
-        if (data) {
-            this.container.fromJSON(data);
-            appNotifications.success(i18n.translate('appstate.restore'));
-        } else {
-            appNotifications.info(i18n.translate('appstate.no_save'));
-        }
+        const i18n = TranslationService.getInstance();
+        // A notificação 'no_save' não é mais necessária, pois o StateService garante o default.json
+        appNotifications.success(i18n.translate('appstate.restore'));
     }
 
-    resetLayout(silent = false) {
+    /**
+     * (MODIFICADO) Limpa o localStorage e recarrega o layout padrão (do default.json).
+     * @param {boolean} [silent=false]
+     */
+    async resetLayout(silent = false) {
         this.stateService.clearState(this.STORAGE_KEY);
         this.container.clear();
-        this.initDefault();
+
+        // Como o localStorage está limpo, o loadInitialLayout vai forçar o StateService
+        // a carregar o 'workspaces/default.json'
+        await this.loadInitialLayout();
 
         if (!silent) {
             const i18n = TranslationService.getInstance();
             appNotifications.success(i18n.translate('appstate.reset'));
         }
-    }
-
-    initDefault() {
-        const c1 = this.container.createColumn();
-        const group = new PanelGroup(
-            new TextPanel('Painel de Texto 1', 'Este é um painel customizado.')
-        );
-        group.addPanel(new TextPanel('Aba um', 'este é o conteudo da aba'), false);
-        group.addPanel(
-            new TextPanel(
-                'Aba Um título muito grande para teste',
-                'abs 2 este é o conteudo da aba'
-            ),
-            false
-        );
-
-        c1.addPanelGroup(group);
-        c1.addPanelGroup(
-            new PanelGroup(
-                new TextPanel('Painel de Texto 2', 'O conteúdo é gerenciado pela subclasse.', 200)
-            )
-        );
-
-        const c2 = this.container.createColumn();
-        c2.addPanelGroup(new PanelGroup(new ToolbarPanel('Barra de Ferramentas')));
-        c2.addPanelGroup(
-            new PanelGroup(new TextPanel('Painel 3', 'Mais um painel de texto.', null), null, true)
-        );
-
-        const c3 = this.container.createColumn();
-        c3.addPanelGroup(new PanelGroup(new TextPanel('Painel 4', 'Conteúdo do painel 4.')));
-        c3.addPanelGroup(new PanelGroup(new ToolbarPanel()));
-
-        this.container.updateColumnsSizes();
     }
 
     addNewPanel() {

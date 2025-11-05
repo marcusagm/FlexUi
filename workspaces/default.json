@@ -1,0 +1,182 @@
+{
+    "name": "Layout Padrão",
+    "layout": {
+        "columns": [
+            {
+                "width": null,
+                "panelGroups": [
+                    {
+                        "type": "PanelGroup",
+                        "height": null,
+                        "collapsed": false,
+                        "activePanelId": null,
+                        "config": {},
+                        "panels": [
+                            {
+                                "type": "TextPanel",
+                                "title": "Painel de Texto 1",
+                                "height": null,
+                                "content": "Este é um painel customizado.",
+                                "config": {
+                                    "closable": true,
+                                    "collapsible": true,
+                                    "movable": true,
+                                    "minHeight": 100
+                                }
+                            },
+                            {
+                                "type": "TextPanel",
+                                "title": "Aba um",
+                                "height": null,
+                                "content": "este é o conteudo da aba",
+                                "config": {
+                                    "closable": true,
+                                    "collapsible": true,
+                                    "movable": true,
+                                    "minHeight": 100
+                                }
+                            },
+                            {
+                                "type": "TextPanel",
+                                "title": "Aba Um título muito grande para teste",
+                                "height": null,
+                                "content": "abs 2 este é o conteudo da aba",
+                                "config": {
+                                    "closable": true,
+                                    "collapsible": true,
+                                    "movable": true,
+                                    "minHeight": 100
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "type": "PanelGroup",
+                        "height": 200,
+                        "collapsed": false,
+                        "activePanelId": null,
+                        "config": {},
+                        "panels": [
+                            {
+                                "type": "TextPanel",
+                                "title": "Painel de Texto 2",
+                                "height": 200,
+                                "content": "O conteúdo é gerenciado pela subclasse.",
+                                "config": {
+                                    "closable": true,
+                                    "collapsible": true,
+                                    "movable": true,
+                                    "minHeight": 100
+                                }
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "width": null,
+                "panelGroups": [
+                    {
+                        "type": "PanelGroup",
+                        "height": null,
+                        "collapsed": false,
+                        "activePanelId": null,
+                        "config": {
+                            "closable": false,
+                            "collapsible": false,
+                            "movable": false,
+                            "minHeight": 50
+                        },
+                        "panels": [
+                            {
+                                "type": "ToolbarPanel",
+                                "title": "Barra de Ferramentas",
+                                "height": null,
+                                "content": null,
+                                "config": {
+                                    "closable": false,
+                                    "collapsible": false,
+                                    "movable": false,
+                                    "minHeight": 50
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "type": "PanelGroup",
+                        "height": null,
+                        "collapsed": true,
+                        "activePanelId": null,
+                        "config": {},
+                        "panels": [
+                            {
+                                "type": "TextPanel",
+                                "title": "Painel 3",
+                                "height": null,
+                                "content": "Mais um painel de texto.",
+                                "config": {
+                                    "closable": true,
+                                    "collapsible": true,
+                                    "movable": true,
+                                    "minHeight": 100
+                                }
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "width": null,
+                "panelGroups": [
+                    {
+                        "type": "PanelGroup",
+                        "height": null,
+                        "collapsed": false,
+                        "activePanelId": null,
+                        "config": {},
+                        "panels": [
+                            {
+                                "type": "TextPanel",
+                                "title": "Painel 4",
+                                "height": null,
+                                "content": "Conteúdo do painel 4.",
+                                "config": {
+                                    "closable": true,
+                                    "collapsible": true,
+                                    "movable": true,
+                                    "minHeight": 100
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "type": "PanelGroup",
+                        "height": null,
+                        "collapsed": false,
+                        "activePanelId": null,
+                        "config": {
+                            "closable": false,
+                            "collapsible": false,
+                            "movable": false,
+                            "minHeight": 50
+                        },
+                        "panels": [
+                            {
+                                "type": "ToolbarPanel",
+                                "title": "",
+                                "height": null,
+                                "content": null,
+                                "config": {
+                                    "closable": false,
+                                    "collapsible": false,
+                                    "movable": false,
+                                    "minHeight": 50
+                                }
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+}

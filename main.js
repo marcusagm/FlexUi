@@ -13,7 +13,8 @@ window.addEventListener('DOMContentLoaded', async () => {
 
         await i18n.setLanguage('pt');
 
-        new App();
+        const app = new App();
+        await app.init();
     } catch (err) {
         console.error('Falha ao iniciar App', err);
         // exibr mensagem de erro amigável ao usuário

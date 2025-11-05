@@ -47,7 +47,7 @@ class EventBus {
         if (!this.listeners.has(eventName)) {
             return;
         }
-        console.info('Evento: ' + eventName);
+        // Linha de log removida
 
         // Itera sobre uma cópia, caso um callback modifique a lista (ex: `off`)
         const listeners = [...this.listeners.get(eventName)];

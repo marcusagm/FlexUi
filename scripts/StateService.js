@@ -2,6 +2,7 @@
  * Serviço responsável por persistir e restaurar o estado da aplicação.
  * (REFATORADO) Agora é um serviço genérico e passivo (Singleton) que
  * apenas lê e escreve no localStorage. A orquestração é feita pelo App.js.
+ * (REFATORADO v2) Agora carrega o 'workspaces/default.json' como fallback.
  */
 export class StateService {
     /**
@@ -33,28 +34,56 @@ export class StateService {
     }
 
     /**
-     * Carrega e analisa dados do localStorage.
+     * Carrega e analisa dados do localStorage, ou carrega o padrão
+     * de 'workspaces/default.json' como fallback.
      * @param {string} key - A chave para buscar no localStorage.
-     * @returns {object | null} O objeto analisado ou nulo se falhar.
+     * @returns {Promise<object | null>} O objeto de workspace analisado ou nulo se falhar.
      */
-    loadState(key) {
+    async loadState(key) {
         const saved = localStorage.getItem(key);
+
         if (saved) {
             try {
+                // Tenta carregar do localStorage primeiro
                 return JSON.parse(saved);
             } catch (e) {
+                // Se estiver corrompido, loga o erro mas continua para carregar o padrão
                 console.error(
-                    'Falha ao carregar estado do localStorage (dados corrompidos). Retornando nulo.',
+                    'Falha ao carregar estado do localStorage (dados corrompidos). Carregando o padrão.',
                     e
                 );
-                return null;
+                // Continua para o fallback (abaixo)
             }
         }
-        return null;
+
+        // Se 'saved' for nulo ou corrompido, carrega o JSON padrão
+        try {
+            // (ALTERADO DE WARN PARA INFO)
+            console.info(
+                `StateService: Nenhum estado salvo encontrado (key: ${key}). Carregando 'workspaces/default.json'.`
+            );
+
+            // O caminho é relativo à raiz (index.html)
+            const response = await fetch('workspaces/default.json');
+
+            if (!response.ok) {
+                throw new Error(`Falha ao buscar default.json: ${response.statusText}`);
+            }
+            const defaultWorkspace = await response.json();
+            return defaultWorkspace;
+        } catch (fetchError) {
+            console.error(
+                'Falha crítica ao carregar o workspace padrão (default.json).',
+                fetchError
+            );
+            return null; // A aplicação terá que lidar com um estado nulo
+        }
     }
 
     /**
      * Salva dados no localStorage.
+     * (Obs: Este método não precisa mudar, pois ele salva
+     * qualquer objeto que o App.js enviar)
      * @param {string} key - A chave para salvar.
      * @param {object} data - O objeto (estado) a ser salvo (será stringificado).
      */
