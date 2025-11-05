@@ -405,7 +405,7 @@ export class PanelGroup {
      */
     requestLayoutUpdate() {
         if (this.state.column) {
-            appBus.emit('layout:changed', { source: this });
+            appBus.emit('layout:column-changed', this.state.column);
         }
     }
 

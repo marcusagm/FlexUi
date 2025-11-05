@@ -55,37 +55,21 @@ export class LayoutService {
      * @private
      */
     _initEventListeners() {
-        // (ALTERADO) Ouve o evento genérico 'layout:changed'
-        appBus.on('layout:changed', this._onLayoutChanged.bind(this));
+        // (ALTERADO) Ouve o evento específico 'layout:column-changed'
+        appBus.on('layout:column-changed', this._onColumnChanged.bind(this));
     }
 
     /**
-     * (NOVO) Handles the generic 'layout:changed' event.
-     * Determines the source Column and triggers the layout update.
+     * (NOVO) Handles the specific 'layout:column-changed' event.
+     * Receives the Column instance directly from the event emitter.
      *
-     * @param {object} event - The event object, expected { source: Component }.
+     * @param {Column} column - The column instance needing a layout update.
      * @private
      */
-    _onLayoutChanged(event) {
-        if (!event || !event.source) {
-            console.warn('LayoutService: "_onLayoutChanged" received an invalid event.');
-            return;
-        }
-
-        let column = null;
-
-        if (event.source instanceof Column) {
-            column = event.source;
-        } else if (event.source instanceof PanelGroup) {
-            column = event.source.state.column;
-        }
-
-        // Validação centralizada para garantir que encontramos uma coluna válida
+    _onColumnChanged(column) {
         if (!column || !(column instanceof Column)) {
-            // (Este console.warn substitui a verificação anterior)
-            console.warn(
-                'LayoutService: Could not determine valid column from "layout:changed" event source.'
-            );
+            // Validação centralizada para garantir que encontramos uma coluna válida
+            console.warn('LayoutService: "_onColumnChanged" received an invalid column object.');
             return;
         }
 
@@ -96,7 +80,7 @@ export class LayoutService {
         this._updatePanelGroupsSizes(column);
     }
 
-    /* O método _onLayoutUpdate(column) foi removido */
+    /* O método _onLayoutChanged(event) foi removido */
 
     /**
      * Ensures at least one PanelGroup is visible in a column.
@@ -119,6 +103,7 @@ export class LayoutService {
      * Recalculates sizes and applies 'panel-group--fills-space'
      * to the correct PanelGroup in a column.
      * (Logic moved from Column.js)
+     * (OTIMIZADO) Esta versão usa 1 filter + 1 forEach (em vez de 1 filter + 2 forEach).
      * @param {Column} column - The column to update.
      * @private
      */

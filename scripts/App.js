@@ -156,7 +156,7 @@ export class App {
      */
     onResizeHandler() {
         this.container.getColumns().forEach(column => {
-            appBus.emit('layout:changed', { source: column });
+            appBus.emit('layout:column-changed', column);
         });
     }
 }

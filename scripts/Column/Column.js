@@ -254,7 +254,6 @@ export class Column {
 
     /**
      * Adds a single PanelGroup to the column at a specific index.
-     * @param {PanelGroup} panelGroup
      * @param {number|null} [index=null]
      */
     addPanelGroup(panelGroup, index = null) {
@@ -312,7 +311,7 @@ export class Column {
      */
     requestLayoutUpdate() {
         if (this.state.container) {
-            appBus.emit('layout:changed', { source: this });
+            appBus.emit('layout:column-changed', this);
         }
     }
 
