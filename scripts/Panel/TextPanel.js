@@ -16,4 +16,23 @@ export class TextPanel extends Panel {
     getPanelType() {
         return 'TextPanel';
     }
+
+    toJSON() {
+        let panelData = super.toJSON();
+        const newData = {
+            ...panelData,
+            content: this.getContentElement().textContent
+        };
+        return newData;
+    }
+
+    /**
+     * Restaura o estado do painel a partir de um objeto JSON.
+     * Este método é chamado pelo PanelFactory.
+     * @param {object} data - O objeto de estado serializado.
+     */
+    fromJSON(data) {
+        this.getContentElement().textContent = data.content;
+        super.fromJSON(data);
+    }
 }

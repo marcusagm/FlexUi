@@ -51,5 +51,21 @@ export class ToolbarPanel extends Panel {
     setContent(htmlString) {
         // Não faz nada. O painel se recria sozinho.
     }
-}
 
+    toJSON() {
+        let panelData = super.toJSON();
+        const newData = {
+            ...panelData
+        };
+        return newData;
+    }
+
+    /**
+     * Restaura o estado do painel a partir de um objeto JSON.
+     * Este método é chamado pelo PanelFactory.
+     * @param {object} data - O objeto de estado serializado.
+     */
+    fromJSON(data) {
+        super.fromJSON(data);
+    }
+}
