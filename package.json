@@ -15,12 +15,12 @@
     ],
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/marcusagm/CircuitSim.git"
+        "url": "git+https://github.com/marcusagm/FlexUi.git"
     },
     "bugs": {
-        "url": "https://github.com/marcusagm/CircuitSim/issues"
+        "url": "https://github.com/marcusagm/FlexUi/issues"
     },
-    "homepage": "https://github.com/marcusagm/CircuitSim#readme",
+    "homepage": "https://github.com/marcusagm/FlexUi#readme",
     "devDependencies": {
         "@eslint/js": "^9.38.0",
         "eslint": "^9.38.0",
