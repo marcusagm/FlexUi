@@ -1,5 +1,4 @@
 import { appBus } from '../EventBus.js';
-// (NOVO) PanelGroup é importado para ser instanciado no fromJSON
 import { PanelGroup } from '../Panel/PanelGroup.js';
 import { DragDropService } from '../Services/DND/DragDropService.js';
 import { throttleRAF } from '../ThrottleRAF.js';
@@ -8,6 +7,8 @@ import { throttleRAF } from '../ThrottleRAF.js';
  * Description:
  * Manages a single vertical column in the container. It holds and organizes
  * PanelGroups, manages horizontal resizing, and delegates drag/drop logic.
+ * (Refatorado) Agora delega a lógica de layout (fills-space, collapse rules)
+ * para o LayoutService emitindo 'layout:changed'.
  *
  * Properties summary:
  * - state {object} : Internal state management.
@@ -49,15 +50,14 @@ export class Column {
      * @param {number|null} [width=null] - The initial width of the column.
      */
     constructor(container, width = null) {
-        this.setMinWidth(150); // Padrão
-        this.setParentContainer(container); // Define o container
+        this.setMinWidth(150);
+        this.setParentContainer(container);
         this.state.width = width;
 
         this.element = document.createElement('div');
         this.element.classList.add('column');
-        this.dropZoneType = 'column'; // Identificador para DND
+        this.dropZoneType = 'column';
 
-        // Inicializa o throttle
         this.setThrottledUpdate(
             throttleRAF(this.state.container.updateColumnsSizes.bind(this.state.container))
         );
@@ -142,7 +142,6 @@ export class Column {
      */
     destroy() {
         appBus.off('panelgroup:removed', this.onPanelGroupRemoved.bind(this));
-        // Cancela qualquer frame de animação pendente
         this.getThrottledUpdate()?.cancel();
 
         [...this.state.panelGroups].forEach(panel => panel.destroy());
@@ -195,7 +194,6 @@ export class Column {
             const delta = ev.clientX - startX;
             me.state.width = Math.max(me.getMinWidth(), startW + delta);
 
-            // Aplicar o throttle
             me.getThrottledUpdate()();
         };
 
@@ -203,9 +201,7 @@ export class Column {
             window.removeEventListener('mousemove', onMove);
             window.removeEventListener('mouseup', onUp);
 
-            // Limpar e garantir o estado final
             me.getThrottledUpdate()?.cancel();
-            // E executa uma atualização final
             container.updateColumnsSizes();
         };
         window.addEventListener('mousemove', onMove);
@@ -222,7 +218,7 @@ export class Column {
         } else if (this.state.width !== null) {
             this.element.style.flex = `0 0 ${this.state.width}px`;
         }
-        this.updatePanelGroupsSizes();
+        this.requestLayoutUpdate();
     }
 
     /**
@@ -253,8 +249,7 @@ export class Column {
             this.element.appendChild(panelGroup.element);
             panelGroup.setParentColumn(this);
         });
-        this.checkPanelsGroupsCollapsed();
-        this.updatePanelGroupsSizes();
+        this.requestLayoutUpdate();
     }
 
     /**
@@ -273,32 +268,7 @@ export class Column {
             this.element.insertBefore(panelGroup.element, nextSiblingElement);
         }
         panelGroup.setParentColumn(this);
-        this.checkPanelsGroupsCollapsed();
-        this.updatePanelGroupsSizes();
-    }
-
-    /**
-     * Recalcula os tamanhos (flex) de todos os PanelGroups filhos.
-     */
-    updatePanelGroupsSizes() {
-        const uncollapsedPanelGroups = this.getPanelGroupsUncollapsed();
-        const lastUncollapsedPanelGroup = uncollapsedPanelGroups[uncollapsedPanelGroups.length - 1];
-
-        this.state.panelGroups.forEach(panel => {
-            panel.element.classList.remove('panel-group--fills-space');
-        });
-
-        if (lastUncollapsedPanelGroup) {
-            lastUncollapsedPanelGroup.state.height = null;
-        }
-
-        this.state.panelGroups.forEach(panel => {
-            panel.updateHeight();
-        });
-
-        if (lastUncollapsedPanelGroup && lastUncollapsedPanelGroup.state.height === null) {
-            lastUncollapsedPanelGroup.element.classList.add('panel-group--fills-space');
-        }
+        this.requestLayoutUpdate();
     }
 
     /**
@@ -316,18 +286,6 @@ export class Column {
     }
 
     /**
-     * Ensures at least one PanelGroup is visible.
-     */
-    checkPanelsGroupsCollapsed() {
-        const uncollapsed = this.getPanelGroupsUncollapsed().length;
-        const total = this.getTotalPanelGroups();
-
-        if (uncollapsed === 0 && total > 0) {
-            this.state.panelGroups[total - 1].unCollapse();
-        }
-    }
-
-    /**
      * Removes a PanelGroup from the column.
      * @param {boolean} [emitEmpty=true] - Whether to emit 'column:empty'.
      */
@@ -342,11 +300,19 @@ export class Column {
             this.element.removeChild(panelGroup.element);
         }
 
-        this.checkPanelsGroupsCollapsed();
-        this.updatePanelGroupsSizes();
+        this.requestLayoutUpdate();
 
         if (emitEmpty && this.getTotalPanelGroups() === 0) {
             appBus.emit('column:empty', this);
+        }
+    }
+
+    /**
+     * Emite um evento para o LayoutService recalcular esta coluna.
+     */
+    requestLayoutUpdate() {
+        if (this.state.container) {
+            appBus.emit('layout:changed', { source: this });
         }
     }
 
@@ -403,38 +369,27 @@ export class Column {
     }
 
     /**
-     * (ALTERADO) Restaura o estado da coluna E de seus PanelGroups filhos.
+     * Restaura o estado da coluna E de seus PanelGroups filhos.
      * @param {object} data - O objeto de estado serializado.
      */
     fromJSON(data) {
-        // 1. Restaurar estado primitivo (lógica existente)
         if (data.width !== undefined) {
             this.state.width = data.width;
         }
 
-        // 2. (NOVO) Hidratar PanelGroups Filhos
         const groupsToRestore = [];
         if (data.panelGroups && Array.isArray(data.panelGroups)) {
             data.panelGroups.forEach(groupData => {
-                // 2a. Instancia um PanelGroup "vazio".
-                // (Depende da Etapa 3, onde o construtor do PanelGroup
-                //  foi alterado para aceitar initialPanel = null)
                 const group = new PanelGroup();
-
-                // 2b. Delega a hidratação (incluindo painéis filhos)
-                //     para o próprio PanelGroup.
                 group.fromJSON(groupData);
-
                 groupsToRestore.push(group);
             });
         }
 
-        // 3. Adiciona os grupos hidratados à coluna
         if (groupsToRestore.length > 0) {
             this.addPanelGroupsBulk(groupsToRestore);
         }
 
-        // 4. Aplica o estado visual (lógica existente)
         this.updateWidth(false);
     }
 }

@@ -14,6 +14,7 @@ import { DragDropService } from './Services/DND/DragDropService.js';
 import { ColumnDropStrategy } from './Services/DND/ColumnDropStrategy.js';
 import { CreateAreaDropStrategy } from './Services/DND/CreateAreaDropStrategy.js';
 import { PanelFactory } from './Panel/PanelFactory.js';
+import { LayoutService } from './Services/LayoutService.js';
 
 export class App {
     /**
@@ -41,6 +42,8 @@ export class App {
         factory.registerPanelType('Panel', Panel);
         factory.registerPanelType('TextPanel', TextPanel);
         factory.registerPanelType('ToolbarPanel', ToolbarPanel);
+
+        LayoutService.getInstance();
 
         document.body.append(this.menu.element, this.container.element);
 
@@ -153,7 +156,7 @@ export class App {
      */
     onResizeHandler() {
         this.container.getColumns().forEach(column => {
-            column.updatePanelGroupsSizes();
+            appBus.emit('layout:changed', { source: column });
         });
     }
 }

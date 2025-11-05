@@ -1,17 +1,17 @@
 import { PanelGroupHeader } from './PanelGroupHeader.js';
 import { appBus } from '../EventBus.js';
-import { throttleRAF } from '../ThrottleRAF.js';
-// (NOVO) Importa o Factory para o fromJSON
+// import { throttleRAF } from '../ThrottleRAF.js'; // Removido (Correto)
 import { PanelFactory } from './PanelFactory.js';
 
 /**
  * Description:
  * Manages a group of Panel (tabs) within a Column. This is the main
  * "widget" that the user sees and interacts with (drag, collapse, resize).
+ * (Refatorado) Agora delega a lógica de layout (fills-space)
+ * para o LayoutService emitindo 'layout:changed'.
  *
  * Properties summary:
  * - state {object} : Internal state management.
- * - _throttledUpdate {function} : A versão throttled da função de update.
  *
  * Typical usage:
  * const panel = new TextPanel('My Tab');
@@ -49,14 +49,7 @@ export class PanelGroup {
     id = Math.random().toString(36).substring(2, 9) + Date.now();
 
     /**
-     * A versão throttled (com rAF) da função de atualização.
-     * @type {function | null}
-     * @private
-     */
-    _throttledUpdate = null;
-
-    /**
-     * @param {Panel | null} [initialPanel=null] - (ALTERADO) O painel inicial é opcional.
+     * @param {Panel | null} [initialPanel=null] - O painel inicial é opcional.
      * @param {number|null} [height=null] - The initial height of the group.
      * @param {boolean} [collapsed=false] - The initial collapsed state.
      * @param {object} [config={}] - Configuration overrides for the group.
@@ -80,34 +73,14 @@ export class PanelGroup {
 
         this.build();
 
-        // (ALTERADO) Só adiciona o painel inicial se ele for fornecido
         if (initialPanel) {
             this.addPanel(initialPanel, true);
         }
 
         this.initEventListeners();
-
-        // Inicializa o throttle (como nulo)
-        this.setThrottledUpdate(null);
     }
 
     // --- Getters / Setters ---
-
-    /**
-     * Define a função de atualização throttled.
-     * @param {function | null} throttledFunction
-     */
-    setThrottledUpdate(throttledFunction) {
-        this._throttledUpdate = throttledFunction;
-    }
-
-    /**
-     * Obtém a função de atualização throttled.
-     * @returns {function | null}
-     */
-    getThrottledUpdate() {
-        return this._throttledUpdate;
-    }
 
     /**
      * @returns {number}
@@ -129,18 +102,11 @@ export class PanelGroup {
     }
 
     /**
-     * Define a coluna pai e inicializa a função throttled.
+     * Define a coluna pai.
      * @param {Column} column - The parent column instance.
      */
     setParentColumn(column) {
         this.state.column = column;
-
-        // Cria a função throttled quando a coluna é definida.
-        if (column && column.updatePanelGroupsSizes) {
-            this.setThrottledUpdate(throttleRAF(column.updatePanelGroupsSizes.bind(column)));
-        } else {
-            this.setThrottledUpdate(null);
-        }
     }
 
     // --- Concrete Methods ---
@@ -191,11 +157,6 @@ export class PanelGroup {
         appBus.off('panel:group-child-close-request', this.onChildCloseRequest.bind(this));
         appBus.off('panel:close-request', this.onCloseRequest.bind(this));
         appBus.off('panel:toggle-collapse-request', this.onToggleCollapseRequest.bind(this));
-
-        // Cancela qualquer frame de animação pendente
-        this.getThrottledUpdate()?.cancel();
-
-        this.state.panels.forEach(p => p.destroy());
     }
 
     /**
@@ -232,12 +193,11 @@ export class PanelGroup {
     canCollapse() {
         if (!this.state.column) return false;
         if (!this.state.collapsible) return false;
-
-        return this.state.column.getPanelGroupsUncollapsed().length > 1;
+        return true;
     }
 
     /**
-     * Toggles the collapse state of the group.
+     * Toggles the collapse state and requests a layout update.
      */
     toggleCollapse() {
         if (!this.state.collapsible) return;
@@ -245,12 +205,11 @@ export class PanelGroup {
         if (this.state.collapsed) {
             this.unCollapse();
         } else {
-            if (!this.canCollapse()) {
-                return;
-            }
             this.collapse();
         }
-        this.state.column?.updatePanelGroupsSizes();
+
+        // (CORRIGIDO) Usa o wrapper de segurança
+        this.requestLayoutUpdate();
     }
 
     /**
@@ -346,24 +305,16 @@ export class PanelGroup {
             const delta = ev.clientY - startY;
             me.state.height = Math.max(minPanelHeight, startH + delta);
 
-            // Aplicar o throttle
-            const updater = me.getThrottledUpdate();
-            if (updater) {
-                updater();
-            }
+            // (CORRIGIDO) Usa o wrapper de segurança
+            me.requestLayoutUpdate();
         };
 
         const onUp = () => {
             window.removeEventListener('mousemove', onMove);
             window.removeEventListener('mouseup', onUp);
 
-            // Limpar e garantir o estado final
-            const updater = me.getThrottledUpdate();
-            if (updater) {
-                updater.cancel();
-            }
-            // Executa uma atualização final
-            me.state.column?.updatePanelGroupsSizes();
+            // (CORRIGIDO) Usa o wrapper de segurança
+            me.requestLayoutUpdate();
         };
 
         window.addEventListener('mousemove', onMove);
@@ -371,12 +322,11 @@ export class PanelGroup {
     }
 
     /**
-     * Adds a new Panel (tab) to this group.
+     * Adds a new Panel (tab) and requests a layout update.
      * @param {Panel} panel - The panel instance to add.
-     * @param {boolean} [makeActive=false] - (ALTERADO) O padrão agora é false.
+     * @param {boolean} [makeActive=false]
      */
     addPanel(panel, makeActive = false) {
-        // (ALTERADO) Lógica de verificação de painel existente melhorada.
         if (this.state.panels.includes(panel)) {
             if (makeActive) {
                 this.setActive(panel);
@@ -394,14 +344,15 @@ export class PanelGroup {
         this.state.header.updateTabs();
 
         if (makeActive || this.state.panels.length === 1) {
-            this.setActive(panel);
+            this.setActive(panel); // setActive também chama requestLayoutUpdate
+        } else {
+            // (CORRIGIDO) Usa o wrapper de segurança
+            this.requestLayoutUpdate();
         }
-
-        this.state.column?.updatePanelGroupsSizes();
     }
 
     /**
-     * Removes a Panel (tab) from this group.
+     * Removes a Panel (tab) and requests a layout update.
      * @param {Panel} panel - The panel instance to remove.
      */
     removePanel(panel) {
@@ -422,15 +373,16 @@ export class PanelGroup {
 
         if (panel === this.state.activePanel) {
             const newActive = this.state.panels[index] || this.state.panels[index - 1];
-            this.setActive(newActive);
+            this.setActive(newActive); // setActive chama requestLayoutUpdate
+        } else {
+            this.state.header.updateTabs();
+            // (CORRIGIDO) Usa o wrapper de segurança
+            this.requestLayoutUpdate();
         }
-
-        this.state.header.updateTabs();
-        this.state.column?.updatePanelGroupsSizes();
     }
 
     /**
-     * Sets a specific Panel (tab) as the active, visible one.
+     * Sets a specific Panel (tab) as active and requests a layout update.
      * @param {Panel} panel - The panel instance to activate.
      */
     setActive(panel) {
@@ -449,7 +401,18 @@ export class PanelGroup {
 
         this.state.title = panel.state.title;
         this.state.header.updateTabs();
-        this.state.column?.updatePanelGroupsSizes();
+
+        // (CORRIGIDO) Usa o wrapper de segurança
+        this.requestLayoutUpdate();
+    }
+
+    /**
+     * (NOVO) Emite um evento para o LayoutService APENAS se a coluna pai existir.
+     */
+    requestLayoutUpdate() {
+        if (this.state.column) {
+            appBus.emit('layout:changed', { source: this });
+        }
     }
 
     /**
@@ -465,7 +428,6 @@ export class PanelGroup {
 
     /**
      * Serializa o estado do grupo para um objeto JSON.
-     * Este método chama .toJSON() em todos os painéis filhos.
      * @returns {object} Um objeto JSON-friendly representando o estado.
      */
     toJSON() {
@@ -475,24 +437,21 @@ export class PanelGroup {
             height: this.state.height,
             collapsed: this.state.collapsed,
             activePanelId: this.state.activePanel ? this.state.activePanel.id : null,
-            // Configurações de estado do grupo
             config: {
                 closable: this.state.closable,
                 collapsible: this.state.collapsible,
                 movable: this.state.movable,
                 minHeight: this.state.minHeight
             },
-            // Serializa os painéis (abas) filhos
             panels: this.state.panels.map(panel => panel.toJSON())
         };
     }
 
     /**
-     * (ALTERADO) Restaura o estado do grupo E de seus painéis filhos.
+     * Restaura o estado do grupo E de seus painéis filhos.
      * @param {object} data - O objeto de estado serializado.
      */
     fromJSON(data) {
-        // 1. Restaurar estado primitivo (lógica existente)
         if (data.id) {
             this.id = data.id;
         }
@@ -506,32 +465,23 @@ export class PanelGroup {
             Object.assign(this.state, data.config);
         }
 
-        // 2. (NOVO) Hidratar Painéis Filhos
         if (data.panels && Array.isArray(data.panels)) {
             const factory = PanelFactory.getInstance();
 
             data.panels.forEach(panelData => {
-                // 2a. Usar o Factory para criar o painel
                 const panel = factory.createPanel(panelData);
 
                 if (panel) {
-                    // 2b. Determinar se é ativo
                     const isActive = panel.id === data.activePanelId;
-
-                    // 2c. Adicionar ao grupo
-                    // O 'addPanel' (makeActive = isActive) também chama setActive
                     this.addPanel(panel, isActive);
                 }
             });
         }
 
-        // 3. (NOVO) Garantia de painel ativo
-        // Se o activePanelId não foi encontrado (ou era nulo), ativa o primeiro.
         if (!this.state.activePanel && this.state.panels.length > 0) {
             this.setActive(this.state.panels[0]);
         }
 
-        // 4. Aplicar o estado visual (lógica existente)
         this.updateHeight();
         this.updateCollapse();
     }
