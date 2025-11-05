@@ -15,6 +15,7 @@ import { ColumnDropStrategy } from './Services/DND/ColumnDropStrategy.js';
 import { CreateAreaDropStrategy } from './Services/DND/CreateAreaDropStrategy.js';
 import { PanelFactory } from './Panel/PanelFactory.js';
 import { LayoutService } from './Services/LayoutService.js';
+import { StatusBar } from './StatusBar/StatusBar.js';
 
 export class App {
     /**
@@ -37,6 +38,7 @@ export class App {
 
         this.menu = new Menu();
         this.container = new Container();
+        this.statusBar = new StatusBar();
 
         this.stateService = StateService.getInstance();
 
@@ -51,21 +53,21 @@ export class App {
 
         LayoutService.getInstance();
 
-        document.body.append(this.menu.element, this.container.element);
+        document.body.append(this.menu.element, this.container.element, this.statusBar.element);
 
         this.initEventListeners();
-        // this.loadInitialLayout(); // REMOVIDO: A inicialização agora é async e chamada pelo main.js
 
         const uiListener = new NotificationUIListener(document.body);
         uiListener.listen(appNotifications);
     }
 
     /**
-     * (NOVO) Inicializa a aplicação, carregando o layout assincronamente.
+     * Inicializa a aplicação, carregando o layout assincronamente.
      * Deve ser chamado pelo main.js.
      */
     async init() {
         await this.loadInitialLayout();
+        appBus.emit('app:set-permanent-status', 'Pronto');
     }
 
     initEventListeners() {
@@ -132,34 +134,26 @@ export class App {
         appNotifications.success(i18n.translate('appstate.save'));
     }
 
-    /**
-     * (MODIFICADO) Restaura o layout salvo no localStorage (ou o padrão se não houver).
-     */
     async restoreLayout() {
         this.container.clear();
-        // Recarrega do StateService (que vai ler o localStorage ou o default.json)
         await this.loadInitialLayout();
 
         const i18n = TranslationService.getInstance();
-        // A notificação 'no_save' não é mais necessária, pois o StateService garante o default.json
         appNotifications.success(i18n.translate('appstate.restore'));
     }
 
     /**
-     * (MODIFICADO) Limpa o localStorage e recarrega o layout padrão (do default.json).
      * @param {boolean} [silent=false]
      */
     async resetLayout(silent = false) {
         this.stateService.clearState(this.STORAGE_KEY);
         this.container.clear();
 
-        // Como o localStorage está limpo, o loadInitialLayout vai forçar o StateService
-        // a carregar o 'workspaces/default.json'
         await this.loadInitialLayout();
 
         if (!silent) {
             const i18n = TranslationService.getInstance();
-            appNotifications.success(i18n.translate('appstate.reset'));
+            appBus.emit('app:set-status-message', i18n.translate('appstate.reset'));
         }
     }
 

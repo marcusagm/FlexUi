@@ -1,0 +1,39 @@
+/* styles/components/status-bar.css */
+
+.status-bar {
+    /* * Sizing and Positioning (Parte do layout flex 'body')
+     * Conforme solicitado, não usamos 'position: fixed'.
+     */
+    height: 24px;
+    flex-shrink: 0; /* Previne que a barra seja esmagada pelo 'container' */
+
+    /* Theming (Baseado no core.css) */
+    background-color: var(--flexui-gray-darker);
+    color: var(--flexui-text-color-dark); /* Cor padrão (esmaecida) */
+    font-size: var(--flexui-text-size);
+
+    /* Sombra consistente com o menu */
+    box-shadow: 0 0 5px 0 #00000099;
+    z-index: 50; /* Acima do conteúdo, abaixo de menus (100) e modais (1000) */
+
+    /* Layout Interno (Flex) */
+    display: flex;
+    justify-content: space-between; /* Empurra permanente(esquerda) e temporário(direita) */
+    align-items: center;
+    padding: 0 10px;
+    line-height: 24px; /* Centraliza o texto verticalmente */
+
+    /* Previne seleção de texto */
+    user-select: none;
+}
+
+.status-bar__permanent {
+    /* Alinhado à esquerda por padrão */
+    /* Usa a cor padrão .status-bar */
+}
+
+.status-bar__temporary {
+    /* Alinhado à direita por padrão */
+    /* Usa uma cor levemente mais clara para mensagens temporárias */
+    color: var(--flexui-text-color);
+}

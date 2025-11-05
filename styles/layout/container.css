@@ -6,7 +6,7 @@
     background: var(--flexui-bg-color);
     overflow: auto;
     width: 100vw;
-    height: calc(100vh - 36px);
+    height: calc(100vh - 60px); /* 36px (Menu) + 24px (StatusBar) */
 }
 
 .container__placeholder {
