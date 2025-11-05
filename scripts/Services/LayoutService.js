@@ -123,27 +123,25 @@ export class LayoutService {
      * @private
      */
     _updatePanelGroupsSizes(column) {
-        // Helper logic (previously getPanelGroupsUncollapsed)
+        // 1. Find the last panel group that should fill space (Iteration 1: filter)
         const uncollapsedPanelGroups = column.state.panelGroups.filter(p => !p.state.collapsed);
-        const lastUncollapsedPanelGroup = uncollapsedPanelGroups[uncollapsedPanelGroups.length - 1];
+        const lastUncollapsedGroup = uncollapsedPanelGroups[uncollapsedPanelGroups.length - 1];
 
+        // 2. Apply rules in a single loop (Iteration 2: forEach)
         column.state.panelGroups.forEach(panel => {
-            panel.element.classList.remove('panel-group--fills-space');
-        });
+            const shouldFillSpace = panel === lastUncollapsedGroup;
 
-        // Allow the last panel to grow
-        if (lastUncollapsedPanelGroup) {
-            lastUncollapsedPanelGroup.state.height = null;
-        }
+            if (shouldFillSpace) {
+                // Allow this panel to grow
+                panel.state.height = null;
+                panel.element.classList.add('panel-group--fills-space');
+            } else {
+                // Ensure all other panels (collapsed or fixed-height) are not growing
+                panel.element.classList.remove('panel-group--fills-space');
+            }
 
-        // Update all individual panel heights (respecting 'null' for the last one)
-        column.state.panelGroups.forEach(panel => {
+            // Update the panel's height (applies either fixed height or new flex state)
             panel.updateHeight();
         });
-
-        // Apply the fill class to the one we set to null
-        if (lastUncollapsedPanelGroup && lastUncollapsedPanelGroup.state.height === null) {
-            lastUncollapsedPanelGroup.element.classList.add('panel-group--fills-space');
-        }
     }
 }
