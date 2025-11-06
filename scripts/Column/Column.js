@@ -36,7 +36,7 @@ export class Column {
      * @type {number}
      * @private
      */
-    _minWidth;
+    _minWidth = 150;
 
     /**
      * A versão throttled (com rAF) da função de atualização.
@@ -50,7 +50,7 @@ export class Column {
      * @param {number|null} [width=null] - The initial width of the column.
      */
     constructor(container, width = null) {
-        this.setMinWidth(150);
+        this.setMinWidth(this._minWidth);
         this.setParentContainer(container);
         this.state.width = width;
 
@@ -148,10 +148,12 @@ export class Column {
     }
 
     /**
-     * Initializes native drag-and-drop event listeners for the column element.
+     * (MODIFICADO) Initializes native drag-and-drop event listeners for the column element.
      */
     initDragDrop() {
+        this.element.addEventListener('dragenter', this.onDragEnter.bind(this));
         this.element.addEventListener('dragover', this.onDragOver.bind(this));
+        this.element.addEventListener('dragleave', this.onDragLeave.bind(this));
         this.element.addEventListener('drop', this.onDrop.bind(this));
     }
 
@@ -222,12 +224,30 @@ export class Column {
     }
 
     /**
+     * (NOVO) Handles the dragenter event by delegating to the DragDropService.
+     * @param {DragEvent} e
+     */
+    onDragEnter(e) {
+        e.preventDefault();
+        DragDropService.getInstance().handleDragEnter(e, this);
+    }
+
+    /**
      * Handles the dragover event by delegating to the DragDropService.
      * @param {DragEvent} e
      */
     onDragOver(e) {
         e.preventDefault();
         DragDropService.getInstance().handleDragOver(e, this);
+    }
+
+    /**
+     * (NOVO) Handles the dragleave event by delegating to the DragDropService.
+     * @param {DragEvent} e
+     */
+    onDragLeave(e) {
+        e.preventDefault();
+        DragDropService.getInstance().handleDragLeave(e, this);
     }
 
     /**
@@ -282,6 +302,14 @@ export class Column {
      */
     getPanelGroupsUncollapsed() {
         return this.state.panelGroups.filter(p => !p.state.collapsed);
+    }
+
+    /**
+     * (NOVO) Getter público para o state de panelGroups (melhor encapsulamento).
+     * @returns {Array<PanelGroup>}
+     */
+    getPanelGroups() {
+        return this.state.panelGroups;
     }
 
     /**
@@ -351,13 +379,6 @@ export class Column {
         return this.state.panelGroups.length;
     }
 
-    // --- Serialização ---
-
-    /**
-     * Serializa o estado da coluna para um objeto JSON.
-     * Este método chama .toJSON() em todos os PanelGroups filhos.
-     * @returns {object} Um objeto JSON-friendly representando o estado.
-     */
     toJSON() {
         return {
             width: this.state.width,

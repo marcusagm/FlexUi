@@ -141,7 +141,19 @@ export class DragDropService {
     }
 
     /**
-     * (REFATORADO) Deleta a lógica para a estratégia registrada.
+     * (NOVO) Delega a lógica de 'dragenter' para a estratégia registrada.
+     * @param {DragEvent} e - The native drag event.
+     * @param {object} dropZone - The drop zone instance (this).
+     */
+    handleDragEnter(e, dropZone) {
+        const strategy = this._strategyRegistry.get(dropZone.dropZoneType);
+        if (strategy && typeof strategy.handleDragEnter === 'function') {
+            strategy.handleDragEnter(e, dropZone, this._draggedItem, this._placeholder);
+        }
+    }
+
+    /**
+     * (REFATORADO) Delega a lógica para a estratégia registrada.
      * @param {DragEvent} e - The native drag event.
      * @param {object} dropZone - The drop zone instance (this).
      */
@@ -155,31 +167,31 @@ export class DragDropService {
 
         // 2. Delegar para a estratégia específica
         const strategy = this._strategyRegistry.get(dropZone.dropZoneType);
-        if (strategy && strategy.handleDragOver) {
+        if (strategy && typeof strategy.handleDragOver === 'function') {
             strategy.handleDragOver(e, dropZone, this._draggedItem, this._placeholder);
         }
     }
 
     /**
-     * (REFATORADO) Deleta a lógica para a estratégia registrada.
+     * (MODIFICADO) Delega a lógica para a estratégia registrada.
      * @param {DragEvent} e - The native drag event.
      * @param {Column | ColumnCreateArea} dropZone - The drop zone instance (this).
      */
     handleDragLeave(e, dropZone) {
         const strategy = this._strategyRegistry.get(dropZone.dropZoneType);
-        if (strategy && strategy.handleDragLeave) {
+        if (strategy && typeof strategy.handleDragLeave === 'function') {
             strategy.handleDragLeave(e, dropZone, this._draggedItem, this._placeholder);
         }
     }
 
     /**
-     * (REFATORADO) Deleta a lógica para a estratégia registrada.
+     * (REFATORADO) Delega a lógica para a estratégia registrada.
      * @param {DragEvent} e - The native drag event.
      * @param {Column | ColumnCreateArea} dropZone - The drop zone instance (this).
      */
     handleDrop(e, dropZone) {
         const strategy = this._strategyRegistry.get(dropZone.dropZoneType);
-        if (strategy && strategy.handleDrop) {
+        if (strategy && typeof strategy.handleDrop === 'function') {
             strategy.handleDrop(e, dropZone, this._draggedItem, this._placeholder);
         }
     }
@@ -247,4 +259,3 @@ export class DragDropService {
         this._isDragging = false;
     }
 }
-
