@@ -8,6 +8,14 @@ export class TextPanel extends Panel {
         this.getContentElement().textContent = initialText;
     }
 
+    /**
+     * (NOVO) Retorna o identificador de tipo estático para o PanelFactory.
+     * @returns {string}
+     */
+    static get panelType() {
+        return 'TextPanel';
+    }
+
     // Opcional: sobrescrever populateContent se a lógica for complexa
     // populateContent() {
     //     this.getContentElement().textContent = 'Texto padrão do TextPanel';
@@ -18,7 +26,7 @@ export class TextPanel extends Panel {
     }
 
     toJSON() {
-        let panelData = super.toJSON();
+        const panelData = super.toJSON();
         const newData = {
             ...panelData,
             content: this.getContentElement().textContent
@@ -26,11 +34,6 @@ export class TextPanel extends Panel {
         return newData;
     }
 
-    /**
-     * Restaura o estado do painel a partir de um objeto JSON.
-     * Este método é chamado pelo PanelFactory.
-     * @param {object} data - O objeto de estado serializado.
-     */
     fromJSON(data) {
         this.getContentElement().textContent = data.content;
         super.fromJSON(data);

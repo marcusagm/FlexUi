@@ -38,6 +38,14 @@ export class Panel {
         this.initEventListeners();
     }
 
+    /**
+     * (NOVO) Retorna o identificador de tipo estático para o PanelFactory.
+     * @returns {string}
+     */
+    static get panelType() {
+        return 'Panel';
+    }
+
     // O Panel não tem mais um PanelHeader visível
     getHeaderHeight() {
         return 0; // O cabeçalho é virtual, gerenciado pelo grupo
@@ -104,20 +112,11 @@ export class Panel {
     }
 
     updateHeight() {
-        // O painel filho (aba) deve sempre preencher o contêiner de conteúdo do grupo
         this.element.style.minHeight = `${this.getMinPanelHeight()}px`;
         this.element.style.height = 'auto';
         this.element.style.flex = '1 1 auto';
     }
 
-    // --- Serialização ---
-
-    /**
-     * Serializa o estado do painel para um objeto JSON.
-     * Classes filhas (ex: TextPanel) devem sobrescrever este método
-     * para adicionar dados específicos (ex: 'content').
-     * @returns {object} Um objeto JSON-friendly representando o estado.
-     */
     toJSON() {
         return {
             id: this.id,
@@ -135,11 +134,6 @@ export class Panel {
         };
     }
 
-    /**
-     * Restaura o estado do painel a partir de um objeto JSON.
-     * Este método é chamado pelo PanelFactory.
-     * @param {object} data - O objeto de estado serializado.
-     */
     fromJSON(data) {
         if (data.id) {
             this.id = data.id;

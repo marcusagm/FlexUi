@@ -13,8 +13,13 @@ export class ToolbarPanel extends Panel {
     }
 
     /**
-     * Sobrescreve o método base para preencher com botões.
+     * (NOVO) Retorna o identificador de tipo estático para o PanelFactory.
+     * @returns {string}
      */
+    static get panelType() {
+        return 'ToolbarPanel';
+    }
+
     populateContent() {
         const contentEl = this.getContentElement();
         contentEl.classList.add('panel__content--toolbar');
@@ -53,18 +58,13 @@ export class ToolbarPanel extends Panel {
     }
 
     toJSON() {
-        let panelData = super.toJSON();
+        const panelData = super.toJSON();
         const newData = {
             ...panelData
         };
         return newData;
     }
 
-    /**
-     * Restaura o estado do painel a partir de um objeto JSON.
-     * Este método é chamado pelo PanelFactory.
-     * @param {object} data - O objeto de estado serializado.
-     */
     fromJSON(data) {
         super.fromJSON(data);
     }

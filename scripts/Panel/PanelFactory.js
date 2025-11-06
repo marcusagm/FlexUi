@@ -14,8 +14,7 @@ import { Panel } from './Panel.js';
  * Typical usage:
  * // In App.js (on init):
  * const factory = PanelFactory.getInstance();
- * factory.registerPanelType('TextPanel', TextPanel);
- * factory.registerPanelType('ToolbarPanel', ToolbarPanel);
+ * factory.registerPanelClasses([Panel, TextPanel, ToolbarPanel]);
  *
  * // In PanelGroup.fromJSON (during hydration):
  * const panel = PanelFactory.getInstance().createPanel(panelData);
@@ -99,6 +98,32 @@ export class PanelFactory {
     }
 
     /**
+     * (NOVO) Registers multiple Panel classes at once using their static 'panelType' property.
+     * @param {Array<typeof Panel>} classList - An array of Panel classes (e.g., [Panel, TextPanel]).
+     */
+    registerPanelClasses(classList) {
+        const me = this;
+        if (!Array.isArray(classList)) {
+            console.warn('PanelFactory: registerPanelClasses requires an array of classes.');
+            return;
+        }
+
+        classList.forEach(panelClass => {
+            // Verifica se a classe é válida e se tem a propriedade estática
+            if (panelClass && typeof panelClass.panelType === 'string') {
+                const typeName = panelClass.panelType;
+                // Reusa a lógica de registro e validação existente
+                me.registerPanelType(typeName, panelClass);
+            } else {
+                console.warn(
+                    'PanelFactory: Attempted to register a class without a static "panelType" property.',
+                    panelClass
+                );
+            }
+        });
+    }
+
+    /**
      * Creates and hydrates a Panel instance based on its type and saved data.
      * This is the core factory method used during deserialization (fromJSON).
      *
@@ -116,13 +141,7 @@ export class PanelFactory {
         }
 
         const PanelClass = me.getRegistry().get(panelData.type) || Panel;
-
-        // 1. Instancia a classe correta
-        // Passa 'config' (se existir) para o construtor base do Panel
         const panel = new PanelClass(panelData.title, panelData.height, panelData.config || {});
-
-        // 2. Hidrata a instância com os dados salvos (ID, etc.)
-        // O método fromJSON é responsável por restaurar o estado interno.
         panel.fromJSON(panelData);
 
         return panel;

@@ -47,9 +47,7 @@ export class App {
         dds.registerStrategy('create-area', new CreateAreaDropStrategy());
 
         const factory = PanelFactory.getInstance();
-        factory.registerPanelType('Panel', Panel);
-        factory.registerPanelType('TextPanel', TextPanel);
-        factory.registerPanelType('ToolbarPanel', ToolbarPanel);
+        factory.registerPanelClasses([Panel, TextPanel, ToolbarPanel]);
 
         LayoutService.getInstance();
 
@@ -62,11 +60,10 @@ export class App {
     }
 
     /**
-     * (MODIFICADO) Inicializa a aplicação, carregando o menu e o layout assincronamente.
+     * Inicializa a aplicação, carregando o menu e o layout assincronamente.
      * Deve ser chamado pelo main.js.
      */
     async init() {
-        // (LINHA ADICIONADA) Carrega a configuração do menu
         await this.menu.load();
         // Carrega o layout (do localStorage ou do default.json)
         await this.loadInitialLayout();
@@ -138,9 +135,6 @@ export class App {
         appNotifications.success(i18n.translate('appstate.save'));
     }
 
-    /**
-     * Restaura o layout salvo no localStorage (ou o padrão se não houver).
-     */
     async restoreLayout() {
         this.container.clear();
         await this.loadInitialLayout();
@@ -150,7 +144,6 @@ export class App {
     }
 
     /**
-     * Limpa o localStorage e recarrega o layout padrão (do default.json).
      * @param {boolean} [silent=false]
      */
     async resetLayout(silent = false) {
