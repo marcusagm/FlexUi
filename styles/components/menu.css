@@ -15,6 +15,7 @@
     list-style: none;
     display: flex;
     align-items: center;
+    user-select: none; /* (ETAPA 2/v5) Previne seleção de texto no menu */
 }
 
 .menu__title {
@@ -45,7 +46,7 @@
 
 .menu__item:hover,
 .menu__item--open {
-    background-color: var(--color-accent-primary);
+    background-color: var(--color-bg-hover);
     color: var(--color-text-primary);
 }
 
@@ -53,7 +54,7 @@
     display: none;
     position: absolute;
     background-color: var(--color-bg-panel);
-    border-radius: var(--flexui-border-radius);
+    border-radius: var(--border-radius-base);
     box-shadow: 0 3px 6px rgba(0, 0, 0, 0.7);
     list-style: none;
     min-width: 180px;

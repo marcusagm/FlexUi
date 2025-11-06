@@ -1,15 +1,9 @@
 /* styles/base.css (Substituindo o antigo core.css) */
-@import 'theme.css'; /* ETAPA 1: Importa os novos tokens semânticos */
+@import 'theme.css'; /* Importa todos os tokens (Cores, Fontes, Spacing) */
 
 /*
- * Variáveis de UI legadas (não-cor) que ainda não
- * estão no theme.css (serão mantidas por enquanto).
+ * Variáveis de UI foram movidas para theme.css
  */
-:root {
-    --flexui-text-font: 'Nunito', Tahoma, Arial, sans-serif;
-    --flexui-text-size: 12px;
-    --header-height: 30px;
-}
 
 html,
 body {
@@ -20,12 +14,13 @@ body {
 
 body {
     /* Mapeamento para os novos tokens do theme.css */
-    font-family: var(--flexui-text-font);
-    background-color: var(--color-bg-app); /* (Era --flexui-bg-color) */
-    color: var(--color-text-primary); /* (Era --flexui-text-color) */
+    font-family: var(--font-family-base);
+    background-color: var(--color-bg-app);
+    color: var(--color-text-primary);
     display: flex;
     flex-direction: column;
-    font-size: var(--flexui-text-size);
+    font-size: var(--font-size-app);
+    /* user-select: none; (REMOVIDO na Etapa 1/v5) - Esta linha quebrou o D&D */
 }
 
 .dragging {
@@ -40,17 +35,17 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-    background: var(--color-accent-inactive); /* (Era --flexui-primary-color-inactive) */
-    border-radius: 3px;
+    background: var(--color-accent-inactive);
+    border-radius: var(--border-radius-sm);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: var(--color-accent-hover); /* (Era --flexui-primary-color-hover) */
+    background: var(--color-accent-hover);
 }
 ::-webkit-scrollbar-thumb:active {
-    background: var(--color-accent-active); /* (Era --flexui-primary-color-active) */
+    background: var(--color-accent-active);
 }
 
 ::-webkit-scrollbar-track {
-    background: var(--color-bg-panel); /* (Era --flexui-bg-color-light) */
+    background: var(--color-bg-panel);
 }

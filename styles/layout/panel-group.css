@@ -1,6 +1,6 @@
 .panel {
-    background-color: var(--color-bg-panel);
-    border-radius: var(--flexui-border-radius);
+    background-color: var(--color-bg-panel); /* (Atualizado para Nível 2) */
+    border-radius: var(--border-radius-base);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -27,7 +27,7 @@
 }
 
 .panel__header {
-    background-color: var(--color-bg-header);
+    background-color: var(--color-bg-panel-header);
     display: flex;
     align-items: center;
     padding: 4px 6px;
@@ -53,7 +53,7 @@
     /* * O SVG foi alterado para fill="currentColor".
      * A cor é agora controlada pela propriedade 'color'.
      */
-    background: url('data:image/svg+xml;utf8,<svg fill="currentColor" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="5" cy="5" r="2"/><circle cx="12" cy="5" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="12" cy="19" r="2"/><circle cx="19" cy="19" r="2"/></svg>')
+    background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="5" cy="5" r="2"/><circle cx="12" cy="5" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="12" cy="19" r="2"/><circle cx="19" cy="19" r="2"/></svg>')
         no-repeat center center;
     background-size: 12px 12px;
     color: var(--color-text-secondary); /* (Define a cor do SVG) */
@@ -91,7 +91,7 @@
     cursor: pointer;
     color: var(--color-text-secondary);
     user-select: none;
-    border-radius: var(--flexui-border-radius);
+    border-radius: var(--border-radius-base);
     background: none;
     transition:
         color 0.3s,
@@ -104,19 +104,20 @@
 .panel__close-btn[disabled] {
     opacity: 0.5;
     cursor: not-allowed;
+    color: var(--color-text-disabled);
 }
 
 .panel__collapse-btn:hover:not([disabled]),
 .panel__close-btn:hover:not([disabled]),
 .panel__collapse-btn:focus:not([disabled]),
 .panel__close-btn:focus:not([disabled]) {
-    background: var(--color-accent-hover);
+    background: var(--color-bg-hover);
     color: var(--color-text-primary);
 }
 
 .panel__collapse-btn:active:not([disabled]),
 .panel__close-btn:active:not([disabled]) {
-    background: var(--color-accent-active);
+    background: var(--color-bg-active);
     color: var(--color-text-bright);
 }
 
@@ -173,7 +174,7 @@
 
 .panel-group__header .panel-group__move-handle:active {
     cursor: grabbing;
-    background: var(--color-bg-hover);
+    background-color: var(--color-bg-hover);
 }
 
 .panel-group__header {
@@ -206,18 +207,20 @@
     border-top: 3px solid var(--color-bg-tab-inactive);
     height: 100%;
     max-width: 250px;
-    border-right: 1px solid var(--color-border-default);
-    border-bottom: 1px solid var(--color-border-default);
-    background-color: var(--color-bg-tab-inactive); /* (Substitui color-mix) */
+    /* border-right: 1px solid var(--color-border-default);
+    border-bottom: 1px solid var(--color-border-default); */
+    margin-right: 1px;
+    background-color: var(--color-bg-tab-inactive);
     color: var(--color-text-secondary);
     font-size: 0.9em;
     cursor: pointer;
     white-space: nowrap;
-    border-top-left-radius: var(--flexui-border-radius);
-    border-top-right-radius: var(--flexui-border-radius);
+    border-top-left-radius: var(--border-radius-base);
+    border-top-right-radius: var(--border-radius-base);
+    user-select: none;
 }
 .panel-group__tab:hover {
-    background-color: var(--color-bg-hover); /* (Substitui color-mix) */
+    background-color: var(--color-bg-hover);
     border-top: 3px solid var(--color-accent-inactive);
     color: var(--color-text-primary);
 }
@@ -237,6 +240,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     padding: 0 5px;
+    user-select: none;
 }
 
 .panel-group__tab-close {
@@ -256,8 +260,8 @@
 }
 .panel-group__tab-close:hover {
     color: var(--color-text-primary);
-    background-color: var(--color-accent-hover);
-    border-radius: var(--flexui-border-radius);
+    background-color: var(--color-bg-hover);
+    border-radius: var(--border-radius-base);
 }
 
 .panel-group__tab-scroll {
@@ -271,7 +275,7 @@
     flex-shrink: 0;
 }
 .panel-group__tab-scroll:hover {
-    background: var(--color-accent-hover);
+    background: var(--color-bg-hover);
     color: var(--color-text-bright);
 }
 .panel-group__tab-scroll--left {
@@ -293,6 +297,7 @@
     padding: 0;
     font-size: 14px;
     color: var(--color-text-bright);
+    user-select: none;
 }
 .panel-group__header--simple .panel-group__tab .panel-group__tab-close {
 }

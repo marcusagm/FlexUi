@@ -10,7 +10,7 @@
     /* Theming (Mapeado para os novos tokens) */
     background-color: var(--color-bg-header);
     color: var(--color-text-secondary);
-    font-size: var(--flexui-text-size);
+    font-size: var(--font-size-app); /* (Era --flexui-text-size) */
 
     /* Sombra consistente com o menu */
     box-shadow: 0 0 5px 0 #00000099;
@@ -23,8 +23,7 @@
     padding: 0 10px;
     line-height: 24px; /* Centraliza o texto verticalmente */
 
-    /* Previne seleção de texto */
-    user-select: none;
+    user-select: none; /* (ETAPA 2/v5) Previne seleção de texto na barra */
 }
 
 /* .status-bar__permanent { */

@@ -1,29 +1,61 @@
-/* styles/reset.css */
+/* styles/reset.css (Atualizado para "The New CSS Reset") */
 
-* {
+/*
+  The new CSS reset - version 1.11.2 (last updated 15th August 2024)
+  GitHub: https://github.com/elad2412/the-new-css-reset
+*/
+
+/*
+  Remove all the styles of the element except background-image
+  DEPRECATED: We're now using `all: unset` as the element root of the reset.
+*/
+*:where(:not(html, iframe, canvas, img, svg, video, audio):not(svg *, symbol *)) {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
     font-family: inherit;
     color: inherit;
+    display: revert;
 }
 
-html {
-    box-sizing: border-box;
-    font-size: 100%;
-    scroll-behavior: smooth;
-    color: var(--color-text-body);
-    background-color: var(--color-background);
-    transition:
-        color 0.2s ease-out,
-        background-color 0.2s ease-out;
-}
+/* Preferred box-sizing model */
 *,
 *::before,
 *::after {
-    box-sizing: inherit;
+    box-sizing: border-box;
 }
-body,
+
+/* Reapply the pointer cursor for buttons */
+button,
+[role='button'] {
+    cursor: revert;
+}
+
+/* Remove list styles (bullets/numbers) */
+ol,
+ul,
+menu {
+    list-style: none;
+}
+
+/* For images to not be able to exceed their borders */
+img {
+    max-inline-size: 100%;
+    max-block-size: 100%;
+}
+
+/* Removes line-height on headers */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    line-height: 1;
+    font-size: inherit;
+}
+
+/* Fixes text-shadow rendering issues in Chrome */
 h1,
 h2,
 h3,
@@ -31,46 +63,57 @@ h4,
 h5,
 h6,
 p,
-ul,
-ol,
-li,
-figure,
-blockquote,
-dl,
-dd {
-    margin: 0;
-    padding: 0;
+pre {
+    text-shadow: none;
 }
-ul,
-ol {
-    list-style: none;
-}
-img,
-video,
-svg,
-canvas {
+
+/* Improve media defaults */
+:where(img, svg, video, audio, object, embed, picture) {
+    display: block;
     max-width: 100%;
     height: auto;
-    display: block;
 }
-svg {
-    fill: currentColor;
+
+/* Overrides the default initial-letter: -1 for details element in safari */
+:where(details) {
+    initial-letter: revert;
 }
-button,
-input,
-textarea,
-select {
-    font-family: inherit;
-    font-size: inherit;
-    line-height: inherit;
-    margin: 0;
+
+/* Re-set default cursor for disabled elements */
+:disabled {
+    cursor: revert;
 }
-button {
-    appearance: none;
-    background: transparent;
-    border: none;
-    padding: 0;
-    cursor: pointer;
-    color: inherit;
-    text-align: inherit;
+
+/* Revert spacing behavior in flow root elements */
+:where(dialog:modal, :fullscreen) {
+    padding: revert;
+    border-width: revert;
+}
+
+/* Set default height for meter and progress */
+meter,
+progress {
+    height: revert;
+}
+
+/* Useful for animated elements */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+        transition-delay: 0ms !important;
+    }
+}
+
+/* A11y & readability */
+:root {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    text-wrap: balance;
 }

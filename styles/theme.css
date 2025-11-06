@@ -4,51 +4,130 @@
 :root {
     /*
    * =========================================
-   * TOKENS SEMÂNTICOS (DARK THEME - PADRÃO)
+   * 1. PALETA DE ELEVAÇÃO (SURFACE TONES)
+   * (Atualizado na Etapa 2/v7)
    * =========================================
-   * Mapeia a paleta tonal (ex: --neutral-10)
-   * para nomes lógicos (ex: --color-bg-app).
+   */
+    --surface-level-0: var(--neutral-10); /* Nível 0 (App) */
+    --surface-level-1: var(--neutral-20); /* Nível 1 (Panel Content) */
+    --surface-level-2: var(--neutral-30); /* Nível 2 (Panel Shell, Menu, Modal Content) */
+    --surface-level-3: var(--neutral-40); /* Nível 3 (Modal Shell, Hover) */
+    --surface-level-4: var(--neutral-50); /* Nível 4 (Active) */
+    --surface-level-disabled: var(--neutral-10);
+
+    /*
+   * =========================================
+   * 2. MAPEAMENTO SEMÂNTICO (BACKGROUNDS)
+   * (Atualizado na Etapa 2/v7)
+   * =========================================
    */
 
-    /* Backgrounds */
-    --color-bg-app: var(--neutral-10); /* Fundo principal da aplicação */
-    --color-bg-panel: var(--neutral-20); /* Fundo de painéis, modais, popups */
-    --color-bg-header: var(--neutral-variant-10); /* Cabeçalhos, menu, status-bar */
-    --color-bg-tab-active: var(--neutral-20);
-    --color-bg-tab-inactive: var(--neutral-10);
-    --color-bg-hover: var(--neutral-30); /* Hover geral de itens */
+    /* Backgrounds (Componentes) */
+    --color-bg-app: var(--surface-level-0);
+    --color-bg-panel: var(--surface-level-1); /* Shell do Painel */
+    --color-bg-panel-content: var(--surface-level-2); /* Conteúdo do Painel */
+    --color-bg-panel-header: var(--surface-level-1);
+    --color-bg-tab-active: var(--surface-level-2);
+    --color-bg-tab-inactive: var(--surface-level-1);
+    --color-bg-menu: var(--surface-level-2);
+    --color-bg-status-bar: var(--surface-level-2);
+    --color-bg-modal: var(--surface-level-2); /* Shell do Modal */
+    --color-bg-modal-content: var(--surface-level-1); /* Conteúdo do Modal */
+    --color-bg-modal-footer: var(--surface-level-2); /* Rodapé do Modal */
+
+    /* Backgrounds (Estados de Interação) */
+    --color-bg-hover: var(--surface-level-3);
+    --color-bg-active: var(--surface-level-4);
+    --color-bg-disabled: var(--surface-level-disabled);
+
+    /*
+   * =========================================
+   * 3. TOKENS DE COR (Texto, Acento, Feedback)
+   * =========================================
+   */
 
     /* Texto */
-    --color-text-primary: var(--neutral-90); /* Texto principal (claro) */
-    --color-text-secondary: var(--neutral-70); /* Texto silenciado (muted) */
-    --color-text-bright: var(--neutral-99); /* Texto brilhante (ex: títulos) */
+    --color-text-primary: var(--neutral-90);
+    --color-text-secondary: var(--neutral-70);
+    --color-text-bright: var(--neutral-99);
     --color-text-placeholder: var(--neutral-60);
+    --color-text-disabled: var(--neutral-50);
 
     /* Ações (Accent) */
-    --color-accent-primary: var(--primary-40); /* Cor principal (botões, foco, D&D) */
-    --color-accent-hover: var(--primary-50); /* Hover da cor principal */
-    --color-accent-active: var(--primary-60); /* Clique da cor principal */
-    --color-accent-inactive: var(--primary-30); /* Cor silenciada (ex: scrollbar) */
-    --color-text-on-accent: var(--primary-on-10); /* Texto sobre a cor principal (Branco) */
+    --color-accent-primary: var(--primary-40);
+    --color-accent-hover: var(--primary-50);
+    --color-accent-active: var(--primary-60);
+    --color-accent-inactive: var(--primary-30);
+    --color-text-on-accent: var(--primary-on-10);
 
     /* Bordas e Divisórias */
     --color-border-default: var(--neutral-variant-30);
-    --color-border-focus: var(--color-accent-primary); /* Reusa o token de ação */
+    --color-border-focus: var(--color-accent-primary);
 
     /* Placeholders (Drag-n-Drop) */
     --color-placeholder-bg: var(--primary-20);
-    --color-placeholder-border: var(--primary-40);
+    --color-placeholder-border: 1px solid transparent;
+    --color-placeholder-border-active: 1px solid var(--primary-40);
 
     /* Feedback (Services e Forms) */
     --color-feedback-info: var(--info-50);
     --color-text-on-info: var(--info-on-10);
-
     --color-feedback-success: var(--success-50);
     --color-text-on-success: var(--success-on-10);
-
     --color-feedback-warning: var(--warning-50);
-    --color-text-on-warning: var(--warning-on-50); /* (Texto escuro) */
-
+    --color-text-on-warning: var(--warning-on-50);
     --color-feedback-danger: var(--danger-50);
     --color-text-on-danger: var(--danger-on-10);
+
+    /*
+   * =========================================
+   * 4. TOKENS GLOBAIS (Layout, Sizing, Typography)
+   * =========================================
+   */
+
+    /* Tipografia (Unificada) */
+    --font-family-base: 'Nunito', Tahoma, Arial, sans-serif;
+    --font-size-app: 12px;
+
+    /* Tipografia (Forms/Web) */
+    --font-size-sm: 0.875rem;
+    --font-size-base: 1rem;
+    --font-size-lg: 1.25rem;
+
+    /* Sizing & Spacing (Forms/Components) */
+    --spacing-1: 0.25rem;
+    --spacing-2: 0.5rem;
+    --spacing-3: 0.75rem;
+    --spacing-4: 1rem;
+    --spacing-5: 1.5rem;
+
+    /* Bordas (Consolidado) */
+    --border-radius-sm: 4px; /* Pequenos elementos (inputs, scrollbar) */
+    --border-radius-base: 6px; /* Padrão (botões, painéis, tabs) */
+    --border-radius-md: 8px; /* Containers maiores (modais) */
+
+    /* Layout App */
+    --header-height: 30px;
+
+    /* Animação */
+    --transition-speed: 200ms ease-in-out;
+
+    /*
+   * =========================================
+   * 5. TOKENS DE COMPONENTES (Forms, Modal)
+   * (Centralizados na Etapa 1/v7)
+   * =========================================
+   */
+
+    /* Forms (Ícones) */
+    --form-icon-valid: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3cpath fill='%23198754' d='M2.3 6.73L.6 4.53c-.4-1.04.46-1.4 1.1-.8l1.1 1.4 3.4-3.8c.6-.63 1.6-.27 1.2.7l-4 4.6c-.43.5-.8.4-1.1.1z'/%3e%3c/svg%3e");
+    --form-icon-invalid: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%23dc3545'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath stroke-linejoin='round' d='M5.8 3.6h.4v.4h-.4z'/%3e%3cpath d='M5.8 4.8h.4v3.6h-.4z'/%3e%3c/svg%3e");
+    --form-select-arrow: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
+
+    /* Modal (Layout) */
+    --modal-padding-small: 16px;
+    --modal-padding-large: 24px;
+    --modal-backdrop-bg: rgba(0, 0, 0, 0.5);
+    --modal-backdrop-blur-bg: rgba(0, 0, 0, 0.2);
+    --modal-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
 }

@@ -14,19 +14,21 @@
     margin: 0;
     /* Usa os tokens de D&D definidos no theme.css */
     background: var(--color-placeholder-bg);
-    border: 1px dashed var(--color-placeholder-border);
-    border-radius: var(--flexui-border-radius);
+    border: var(--color-placeholder-border-active);
+    border-radius: var(--border-radius-base); /* (Era --flexui-border-radius) */
 }
 
 .container__drop-area {
     flex: 0 0 5px;
-    border-radius: var(--flexui-border-radius);
+    border: var(--color-placeholder-border);
+    border-radius: var(--border-radius-base); /* (Era --flexui-border-radius) */
     display: flex;
     position: relative;
     overflow: auto;
     transition: background-color 0.2s ease-out;
+    transition: border 0.2s ease-out;
 }
 .container__drop-area--active {
-    /* Usa os tokens de D&D definidos no theme.css */
+    border: var(--color-placeholder-border-active);
     background: var(--color-placeholder-bg);
 }
