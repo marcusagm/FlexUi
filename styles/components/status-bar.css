@@ -7,9 +7,9 @@
     height: 24px;
     flex-shrink: 0; /* Previne que a barra seja esmagada pelo 'container' */
 
-    /* Theming (Baseado no core.css) */
-    background-color: var(--flexui-gray-darker);
-    color: var(--flexui-text-color-dark); /* Cor padrão (esmaecida) */
+    /* Theming (Mapeado para os novos tokens) */
+    background-color: var(--color-bg-header);
+    color: var(--color-text-secondary);
     font-size: var(--flexui-text-size);
 
     /* Sombra consistente com o menu */
@@ -29,11 +29,11 @@
 
 /* .status-bar__permanent { */
 /* Alinhado à esquerda por padrão */
-/* Usa a cor padrão .status-bar */
+/* Usa a cor padrão .status-bar (secondary) */
 /* } */
 
 .status-bar__temporary {
     /* Alinhado à direita por padrão */
     /* Usa uma cor levemente mais clara para mensagens temporárias */
-    color: var(--flexui-text-color);
+    color: var(--color-text-primary);
 }

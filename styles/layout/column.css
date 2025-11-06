@@ -16,11 +16,11 @@
 }
 
 .column__resize-handle:hover {
-    background: var(--flexui-primary-color-hover);
+    background: var(--color-accent-hover);
 }
 
 .column__resize-handle:active {
-    background: var(--flexui-primary-color-active);
+    background: var(--color-accent-active);
 }
 
 .column--resize-left .column__resize-handle,

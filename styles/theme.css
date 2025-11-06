@@ -1,0 +1,54 @@
+/* styles/theme.css */
+@import 'variables.css';
+
+:root {
+    /*
+   * =========================================
+   * TOKENS SEMÂNTICOS (DARK THEME - PADRÃO)
+   * =========================================
+   * Mapeia a paleta tonal (ex: --neutral-10)
+   * para nomes lógicos (ex: --color-bg-app).
+   */
+
+    /* Backgrounds */
+    --color-bg-app: var(--neutral-10); /* Fundo principal da aplicação */
+    --color-bg-panel: var(--neutral-20); /* Fundo de painéis, modais, popups */
+    --color-bg-header: var(--neutral-variant-10); /* Cabeçalhos, menu, status-bar */
+    --color-bg-tab-active: var(--neutral-20);
+    --color-bg-tab-inactive: var(--neutral-10);
+    --color-bg-hover: var(--neutral-30); /* Hover geral de itens */
+
+    /* Texto */
+    --color-text-primary: var(--neutral-90); /* Texto principal (claro) */
+    --color-text-secondary: var(--neutral-70); /* Texto silenciado (muted) */
+    --color-text-bright: var(--neutral-99); /* Texto brilhante (ex: títulos) */
+    --color-text-placeholder: var(--neutral-60);
+
+    /* Ações (Accent) */
+    --color-accent-primary: var(--primary-40); /* Cor principal (botões, foco, D&D) */
+    --color-accent-hover: var(--primary-50); /* Hover da cor principal */
+    --color-accent-active: var(--primary-60); /* Clique da cor principal */
+    --color-accent-inactive: var(--primary-30); /* Cor silenciada (ex: scrollbar) */
+    --color-text-on-accent: var(--primary-on-10); /* Texto sobre a cor principal (Branco) */
+
+    /* Bordas e Divisórias */
+    --color-border-default: var(--neutral-variant-30);
+    --color-border-focus: var(--color-accent-primary); /* Reusa o token de ação */
+
+    /* Placeholders (Drag-n-Drop) */
+    --color-placeholder-bg: var(--primary-20);
+    --color-placeholder-border: var(--primary-40);
+
+    /* Feedback (Services e Forms) */
+    --color-feedback-info: var(--info-50);
+    --color-text-on-info: var(--info-on-10);
+
+    --color-feedback-success: var(--success-50);
+    --color-text-on-success: var(--success-on-10);
+
+    --color-feedback-warning: var(--warning-50);
+    --color-text-on-warning: var(--warning-on-50); /* (Texto escuro) */
+
+    --color-feedback-danger: var(--danger-50);
+    --color-text-on-danger: var(--danger-on-10);
+}

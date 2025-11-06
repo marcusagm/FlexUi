@@ -1,6 +1,6 @@
 .menu {
     display: flex;
-    background-color: var(--flexui-gray-darker);
+    background-color: var(--color-bg-header);
     /* border-bottom: 1px solid #111; */
     box-shadow: 0 0 5px 0 #00000099;
     z-index: 100;
@@ -9,7 +9,7 @@
 .menu__item {
     position: relative;
     cursor: pointer;
-    color: var(--flexui-text-color);
+    color: var(--color-text-primary);
     font-size: 1.1em;
     line-height: 1em;
     list-style: none;
@@ -35,7 +35,7 @@
     flex-shrink: 0;
     margin-left: 10px;
     font-size: 0.9em;
-    color: var(--flexui-text-color);
+    color: var(--color-text-primary);
     display: none;
 }
 
@@ -45,14 +45,14 @@
 
 .menu__item:hover,
 .menu__item--open {
-    background-color: var(--flexui-primary-color);
-    color: var(--flexui-text-color);
+    background-color: var(--color-accent-primary);
+    color: var(--color-text-primary);
 }
 
 .menu__submenu {
     display: none;
     position: absolute;
-    background-color: rgb(46, 46, 46, 0.8);
+    background-color: var(--color-bg-panel);
     border-radius: var(--flexui-border-radius);
     box-shadow: 0 3px 6px rgba(0, 0, 0, 0.7);
     list-style: none;

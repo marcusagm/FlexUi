@@ -1,10 +1,10 @@
 .panel {
-    background-color: var(--flexui-bg-color-light);
+    background-color: var(--color-bg-panel);
     border-radius: var(--flexui-border-radius);
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    color: var(--flexui-text-color);
+    color: var(--color-text-primary);
     position: relative;
 }
 
@@ -27,12 +27,12 @@
 }
 
 .panel__header {
-    background-color: #444;
+    background-color: var(--color-bg-header);
     display: flex;
     align-items: center;
     padding: 4px 6px;
     gap: 6px;
-    border-bottom: 1px solid var(--flexui-gray-darker);
+    border-bottom: 1px solid var(--color-border-default);
     user-select: none;
     height: 26px;
     flex-shrink: 0;
@@ -50,9 +50,13 @@
     height: 14px;
     flex: 0 0 14px;
     cursor: grab;
-    background: url('data:image/svg+xml;utf8,<svg fill="%23999" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="5" cy="5" r="2"/><circle cx="12" cy="5" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="12" cy="19" r="2"/><circle cx="19" cy="19" r="2"/></svg>')
+    /* * O SVG foi alterado para fill="currentColor".
+     * A cor é agora controlada pela propriedade 'color'.
+     */
+    background: url('data:image/svg+xml;utf8,<svg fill="currentColor" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="5" cy="5" r="2"/><circle cx="12" cy="5" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="12" cy="19" r="2"/><circle cx="19" cy="19" r="2"/></svg>')
         no-repeat center center;
     background-size: 12px 12px;
+    color: var(--color-text-secondary); /* (Define a cor do SVG) */
     opacity: 0.7;
 }
 
@@ -62,7 +66,7 @@
 
 .panel__title {
     flex-grow: 1;
-    color: #eee;
+    color: var(--color-text-bright);
     font-size: 14px;
     white-space: nowrap;
     overflow: hidden;
@@ -85,7 +89,7 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    color: #999;
+    color: var(--color-text-secondary);
     user-select: none;
     border-radius: var(--flexui-border-radius);
     background: none;
@@ -106,14 +110,14 @@
 .panel__close-btn:hover:not([disabled]),
 .panel__collapse-btn:focus:not([disabled]),
 .panel__close-btn:focus:not([disabled]) {
-    background: var(--flexui-primary-color-hover);
-    color: #ccc;
+    background: var(--color-accent-hover);
+    color: var(--color-text-primary);
 }
 
 .panel__collapse-btn:active:not([disabled]),
 .panel__close-btn:active:not([disabled]) {
-    background: var(--flexui-primary-color-active);
-    color: #fff;
+    background: var(--color-accent-active);
+    color: var(--color-text-bright);
 }
 
 .panel__collapse-btn::before {
@@ -131,16 +135,16 @@
 .panel-group__resize-handle {
     height: 3px;
     cursor: ns-resize;
-    background: var(--flexui-gray-light);
+    background: var(--color-border-default);
     transition: background-color 0.2s ease-in-out;
 }
 
 .panel-group__resize-handle:hover {
-    background: var(--flexui-primary-color-hover);
+    background: var(--color-accent-hover);
 }
 
 .panel-group__resize-handle:active {
-    background: var(--flexui-primary-color-active);
+    background: var(--color-accent-active);
 }
 .panel-group.panel-group--fills-space > .panel-group__resize-handle {
     display: none;
@@ -169,7 +173,7 @@
 
 .panel-group__header .panel-group__move-handle:active {
     cursor: grabbing;
-    background: var(--flexui-gray-dark);
+    background: var(--color-bg-hover);
 }
 
 .panel-group__header {
@@ -199,13 +203,13 @@
     display: flex;
     align-items: center;
     padding: 0;
-    border-top: 3px solid var(--flexui-gray-dark);
+    border-top: 3px solid var(--color-bg-tab-inactive);
     height: 100%;
     max-width: 250px;
-    border-right: 1px solid var(--flexui-gray-dark);
-    border-bottom: 1px solid var(--flexui-gray-dark);
-    background-color: color-mix(in srgb, var(--flexui-gray-dark) 100%, #000 15%);
-    color: var(--flexui-text-color-dark);
+    border-right: 1px solid var(--color-border-default);
+    border-bottom: 1px solid var(--color-border-default);
+    background-color: var(--color-bg-tab-inactive); /* (Substitui color-mix) */
+    color: var(--color-text-secondary);
     font-size: 0.9em;
     cursor: pointer;
     white-space: nowrap;
@@ -213,17 +217,17 @@
     border-top-right-radius: var(--flexui-border-radius);
 }
 .panel-group__tab:hover {
-    background-color: color-mix(in srgb, var(--flexui-gray-dark) 100%, #000 10%);
-    border-top: 3px solid var(--flexui-primary-color-inactive);
-    color: var(--flexui-text-color);
+    background-color: var(--color-bg-hover); /* (Substitui color-mix) */
+    border-top: 3px solid var(--color-accent-inactive);
+    color: var(--color-text-primary);
 }
 .panel-group__tab--active:hover,
 .panel-group__tab--active {
-    background-color: var(--flexui-gray);
+    background-color: var(--color-bg-tab-active);
     margin-top: 0;
-    border-top: 3px solid var(--flexui-primary-color-hover);
+    border-top: 3px solid var(--color-accent-hover);
     border-bottom: 0;
-    color: var(--flexui-text-color);
+    color: var(--color-text-primary);
 }
 
 .panel-group__tab-title {
@@ -239,7 +243,7 @@
     font-size: 1.2em;
     line-height: 1;
     margin-right: 2px;
-    color: #999;
+    color: var(--color-text-secondary);
     padding: 2px;
     width: 16px;
     height: 16px;
@@ -251,14 +255,14 @@
     cursor: pointer;
 }
 .panel-group__tab-close:hover {
-    color: var(--flexui-text-color);
-    background-color: var(--flexui-primary-color-hover);
+    color: var(--color-text-primary);
+    background-color: var(--color-accent-hover);
     border-radius: var(--flexui-border-radius);
 }
 
 .panel-group__tab-scroll {
     background: none;
-    color: var(--flexui-text-color);
+    color: var(--color-text-primary);
     border: none;
     padding: 0 4px;
     height: 100%;
@@ -267,14 +271,14 @@
     flex-shrink: 0;
 }
 .panel-group__tab-scroll:hover {
-    background: var(--flexui-primary-color-hover);
-    color: #fff;
+    background: var(--color-accent-hover);
+    color: var(--color-text-bright);
 }
 .panel-group__tab-scroll--left {
-    border-right: 1px solid var(--flexui-gray-darker);
+    border-right: 1px solid var(--color-border-default);
 }
 .panel-group__tab-scroll--right {
-    border-left: 1px solid var(--flexui-gray-darker);
+    border-left: 1px solid var(--color-border-default);
 }
 
 /* .panel-group__header--simple {
@@ -288,7 +292,7 @@
     min-width: 0;
     padding: 0;
     font-size: 14px;
-    color: #eee;
+    color: var(--color-text-bright);
 }
 .panel-group__header--simple .panel-group__tab .panel-group__tab-close {
 }
@@ -300,7 +304,7 @@
 .panel-group__content {
     flex-grow: 1;
     font-size: 14px;
-    color: #ccc;
+    color: var(--color-text-primary);
     overflow: auto;
     min-height: 20px;
 

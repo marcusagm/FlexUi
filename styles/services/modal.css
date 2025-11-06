@@ -1,121 +1,55 @@
 /* ========================================================================
- * FILE: modal.css (FINAL VERSION)
- * * DESCRIPTION:
- * This file contains all BEM-compliant styles for the ModalService.
- * It uses CSS Custom Properties (variables) for easy theming (light/dark)
- * and customization.
- *
- * JAVASCRIPT DEPENDENCY:
- * The `_animationDuration` variable in ModalService.js should be
- * set to match `--modal-transition-duration` (e.g., 250ms).
+ * FILE: modal.css (REFATORADO)
+ * * DESCRIÇÃO:
+ * O sistema de tema isolado foi REMOVIDO (Etapa 4).
+ * Este arquivo agora mapeia suas variáveis internas para os
+ * tokens semânticos globais (definidos em theme.css).
  * ======================================================================== */
 
 /* ========================================================================
- * SECTION: THEME VARIABLES
- * * Define all customizable properties here.
- * Defaults are for the "Light Theme".
+ * SECTION: MAPEAMENTO DE TOKENS SEMÂNTICOS
+ * Mapeia tokens globais (--color-*) para tokens locais (--modal-*)
+ * para minimizar a refatoração no resto deste arquivo.
  * ======================================================================== */
 :root {
-    /* -- Sizing & Spacing -- */
+    /* -- Sizing & Spacing (Mantido) -- */
     --modal-window-radius: 8px;
     --modal-button-radius: 6px;
     --modal-padding-small: 16px;
     --modal-padding-large: 24px;
     --modal-transition-duration: 0.25s;
 
-    /* -- Light Theme Colors -- */
-    --modal-bg: #ffffff;
-    --modal-text: #333333;
-    --modal-title-text: #111111;
-    --modal-icon-color: #555555;
-    --modal-icon-hover-color: #000000;
-    --modal-border-color: #eeeeee;
-    --modal-footer-bg: #f9f9f9;
+    /* -- Cores (Mapeado para tokens globais) -- */
+    --modal-bg: var(--color-bg-panel);
+    --modal-text: var(--color-text-primary);
+    --modal-title-text: var(--color-text-bright);
+    --modal-icon-color: var(--color-text-secondary);
+    --modal-icon-hover-color: var(--color-text-primary);
+    --modal-border-color: var(--color-border-default);
+    --modal-footer-bg: var(--color-bg-header);
 
-    /* -- Backdrop -- */
+    /* -- Backdrop (Mantido como estava, pois é específico) -- */
     --modal-backdrop-bg: rgba(0, 0, 0, 0.5);
     --modal-backdrop-blur-bg: rgba(0, 0, 0, 0.2);
     --modal-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
 
-    /* -- Components: Buttons -- */
-    --modal-btn-primary-bg: #007aff;
-    --modal-btn-primary-text: #ffffff;
-    --modal-btn-primary-hover-bg: #0056b3;
+    /* -- Componentes: Buttons (Mapeado) -- */
+    --modal-btn-primary-bg: var(--color-accent-primary);
+    --modal-btn-primary-text: var(--color-text-on-accent);
+    --modal-btn-primary-hover-bg: var(--color-accent-hover);
 
-    --modal-btn-secondary-bg: #6c757d;
-    --modal-btn-secondary-text: #ffffff;
-    --modal-btn-secondary-hover-bg: #5a6268;
+    --modal-btn-secondary-bg: var(--color-bg-hover);
+    --modal-btn-secondary-text: var(--color-text-primary);
+    --modal-btn-secondary-hover-bg: var(--neutral-40); /* (Um hover um pouco mais escuro) */
 
-    /* -- Components: Inputs (Prompt) -- */
-    --modal-input-bg: #ffffff;
-    --modal-input-text: #222222;
-    --modal-input-border: #cccccc;
+    /* -- Componentes: Inputs (Prompt) (Mapeado) -- */
+    --modal-input-bg: var(--color-bg-app);
+    --modal-input-text: var(--color-text-primary);
+    --modal-input-border: var(--color-border-default);
 
-    /* -- Components: Spinner -- */
-    --modal-spinner-track: #f3f3f3;
-    --modal-spinner-thumb: #3498db;
-}
-
-/* ========================================================================
- * SECTION: DARK THEME OVERRIDES
- *
- * Automatically applies if the user's OS preference is dark.
- * Also applies if you manually add `data-theme="dark"` to <html> or <body>.
- * ======================================================================== */
-@media (prefers-color-scheme: dark) {
-    :root {
-        --modal-bg: #2d2d2d;
-        --modal-text: #eeeeee;
-        --modal-title-text: #ffffff;
-        --modal-icon-color: #bbbbbb;
-        --modal-icon-hover-color: #ffffff;
-        --modal-border-color: #444444;
-        --modal-footer-bg: #252525;
-
-        --modal-backdrop-bg: rgba(0, 0, 0, 0.7);
-        --modal-backdrop-blur-bg: rgba(0, 0, 0, 0.3);
-        --modal-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-
-        --modal-btn-primary-bg: #007aff;
-        --modal-btn-primary-text: #ffffff;
-        --modal-btn-primary-hover-bg: #0056b3;
-
-        --modal-btn-secondary-bg: #5a6268;
-        --modal-btn-secondary-text: #eeeeee;
-        --modal-btn-secondary-hover-bg: #495057;
-
-        --modal-input-bg: #444444;
-        --modal-input-text: #eeeeee;
-        --modal-input-border: #666666;
-
-        --modal-spinner-track: #555555;
-        --modal-spinner-thumb: #3498db;
-    }
-}
-
-/* Allow manual theme override */
-[data-theme='dark'] {
-    --modal-bg: #2d2d2d;
-    --modal-text: #eeeeee;
-    --modal-title-text: #ffffff;
-    --modal-icon-color: #bbbbbb;
-    --modal-icon-hover-color: #ffffff;
-    --modal-border-color: #444444;
-    --modal-footer-bg: #252525;
-    --modal-backdrop-bg: rgba(0, 0, 0, 0.7);
-    --modal-backdrop-blur-bg: rgba(0, 0, 0, 0.3);
-    --modal-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-    --modal-btn-primary-bg: #007aff;
-    --modal-btn-primary-text: #ffffff;
-    --modal-btn-primary-hover-bg: #0056b3;
-    --modal-btn-secondary-bg: #5a6268;
-    --modal-btn-secondary-text: #eeeeee;
-    --modal-btn-secondary-hover-bg: #495057;
-    --modal-input-bg: #444444;
-    --modal-input-text: #eeeeee;
-    --modal-input-border: #666666;
-    --modal-spinner-track: #555555;
-    --modal-spinner-thumb: #3498db;
+    /* -- Componentes: Spinner (Mapeado) -- */
+    --modal-spinner-track: var(--color-bg-hover);
+    --modal-spinner-thumb: var(--color-accent-primary);
 }
 
 /* ========================================================================

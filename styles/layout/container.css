@@ -3,7 +3,7 @@
     display: flex;
     gap: 0px;
     padding: 3px 0 3px 0px;
-    background: var(--flexui-bg-color);
+    background: var(--color-bg-app);
     overflow: auto;
     width: 100vw;
     height: calc(100vh - 60px); /* 36px (Menu) + 24px (StatusBar) */
@@ -12,20 +12,21 @@
 .container__placeholder {
     height: 60px;
     margin: 0;
-    /* border: 2px dotted var(--flexui-primary-color); */
-    background: var(--flexui-primary-color-inactive-opacity);
+    /* Usa os tokens de D&D definidos no theme.css */
+    background: var(--color-placeholder-bg);
+    border: 1px dashed var(--color-placeholder-border);
     border-radius: var(--flexui-border-radius);
 }
 
 .container__drop-area {
     flex: 0 0 5px;
     border-radius: var(--flexui-border-radius);
-    /* border: 1px dashed #00ffcc33; */
     display: flex;
     position: relative;
     overflow: auto;
+    transition: background-color 0.2s ease-out;
 }
 .container__drop-area--active {
-    /* border: 2px dotted var(--flexui-primary-color); */
-    background: var(--flexui-primary-color-inactive-opacity);
+    /* Usa os tokens de D&D definidos no theme.css */
+    background: var(--color-placeholder-bg);
 }
