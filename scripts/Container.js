@@ -74,7 +74,7 @@ export class Container {
     }
 
     /**
-     * Exclui uma coluna e seu CCA subsequente.
+     * (MODIFICADO) Exclui uma coluna e seu CCA subsequente.
      */
     deleteColumn(column) {
         const index = this.state.children.indexOf(column);
@@ -85,8 +85,18 @@ export class Container {
 
         const columnEl = this.state.children[index].element;
         const createAreaEl = this.state.children[index + 1].element;
-        if (columnEl) this.element.removeChild(columnEl);
-        if (createAreaEl) this.element.removeChild(createAreaEl);
+
+        // (CORREÇÃO BUG 3.1)
+        // Adiciona verificação .contains() antes de remover o nó,
+        // prevenindo o erro 'NotFoundError' se o DOM e o
+        // estado 'this.state.children' estiverem dessincronizados.
+        if (columnEl && this.element.contains(columnEl)) {
+            this.element.removeChild(columnEl);
+        }
+        if (createAreaEl && this.element.contains(createAreaEl)) {
+            this.element.removeChild(createAreaEl);
+        }
+
         this.state.children.splice(index, 2);
         this.updateColumnsSizes();
         this.updateAllResizeBars();
@@ -135,11 +145,6 @@ export class Container {
         this.state.children.push(columnCreateArea);
     }
 
-    /**
-     * Serializa o estado completo do container para um objeto JSON.
-     * Este método chama .toJSON() recursivamente em todas as colunas.
-     * @returns {object} Um objeto JSON-friendly representando todo o layout.
-     */
     toJSON() {
         return {
             // getColumns() já filtra para retornar apenas instâncias de Column
@@ -147,11 +152,6 @@ export class Container {
         };
     }
 
-    /**
-     * Restaura o layout completo do container a partir de um objeto JSON.
-     * Este método é o orquestrador da "hidratação".
-     * @param {object} data - O objeto de estado serializado (deve ter a chave 'columns').
-     */
     fromJSON(data) {
         // Limpa o container
         this.clear();
@@ -159,16 +159,9 @@ export class Container {
         const columnsData = data.columns || [];
 
         columnsData.forEach(colData => {
-            // 1. Cria uma nova coluna (vazia)
-            // O construtor do Column (new Column(this)) já a anexa ao container.
             const column = this.createColumn();
-
-            // 2. Restaura o estado primitivo da Coluna (seu 'width')
-            // (Este método fromJSON foi o que definimos na etapa anterior)
             column.fromJSON(colData);
         });
-
-        // 6. Atualiza o layout (barras de redimensionamento e flex)
         this.updateColumnsSizes();
         this.updateAllResizeBars();
     }

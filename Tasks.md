@@ -95,19 +95,3 @@
 - https://gist.github.com/jakebrinkmann/c63eaedbe384516e4a7bc133c1e1066b
 
 # To fix
-
-Ao remover o último painel da última coluna, algumas vezes acontece um erro.
-Aparentemente ocorre quando a última coluna foi criada por arraste de painel.
-Pode ocorrer tabem ao remover o ultimo painel de uma coluna criada qualquer.
-
-```javascript
-Container.js:61 Uncaught NotFoundError: Failed to execute 'removeChild' on 'Node': The node to be removed is not a child of this node.
-    at Container.deleteColumn (Container.js:61:22)
-    at Column.removePanel (Column.js:182:34)
-    at Panel.close (Panel.js:98:16)
-    at HTMLDivElement.<anonymous> (PanelHeader.js:89:66)
-deleteColumn @ Container.js:61
-removePanel @ Column.js:182
-close @ Panel.js:98
-(anonymous) @ PanelHeader.js:89
-```
