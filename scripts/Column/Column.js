@@ -58,8 +58,14 @@ export class Column {
         this.element.classList.add('column');
         this.dropZoneType = 'column';
 
+        // (MODIFICADO) A função throttled agora atualiza apenas o estilo O(1) desta coluna.
+        // A atualização O(N) (container.updateColumnsSizes) é chamada apenas no 'onUp'.
         this.setThrottledUpdate(
-            throttleRAF(this.state.container.updateColumnsSizes.bind(this.state.container))
+            throttleRAF(() => {
+                if (this.state.width !== null) {
+                    this.element.style.flex = `0 0 ${this.state.width}px`;
+                }
+            })
         );
 
         this.initDragDrop();
@@ -175,14 +181,14 @@ export class Column {
     }
 
     /**
-     * Handles the start of a horizontal resize drag.
+     * (MODIFICADO) Handles the start of a horizontal resize drag.
      * @param {MouseEvent} e - The mousedown event.
      */
     startResize(e) {
         const me = this;
         const container = me.state.container;
 
-        const columns = container.state.children.filter(c => c instanceof Column);
+        const columns = container.getColumns(); // Usa o getter
         const cols = columns.map(c => c.element);
 
         const idx = cols.indexOf(me.element);
@@ -196,6 +202,7 @@ export class Column {
             const delta = ev.clientX - startX;
             me.state.width = Math.max(me.getMinWidth(), startW + delta);
 
+            // Chama a função throttled (O(1))
             me.getThrottledUpdate()();
         };
 
@@ -203,7 +210,11 @@ export class Column {
             window.removeEventListener('mousemove', onMove);
             window.removeEventListener('mouseup', onUp);
 
+            // Cancela qualquer frame O(1) pendente
             me.getThrottledUpdate()?.cancel();
+
+            // Chama a atualização O(N) uma única vez no final
+            // para sincronizar todas as colunas (especialmente a última).
             container.updateColumnsSizes();
         };
         window.addEventListener('mousemove', onMove);
@@ -305,7 +316,7 @@ export class Column {
     }
 
     /**
-     * (NOVO) Getter público para o state de panelGroups (melhor encapsulamento).
+     * Getter público para o state de panelGroups (melhor encapsulamento).
      * @returns {Array<PanelGroup>}
      */
     getPanelGroups() {
