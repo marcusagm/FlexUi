@@ -5,7 +5,6 @@
     /*
    * =========================================
    * 1. PALETA DE ELEVAÇÃO (SURFACE TONES)
-   * (Atualizado na Etapa 2/v7)
    * =========================================
    */
     --surface-level-0: var(--neutral-10); /* Nível 0 (App) */
@@ -18,7 +17,6 @@
     /*
    * =========================================
    * 2. MAPEAMENTO SEMÂNTICO (BACKGROUNDS)
-   * (Atualizado na Etapa 2/v7)
    * =========================================
    */
 
@@ -30,7 +28,7 @@
     --color-bg-tab-active: var(--surface-level-2);
     --color-bg-tab-inactive: var(--surface-level-1);
     --color-bg-menu: var(--surface-level-2);
-    --color-bg-status-bar: var(--surface-level-2);
+    --color-bg-status-bar: var(--surface-level-0);
     --color-bg-modal: var(--surface-level-2); /* Shell do Modal */
     --color-bg-modal-content: var(--surface-level-1); /* Conteúdo do Modal */
     --color-bg-modal-footer: var(--surface-level-2); /* Rodapé do Modal */
@@ -107,7 +105,8 @@
     --border-radius-md: 8px; /* Containers maiores (modais) */
 
     /* Layout App */
-    --header-height: 30px;
+    --menu-height: 26px;
+    --statusbar-height: 24px;
 
     /* Animação */
     --transition-speed: 200ms ease-in-out;
@@ -115,7 +114,6 @@
     /*
    * =========================================
    * 5. TOKENS DE COMPONENTES (Forms, Modal)
-   * (Centralizados na Etapa 1/v7)
    * =========================================
    */
 
@@ -124,10 +122,366 @@
     --form-icon-invalid: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%23dc3545'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath stroke-linejoin='round' d='M5.8 3.6h.4v.4h-.4z'/%3e%3cpath d='M5.8 4.8h.4v3.6h-.4z'/%3e%3c/svg%3e");
     --form-select-arrow: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
 
-    /* Modal (Layout) */
+    /*
+   * =========================================
+   * 6. TOKENS DE COMPONENTES (Granular)
+   * =========================================
+   */
+
+    /* Component: Container */
+    --container-gap: 0px;
+    --container-padding: 3px 0 3px 0px;
+    --container-width: 100vw;
+    --container-height-calc: calc(100vh - var(--menu-height) - var(--statusbar-height));
+    --container-placeholder-height: 60px;
+    --container-placeholder-margin: 0;
+    --container-drop-area-flex: 0 0 5px;
+
+    /* Component: Menu */
+    --menu-item-font-size: 1.1em;
+    --menu-item-line-height: 1em;
+    --menu-item-padding: 8px 12px 6px 12px;
+    --menu-submenu-item-padding: 4px 12px;
+    --menu-arrow-margin-left: 10px;
+    --menu-arrow-font-size: 0.9em;
+    --menu-submenu-padding: 4px 0;
+    --menu-submenu-min-width: 180px;
+    --menu-submenu-nested-top: 5px;
+    --menu-submenu-nested-border-radius: 0;
+
+    /* Component: StatusBar */
+    --statusbar-flex-shrink: 0;
+    --statusbar-padding: 0 10px;
+    --statusbar-line-height: var(--statusbar-height);
+    --statusbar-font-size: var(--font-size-app);
+
+    /* Component: PanelGroup */
+    --panel-dragging-opacity: 0.6;
+    --panel-collapsed-height: 26px;
+    --panel-header-padding: 4px 6px;
+    --panel-header-gap: 6px;
+    --panel-header-border-bottom-width: 1px;
+    --panel-header-height: 26px;
+    --panel-header-flex-shrink: 0;
+    --panel-move-handle-size: 14px;
+    --panel-move-handle-flex: 0 0 var(--panel-move-handle-size);
+    --panel-move-handle-icon-size: 12px 12px;
+    --panel-move-handle-opacity: 0.7;
+    --panel-title-font-size: 14px;
+    --panel-title-min-width: 10px;
+    --panel-header-spacer-flex-grow: 100;
+    --panel-header-spacer-min-width: 5px;
+    --panel-button-size: 16px;
+    --panel-button-flex: 0 0 var(--panel-button-size);
+    --panel-button-font-size: 1.1em;
+    --panel-button-line-height: var(--panel-button-size);
+    --panel-button-padding: 0;
+    --panel-button-disabled-opacity: 0.5;
+    --panel-resize-handle-height: 3px;
+    --panel-group-header-move-handle-height: 100%;
+    --panel-group-header-move-handle-width: 20px;
+    --panel-group-header-move-handle-flex: 0 0 var(--panel-group-header-move-handle-width);
+    --panel-group-header-padding: 0 3px 0 0;
+    --panel-group-header-height: 26px;
+    --panel-group-header-flex-shrink: 0;
+    --panel-tab-container-flex-grow: 1;
+    --panel-tab-container-height: 100%;
+    --panel-tab-padding: 0;
+    --panel-tab-border-top-width: 3px;
+    --panel-tab-height: 100%;
+    --panel-tab-max-width: 250px;
+    --panel-tab-margin-right: 1px;
+    --panel-tab-font-size: 0.9em;
+    --panel-tab-title-flex-grow: 1;
+    --panel-tab-title-flex-shrink: 1;
+    --panel-tab-title-padding: 0 5px;
+    --panel-tab-close-font-size: 1.2em;
+    --panel-tab-close-line-height: 1;
+    --panel-tab-close-margin-right: 2px;
+    --panel-tab-close-padding: 2px;
+    --panel-tab-close-size: 16px;
+    --panel-tab-close-flex-shrink: 0;
+    --panel-tab-scroll-padding: 0 4px;
+    --panel-tab-scroll-height: 100%;
+    --panel-tab-scroll-z-index: 10;
+    --panel-tab-scroll-flex-shrink: 0;
+    --panel-tab-scroll-border-width: 1px;
+    --panel-simple-header-tab-container-flex-grow: 0;
+    --panel-simple-header-tab-font-size: 14px;
+    --panel-simple-header-title-min-width: 10px;
+    --panel-simple-header-title-padding: 0 5px;
+    --panel-content-flex-grow: 1;
+    --panel-content-min-height: 20px; /* (Esta duplicata foi de panel-group, não panel.css) */
+
+    /* Component: Panel (Content) */
+    --panel-content-padding: 8px;
+    --panel-content-font-size-base: 1em;
+    --panel-content-min-height-base: 20px;
+    --panel-toolbar-gap: 4px;
+    --panel-toolbar-button-border: 1px solid var(--color-border-default);
+    --panel-toolbar-button-padding: 4px 8px;
+    --panel-toolbar-button-font-size: 0.85em;
+
+    /* Component: Modal */
     --modal-padding-small: 16px;
     --modal-padding-large: 24px;
     --modal-backdrop-bg: rgba(0, 0, 0, 0.5);
     --modal-backdrop-blur-bg: rgba(0, 0, 0, 0.2);
     --modal-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    --modal-z-index: 1000;
+    --modal-center-max-height: 90vh;
+    --modal-center-size-auto-width: auto;
+    --modal-center-size-auto-max-width: 90vw;
+    --modal-center-size-small-width: 400px;
+    --modal-center-size-medium-width: 600px;
+    --modal-center-size-large-width: 900px;
+    --modal-drawer-height: 100vh;
+    --modal-drawer-max-height: 100vh;
+    --modal-drawer-size-auto-width: auto;
+    --modal-drawer-size-auto-max-width: 90vw;
+    --modal-drawer-size-small-width: 320px;
+    --modal-drawer-size-medium-width: 480px;
+    --modal-drawer-size-large-width: 600px;
+    --modal-sheet-width: 100vw;
+    --modal-sheet-top-max-height: 50vh;
+    --modal-sheet-bottom-max-height: 90vh;
+    --modal-sheet-size-auto-height: auto;
+    --modal-sheet-size-small-height: 30vh;
+    --modal-sheet-size-medium-height: 50vh;
+    --modal-sheet-size-large-height: 75vh;
+    --modal-fullscreen-width: 100vw;
+    --modal-fullscreen-height: 100vh;
+    --modal-fullscreen-border-radius: 0;
+    --modal-header-padding: var(--modal-padding-small) var(--modal-padding-large);
+    --modal-header-border-bottom-width: 1px;
+    --modal-header-flex-shrink: 0;
+    --modal-title-font-size: 1.25rem;
+    --modal-title-font-weight: 600;
+    --modal-title-margin: 0;
+    --modal-title-padding-bottom: 0;
+    --modal-nav-button-font-size: 1.5rem;
+    --modal-nav-button-line-height: 1;
+    --modal-nav-button-padding: 0;
+    --modal-back-button-margin-right: 12px;
+    --modal-back-button-padding-x: 4px;
+    --modal-close-button-font-weight: bold;
+    --modal-content-padding: var(--modal-padding-large);
+    --modal-content-flex-grow: 1;
+    --modal-footer-padding: var(--modal-padding-small) var(--modal-padding-large);
+    --modal-footer-border-top-width: 1px;
+    --modal-footer-flex-shrink: 0;
+    --modal-footer-text-font-size: 0.875rem;
+    --modal-footer-text-opacity: 0.7;
+    --modal-footer-buttons-gap: 8px;
+    --modal-button-padding: 8px 14px;
+    --modal-button-font-size: 0.9rem;
+    --modal-button-font-weight: 500;
+    --modal-button-margin: 4px;
+    --modal-prompt-label-margin-bottom: 8px;
+    --modal-prompt-input-padding: 8px;
+    --modal-prompt-input-border-width: 1px;
+    --modal-prompt-input-font-size: 1rem;
+    --modal-spinner-border-width: 4px;
+    --modal-spinner-size: 40px;
+    --modal-spinner-margin: 40px auto;
+    --modal-responsive-drawer-width: 90vw;
+    --modal-responsive-center-width: 95vw;
+    --modal-responsive-header-footer-padding: 12px var(--modal-padding-small);
+
+    /* Component: Button */
+    --button-padding-y: var(--spacing-2);
+    --button-padding-x: var(--spacing-4);
+    --button-font-size: var(--font-size-base);
+    --button-font-weight: 600;
+    --button-line-height: 1.5;
+    --button-border-width: 1px;
+    --button-border-radius: var(--border-radius-sm);
+    --button-text-align: center;
+    --button-text-decoration: none;
+    --button-vertical-align: middle;
+    --button-cursor: pointer;
+    --button-user-select: none;
+    --button-display: inline-block;
+    --button-lg-padding-y: var(--spacing-3);
+    --button-lg-padding-x: var(--spacing-5);
+    --button-lg-font-size: var(--font-size-lg);
+    --button-sm-padding-y: var(--spacing-1);
+    --button-sm-padding-x: var(--spacing-3);
+    --button-sm-font-size: var(--font-size-sm);
+    --button-group-display: inline-flex;
+    --button-group-vertical-align: middle;
+    --button-group-btn-position: relative;
+    --button-group-btn-border-radius: 0;
+    --button-group-btn-margin-left: -1px;
+
+    /* Component: Forms */
+    --form-group-margin-bottom: var(--spacing-5);
+    --form-group-label-font-weight: 600;
+    --form-group-label-margin-bottom: var(--spacing-2);
+    --form-group-label-focus-font-weight: 700;
+    --form-group-label-required-font-weight: 700;
+    --form-group-label-required-margin-left: 2px;
+    --form-group-text-font-size: var(--font-size-sm);
+    --form-group-text-margin-top: var(--spacing-2);
+    --form-grid-gap: var(--spacing-4);
+    --fieldset-border-width: 1px;
+    --fieldset-padding: var(--spacing-5);
+    --fieldset-margin: var(--spacing-5) 0;
+    --fieldset-legend-font-size: var(--font-size-lg);
+    --fieldset-legend-font-weight: 600;
+    --fieldset-legend-padding: 0 var(--spacing-2);
+    --fieldset-legend-margin-left: var(--spacing-3);
+    --form-floating-control-padding-top: calc(var(--spacing-4) + var(--spacing-2));
+    --form-floating-control-padding-bottom: var(--spacing-2);
+    --form-floating-label-top: 1rem;
+    --form-floating-label-left: var(--spacing-3);
+    --form-floating-label-font-weight: 400;
+    --form-floating-label-margin-bottom: 0;
+    --form-floating-label-focus-transform: scale(0.8) translateY(-0.75rem);
+    --form-floating-label-focus-font-weight: 700;
+    --form-counter-font-size: var(--font-size-sm);
+    --form-counter-margin-top: var(--spacing-1);
+    --form-control-padding-y: var(--spacing-2);
+    --form-control-padding-x: var(--spacing-3);
+    --form-control-font-size: var(--font-size-base);
+    --form-control-font-weight: 400;
+    --form-control-line-height: 1.5;
+    --form-control-border-width: 1px;
+    --form-control-icon-bg-size: 1.25em 1.25em;
+    --form-control-focus-outline: 0;
+    --form-control-placeholder-opacity: 1;
+    --form-control-disabled-opacity: 0.7;
+    --form-textarea-min-height: 120px;
+    --form-select-bg-size: 16px 12px;
+    --form-select-padding-right-multiplier: 2.5;
+    --form-select-padding-right: calc(
+        var(--form-control-padding-x) * var(--form-select-padding-right-multiplier)
+    );
+    --form-select-multiple-min-height: 120px;
+    --form-file-input-size: 1px;
+    --form-file-input-padding: 0;
+    --form-file-input-margin: -1px;
+    --form-file-label-padding-y: var(--button-padding-y);
+    --form-file-label-padding-x: var(--button-padding-x);
+    --form-file-label-font-weight: 600;
+    --form-file-label-border-width: 1px;
+    --form-file-label-flex-shrink: 0;
+    --form-file-focus-outline-width: 3px;
+    --form-file-focus-outline-offset: 2px;
+    --form-file-text-margin-left: var(--spacing-3);
+    --form-file-text-font-size: var(--font-size-sm);
+    --form-check-size: 1.25em;
+    --form-check-padding-left-calc: calc(var(--form-check-size) + var(--spacing-2));
+    --form-check-margin-bottom: var(--spacing-3);
+    --form-check-min-height: var(--form-check-size);
+    --form-check-input-opacity: 0;
+    --form-check-input-size: 0;
+    --form-check-label-line-height: var(--form-check-size);
+    --form-check-before-left: 0;
+    --form-check-before-top: 0;
+    --form-check-before-border-width: 1px;
+    --form-check-focus-outline-width: 3px;
+    --form-check-focus-outline-offset: 2px;
+    --form-check-disabled-opacity: 0.6;
+    --form-checkbox-after-left-calc: calc(var(--form-check-size) * 0.25);
+    --form-checkbox-after-top-calc: calc(var(--form-check-size) * 0.1);
+    --form-checkbox-after-width-calc: calc(var(--form-check-size) * 0.4);
+    --form-checkbox-after-height-calc: calc(var(--form-check-size) * 0.6);
+    --form-checkbox-after-border-width: 0 2px 2px 0;
+    --form-radio-after-left-calc: calc(var(--form-check-size) * 0.25);
+    --form-radio-after-top-calc: calc(var(--form-check-size) * 0.25);
+    --form-radio-after-width-calc: calc(var(--form-check-size) * 0.5);
+    --form-radio-after-height-calc: calc(var(--form-check-size) * 0.5);
+    --form-switch-width-calc: calc(var(--form-check-size) * 1.75);
+    --form-switch-padding-left-calc: calc(var(--form-switch-width-calc) + var(--spacing-2));
+    --form-switch-after-top: 2px;
+    --form-switch-after-left: 2px;
+    --form-switch-after-size-calc: calc(var(--form-check-size) - 4px);
+    --form-switch-checked-transform-calc: translateX(
+        calc(var(--form-switch-width-calc) - var(--form-check-size))
+    );
+    --input-group-item-margin-left: -1px;
+    --input-group-text-font-size: var(--font-size-base);
+    --input-group-text-font-weight: 400;
+    --input-group-text-line-height: 1.5;
+    --input-group-text-border-width: 1px;
+    --input-group-btn-flex-shrink: 0;
+    --input-group-btn-z-index: 2;
+    --input-group-btn-focus-outline-offset: -1px;
+    --input-group-icon-top: 50%;
+    --input-group-icon-z-index: 2;
+    --input-group-icon-size: 1.25em;
+    --input-group-icon-padding-left-calc: calc(var(--form-control-padding-x) * 2 + 1.25em);
+    --input-group-icon-padding-right-calc: calc(var(--form-control-padding-x) * 2 + 1.25em);
+    --form-range-height: 1.5rem;
+    --form-range-padding: 0;
+    --form-range-track-height: 0.5rem;
+    --form-range-thumb-size: 1.25rem;
+    --form-range-thumb-border-width: 0;
+    --form-range-thumb-margin-top: -0.375rem;
+    --progress-group-gap: var(--spacing-3);
+    --progress-group-label-margin-bottom: var(--spacing-2);
+    --progress-group-label-margin-top: var(--spacing-2);
+    --progress-group-label-font-size: var(--font-size-sm);
+    --progress-group-label-font-weight: 600;
+    --progress-height: 1rem;
+    --progress-font-size: 0.75rem;
+    --progress-bar-transition: width 0.4s ease;
+    --form-feedback-margin-top: var(--spacing-2);
+    --form-feedback-font-size: var(--font-size-sm);
+    --form-valid-icon-padding-right-calc: calc(var(--form-control-padding-x) * 2 + 1.25em);
+    --form-valid-select-bg-pos: right var(--form-control-padding-x) center, right 2.5em center;
+    --form-valid-select-padding-right: 4.5em;
+    --form-error-summary-padding: var(--spacing-4);
+    --form-error-summary-margin-bottom: var(--spacing-5);
+    --form-error-summary-border-width: 1px;
+    --form-error-summary-focus-outline-width: 3px;
+    --form-error-summary-focus-outline-offset: 2px;
+    --form-error-summary-title-font-weight: 700;
+    --form-error-summary-title-font-size: var(--font-size-lg);
+    --form-error-summary-title-margin-bottom: var(--spacing-3);
+    --form-error-summary-item-font-weight: 600;
+    --form-compact-control-padding-y: var(--spacing-1);
+    --form-compact-control-padding-x: var(--spacing-2);
+    --form-compact-btn-padding-y: var(--spacing-1);
+    --form-compact-btn-padding-x: var(--spacing-3);
+    --form-compact-btn-font-size: var(--font-size-sm);
+    --form-compact-font-size: var(--font-size-sm);
+    --form-compact-group-margin-bottom: var(--spacing-3);
+    --form-compact-floating-control-padding-top: calc(var(--spacing-3) + var(--spacing-1));
+    --form-compact-floating-control-padding-bottom: var(--spacing-1);
+    --form-compact-floating-label-top: 0.6rem;
+    --form-compact-floating-label-focus-transform: scale(0.85) translateY(-0.5rem);
+
+    /* Component: Notification */
+    --notification-container-z-index: 9999;
+    --notification-container-max-width: 350px;
+    --notification-container-offset: 20px; /* (top/right/bottom/left) */
+    --notification-margin-bottom: 10px;
+    --notification-padding: 15px;
+    --notification-min-width: 280px;
+    --notification-box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    --notification-snackbar-min-width: 320px;
+    --notification-icon-wrapper-margin-right: 12px;
+    --notification-icon-wrapper-font-size: 1.2em;
+    --notification-icon-wrapper-line-height: 1em;
+    --notification-message-margin: 0;
+    --notification-message-padding: 0;
+    --notification-message-line-height: 1.4;
+    --notification-buttons-margin-top: 10px;
+    --notification-button-font-weight: bold;
+    --notification-button-padding: 5px 10px;
+    --notification-button-margin-left: 8px;
+    --notification-button-opacity: 0.8;
+    --notification-button-hover-opacity: 1;
+    --notification-button-hover-bg: rgba(0, 0, 0, 0.1);
+    --notification-warning-button-hover-bg: rgba(0, 0, 0, 0.05);
+    --notification-close-button-font-size: 1.5em;
+    --notification-close-button-line-height: 0.5;
+    --notification-close-button-padding: 5px;
+    --notification-close-button-margin-left: 10px;
+    --notification-close-button-opacity: 0.7;
+    --notification-close-button-hover-opacity: 1;
+    --notification-animation-transform-y: 20px;
+    --notification-icon-size: 1.2em;
 }

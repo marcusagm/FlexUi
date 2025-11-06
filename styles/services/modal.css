@@ -1,5 +1,5 @@
 /* ========================================================================
- * FILE: modal.css (REFATORADO v7)
+ * FILE: modal.css (REFATORADO v8)
  * * DESCRIÇÃO:
  * Bloco :root removido. Este arquivo agora consome 100%
  * dos tokens de styles/theme.css.
@@ -16,7 +16,7 @@
     left: 0;
     width: 100%;
     height: 100%;
-    z-index: 1000;
+    z-index: var(--modal-z-index);
     display: none;
     pointer-events: none;
 }
@@ -92,7 +92,7 @@
     top: 50%;
     left: 50%;
     border-radius: var(--border-radius-md);
-    max-height: 90vh;
+    max-height: var(--modal-center-max-height);
 }
 .modal--position-center.modal--is-visible {
     transform: translate(-50%, -50%) scale(1);
@@ -105,8 +105,8 @@
 .modal--position-right {
     top: 0;
     right: 0;
-    height: 100vh;
-    max-height: 100vh;
+    height: var(--modal-drawer-height);
+    max-height: var(--modal-drawer-max-height);
     transform: translateX(100%);
 }
 .modal--position-right.modal--is-visible {
@@ -120,8 +120,8 @@
 .modal--position-left {
     top: 0;
     left: 0;
-    height: 100vh;
-    max-height: 100vh;
+    height: var(--modal-drawer-height);
+    max-height: var(--modal-drawer-max-height);
     transform: translateX(-100%);
 }
 .modal--position-left.modal--is-visible {
@@ -135,8 +135,8 @@
 .modal--position-top {
     top: 0;
     left: 0;
-    width: 100vw;
-    max-height: 50vh;
+    width: var(--modal-sheet-width);
+    max-height: var(--modal-sheet-top-max-height);
     transform: translateY(-100%);
 }
 .modal--position-top.modal--is-visible {
@@ -150,8 +150,8 @@
 .modal--position-bottom {
     bottom: 0;
     left: 0;
-    width: 100vw;
-    max-height: 90vh;
+    width: var(--modal-sheet-width);
+    max-height: var(--modal-sheet-bottom-max-height);
     top: auto;
     transform: translateY(100%);
 }
@@ -166,76 +166,76 @@
 
 /* Size rules for 'center' */
 .modal--position-center.modal--size-auto {
-    width: auto;
-    max-width: 90vw;
+    width: var(--modal-center-size-auto-width);
+    max-width: var(--modal-center-size-auto-max-width);
 }
 .modal--position-center.modal--size-small {
-    width: 400px;
-    max-width: 90vw;
+    width: var(--modal-center-size-small-width);
+    max-width: var(--modal-center-size-auto-max-width);
 }
 .modal--position-center.modal--size-medium {
-    width: 600px;
-    max-width: 90vw;
+    width: var(--modal-center-size-medium-width);
+    max-width: var(--modal-center-size-auto-max-width);
 }
 .modal--position-center.modal--size-large {
-    width: 900px;
-    max-width: 90vw;
+    width: var(--modal-center-size-large-width);
+    max-width: var(--modal-center-size-auto-max-width);
 }
 
 /* Size rules for 'right' / 'left' drawers (controls width) */
 .modal--position-right.modal--size-auto,
 .modal--position-left.modal--size-auto {
-    width: auto;
-    max-width: 90vw;
+    width: var(--modal-drawer-size-auto-width);
+    max-width: var(--modal-drawer-size-auto-max-width);
 }
 .modal--position-right.modal--size-small,
 .modal--position-left.modal--size-small {
-    width: 320px;
-    max-width: 90vw;
+    width: var(--modal-drawer-size-small-width);
+    max-width: var(--modal-drawer-size-auto-max-width);
 }
 .modal--position-right.modal--size-medium,
 .modal--position-left.modal--size-medium {
-    width: 480px;
-    max-width: 90vw;
+    width: var(--modal-drawer-size-medium-width);
+    max-width: var(--modal-drawer-size-auto-max-width);
 }
 .modal--position-right.modal--size-large,
 .modal--position-left.modal--size-large {
-    width: 600px;
-    max-width: 90vw;
+    width: var(--modal-drawer-size-large-width);
+    max-width: var(--modal-drawer-size-auto-max-width);
 }
 
 /* Size rules for 'top' / 'bottom' (controls height) */
 .modal--position-top.modal--size-auto,
 .modal--position-bottom.modal--size-auto {
-    height: auto;
+    height: var(--modal-sheet-size-auto-height);
 }
 .modal--position-top.modal--size-small,
 .modal--position-bottom.modal--size-small {
-    height: 30vh;
-    max-height: 30vh;
+    height: var(--modal-sheet-size-small-height);
+    max-height: var(--modal-sheet-size-small-height);
 }
 .modal--position-top.modal--size-medium,
 .modal--position-bottom.modal--size-medium {
-    height: 50vh;
-    max-height: 50vh;
+    height: var(--modal-sheet-size-medium-height);
+    max-height: var(--modal-sheet-size-medium-height);
 }
 .modal--position-top.modal--size-large,
 .modal--position-bottom.modal--size-large {
-    height: 75vh;
-    max-height: 75vh;
+    height: var(--modal-sheet-size-large-height);
+    max-height: var(--modal-sheet-size-large-height);
 }
 
 /* Fullscreen (applies to all positions) */
 .modal--size-fullscreen {
-    width: 100vw;
-    height: 100vh;
-    max-height: 100vh;
+    width: var(--modal-fullscreen-width);
+    height: var(--modal-fullscreen-height);
+    max-height: var(--modal-fullscreen-height);
     top: 0;
     left: 0;
     right: auto;
     bottom: auto;
     transform: none !important;
-    border-radius: 0;
+    border-radius: var(--modal-fullscreen-border-radius);
 }
 
 /* ========================================================================
@@ -247,9 +247,9 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: var(--modal-padding-small) var(--modal-padding-large);
-    border-bottom: 1px solid var(--color-border-default);
-    flex-shrink: 0;
+    padding: var(--modal-header-padding);
+    border-bottom: var(--modal-header-border-bottom-width) solid var(--color-border-default);
+    flex-shrink: var(--modal-header-flex-shrink);
 }
 /* Modifier: modal__header--draggable */
 .modal__header--draggable {
@@ -264,11 +264,11 @@
 
 /* --- Element: modal__title --- */
 .modal__title {
-    font-size: 1.25rem;
-    font-weight: 600;
-    margin: 0;
+    font-size: var(--modal-title-font-size);
+    font-weight: var(--modal-title-font-weight);
+    margin: var(--modal-title-margin);
     border-bottom: none;
-    padding-bottom: 0;
+    padding-bottom: var(--modal-title-padding-bottom);
     color: var(--color-text-bright);
 }
 
@@ -277,10 +277,10 @@
     background: transparent;
     border: none;
     cursor: pointer;
-    font-size: 1.5rem;
-    margin-right: 12px;
-    padding: 0 4px;
-    line-height: 1;
+    font-size: var(--modal-nav-button-font-size);
+    margin-right: var(--modal-back-button-margin-right);
+    padding: var(--modal-nav-button-padding) var(--modal-back-button-padding-x);
+    line-height: var(--modal-nav-button-line-height);
     color: var(--color-text-secondary);
     transition: color 0.2s;
 }
@@ -293,11 +293,11 @@
     background: transparent;
     border: none;
     cursor: pointer;
-    font-size: 1.5rem;
-    padding: 0;
-    line-height: 1;
+    font-size: var(--modal-nav-button-font-size);
+    padding: var(--modal-nav-button-padding);
+    line-height: var(--modal-nav-button-line-height);
     color: var(--color-text-secondary);
-    font-weight: bold;
+    font-weight: var(--modal-close-button-font-weight);
     transition: color 0.2s;
 }
 .modal__close-button:hover {
@@ -306,8 +306,8 @@
 
 /* --- Element: modal__content --- */
 .modal__content {
-    padding: var(--modal-padding-large);
-    flex-grow: 1;
+    padding: var(--modal-content-padding);
+    flex-grow: var(--modal-content-flex-grow);
     overflow-y: auto;
     overflow-x: hidden;
     user-select: auto;
@@ -319,23 +319,23 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: var(--modal-padding-small) var(--modal-padding-large);
-    border-top: 1px solid var(--color-border-default);
+    padding: var(--modal-footer-padding);
+    border-top: var(--modal-footer-border-top-width) solid var(--color-border-default);
     background-color: var(--color-bg-modal-footer);
-    flex-shrink: 0;
+    flex-shrink: var(--modal-footer-flex-shrink);
 }
 
 /* --- Element: modal__footer-text --- */
 .modal__footer-text {
-    font-size: 0.875rem;
+    font-size: var(--modal-footer-text-font-size);
     color: var(--color-text-primary);
-    opacity: 0.7;
+    opacity: var(--modal-footer-text-opacity);
 }
 
 /* --- Element: modal__footer-buttons --- */
 .modal__footer-buttons {
     display: flex;
-    gap: 8px;
+    gap: var(--modal-footer-buttons-gap);
 }
 
 /* ========================================================================
@@ -345,12 +345,12 @@
 /* --- Element: modal__button (Base) --- */
 .modal__button {
     border: none;
-    padding: 8px 14px;
+    padding: var(--modal-button-padding);
     border-radius: var(--border-radius-base);
     cursor: pointer;
-    font-size: 0.9rem;
-    font-weight: 500;
-    margin: 4px;
+    font-size: var(--modal-button-font-size);
+    font-weight: var(--modal-button-font-weight);
+    margin: var(--modal-button-margin);
     transition: background-color 0.2s;
     background-color: var(--color-bg-hover);
     color: var(--color-text-primary);
@@ -382,15 +382,15 @@
     flex-direction: column;
 }
 .modal__prompt-label {
-    margin-bottom: 8px;
+    margin-bottom: var(--modal-prompt-label-margin-bottom);
 }
 .modal__prompt-input {
-    padding: 8px;
-    border: 1px solid var(--color-border-default);
+    padding: var(--modal-prompt-input-padding);
+    border: var(--modal-prompt-input-border-width) solid var(--color-border-default);
     background-color: var(--color-bg-app);
     color: var(--color-text-primary);
     border-radius: var(--border-radius-sm);
-    font-size: 1rem;
+    font-size: var(--modal-prompt-input-font-size);
     user-select: auto;
 }
 .modal__prompt-input:focus {
@@ -400,13 +400,13 @@
 
 /* --- Element: modal__spinner --- */
 .modal__spinner {
-    border: 4px solid var(--color-bg-hover);
-    border-top: 4px solid var(--color-accent-primary);
+    border: var(--modal-spinner-border-width) solid var(--color-bg-hover);
+    border-top-color: var(--color-accent-primary); /* (border-top -> border-top-color) */
     border-radius: 50%;
-    width: 40px;
-    height: 40px;
+    width: var(--modal-spinner-size);
+    height: var(--modal-spinner-size);
     animation: modal-spin 1s linear infinite;
-    margin: 40px auto;
+    margin: var(--modal-spinner-margin);
 }
 @keyframes modal-spin {
     0% {
@@ -434,14 +434,14 @@
     .modal--position-left.modal--size-small,
     .modal--position-right.modal--size-medium,
     .modal--position-left.modal--size-medium {
-        width: 90vw;
+        width: var(--modal-responsive-drawer-width);
     }
 
     /* Make centered modals simpler */
     .modal--position-center.modal--size-small,
     .modal--position-center.modal--size-medium {
-        width: 95vw;
-        max-width: 95vw;
+        width: var(--modal-responsive-center-width);
+        max-width: var(--modal-responsive-center-width);
     }
 
     /* Reduce padding on mobile */
@@ -450,6 +450,6 @@
     }
     .modal__header,
     .modal__footer {
-        padding: 12px var(--modal-padding-small);
+        padding: var(--modal-responsive-header-footer-padding);
     }
 }

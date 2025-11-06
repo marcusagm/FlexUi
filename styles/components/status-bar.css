@@ -4,13 +4,13 @@
     /* * Sizing and Positioning (Parte do layout flex 'body')
      * Conforme solicitado, não usamos 'position: fixed'.
      */
-    height: 24px;
-    flex-shrink: 0; /* Previne que a barra seja esmagada pelo 'container' */
+    height: var(--statusbar-height);
+    flex-shrink: var(--statusbar-flex-shrink);
 
     /* Theming (Mapeado para os novos tokens) */
-    background-color: var(--color-bg-header);
+    background-color: var(--color-bg-status-bar);
     color: var(--color-text-secondary);
-    font-size: var(--font-size-app); /* (Era --flexui-text-size) */
+    font-size: var(--statusbar-font-size);
 
     /* Sombra consistente com o menu */
     box-shadow: 0 0 5px 0 #00000099;
@@ -20,10 +20,10 @@
     display: flex;
     justify-content: space-between; /* Empurra permanente(esquerda) e temporário(direita) */
     align-items: center;
-    padding: 0 10px;
-    line-height: 24px; /* Centraliza o texto verticalmente */
+    padding: var(--statusbar-padding);
+    line-height: var(--statusbar-line-height);
 
-    user-select: none; /* (ETAPA 2/v5) Previne seleção de texto na barra */
+    user-select: none;
 }
 
 /* .status-bar__permanent { */

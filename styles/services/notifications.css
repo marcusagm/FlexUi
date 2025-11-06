@@ -2,41 +2,41 @@
 /* Posiciona os containers em locais fixos */
 .notification-container {
     position: fixed;
-    z-index: 9999;
+    z-index: var(--notification-container-z-index);
     display: flex;
     flex-direction: column;
-    max-width: 350px; /* Largura máxima do toast */
+    max-width: var(--notification-container-max-width);
 }
 
 /* Espaçamento entre notificações */
 .notification-container .notification {
-    margin-bottom: 10px;
+    margin-bottom: var(--notification-margin-bottom);
 }
 
 /* Posições */
 .notification-container--top-right {
-    top: 20px;
-    right: 20px;
+    top: var(--notification-container-offset);
+    right: var(--notification-container-offset);
 }
 .notification-container--top-left {
-    top: 20px;
-    left: 20px;
+    top: var(--notification-container-offset);
+    left: var(--notification-container-offset);
 }
 .notification-container--top-center {
-    top: 20px;
+    top: var(--notification-container-offset);
     left: 50%;
     transform: translateX(-50%);
 }
 .notification-container--bottom-right {
-    bottom: 20px;
-    right: 20px;
+    bottom: var(--notification-container-offset);
+    right: var(--notification-container-offset);
 }
 .notification-container--bottom-left {
-    bottom: 20px;
-    left: 20px;
+    bottom: var(--notification-container-offset);
+    left: var(--notification-container-offset);
 }
 .notification-container--bottom-center {
-    bottom: 20px;
+    bottom: var(--notification-container-offset);
     left: 50%;
     transform: translateX(-50%);
 }
@@ -47,10 +47,11 @@
     align-items: flex-start; /* Alinha ícone e conteúdo */
     background: var(--color-bg-panel);
     color: var(--color-text-primary);
-    padding: 15px;
-    border-radius: var(--border-radius-base); /* (Era 5px) */
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    min-width: 280px;
+    padding: var(--notification-padding);
+    border-radius: var(--border-radius-base);
+    box-shadow: var(--notification-box-shadow);
+    min-width: var(--notification-min-width);
+    align-items: center;
 }
 
 /* === 3. Variantes (Toast vs Snackbar) === */
@@ -60,7 +61,7 @@
 }
 .notification--snackbar {
     /* Snackbars geralmente ficam embaixo e são mais largos */
-    min-width: 320px;
+    min-width: var(--notification-snackbar-min-width);
     background: var(--color-bg-app);
 }
 
@@ -84,9 +85,9 @@
 
 /* === 5. Elementos Internos === */
 .notification__icon-wrapper {
-    margin-right: 12px;
-    font-size: 1.2em; /* Torna o ícone um pouco maior */
-    line-height: 1em;
+    margin-right: var(--notification-icon-wrapper-margin-right);
+    font-size: var(--notification-icon-wrapper-font-size);
+    line-height: var(--notification-icon-wrapper-line-height);
 }
 
 .notification__content {
@@ -94,60 +95,60 @@
 }
 
 .notification__message {
-    margin: 0;
-    padding: 0;
-    line-height: 1.4;
+    margin: var(--notification-message-margin);
+    padding: var(--notification-message-padding);
+    line-height: var(--notification-message-line-height);
 }
 
 .notification__buttons {
     display: flex;
     justify-content: flex-end; /* Alinha botões à direita */
-    margin-top: 10px;
+    margin-top: var(--notification-buttons-margin-top);
 }
 
 .notification__button {
     background: transparent;
     border: none;
     color: inherit; /* Herda a cor do tipo (ex: branco no 'danger') */
-    font-weight: bold;
+    font-weight: var(--notification-button-font-weight);
     text-transform: uppercase;
-    padding: 5px 10px;
-    margin-left: 8px;
+    padding: var(--notification-button-padding);
+    margin-left: var(--notification-button-margin-left);
     cursor: pointer;
-    opacity: 0.8;
+    opacity: var(--notification-button-opacity);
 }
 
 /* Destaque para botões OK/Cancel */
 .notification__button--ok,
 .notification__button--cancel {
-    opacity: 1;
+    opacity: var(--notification-button-hover-opacity);
 }
 
 .notification__button:hover {
-    opacity: 1;
-    background: rgba(0, 0, 0, 0.1);
+    opacity: var(--notification-button-hover-opacity);
+    background: var(--notification-button-hover-bg);
 }
 
 .notification--warning .notification__button {
     color: var(--color-text-on-warning); /* Garante legibilidade no fundo amarelo */
 }
 .notification--warning .notification__button:hover {
-    background: rgba(0, 0, 0, 0.05);
+    background: var(--notification-warning-button-hover-bg);
 }
 
 .notification__close-button {
     background: transparent;
     border: none;
     color: inherit;
-    font-size: 1.5em;
-    line-height: 0.5;
-    padding: 5px;
-    margin-left: 10px;
+    font-size: var(--notification-close-button-font-size);
+    line-height: var(--notification-close-button-line-height);
+    padding: var(--notification-close-button-padding);
+    margin-left: var(--notification-close-button-margin-left);
     cursor: pointer;
-    opacity: 0.7;
+    opacity: var(--notification-close-button-opacity);
 }
 .notification__close-button:hover {
-    opacity: 1;
+    opacity: var(--notification-close-button-hover-opacity);
 }
 
 /* === 6. Animações === */
@@ -156,13 +157,13 @@
         opacity 0.3s ease,
         transform 0.3s ease;
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(var(--notification-animation-transform-y));
 }
 
 .notification-container--top-center .notification,
 .notification-container--top-left .notification,
 .notification-container--top-right .notification {
-    transform: translateY(-20px);
+    transform: translateY(calc(-1 * var(--notification-animation-transform-y)));
 }
 
 /* Estado de entrada */
@@ -174,7 +175,9 @@
 /* Estado de saída */
 .notification.is-exiting {
     opacity: 0;
-    transform: translateY(20px); /* Ou de volta para cima, dependendo da posição */
+    transform: translateY(
+        var(--notification-animation-transform-y)
+    ); /* Ou de volta para cima, dependendo da posição */
 }
 
 /* =================================================================== */
@@ -189,8 +192,8 @@
 .icon {
     display: inline-block;
     /* Tamanho do ícone. Use 'em' para escalar com o font-size do pai */
-    width: 1.2em;
-    height: 1.2em;
+    width: var(--notification-icon-size);
+    height: var(--notification-icon-size);
     vertical-align: middle;
 
     /* Cor do ícone - herda a cor do texto (ex: 'color: white') */

@@ -1,27 +1,27 @@
 .panel__content {
-    flex-grow: 1;
-    padding: 8px;
-    font-size: 1em;
+    flex-grow: var(--panel-content-flex-grow);
+    padding: var(--panel-content-padding);
+    font-size: var(--panel-content-font-size-base);
     color: var(--color-text-primary);
     overflow: auto;
-    min-height: 20px;
-    background: var(--color-bg-panel-content); /* (Atualizado para Nível 1) */
+    min-height: var(--panel-content-min-height-base);
+    background: var(--color-bg-panel-content);
     user-select: auto;
 }
 
 .panel__content--toolbar {
     display: flex;
-    gap: 4px;
+    gap: var(--panel-toolbar-gap);
     flex-wrap: wrap;
 }
 .panel__content--toolbar button {
     background-color: var(--color-bg-hover);
     color: var(--color-text-primary);
-    border: 1px solid var(--color-border-default);
-    padding: 4px 8px;
+    border: var(--panel-toolbar-button-border);
+    padding: var(--panel-toolbar-button-padding);
     border-radius: var(--border-radius-base);
     cursor: pointer;
-    font-size: 0.85em;
+    font-size: var(--panel-toolbar-button-font-size);
 }
 .panel__content--toolbar button:hover {
     background-color: var(--color-bg-hover);

@@ -1,27 +1,27 @@
 .container {
     flex: 1;
     display: flex;
-    gap: 0px;
-    padding: 3px 0 3px 0px;
+    gap: var(--container-gap);
+    padding: var(--container-padding);
     background: var(--color-bg-app);
     overflow: auto;
-    width: 100vw;
-    height: calc(100vh - 60px); /* 36px (Menu) + 24px (StatusBar) */
+    width: var(--container-width);
+    height: var(--container-height-calc);
 }
 
 .container__placeholder {
-    height: 60px;
-    margin: 0;
+    height: var(--container-placeholder-height);
+    margin: var(--container-placeholder-margin);
     /* Usa os tokens de D&D definidos no theme.css */
     background: var(--color-placeholder-bg);
     border: var(--color-placeholder-border-active);
-    border-radius: var(--border-radius-base); /* (Era --flexui-border-radius) */
+    border-radius: var(--border-radius-base);
 }
 
 .container__drop-area {
-    flex: 0 0 5px;
+    flex: var(--container-drop-area-flex);
     border: var(--color-placeholder-border);
-    border-radius: var(--border-radius-base); /* (Era --flexui-border-radius) */
+    border-radius: var(--border-radius-base);
     display: flex;
     position: relative;
     overflow: auto;

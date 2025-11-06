@@ -1,5 +1,6 @@
 .menu {
     display: flex;
+    height: var(--menu-height);
     background-color: var(--color-bg-header);
     /* border-bottom: 1px solid #111; */
     box-shadow: 0 0 5px 0 #00000099;
@@ -10,12 +11,12 @@
     position: relative;
     cursor: pointer;
     color: var(--color-text-primary);
-    font-size: 1.1em;
-    line-height: 1em;
+    font-size: var(--menu-item-font-size);
+    line-height: var(--menu-item-line-height);
     list-style: none;
     display: flex;
     align-items: center;
-    user-select: none; /* (ETAPA 2/v5) Previne seleção de texto no menu */
+    user-select: none;
 }
 
 .menu__title {
@@ -23,19 +24,19 @@
 }
 
 .menu > .menu__item {
-    padding: 8px 12px 6px 12px;
+    padding: var(--menu-item-padding);
     justify-content: flex-start;
 }
 
 .menu__submenu .menu__item {
-    padding: 4px 12px;
+    padding: var(--menu-submenu-item-padding);
     justify-content: space-between;
 }
 
 .menu__arrow {
     flex-shrink: 0;
-    margin-left: 10px;
-    font-size: 0.9em;
+    margin-left: var(--menu-arrow-margin-left);
+    font-size: var(--menu-arrow-font-size);
     color: var(--color-text-primary);
     display: none;
 }
@@ -57,9 +58,9 @@
     border-radius: var(--border-radius-base);
     box-shadow: 0 3px 6px rgba(0, 0, 0, 0.7);
     list-style: none;
-    min-width: 180px;
+    min-width: var(--menu-submenu-min-width);
     z-index: 1000;
-    padding: 4px 0;
+    padding: var(--menu-submenu-padding);
 }
 
 .menu > .menu__item--open > .menu__submenu {
@@ -70,7 +71,7 @@
 
 .menu__submenu .menu__item--open > .menu__submenu {
     display: block;
-    top: 5px;
+    top: var(--menu-submenu-nested-top);
     left: 100%;
-    border-top-left-radius: 0;
+    border-top-left-radius: var(--menu-submenu-nested-border-radius);
 }

@@ -1,6 +1,6 @@
 /*
  * =================================================================
- * ARQUIVO CSS DE FORMULÁRIOS (REFATORADO v7)
+ * ARQUIVO CSS DE FORMULÁRIOS (REFATORADO v8)
  *
  * Bloco :root removido. Este arquivo agora consome 100%
  * dos tokens de styles/theme.css.
@@ -16,12 +16,12 @@
 /* --- 2.1 Estrutura do Formulário --- */
 
 .form-group {
-    margin-bottom: var(--spacing-5);
+    margin-bottom: var(--form-group-margin-bottom);
 }
 .form-group__label {
     display: block;
-    font-weight: 600;
-    margin-bottom: var(--spacing-2);
+    font-weight: var(--form-group-label-font-weight);
+    margin-bottom: var(--form-group-label-margin-bottom);
     color: var(--color-text-primary);
     transition:
         color 0.2s ease-out,
@@ -30,37 +30,37 @@
 }
 .form-group__text {
     display: block;
-    font-size: var(--font-size-sm);
+    font-size: var(--form-group-text-font-size);
     color: var(--color-text-secondary);
-    margin-top: var(--spacing-2);
+    margin-top: var(--form-group-text-margin-top);
     user-select: auto;
 }
 .form-group:focus-within .form-group__label {
     color: var(--color-accent-primary);
-    font-weight: 700;
+    font-weight: var(--form-group-label-focus-font-weight);
 }
 .form-group__label--required::after {
     content: ' *';
     color: var(--color-feedback-danger);
-    font-weight: 700;
-    margin-left: 2px;
+    font-weight: var(--form-group-label-required-font-weight);
+    margin-left: var(--form-group-label-required-margin-left);
 }
 .form-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: var(--spacing-4);
+    gap: var(--form-grid-gap);
 }
 .fieldset {
-    border: 1px solid var(--color-border-default);
+    border: var(--fieldset-border-width) solid var(--color-border-default);
     border-radius: var(--border-radius-md);
-    padding: var(--spacing-5);
-    margin: var(--spacing-5) 0;
+    padding: var(--fieldset-padding);
+    margin: var(--fieldset-margin);
 }
 .fieldset__legend {
-    font-size: var(--font-size-lg);
-    font-weight: 600;
-    padding: 0 var(--spacing-2);
-    margin-left: var(--spacing-3);
+    font-size: var(--fieldset-legend-font-size);
+    font-weight: var(--fieldset-legend-font-weight);
+    padding: var(--fieldset-legend-padding);
+    margin-left: var(--fieldset-legend-margin-left);
     color: var(--color-text-primary);
     user-select: auto;
 }
@@ -70,94 +70,82 @@
     position: relative;
 }
 .form-group--floating .form-control {
-    padding-top: calc(var(--spacing-4) + var(--spacing-2));
-    padding-bottom: var(--spacing-2);
+    padding-top: var(--form-floating-control-padding-top);
+    padding-bottom: var(--form-floating-control-padding-bottom);
 }
 .form-group--floating .form-group__label {
     position: absolute;
-    top: 1rem;
-    left: var(--form-control-padding-x, var(--spacing-3));
+    top: var(--form-floating-label-top);
+    left: var(--form-floating-label-left);
     color: var(--color-text-secondary);
     pointer-events: none;
     transform-origin: 0 0;
     transition:
         transform 0.2s ease-out,
         color 0.2s ease-out;
-    font-weight: 400;
-    margin-bottom: 0;
+    font-weight: var(--form-floating-label-font-weight);
+    margin-bottom: var(--form-floating-label-margin-bottom);
     user-select: none;
 }
 .form-group--floating .form-control:focus ~ .form-group__label,
 .form-group--floating .form-control:not(:placeholder-shown) ~ .form-group__label {
-    transform: scale(0.8) translateY(-0.75rem);
+    transform: var(--form-floating-label-focus-transform);
     color: var(--color-accent-primary);
-    font-weight: 700;
+    font-weight: var(--form-floating-label-focus-font-weight);
 }
 
 /* Contador de Caracteres (v4.0) */
 .form-group__counter {
     display: block;
-    font-size: var(--font-size-sm);
+    font-size: var(--form-counter-font-size);
     color: var(--color-text-secondary);
     text-align: right;
-    margin-top: var(--spacing-1);
+    margin-top: var(--form-counter-margin-top);
 }
 
 /* --- 2.2 Controles Padrão --- */
 
 .form-control,
 .form-select {
-    /* Variáveis locais do componente (Mapeadas) */
-    --form-control-bg: var(--color-bg-app);
-    --form-control-color: var(--color-text-primary);
-    --form-control-border: var(--color-border-default);
-    --form-control-border-radius: var(--border-radius-sm);
-    --form-control-padding-y: var(--spacing-2);
-    --form-control-padding-x: var(--spacing-3);
-    --form-control-focus-border: var(--color-accent-primary);
-    --form-control-focus-shadow: 0 0 0 3px var(--color-placeholder-bg);
-
     display: block;
     width: 100%;
     padding: var(--form-control-padding-y) var(--form-control-padding-x);
     font-family: var(--font-family-base);
-    font-size: var(--font-size-base);
-    font-weight: 400;
-    line-height: 1.5;
-    color: var(--form-control-color);
-    background-color: var(--form-control-bg);
-    border: 1px solid var(--form-control-border);
-    border-radius: var(--form-control-border-radius);
+    font-size: var(--form-control-font-size);
+    font-weight: var(--form-control-font-weight);
+    line-height: var(--form-control-line-height);
+    color: var(--color-text-primary);
+    background-color: var(--color-bg-app);
+    border: var(--form-control-border-width) solid var(--color-border-default);
+    border-radius: var(--border-radius-sm);
     transition:
         border-color var(--transition-speed),
         box-shadow var(--transition-speed);
     user-select: auto;
-
-    /* Padrão: sem ícone de validação */
     background-image: none;
     background-repeat: no-repeat;
     background-position: right var(--form-control-padding-x) center;
-    background-size: 1.25em 1.25em; /* Tamanho do ícone de validação */
+    background-size: var(--form-control-icon-bg-size);
 }
 .form-control:focus,
 .form-select:focus {
-    border-color: var(--form-control-focus-border);
-    outline: 0;
-    box-shadow: var(--form-control-focus-shadow);
+    border-color: var(--color-border-focus);
+    outline: var(--form-control-focus-outline);
+    box-shadow: 0 0 0 3px var(--color-placeholder-bg);
 }
 .form-control::placeholder {
     color: var(--color-text-placeholder);
-    opacity: 1;
+    opacity: var(--form-control-placeholder-opacity);
 }
 .form-control:disabled,
 .form-control[readonly],
 .form-select:disabled {
     background-color: var(--color-bg-hover);
-    opacity: 0.7;
+    opacity: var(--form-control-disabled-opacity);
     cursor: not-allowed;
 }
 textarea.form-control {
-    min-height: 120px;
+    min-height: var(--form-textarea-min-height);
     resize: vertical;
 }
 
@@ -166,22 +154,21 @@ textarea.form-control {
     appearance: none;
     background-image: var(--form-select-arrow);
     background-position: right var(--form-control-padding-x) center;
-    background-size: 16px 12px;
-    padding-right: calc(var(--form-control-padding-x) * 2.5);
+    background-size: var(--form-select-bg-size);
+    padding-right: var(--form-select-padding-right);
 }
 
 /* Correção para Select Múltiplo (v4.0) */
 .form-select[multiple] {
-    appearance: auto; /* Restaura a aparência nativa */
-    background-image: none; /* Remove nossa seta */
-    padding-right: var(--form-control-padding-x); /* Reseta o padding */
-    min-height: 120px;
+    appearance: auto;
+    background-image: none;
+    padding-right: var(--form-control-padding-x);
+    min-height: var(--form-select-multiple-min-height);
 }
 .form-select[multiple]:focus {
-    /* Mantém o foco customizado */
-    border-color: var(--form-control-focus-border);
-    outline: 0;
-    box-shadow: var(--form-control-focus-shadow);
+    border-color: var(--color-border-focus);
+    outline: var(--form-control-focus-outline);
+    box-shadow: 0 0 0 3px var(--color-placeholder-bg);
 }
 
 /* Input de Arquivo Customizado (Corrigido v4.0) */
@@ -190,43 +177,40 @@ textarea.form-control {
     align-items: center;
 }
 .form-file__input {
-    /* Esconde o input, mas o mantém acessível */
     position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
+    width: var(--form-file-input-size);
+    height: var(--form-file-input-size);
+    padding: var(--form-file-input-padding);
+    margin: var(--form-file-input-margin);
     overflow: hidden;
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border-width: 0;
 }
 .form-file__label {
-    /* Estilizado como um botão */
     display: inline-block;
-    padding: var(--btn-padding-y) var(--btn-padding-x);
-    font-weight: 600;
+    padding: var(--form-file-label-padding-y) var(--form-file-label-padding-x);
+    font-weight: var(--form-file-label-font-weight);
     cursor: pointer;
-    border: 1px solid var(--color-border-default);
+    border: var(--form-file-label-border-width) solid var(--color-border-default);
     border-radius: var(--border-radius-sm);
     background-color: var(--color-bg-hover);
     transition: background-color var(--transition-speed);
-    flex-shrink: 0; /* Não encolhe */
+    flex-shrink: var(--form-file-label-flex-shrink);
     user-select: auto;
 }
 .form-file__label:hover {
     background-color: var(--color-border-default);
 }
 .form-file__input:focus-visible ~ .form-file__label {
-    outline: 3px solid var(--color-accent-primary);
-    outline-offset: 2px;
+    outline: var(--form-file-focus-outline-width) solid var(--color-accent-primary);
+    outline-offset: var(--form-file-focus-outline-offset);
 }
 .form-file__text {
-    margin-left: var(--spacing-3);
+    margin-left: var(--form-file-text-margin-left);
     font-style: italic;
     color: var(--color-text-secondary);
-    font-size: var(--font-size-sm);
-    /* Trunca o nome do arquivo se for muito longo */
+    font-size: var(--form-file-text-font-size);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -235,37 +219,35 @@ textarea.form-control {
 
 /* --- 2.3 Controles Customizados --- */
 .form-check {
-    --form-check-size: 1.25em;
-    --form-check-border: var(--color-border-default);
-    --form-check-border-radius: var(--border-radius-sm);
+    --form-check-size: var(--form-check-size, 1.25em); /* (Variável local mantida) */
     display: block;
     position: relative;
-    padding-left: calc(var(--form-check-size) + var(--spacing-2));
-    margin-bottom: var(--spacing-3);
-    min-height: var(--form-check-size);
+    padding-left: var(--form-check-padding-left-calc);
+    margin-bottom: var(--form-check-margin-bottom);
+    min-height: var(--form-check-min-height);
 }
 .form-check__input {
     position: absolute;
-    opacity: 0;
-    width: 0;
-    height: 0;
+    opacity: var(--form-check-input-opacity);
+    width: var(--form-check-input-size);
+    height: var(--form-check-input-size);
 }
 .form-check__label {
     display: inline-block;
     cursor: pointer;
-    line-height: var(--form-check-size);
+    line-height: var(--form-check-label-line-height);
     user-select: auto;
 }
 .form-check__label::before {
     content: '';
     position: absolute;
-    left: 0;
-    top: 0;
+    left: var(--form-check-before-left);
+    top: var(--form-check-before-top);
     width: var(--form-check-size);
     height: var(--form-check-size);
     background-color: var(--color-bg-app);
-    border: 1px solid var(--form-check-border);
-    border-radius: var(--form-check-border-radius);
+    border: var(--form-check-before-border-width) solid var(--color-border-default);
+    border-radius: var(--border-radius-sm);
     transition:
         background-color var(--transition-speed),
         border-color var(--transition-speed);
@@ -283,11 +265,11 @@ textarea.form-control {
     display: block;
 }
 .form-check__input:focus-visible ~ .form-check__label::before {
-    outline: 3px solid var(--color-accent-primary);
-    outline-offset: 2px;
+    outline: var(--form-check-focus-outline-width) solid var(--color-accent-primary);
+    outline-offset: var(--form-check-focus-outline-offset);
 }
 .form-check__input:disabled ~ .form-check__label {
-    opacity: 0.6;
+    opacity: var(--form-check-disabled-opacity);
     cursor: not-allowed;
 }
 .form-check__input:disabled ~ .form-check__label::before {
@@ -296,12 +278,12 @@ textarea.form-control {
 
 /* Checkbox */
 .form-check__label::after {
-    left: calc(var(--form-check-size) * 0.25);
-    top: calc(var(--form-check-size) * 0.1);
-    width: calc(var(--form-check-size) * 0.4);
-    height: calc(var(--form-check-size) * 0.6);
+    left: var(--form-checkbox-after-left-calc);
+    top: var(--form-checkbox-after-top-calc);
+    width: var(--form-checkbox-after-width-calc);
+    height: var(--form-checkbox-after-height-calc);
     border: solid var(--color-bg-app);
-    border-width: 0 2px 2px 0;
+    border-width: var(--form-checkbox-after-border-width);
     transform: rotate(45deg);
 }
 /* Radio */
@@ -309,19 +291,17 @@ textarea.form-control {
     border-radius: 50%;
 }
 .form-check--radio .form-check__label::after {
-    left: calc(var(--form-check-size) * 0.25);
-    top: calc(var(--form-check-size) * 0.25);
-    width: calc(var(--form-check-size) * 0.5);
-    height: calc(var(--form-check-size) * 0.5);
+    left: var(--form-radio-after-left-calc);
+    top: var(--form-radio-after-top-calc);
+    width: var(--form-radio-after-width-calc);
+    height: var(--form-radio-after-height-calc);
     border-radius: 50%;
     background: var(--color-bg-app);
 }
 /* Switch */
 .form-check--switch {
-    --form-switch-width: calc(var(--form-check-size) * 1.75);
-}
-.form-check--switch .form-check__label {
-    padding-left: calc(var(--form-switch-width) + var(--spacing-2));
+    --form-switch-width: var(--form-switch-width-calc); /* (Variável local mantida) */
+    padding-left: var(--form-switch-padding-left-calc);
 }
 .form-check--switch .form-check__label::before {
     width: var(--form-switch-width);
@@ -330,11 +310,11 @@ textarea.form-control {
     border-color: var(--color-border-default);
 }
 .form-check--switch .form-check__label::after {
-    display: block; /* Correção v2 */
-    top: 2px;
-    left: 2px;
-    width: calc(var(--form-check-size) - 4px);
-    height: calc(var(--form-check-size) - 4px);
+    display: block;
+    top: var(--form-switch-after-top);
+    left: var(--form-switch-after-left);
+    width: var(--form-switch-after-size-calc);
+    height: var(--form-switch-after-size-calc);
     background-color: var(--color-bg-app);
     border-radius: 50%;
     transition: transform var(--transition-speed);
@@ -344,7 +324,7 @@ textarea.form-control {
     border-color: var(--color-accent-primary);
 }
 .form-check--switch .form-check__input:checked ~ .form-check__label::after {
-    transform: translateX(calc(var(--form-switch-width) - var(--form-check-size)));
+    transform: var(--form-switch-checked-transform-calc);
 }
 
 /* --- 2.5 Elementos Compostos --- */
@@ -354,7 +334,7 @@ textarea.form-control {
     position: relative;
     display: flex;
     flex-wrap: wrap;
-    align-items: stretch; /* Garante altura igual */
+    align-items: stretch;
     width: 100%;
 }
 .input-group > .form-control {
@@ -376,28 +356,28 @@ textarea.form-control {
 }
 /* Colapso de borda */
 .input-group > :not(:first-child) {
-    margin-left: -1px;
+    margin-left: var(--input-group-item-margin-left);
 }
 .input-group__text {
-    display: flex; /* CORREÇÃO: Garante alinhamento vertical do texto */
+    display: flex;
     align-items: center;
     padding: var(--form-control-padding-y) var(--form-control-padding-x);
-    font-size: var(--font-size-base);
-    font-weight: 400;
-    line-height: 1.5;
+    font-size: var(--input-group-text-font-size);
+    font-weight: var(--input-group-text-font-weight);
+    line-height: var(--input-group-text-line-height);
     color: var(--color-text-secondary);
     text-align: center;
     background-color: var(--color-bg-hover);
-    border: 1px solid var(--form-control-border);
-    border-radius: var(--form-control-border-radius);
+    border: var(--input-group-text-border-width) solid var(--color-border-default);
+    border-radius: var(--border-radius-sm);
 }
 .input-group > .btn {
     position: relative;
-    flex-shrink: 0; /* Garante que o botão não encolha */
-    z-index: 2; /* Foco do botão aparece sobre os elementos adjacentes */
+    flex-shrink: var(--input-group-btn-flex-shrink);
+    z-index: var(--input-group-btn-z-index);
 }
 .input-group > .btn:focus-visible {
-    outline-offset: -1px;
+    outline-offset: var(--input-group-btn-focus-outline-offset);
 }
 
 /* Input Group com Ícone (Corrigido v4.0) */
@@ -406,13 +386,13 @@ textarea.form-control {
 }
 .input-group__icon {
     position: absolute;
-    top: 50%;
+    top: var(--input-group-icon-top);
     transform: translateY(-50%);
-    z-index: 2;
+    z-index: var(--input-group-icon-z-index);
     color: var(--color-text-secondary);
     left: var(--form-control-padding-x);
-    width: 1.25em; /* Tamanho consistente */
-    height: 1.25em;
+    width: var(--input-group-icon-size);
+    height: var(--input-group-icon-size);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -422,10 +402,10 @@ textarea.form-control {
     right: var(--form-control-padding-x);
 }
 .input-group--icon .form-control {
-    padding-left: calc(var(--form-control-padding-x) * 2 + 1.25em);
+    padding-left: var(--input-group-icon-padding-left-calc);
 }
 .input-group--icon .form-control--icon-right {
-    padding-right: calc(var(--form-control-padding-x) * 2 + 1.25em);
+    padding-right: var(--input-group-icon-padding-right-calc);
     padding-left: var(--form-control-padding-x);
 }
 .input-group__icon--clickable {
@@ -439,8 +419,8 @@ textarea.form-control {
 /* Range Slider */
 .form-range {
     width: 100%;
-    height: 1.5rem;
-    padding: 0;
+    height: var(--form-range-height);
+    padding: var(--form-range-padding);
     background-color: transparent;
     appearance: none;
 }
@@ -449,38 +429,38 @@ textarea.form-control {
 }
 .form-range::-webkit-slider-runnable-track {
     width: 100%;
-    height: 0.5rem;
+    height: var(--form-range-track-height);
     background-color: var(--color-border-default);
     border-radius: var(--border-radius-md);
 }
 .form-range::-moz-range-track {
     width: 100%;
-    height: 0.5rem;
+    height: var(--form-range-track-height);
     background-color: var(--color-border-default);
     border-radius: var(--border-radius-md);
 }
 .form-range::-webkit-slider-thumb {
     appearance: none;
-    width: 1.25rem;
-    height: 1.25rem;
+    width: var(--form-range-thumb-size);
+    height: var(--form-range-thumb-size);
     background-color: var(--color-accent-primary);
     border-radius: 50%;
-    border: 0;
-    margin-top: -0.375rem;
+    border: var(--form-range-thumb-border-width);
+    margin-top: var(--form-range-thumb-margin-top);
     transition: background-color var(--transition-speed);
 }
 .form-range::-moz-range-thumb {
-    width: 1.25rem;
-    height: 1.25rem;
+    width: var(--form-range-thumb-size);
+    height: var(--form-range-thumb-size);
     background-color: var(--color-accent-primary);
     border-radius: 50%;
-    border: 0;
+    border: var(--form-range-thumb-border-width);
 }
 .form-range:focus::-webkit-slider-thumb {
-    box-shadow: var(--form-control-focus-shadow);
+    box-shadow: 0 0 0 3px var(--color-placeholder-bg);
 }
 .form-range:focus::-moz-range-thumb {
-    box-shadow: var(--form-control-focus-shadow);
+    box-shadow: 0 0 0 3px var(--color-placeholder-bg);
 }
 
 /* --- 2.6 Feedback (Validação e Progresso) --- */
@@ -489,26 +469,26 @@ textarea.form-control {
 .progress-group {
     display: flex;
     align-items: center;
-    gap: var(--spacing-3);
+    gap: var(--progress-group-gap);
 }
 .progress-group--label-top {
     flex-direction: column;
     align-items: stretch;
 }
 .progress-group--label-top .progress-group__label {
-    margin-bottom: var(--spacing-2);
+    margin-bottom: var(--progress-group-label-margin-bottom);
 }
 .progress-group--label-bottom {
     flex-direction: column-reverse;
     align-items: stretch;
 }
 .progress-group--label-bottom .progress-group__label {
-    margin-top: var(--spacing-2);
+    margin-top: var(--progress-group-label-margin-top);
 }
 .progress-group__label {
     flex-shrink: 0;
-    font-size: var(--font-size-sm);
-    font-weight: 600;
+    font-size: var(--progress-group-label-font-size);
+    font-weight: var(--progress-group-label-font-weight);
     color: var(--color-text-secondary);
 }
 .progress-group .progress {
@@ -518,9 +498,9 @@ textarea.form-control {
 /* Barra de Progresso (Padrão) */
 .progress {
     display: flex;
-    height: 1rem;
+    height: var(--progress-height);
     overflow: hidden;
-    font-size: 0.75rem;
+    font-size: var(--progress-font-size);
     background-color: var(--color-bg-hover);
     border-radius: var(--border-radius-sm);
 }
@@ -533,15 +513,15 @@ textarea.form-control {
     text-align: center;
     white-space: nowrap;
     background-color: var(--color-accent-primary);
-    transition: width 0.4s ease;
+    transition: var(--progress-bar-transition);
 }
 
 /* Validação (Feedback) */
 .form-feedback {
     display: none;
     width: 100%;
-    margin-top: var(--spacing-2);
-    font-size: var(--font-size-sm);
+    margin-top: var(--form-feedback-margin-top);
+    font-size: var(--form-feedback-font-size);
 }
 .form-feedback--invalid {
     color: var(--color-feedback-danger);
@@ -554,31 +534,27 @@ textarea.form-control {
 .form-control[aria-invalid='true'],
 .form-select[aria-invalid='true'] {
     border-color: var(--color-feedback-danger);
-    --form-control-focus-shadow: 0 0 0 3px var(--danger-20); /* (Token direto) */
+    --form-control-focus-shadow: 0 0 0 3px var(--danger-20);
     background-image: var(--form-icon-invalid);
-    padding-right: calc(var(--form-control-padding-x) * 2 + 1.25em); /* Abre espaço para o ícone */
+    padding-right: var(--form-valid-icon-padding-right-calc);
 }
 .form-control[aria-invalid='false'],
 .form-select[aria-invalid='false'] {
     border-color: var(--color-feedback-success);
-    --form-control-focus-shadow: 0 0 0 3px var(--success-20); /* (Token direto) */
+    --form-control-focus-shadow: 0 0 0 3px var(--success-20);
     background-image: var(--form-icon-valid);
-    padding-right: calc(var(--form-control-padding-x) * 2 + 1.25em);
+    padding-right: var(--form-valid-icon-padding-right-calc);
 }
 /* Lógica de múltiplos backgrounds para .form-select */
 .form-select[aria-invalid='true'] {
     background-image: var(--form-icon-invalid), var(--form-select-arrow);
-    background-position:
-        right var(--form-control-padding-x) center,
-        right 2.5em center;
-    padding-right: 4.5em; /* Espaço para ambos */
+    background-position: var(--form-valid-select-bg-pos);
+    padding-right: var(--form-valid-select-padding-right);
 }
 .form-select[aria-invalid='false'] {
     background-image: var(--form-icon-valid), var(--form-select-arrow);
-    background-position:
-        right var(--form-control-padding-x) center,
-        right 2.5em center;
-    padding-right: 4.5em;
+    background-position: var(--form-valid-select-bg-pos);
+    padding-right: var(--form-valid-select-padding-right);
 }
 
 /* Mostra a mensagem de feedback */
@@ -601,22 +577,22 @@ textarea.form-control {
 
 /* Sumário de Erros (v4.0) */
 .form-error-summary {
-    display: none; /* Escondido por padrão */
-    padding: var(--spacing-4);
-    margin-bottom: var(--spacing-5);
-    border: 1px solid var(--color-feedback-danger);
-    background-color: var(--danger-20); /* (Token direto) */
+    display: none;
+    padding: var(--form-error-summary-padding);
+    margin-bottom: var(--form-error-summary-margin-bottom);
+    border: var(--form-error-summary-border-width) solid var(--color-feedback-danger);
+    background-color: var(--danger-20);
     color: var(--color-feedback-danger);
     border-radius: var(--border-radius-md);
 }
 .form-error-summary:focus {
-    outline: 3px solid var(--color-feedback-danger);
-    outline-offset: 2px;
+    outline: var(--form-error-summary-focus-outline-width) solid var(--color-feedback-danger);
+    outline-offset: var(--form-error-summary-focus-outline-offset);
 }
 .form-error-summary__title {
-    font-weight: 700;
-    font-size: var(--font-size-lg);
-    margin-bottom: var(--spacing-3);
+    font-weight: var(--form-error-summary-title-font-weight);
+    font-size: var(--form-error-summary-title-font-size);
+    margin-bottom: var(--form-error-summary-title-margin-bottom);
     color: var(--color-feedback-danger);
 }
 .form-error-summary__list {
@@ -626,7 +602,7 @@ textarea.form-control {
 }
 .form-error-summary__item a {
     color: var(--color-feedback-danger);
-    font-weight: 600;
+    font-weight: var(--form-error-summary-item-font-weight);
     text-decoration: underline;
 }
 
@@ -634,31 +610,31 @@ textarea.form-control {
 
 /* Modificador de Densidade (v3.0) */
 .form--compact {
-    --form-control-padding-y: var(--spacing-1);
-    --form-control-padding-x: var(--spacing-2);
-    --btn-padding-y: var(--spacing-1);
-    --btn-padding-x: var(--spacing-3);
-    --btn-font-size: var(--font-size-sm);
-    font-size: var(--font-size-sm);
+    --form-control-padding-y: var(--form-compact-control-padding-y);
+    --form-control-padding-x: var(--form-compact-control-padding-x);
+    --btn-padding-y: var(--form-compact-btn-padding-y);
+    --btn-padding-x: var(--form-compact-btn-padding-x);
+    --btn-font-size: var(--form-compact-btn-font-size);
+    font-size: var(--form-compact-font-size);
 }
 .form--compact .form-control,
 .form--compact .form-select,
 .form--compact .btn,
 .form--compact .input-group__text {
-    font-size: var(--font-size-sm);
+    font-size: var(--form-compact-font-size);
 }
 .form--compact .form-group {
-    margin-bottom: var(--spacing-3);
+    margin-bottom: var(--form-compact-group-margin-bottom);
 }
 .form--compact .form-group--floating .form-control {
-    padding-top: calc(var(--spacing-3) + var(--spacing-1));
-    padding-bottom: var(--spacing-1);
+    padding-top: var(--form-compact-floating-control-padding-top);
+    padding-bottom: var(--form-compact-floating-control-padding-bottom);
 }
 .form--compact .form-group--floating .form-group__label {
-    top: 0.6rem;
+    top: var(--form-compact-floating-label-top);
     left: var(--form-control-padding-x);
 }
 .form--compact .form-group--floating .form-control:focus ~ .form-group__label,
 .form--compact .form-group--floating .form-control:not(:placeholder-shown) ~ .form-group__label {
-    transform: scale(0.85) translateY(-0.5rem);
+    transform: var(--form-compact-floating-label-focus-transform);
 }
