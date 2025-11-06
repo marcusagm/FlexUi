@@ -51,6 +51,7 @@
     border-radius: 5px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     min-width: 280px;
+    align-items: center;
 }
 
 /* === 3. Variantes (Toast vs Snackbar) === */
@@ -86,7 +87,7 @@
 .notification__icon-wrapper {
     margin-right: 12px;
     font-size: 1.2em; /* Torna o ícone um pouco maior */
-    padding-top: 2px; /* Alinhamento vertical */
+    line-height: 1em;
 }
 
 .notification__content {

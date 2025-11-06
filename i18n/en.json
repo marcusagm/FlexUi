@@ -3,8 +3,14 @@
         "hello": "Hello, {name}!"
     },
     "actions": {
+        "ok": "Ok",
+        "yes": "Yes",
+        "no": "No",
+        "confirm": "Confirm",
+        "apply": "Apply",
         "cancel": "Cancel",
-        "save": "Save"
+        "save": "Save",
+        "close": "Close"
     },
     "appstate": {
         "save": "Workspace saved!",

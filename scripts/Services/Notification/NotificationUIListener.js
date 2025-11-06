@@ -300,7 +300,8 @@ export class NotificationUIListener {
         const closeButton = document.createElement('button');
         closeButton.className = 'notification__close-button';
         closeButton.innerHTML = '&times;';
-        closeButton.setAttribute('aria-label', TranslationService.translate('common.close'));
+        const i18n = TranslationService.getInstance();
+        closeButton.setAttribute('aria-label', i18n.translate('actions.close'));
 
         closeButton.onclick = () => {
             me._notificationService.dismiss(id);
@@ -319,10 +320,11 @@ export class NotificationUIListener {
         const me = this;
         const customButtons = options.buttons || [];
         const standardButtons = [];
+        const i18n = TranslationService.getInstance();
 
         if (options.showCancelButton) {
             standardButtons.push({
-                text: TranslationService.translate('common.cancel'),
+                text: i18n.translate('actions.cancel'),
                 cssClass: 'notification__button--cancel',
                 onClick: id => me._notificationService.dismiss(id)
             });
@@ -330,7 +332,7 @@ export class NotificationUIListener {
 
         if (options.showOKButton) {
             standardButtons.push({
-                text: TranslationService.translate('common.ok'),
+                text: i18n.translate('actions.ok'),
                 cssClass: 'notification__button--ok',
                 onClick: id => me._notificationService.dismiss(id)
             });

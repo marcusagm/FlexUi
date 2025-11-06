@@ -1,18 +1,3 @@
-/* =================================================================
- * ARQUIVO CSS DE FORMULÁRIOS (REFATORADO)
- *
- * As seções 1.1 (Reset), 1.2 (Tokens), 1.3 (Base),
- * 1.4 (Acessibilidade) e 1.5 (Dark Mode) foram REMOVIDAS.
- *
- * Elas agora são gerenciadas por reset.css, base.css e theme.css.
- *
- * Este arquivo agora contém apenas a PARTE 2 (Form System).
- * =================================================================
- */
-
-/* * Variáveis locais de espaçamento e fonte (mantidas por enquanto,
- * pois são específicas deste módulo de formulário).
- */
 :root {
     --font-family-sans:
         -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;

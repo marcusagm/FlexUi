@@ -34,7 +34,7 @@ export class ToolbarPanel extends Panel {
 
         const btn3 = document.createElement('button');
         btn3.textContent = 'Salvar';
-        btn3.onclick = () => appNotifications.warning('Clicou em Salvar');
+        btn3.onclick = () => appNotifications.warning('Clicou em Salvar', { sticky: true });
 
         const btn4 = document.createElement('button');
         btn4.textContent = 'Preferencias';
@@ -45,8 +45,30 @@ export class ToolbarPanel extends Panel {
                 footerText: 'Texto de rodapé'
             });
         };
+        const btn5 = document.createElement('button');
+        btn5.textContent = 'Preferencias';
+        btn5.onclick = () => {
+            appNotifications.danger('Connection lost. Cannot save data.', {
+                sticky: true,
+                buttons: [
+                    {
+                        text: 'Retry',
+                        cssClass: 'notification__button--ok',
+                        onClick: id => {
+                            appNotifications.dismiss(id);
+                            appNotifications.info('Retrying connection...', { duration: 2000 });
+                        }
+                    },
+                    {
+                        text: 'Close',
+                        cssClass: 'notification__button--cancel',
+                        onClick: id => appNotifications.dismiss(id)
+                    }
+                ]
+            });
+        };
 
-        contentEl.append(btn1, btn2, btn3, btn4);
+        contentEl.append(btn1, btn2, btn3, btn4, btn5);
     }
 
     getPanelType() {

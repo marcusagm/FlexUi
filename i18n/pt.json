@@ -3,8 +3,14 @@
         "hello": "Bem-vindo, {name}!"
     },
     "actions": {
+        "ok": "Ok",
+        "yes": "Sim",
+        "no": "Não",
+        "confirm": "Confirmar",
+        "apply": "Aplicar",
         "cancel": "Cancelar",
-        "save": "Salvar"
+        "save": "Salvar",
+        "close": "Fechar"
     },
     "appstate": {
         "save": "Área de trabalho salva!",
