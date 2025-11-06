@@ -51,7 +51,6 @@
     border-radius: var(--border-radius-base); /* (Era 5px) */
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     min-width: 280px;
-    align-items: center;
 }
 
 /* === 3. Variantes (Toast vs Snackbar) === */

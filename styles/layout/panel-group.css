@@ -304,6 +304,7 @@
 .panel-group__header--simple .panel-group__title-simple {
     flex-grow: 1;
     min-width: 10px;
+    padding: 0 5px;
 }
 
 .panel-group__content {
