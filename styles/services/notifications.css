@@ -51,7 +51,6 @@
     border-radius: var(--border-radius-base);
     box-shadow: var(--notification-box-shadow);
     min-width: var(--notification-min-width);
-    align-items: center;
 }
 
 /* === 3. Variantes (Toast vs Snackbar) === */
