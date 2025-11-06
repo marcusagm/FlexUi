@@ -148,7 +148,7 @@ export class Column {
     }
 
     /**
-     * (MODIFICADO) Initializes native drag-and-drop event listeners for the column element.
+     * Initializes native drag-and-drop event listeners for the column element.
      */
     initDragDrop() {
         this.element.addEventListener('dragenter', this.onDragEnter.bind(this));
@@ -224,7 +224,7 @@ export class Column {
     }
 
     /**
-     * (NOVO) Handles the dragenter event by delegating to the DragDropService.
+     * Handles the dragenter event by delegating to the DragDropService.
      * @param {DragEvent} e
      */
     onDragEnter(e) {
@@ -242,7 +242,7 @@ export class Column {
     }
 
     /**
-     * (NOVO) Handles the dragleave event by delegating to the DragDropService.
+     * Handles the dragleave event by delegating to the DragDropService.
      * @param {DragEvent} e
      */
     onDragLeave(e) {

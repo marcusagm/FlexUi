@@ -14,7 +14,7 @@ import { Column } from '../Column/Column.js';
  * // In App.js (on init):
  * LayoutService.getInstance();
  *
- * // (ALTERADO) In components (e.g., Column.js / PanelGroup.js):
+ * // In components (e.g., Column.js / PanelGroup.js):
  * appBus.emit('layout:changed', { source: this });
  */
 export class LayoutService {
@@ -58,7 +58,7 @@ export class LayoutService {
     }
 
     /**
-     * (NOVO) Handles the specific 'layout:column-changed' event.
+     * Handles the specific 'layout:column-changed' event.
      * Receives the Column instance directly from the event emitter.
      *
      * @param {Column} column - The column instance needing a layout update.
@@ -80,18 +80,17 @@ export class LayoutService {
 
     /**
      * Ensures at least one PanelGroup is visible in a column.
-     * (Logic moved from Column.js)
      * @param {Column} column - The column to check.
      * @private
      */
     _checkPanelsGroupsCollapsed(column) {
-        // Helper logic (previously getPanelGroupsUncollapsed)
-        const uncollapsedGroups = column.state.panelGroups.filter(p => !p.state.collapsed);
-        const totalGroups = column.state.panelGroups.length;
+        const panelGroups = column.getPanelGroups();
+
+        const uncollapsedGroups = panelGroups.filter(p => !p.state.collapsed);
+        const totalGroups = panelGroups.length;
 
         if (uncollapsedGroups.length === 0 && totalGroups > 0) {
-            // Force the last panel to uncollapse
-            column.state.panelGroups[totalGroups - 1].unCollapse();
+            panelGroups[totalGroups - 1].unCollapse();
         }
     }
 
@@ -99,29 +98,25 @@ export class LayoutService {
      * Recalculates sizes and applies 'panel-group--fills-space'
      * to the correct PanelGroup in a column.
      * (Logic moved from Column.js)
-     * (OTIMIZADO) Esta versão usa 1 filter + 1 forEach (em vez de 1 filter + 2 forEach).
+     * Esta versão usa 1 filter + 1 forEach (em vez de 1 filter + 2 forEach).
      * @param {Column} column - The column to update.
      * @private
      */
     _updatePanelGroupsSizes(column) {
-        // 1. Find the last panel group that should fill space (Iteration 1: filter)
-        const uncollapsedPanelGroups = column.state.panelGroups.filter(p => !p.state.collapsed);
+        const panelGroups = column.getPanelGroups();
+
+        const uncollapsedPanelGroups = panelGroups.filter(p => !p.state.collapsed);
         const lastUncollapsedGroup = uncollapsedPanelGroups[uncollapsedPanelGroups.length - 1];
 
-        // 2. Apply rules in a single loop (Iteration 2: forEach)
-        column.state.panelGroups.forEach(panel => {
+        panelGroups.forEach(panel => {
             const shouldFillSpace = panel === lastUncollapsedGroup;
 
             if (shouldFillSpace) {
-                // Allow this panel to grow
                 panel.state.height = null;
                 panel.element.classList.add('panel-group--fills-space');
             } else {
-                // Ensure all other panels (collapsed or fixed-height) are not growing
                 panel.element.classList.remove('panel-group--fills-space');
             }
-
-            // Update the panel's height (applies either fixed height or new flex state)
             panel.updateHeight();
         });
     }

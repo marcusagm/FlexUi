@@ -107,6 +107,14 @@ export class PanelGroup {
     }
 
     /**
+     * (NOVO) Retorna a coluna pai deste grupo.
+     * @returns {Column | null}
+     */
+    getColumn() {
+        return this.state.column;
+    }
+
+    /**
      * Initializes event listeners for the EventBus.
      */
     initEventListeners() {
@@ -404,11 +412,12 @@ export class PanelGroup {
     }
 
     /**
-     * Emite um evento para o LayoutService APENAS se a coluna pai existir.
+     * (MODIFICADO) Emite um evento para o LayoutService APENAS se a coluna pai existir.
      */
     requestLayoutUpdate() {
-        if (this.state.column) {
-            appBus.emit('layout:column-changed', this.state.column);
+        const column = this.getColumn();
+        if (column) {
+            appBus.emit('layout:column-changed', column);
         }
     }
 
