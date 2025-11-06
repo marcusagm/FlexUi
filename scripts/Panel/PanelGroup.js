@@ -146,12 +146,15 @@ export class PanelGroup {
     }
 
     /**
-     * Cleans up event listeners when the group is destroyed.
+     * (MODIFICADO) Cleans up event listeners when the group is destroyed.
      */
     destroy() {
         appBus.off('panel:group-child-close-request', this.onChildCloseRequest.bind(this));
         appBus.off('panel:close-request', this.onCloseRequest.bind(this));
         appBus.off('panel:toggle-collapse-request', this.onToggleCollapseRequest.bind(this));
+
+        // (NOVO) Garante que o ResizeObserver do header seja desconectado
+        this.state.header?.destroy();
     }
 
     /**

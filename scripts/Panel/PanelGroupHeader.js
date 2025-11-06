@@ -5,11 +5,21 @@ export class PanelGroupHeader {
         title: null
     };
 
+    /**
+     * @type {ResizeObserver | null}
+     * @description Observador para 'resize' do container de abas.
+     * @private
+     */
+    _resizeObserver = null;
+
     constructor(panelGroup) {
         this.panelGroup = panelGroup;
         this.element = document.createElement('div');
         this.element.classList.add('panel-group__header');
         this.build();
+
+        // (NOVO) Inicializa o ResizeObserver para monitorar o container de abas
+        this._initResizeObserver();
     }
 
     build() {
@@ -24,7 +34,10 @@ export class PanelGroupHeader {
         // 2. Botão de Scroll Esquerda
         this.scrollLeftBtn = document.createElement('button');
         this.scrollLeftBtn.type = 'button';
-        this.scrollLeftBtn.classList.add('panel-group__tab-scroll', 'panel-group__tab-scroll--left');
+        this.scrollLeftBtn.classList.add(
+            'panel-group__tab-scroll',
+            'panel-group__tab-scroll--left'
+        );
         this.scrollLeftBtn.textContent = '<';
         this.scrollLeftBtn.style.display = 'none';
 
@@ -35,7 +48,10 @@ export class PanelGroupHeader {
         // 4. Botão de Scroll Direita
         this.scrollRightBtn = document.createElement('button');
         this.scrollRightBtn.type = 'button';
-        this.scrollRightBtn.classList.add('panel-group__tab-scroll', 'panel-group__tab-scroll--right');
+        this.scrollRightBtn.classList.add(
+            'panel-group__tab-scroll',
+            'panel-group__tab-scroll--right'
+        );
         this.scrollRightBtn.textContent = '>';
         this.scrollRightBtn.style.display = 'none';
 
@@ -79,6 +95,27 @@ export class PanelGroupHeader {
         this.tabContainer.addEventListener('scroll', this.updateScrollButtons.bind(this));
     }
 
+    /**
+     * (NOVO) Configura o ResizeObserver para chamar updateScrollButtons
+     * sempre que o 'tabContainer' mudar de tamanho (ex: adição de aba).
+     * @private
+     */
+    _initResizeObserver() {
+        // O callback é amarrado (bind) para manter o contexto 'this'
+        this._resizeObserver = new ResizeObserver(this.updateScrollButtons.bind(this));
+        // Observa o elemento do container de abas
+        this._resizeObserver.observe(this.tabContainer);
+    }
+
+    /**
+     * (NOVO) Limpa o observador para evitar memory leaks.
+     */
+    destroy() {
+        if (this._resizeObserver) {
+            this._resizeObserver.disconnect();
+        }
+    }
+
     updateTabs() {
         const panels = this.panelGroup.state.panels;
         const activePanel = this.panelGroup.state.activePanel;
@@ -95,9 +132,7 @@ export class PanelGroupHeader {
             titleEl.textContent = panel.state.title || 'Sem Título';
             this.tabContainer.appendChild(titleEl);
 
-
             // Atualiza os botões do grupo com base no painel filho
-            // (Req 1) Lendo do panelGroup, que leu do filho
             this.collapseBtn.style.display = this.panelGroup.state.collapsible ? '' : 'none';
             this.closeBtn.style.display = this.panelGroup.state.closable ? '' : 'none';
             this.moveHandle.style.display = this.panelGroup.state.movable ? '' : 'none';
@@ -116,9 +151,6 @@ export class PanelGroupHeader {
         }
 
         this.updateAriaLabels();
-
-        // (Req 3.3) Aguarda o DOM renderizar o novo innerHTML
-        setTimeout(() => this.updateScrollButtons(), 0);
     }
 
     // Cria um elemento de aba
@@ -131,13 +163,10 @@ export class PanelGroupHeader {
             tab.classList.add('panel-group__tab--active');
         }
 
-
         const titleSpan = document.createElement('span');
         titleSpan.classList.add('panel-group__tab-title');
         titleSpan.textContent = panel.state.title || 'Sem Título';
         tab.appendChild(titleSpan);
-
-
 
         // Botão de fechar (X) na aba
         if (panel.state.closable) {
@@ -186,4 +215,3 @@ export class PanelGroupHeader {
         this.moveHandle.style.cursor = 'grab';
     }
 }
-

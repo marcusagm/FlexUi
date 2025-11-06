@@ -1,6 +1,4 @@
 import { appBus } from '../EventBus.js';
-import { PanelGroup } from '../Panel/PanelGroup.js';
-// (NOVO) Adicionada importação da Column para verificação
 import { Column } from '../Column/Column.js';
 
 /**
@@ -79,8 +77,6 @@ export class LayoutService {
         // 2. Apply sizing rules (like fills-space)
         this._updatePanelGroupsSizes(column);
     }
-
-    /* O método _onLayoutChanged(event) foi removido */
 
     /**
      * Ensures at least one PanelGroup is visible in a column.

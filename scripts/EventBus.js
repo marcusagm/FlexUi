@@ -53,6 +53,7 @@ class EventBus {
         const listeners = [...this.listeners.get(eventName)];
         for (const callback of listeners) {
             try {
+                console.info(eventName, args);
                 callback(...args);
             } catch (e) {
                 console.error(`Erro no ouvinte do evento "${eventName}":`, e);
