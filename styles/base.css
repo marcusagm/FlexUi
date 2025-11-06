@@ -23,11 +23,6 @@ body {
     /* user-select: none; (REMOVIDO na Etapa 1/v5) - Esta linha quebrou o D&D */
 }
 
-.dragging {
-    cursor: grabbing !important;
-    user-select: none !important;
-}
-
 /* Scrollbar agora usa os tokens de Acento */
 ::-webkit-scrollbar {
     width: 8px;
@@ -48,4 +43,32 @@ body {
 
 ::-webkit-scrollbar-track {
     background: var(--color-bg-panel);
+}
+
+.dragging {
+    cursor: grabbing !important;
+    user-select: none !important;
+}
+
+/* --- Utilitários de Acessibilidade --- */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}
+.sr-only-focusable:active,
+.sr-only-focusable:focus {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
 }
