@@ -10,6 +10,7 @@ export class MenuItem {
 
         this.title = document.createElement('div');
         this.title.classList.add('menu__title');
+        // O 'title' aqui já virá processado (traduzido) pela classe Menu.js
         this.title.textContent = itemData.title;
 
         this.element.appendChild(this.title);
@@ -21,6 +22,7 @@ export class MenuItem {
 
             this.element.appendChild(this.arrow);
 
+            // Nota: O 'Submenu' irá processar os 'children' recursivamente
             this.submenu = new Submenu(itemData.children, this.level + 1);
             this.element.appendChild(this.submenu.element);
             this.element.classList.add('menu__item--has-submenu');
@@ -30,7 +32,8 @@ export class MenuItem {
     }
 
     initListeners() {
-        if (this.itemData.fn) {
+        // (MODIFICADO) Verifica se o item tem uma 'callback' ou 'event'
+        if (this.itemData.callback || this.itemData.event) {
             this.element.addEventListener('click', this.handleClick.bind(this));
         } else if (this.itemData.children) {
             const isTopLevel = this.level === 1;
@@ -77,11 +80,15 @@ export class MenuItem {
 
     handleClick(e) {
         e.stopPropagation();
-        if (this.itemData.fn) {
-            this.itemData.fn();
+
+        // (MODIFICADO) Lógica para suportar 'callback' (função) ou 'event' (string)
+        // Damos prioridade ao 'callback' se ambos forem definidos.
+        if (typeof this.itemData.callback === 'function') {
+            this.itemData.callback();
+        } else if (this.itemData.event) {
+            appBus.emit(this.itemData.event);
         }
+
         appBus.emit('menu:item-selected');
     }
 }
-
-

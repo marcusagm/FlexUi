@@ -62,11 +62,15 @@ export class App {
     }
 
     /**
-     * Inicializa a aplicação, carregando o layout assincronamente.
+     * (MODIFICADO) Inicializa a aplicação, carregando o menu e o layout assincronamente.
      * Deve ser chamado pelo main.js.
      */
     async init() {
+        // (LINHA ADICIONADA) Carrega a configuração do menu
+        await this.menu.load();
+        // Carrega o layout (do localStorage ou do default.json)
         await this.loadInitialLayout();
+
         appBus.emit('app:set-permanent-status', 'Pronto');
     }
 
@@ -85,7 +89,7 @@ export class App {
     }
 
     /**
-     * (MODIFICADO) Carrega o layout inicial do StateService (localStorage ou JSON).
+     * Carrega o layout inicial do StateService (localStorage ou JSON).
      */
     async loadInitialLayout() {
         const workspaceData = await this.stateService.loadState(this.STORAGE_KEY);
@@ -107,7 +111,7 @@ export class App {
     }
 
     /**
-     * (MODIFICADO) Salva o estado do layout atual no objeto de workspace.
+     * Salva o estado do layout atual no objeto de workspace.
      */
     saveLayout() {
         // 1. Pega os dados de layout atuais do container
@@ -134,6 +138,9 @@ export class App {
         appNotifications.success(i18n.translate('appstate.save'));
     }
 
+    /**
+     * Restaura o layout salvo no localStorage (ou o padrão se não houver).
+     */
     async restoreLayout() {
         this.container.clear();
         await this.loadInitialLayout();
@@ -143,6 +150,7 @@ export class App {
     }
 
     /**
+     * Limpa o localStorage e recarrega o layout padrão (do default.json).
      * @param {boolean} [silent=false]
      */
     async resetLayout(silent = false) {

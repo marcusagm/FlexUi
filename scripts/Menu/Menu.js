@@ -6,46 +6,72 @@ export class Menu {
     constructor() {
         this.element = document.createElement('div');
         this.element.classList.add('menu');
-        this.build();
+        // REMOVIDO: this.build() - A construção agora é assíncrona
 
         this.initGlobalListeners();
     }
 
-    getMenuData() {
-        const i18n = TranslationService.getInstance();
+    /**
+     * (NOVO) Carrega, processa e constrói o menu a partir de um módulo de configuração.
+     * @param {string} [url='workspaces/menus/menu.js'] - O caminho para o módulo de configuração do menu.
+     */
+    async load(url = 'workspaces/menus/menu.js') {
+        try {
+            // Usa importação dinâmica para carregar o módulo JS
+            // O caminho relativo sobe dois níveis (de scripts/Menu/ para a raiz)
+            const menuModule = await import(`../../${url}`);
+            const rawMenuData = menuModule.default;
 
-        return [
-            {
-                title: i18n.translate('panels.menu'),
-                children: [
-                    {
-                        title: i18n.translate('panels.add'),
-                        fn: () => appBus.emit('app:add-new-panel')
-                    }
-                ]
-            },
-            {
-                title: i18n.translate('workspace.menu'),
-                children: [
-                    {
-                        title: i18n.translate('workspace.save'),
-                        fn: () => appBus.emit('app:save-state')
-                    },
-                    {
-                        title: i18n.translate('workspace.restore'),
-                        fn: () => appBus.emit('app:restore-state')
-                    },
-                    {
-                        title: i18n.translate('workspace.reset'),
-                        fn: () => appBus.emit('app:reset-state')
-                    }
-                ]
-            }
-        ];
+            // Pega a instância do i18n para processar os títulos
+            const i18n = TranslationService.getInstance();
+            const processedItems = this._processMenuData(rawMenuData, i18n);
+
+            // Constrói o menu com os dados processados e traduzidos
+            this.build(processedItems);
+        } catch (error) {
+            console.error(`Falha ao carregar o módulo do menu: ${url}`, error);
+            this.element.innerHTML = '<div class="menu__item">Erro ao carregar menu.</div>';
+        }
     }
 
-    build() {
-        const items = this.getMenuData();
+    /**
+     * (NOVO) Processa recursivamente os dados do menu para traduzir 'titleKey'.
+     * @param {Array<object>} items - O array de itens de menu (raw).
+     * @param {TranslationService} i18n - A instância do serviço de tradução.
+     * @returns {Array<object>} O array de itens processados.
+     * @private
+     */
+    _processMenuData(items, i18n) {
+        if (!items || !Array.isArray(items)) {
+            return [];
+        }
+
+        return items.map(item => {
+            // Copia o item original
+            const processedItem = { ...item };
+
+            // Traduz o 'titleKey' para 'title'
+            // O MenuItem espera uma propriedade 'title'
+            if (item.titleKey) {
+                processedItem.title = i18n.translate(item.titleKey);
+            }
+
+            // Processa recursivamente os filhos
+            if (item.children && item.children.length > 0) {
+                processedItem.children = this._processMenuData(item.children, i18n);
+            }
+
+            return processedItem;
+        });
+    }
+
+    /**
+     * Constrói o DOM do menu com base nos itens processados.
+     * @param {Array<object>} items - Os itens de menu processados (com títulos traduzidos).
+     */
+    build(items) {
+        // Limpa qualquer conteúdo anterior (ex: mensagem de erro)
+        this.element.innerHTML = '';
 
         items.forEach(itemData => {
             const mi = new MenuItem(itemData, 1);
@@ -80,5 +106,3 @@ export class Menu {
         });
     }
 }
-
-

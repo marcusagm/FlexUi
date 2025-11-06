@@ -78,11 +78,11 @@
 
 ## Outros
 
-- [ ] Barra de status
+- [x] Barra de status
 - [x] Sistemas de notificação
 - [x] Sistema de tradução
-- [ ] Bloqueio da tela abaixo
-- [ ] Telas de confirmação
+- [x] Bloqueio da tela abaixo
+- [x] Telas de confirmação
 - [ ] Sistema de atalhos de teclado
 
 # Melhorar o CONTRIBUTING.md
