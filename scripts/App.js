@@ -13,6 +13,8 @@ import { TranslationService } from './Services/TranslationService.js';
 import { DragDropService } from './Services/DND/DragDropService.js';
 import { ColumnDropStrategy } from './Services/DND/ColumnDropStrategy.js';
 import { ContainerDropStrategy } from './Services/DND/ContainerDropStrategy.js';
+// (NOVO) Importa a nova estratégia de Abas
+import { TabContainerDropStrategy } from './Services/DND/TabContainerDropStrategy.js';
 import { PanelFactory } from './Panel/PanelFactory.js';
 import { LayoutService } from './Services/LayoutService.js';
 import { StatusBar } from './StatusBar/StatusBar.js';
@@ -45,6 +47,8 @@ export class App {
         const dds = DragDropService.getInstance();
         dds.registerStrategy('column', new ColumnDropStrategy());
         dds.registerStrategy('container', new ContainerDropStrategy());
+        // (NOVO) Regista a nova estratégia para o 'TabContainer'
+        dds.registerStrategy('TabContainer', new TabContainerDropStrategy());
 
         const factory = PanelFactory.getInstance();
         factory.registerPanelClasses([Panel, TextPanel, ToolbarPanel]);

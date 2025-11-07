@@ -208,7 +208,7 @@
     --panel-tab-scroll-z-index: 10;
     --panel-tab-scroll-flex-shrink: 0;
     --panel-tab-scroll-border-width: 1px;
-    --panel-simple-header-tab-container-flex-grow: 0;
+    --panel-simple-header-tab-container-flex-grow: 1;
     --panel-simple-header-tab-font-size: 14px;
     --panel-simple-header-title-min-width: 10px;
     --panel-simple-header-title-padding: 0 5px;
