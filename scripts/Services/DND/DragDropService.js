@@ -3,28 +3,15 @@ import { appBus } from '../../EventBus.js';
 /**
  * Description:
  * Manages the global state and logic for drag-and-drop (D&D) operations.
- * It listens to appBus events, holds the dragged item state, and now also
- * contains the logic for handling drop targets (Drop Zones).
+ *
+ * (Refatorado vPlan) Agora gere um *único* placeholder (this._placeholder)
+ * e expõe métodos (show/hidePlaceholder) para que as Estratégias
+ * controlem a sua aparência (horizontal vs. vertical).
+ *
+ * (Refatorado vBugFix) Agora é responsável por limpar o cache
+ * de todas as estratégias registadas no início e fim do D&D.
  *
  * This is implemented as a Singleton.
- *
- * Properties summary:
- * - _draggedItem {PanelGroup | null} : The actual PanelGroup instance being dragged.
- * - _placeholder {HTMLElement} : The shared DOM element used to show drop locations.
- * - _isDragging {boolean} : Flag indicating if a D&D operation is active.
- * - _strategyRegistry {Map} : (NOVO) Armazena as estratégias de soltura (Strategy Pattern).
- *
- * Typical usage:
- * // In App.js (to initialize):
- * const dds = DragDropService.getInstance();
- * dds.registerStrategy('column', new ColumnDropStrategy(dds));
- * dds.registerStrategy('create-area', new CreateAreaDropStrategy(dds));
- *
- * // In Drop Zones (e.g., Column.js):
- * onDragOver(e) {
- * e.preventDefault();
- * DragDropService.getInstance().handleDragOver(e, this); // 'this' is the dropZone
- * }
  */
 export class DragDropService {
     /**
@@ -52,7 +39,7 @@ export class DragDropService {
     _isDragging = false;
 
     /**
-     * (NOVO) Registro para o Strategy Pattern.
+     * Registro para o Strategy Pattern.
      * @type {Map<string, object>}
      * @private
      */
@@ -85,6 +72,42 @@ export class DragDropService {
     }
 
     // --- API Pública ---
+
+    /**
+     * (NOVO) Esconde o placeholder, removendo-o do DOM e redefinindo
+     * as suas classes de modo (horizontal/vertical).
+     */
+    hidePlaceholder() {
+        if (this._placeholder.parentElement) {
+            this._placeholder.parentElement.removeChild(this._placeholder);
+        }
+        // Redefine para o estado base, removendo classes de modo
+        this._placeholder.className = 'container__placeholder';
+        // Redefine a altura que pode ter sido definida via JS (modo horizontal)
+        this._placeholder.style.height = '';
+    }
+
+    /**
+     * (NOVO) Prepara o placeholder para ser exibido num modo.
+     * As estratégias são responsáveis por o inserir no DOM.
+     * @param {'horizontal' | 'vertical'} mode - O modo de exibição.
+     * @param {number | null} [height=null] - A altura (usada apenas no modo horizontal).
+     */
+    showPlaceholder(mode, height = null) {
+        // 1. Garante que está limpo de estados anteriores
+        this.hidePlaceholder();
+
+        // 2. Aplica o modo
+        if (mode === 'horizontal') {
+            this._placeholder.classList.add('container__placeholder--horizontal');
+            if (height) {
+                this._placeholder.style.height = `${height}px`;
+            }
+        } else if (mode === 'vertical') {
+            this._placeholder.classList.add('container__placeholder--vertical');
+            // A altura/largura é controlada pelo CSS no modo vertical
+        }
+    }
 
     /**
      * (NOVO) Registra uma estratégia de D&D para um tipo de zona de soltura.
@@ -148,7 +171,8 @@ export class DragDropService {
     handleDragEnter(e, dropZone) {
         const strategy = this._strategyRegistry.get(dropZone.dropZoneType);
         if (strategy && typeof strategy.handleDragEnter === 'function') {
-            strategy.handleDragEnter(e, dropZone, this._draggedItem, this._placeholder);
+            // (MODIFICADO) Passa a instância do DDS para a estratégia
+            strategy.handleDragEnter(e, dropZone, this._draggedItem, this);
         }
     }
 
@@ -161,14 +185,14 @@ export class DragDropService {
         const draggedItem = this.getDraggedItem();
         if (!draggedItem) return;
 
-        // 1. Lógica comum: remover placeholder de qualquer outro lugar
-        // (Movido para cá, pois ColumnCreateArea também precisa disso)
-        this.getPlaceholder().remove();
+        // 1. Lógica comum: (REMOVIDO - Agora é responsabilidade das estratégias)
+        // this.getPlaceholder().remove();
 
         // 2. Delegar para a estratégia específica
         const strategy = this._strategyRegistry.get(dropZone.dropZoneType);
         if (strategy && typeof strategy.handleDragOver === 'function') {
-            strategy.handleDragOver(e, dropZone, this._draggedItem, this._placeholder);
+            // (MODIFICADO) Passa a instância do DDS para a estratégia
+            strategy.handleDragOver(e, dropZone, this._draggedItem, this);
         }
     }
 
@@ -180,7 +204,8 @@ export class DragDropService {
     handleDragLeave(e, dropZone) {
         const strategy = this._strategyRegistry.get(dropZone.dropZoneType);
         if (strategy && typeof strategy.handleDragLeave === 'function') {
-            strategy.handleDragLeave(e, dropZone, this._draggedItem, this._placeholder);
+            // (MODIFICADO) Passa a instância do DDS para a estratégia
+            strategy.handleDragLeave(e, dropZone, this._draggedItem, this);
         }
     }
 
@@ -192,7 +217,8 @@ export class DragDropService {
     handleDrop(e, dropZone) {
         const strategy = this._strategyRegistry.get(dropZone.dropZoneType);
         if (strategy && typeof strategy.handleDrop === 'function') {
-            strategy.handleDrop(e, dropZone, this._draggedItem, this._placeholder);
+            // (MODIFICADO) Passa a instância do DDS para a estratégia
+            strategy.handleDrop(e, dropZone, this._draggedItem, this);
         }
     }
 
@@ -217,12 +243,30 @@ export class DragDropService {
     }
 
     /**
+     * (NOVO - CORREÇÃO) Itera sobre todas as estratégias registradas e limpa
+     * os seus caches internos (estado).
+     * @private
+     */
+    _clearStrategyCaches() {
+        if (!this._strategyRegistry) return;
+
+        for (const strategy of this._strategyRegistry.values()) {
+            if (strategy && typeof strategy.clearCache === 'function') {
+                strategy.clearCache();
+            }
+        }
+    }
+
+    /**
      * Handles the 'dragstart' event from the appBus.
      * @param {object} payload - The event payload { item: PanelGroup, event: DragEvent }.
      * @private
      */
     _onDragStart(payload) {
         if (!payload || !payload.item) return;
+
+        // (ADIÇÃO DA CORREÇÃO) Limpa caches de estratégias anteriores
+        this._clearStrategyCaches();
 
         const item = payload.item;
         const e = payload.event;
@@ -231,11 +275,10 @@ export class DragDropService {
         this._draggedItem = item;
         this._isDragging = true;
 
-        // 2. Aplicar lógica de D&D (copiado de Container.startDrag)
+        // 2. Aplicar lógica de D&D
         e.dataTransfer.setData('text/plain', '');
         e.dataTransfer.dropEffect = 'move';
         item.element.classList.add('dragging');
-        this._placeholder.style.height = `${item.element.offsetHeight}px`;
         e.dataTransfer.setDragImage(item.element, 20, 20);
     }
 
@@ -244,10 +287,11 @@ export class DragDropService {
      * @private
      */
     _onDragEnd() {
-        // 1. Remover placeholder do DOM
-        if (this._placeholder.parentElement) {
-            this._placeholder.parentElement.removeChild(this._placeholder);
-        }
+        // (MODIFICADO) Usa o novo método centralizado
+        this.hidePlaceholder();
+
+        // (ADIÇÃO DA CORREÇÃO) Limpa os caches de D&D
+        this._clearStrategyCaches();
 
         // 2. Remover feedback visual
         if (this._draggedItem && this._draggedItem.element) {

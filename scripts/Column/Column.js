@@ -240,6 +240,7 @@ export class Column {
      */
     onDragEnter(e) {
         e.preventDefault();
+        e.stopPropagation(); // (ADIÇÃO DA CORREÇÃO)
         DragDropService.getInstance().handleDragEnter(e, this);
     }
 
@@ -249,6 +250,7 @@ export class Column {
      */
     onDragOver(e) {
         e.preventDefault();
+        e.stopPropagation(); // (ADIÇÃO DA CORREÇÃO)
         DragDropService.getInstance().handleDragOver(e, this);
     }
 
@@ -258,6 +260,7 @@ export class Column {
      */
     onDragLeave(e) {
         e.preventDefault();
+        e.stopPropagation(); // (ADIÇÃO DA CORREÇÃO)
         DragDropService.getInstance().handleDragLeave(e, this);
     }
 
@@ -267,6 +270,7 @@ export class Column {
      */
     onDrop(e) {
         e.preventDefault();
+        e.stopPropagation(); // (ADIÇÃO DA CORREÇÃO)
         DragDropService.getInstance().handleDrop(e, this);
     }
 

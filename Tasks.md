@@ -36,7 +36,7 @@
 - [x] O painel deve ocupar a largura total da coluna.
 - [x] A altura mínima do painel é de 100px caso não esteja colapsado.
 - [x] Ao fechar um painel ele deve ser removido por completo.
-- [ ] Agrupar paineis em abas
+- [x] Agrupar paineis em abas
 - [x] Possibilitar proibir paineis de serem fechados
 - [x] Possibilitar proibir paineis de serem colapsados
 - [x] Permitir Paineis sem título

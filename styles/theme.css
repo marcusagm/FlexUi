@@ -129,8 +129,8 @@
    */
 
     /* Component: Container */
-    --container-gap: 0px;
-    --container-padding: 3px 0 3px 0px;
+    --container-gap: 5px;
+    --container-padding: 3px var(--container-gap);
     --container-width: 100vw;
     --container-height-calc: calc(100vh - var(--menu-height) - var(--statusbar-height));
     --container-placeholder-height: 60px;

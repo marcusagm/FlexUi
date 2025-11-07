@@ -10,25 +10,19 @@
 }
 
 .container__placeholder {
-    height: var(--container-placeholder-height);
-    margin: var(--container-placeholder-margin);
-    /* Usa os tokens de D&D definidos no theme.css */
     background: var(--color-placeholder-bg);
     border: var(--color-placeholder-border-active);
     border-radius: var(--border-radius-base);
+    margin: 0;
 }
 
-.container__drop-area {
-    flex: var(--container-drop-area-flex);
-    border: var(--color-placeholder-border);
-    border-radius: var(--border-radius-base);
-    display: flex;
-    position: relative;
-    overflow: auto;
-    transition: background-color 0.2s ease-out;
-    transition: border 0.2s ease-out;
+.container__placeholder--horizontal {
+    width: auto;
+    margin: var(--container-placeholder-margin);
 }
-.container__drop-area--active {
-    border: var(--color-placeholder-border-active);
-    background: var(--color-placeholder-bg);
+
+.container__placeholder--vertical {
+    width: 5px;
+    flex: 0 0 5px;
+    align-self: stretch;
 }

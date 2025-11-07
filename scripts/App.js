@@ -12,7 +12,7 @@ import { NotificationUIListener } from './Services/Notification/NotificationUILi
 import { TranslationService } from './Services/TranslationService.js';
 import { DragDropService } from './Services/DND/DragDropService.js';
 import { ColumnDropStrategy } from './Services/DND/ColumnDropStrategy.js';
-import { CreateAreaDropStrategy } from './Services/DND/CreateAreaDropStrategy.js';
+import { ContainerDropStrategy } from './Services/DND/ContainerDropStrategy.js';
 import { PanelFactory } from './Panel/PanelFactory.js';
 import { LayoutService } from './Services/LayoutService.js';
 import { StatusBar } from './StatusBar/StatusBar.js';
@@ -44,7 +44,7 @@ export class App {
 
         const dds = DragDropService.getInstance();
         dds.registerStrategy('column', new ColumnDropStrategy());
-        dds.registerStrategy('create-area', new CreateAreaDropStrategy());
+        dds.registerStrategy('container', new ContainerDropStrategy());
 
         const factory = PanelFactory.getInstance();
         factory.registerPanelClasses([Panel, TextPanel, ToolbarPanel]);
