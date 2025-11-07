@@ -1,21 +1,19 @@
 import { PanelGroupHeader } from './PanelGroupHeader.js';
 import { appBus } from '../EventBus.js';
 import { PanelFactory } from './PanelFactory.js';
+import { Panel } from './Panel.js'; // (NOVO) Importar Panel para verificação
 
 /**
  * Description:
- * Manages a group of Panel (tabs) within a Column. This is the main
- * "widget" that the user sees and interacts with (drag, collapse, resize).
- * (Refatorado) Agora delega a lógica de layout (fills-space)
- * para o LayoutService emitindo 'layout:changed'.
+ * Manages a group of Panel (tabs) within a Column.
+ *
+ * (Refatorado vArch) Esta classe é agora uma "Orquestradora".
+ * Ela não renderiza abas. Ela pede ao Panel (filho) o seu
+ * 'header.element' (aba) e 'content.element' (conteúdo) e
+ * anexa-os aos seus contentores corretos (o TabContainer e o ContentContainer).
  *
  * Properties summary:
  * - state {object} : Internal state management.
- *
- * Typical usage:
- * const panel = new TextPanel('My Tab');
- * const group = new PanelGroup(panel);
- * column.addPanelGroup(group);
  */
 export class PanelGroup {
     /**
@@ -24,8 +22,8 @@ export class PanelGroup {
      */
     state = {
         column: null,
-        header: null,
-        contentContainer: null,
+        header: null, // Instância de PanelGroupHeader
+        contentContainer: null, // O <div> .panel-group__content
 
         panels: [],
         activePanel: null,
@@ -39,7 +37,7 @@ export class PanelGroup {
         collapsible: true,
         movable: true,
         hasTitle: true,
-        title: null
+        title: null // (Usado para ARIA no PanelGroupHeader)
     };
 
     /**
@@ -56,6 +54,7 @@ export class PanelGroup {
     constructor(initialPanel = null, height = null, collapsed = false, config = {}) {
         Object.assign(this.state, config);
 
+        // (MODIFICADO) O contentContainer é criado aqui
         this.state.contentContainer = document.createElement('div');
         this.state.contentContainer.classList.add('panel-group__content');
 
@@ -64,6 +63,7 @@ export class PanelGroup {
         this.element.classList.add('panel-group');
         this.element.classList.add('panel');
 
+        // (MODIFICADO) O header (contentor de abas) é instanciado aqui
         this.state.header = new PanelGroupHeader(this);
 
         if (height !== null) {
@@ -107,7 +107,7 @@ export class PanelGroup {
     }
 
     /**
-     * (NOVO) Retorna a coluna pai deste grupo.
+     * Retorna a coluna pai deste grupo.
      * @returns {Column | null}
      */
     getColumn() {
@@ -154,15 +154,18 @@ export class PanelGroup {
     }
 
     /**
-     * (MODIFICADO) Cleans up event listeners when the group is destroyed.
+     * Cleans up event listeners when the group is destroyed.
      */
     destroy() {
         appBus.off('panel:group-child-close-request', this.onChildCloseRequest.bind(this));
         appBus.off('panel:close-request', this.onCloseRequest.bind(this));
         appBus.off('panel:toggle-collapse-request', this.onToggleCollapseRequest.bind(this));
 
-        // (NOVO) Garante que o ResizeObserver do header seja desconectado
+        // Garante que o ResizeObserver do header seja desconectado
         this.state.header?.destroy();
+
+        // (NOVO) Destrói todos os painéis filhos (que limpam seus headers)
+        this.state.panels.forEach(panel => panel.destroy());
     }
 
     /**
@@ -174,8 +177,8 @@ export class PanelGroup {
         this.resizeHandle.addEventListener('mousedown', this.startResize.bind(this));
 
         this.element.append(
-            this.state.header.element,
-            this.state.contentContainer,
+            this.state.header.element, // O cabeçalho (contentor de abas)
+            this.state.contentContainer, // O contentor de conteúdo
             this.resizeHandle
         );
 
@@ -195,8 +198,6 @@ export class PanelGroup {
 
     /**
      * Verifica se este painel pode ser recolhido.
-     * Ele não pode ser recolhido se for o último painel visível na coluna.
-     * @returns {boolean}
      */
     canCollapse() {
         if (!this.state.column) return false;
@@ -250,7 +251,7 @@ export class PanelGroup {
     unCollapse() {
         this.state.collapsed = false;
         this.element.classList.remove('panel--collapsed');
-        this.state.contentContainer.style.display = '';
+        this.state.contentContainer.style.display = ''; // (CSS fará 'flex')
         this.resizeHandle.style.display = '';
         this.updateHeight();
     }
@@ -330,48 +331,95 @@ export class PanelGroup {
     }
 
     /**
-     * Adds a new Panel (tab) and requests a layout update.
+     * (NOVO - CORREÇÃO REGRESSÃO) Atualiza o estado visual do cabeçalho
+     * (modo simples vs. modo abas) com base na contagem de painéis.
+     * @private
+     */
+    _updateHeaderMode() {
+        if (!this.state.header) return;
+
+        const isSimpleMode = this.state.panels.length === 1;
+
+        // 1. Aplica a classe ao container do cabeçalho (para CSS)
+        this.state.header.element.classList.toggle('panel-group__header--simple', isSimpleMode);
+
+        // 2. Informa cada PanelHeader (aba) para mudar o seu modo
+        this.state.panels.forEach(p => {
+            if (p.state.header && typeof p.state.header.setMode === 'function') {
+                p.state.header.setMode(isSimpleMode);
+            }
+        });
+
+        // 3. Atualiza os botões de controlo do GRUPO
+        if (isSimpleMode && this.state.panels.length === 1) {
+            // No modo simples, os botões do grupo refletem o painel filho
+            const panel = this.state.panels[0];
+            this.state.header.collapseBtn.style.display =
+                panel.state.collapsible && this.state.collapsible ? '' : 'none';
+            this.state.header.closeBtn.style.display =
+                panel.state.closable && this.state.closable ? '' : 'none';
+            this.state.header.moveHandle.style.display =
+                panel.state.movable && this.state.movable ? '' : 'none';
+        } else {
+            // No modo de abas, os botões do grupo refletem o grupo
+            this.state.header.collapseBtn.style.display = this.state.collapsible ? '' : 'none';
+            this.state.header.closeBtn.style.display = this.state.closable ? '' : 'none';
+            this.state.header.moveHandle.style.display = this.state.movable ? '' : 'none';
+        }
+    }
+
+    /**
+     * (MODIFICADO - vArch) Adiciona um Panel, orquestrando
+     * a inserção do seu header e do seu content.
      * @param {Panel} panel - The panel instance to add.
      * @param {boolean} [makeActive=false]
      */
     addPanel(panel, makeActive = false) {
+        if (!panel || !(panel instanceof Panel)) {
+            console.warn('PanelGroup.addPanel: item não é uma instância de Panel.', panel);
+            return;
+        }
         if (this.state.panels.includes(panel)) {
-            if (makeActive) {
-                this.setActive(panel);
-            }
+            if (makeActive) this.setActive(panel);
             return;
         }
 
         this.state.panels.push(panel);
         panel.setParentGroup(this);
 
-        if (panel.element.parentElement) {
-            panel.element.parentElement.removeChild(panel.element);
-        }
+        // (MODIFICADO) Anexa o header (aba) e o conteúdo nos locais corretos
+        this.state.header.tabContainer.appendChild(panel.state.header.element);
+        this.state.contentContainer.appendChild(panel.getContentElement());
 
-        this.state.header.updateTabs();
+        this._updateHeaderMode(); // (NOVO) Atualiza o modo (simples/abas)
+        this.state.header.updateScrollButtons(); // Atualiza scroll
 
         if (makeActive || this.state.panels.length === 1) {
             this.setActive(panel);
         } else {
+            // Se não for ativar, esconde o conteúdo
+            panel.getContentElement().style.display = 'none';
             this.requestLayoutUpdate();
         }
     }
 
     /**
-     * Removes a Panel (tab) and requests a layout update.
+     * (MODIFICADO - vArch) Remove um Panel (aba).
      * @param {Panel} panel - The panel instance to remove.
      */
     removePanel(panel) {
         const index = this.state.panels.indexOf(panel);
         if (index === -1) return;
 
-        this.state.panels.splice(index, 1);
+        // (MODIFICADO) Remove ambos os elementos
+        panel.state.header.element.remove();
+        panel.getContentElement().remove();
 
-        if (this.state.contentContainer.contains(panel.element)) {
-            this.state.contentContainer.removeChild(panel.element);
-        }
+        this.state.panels.splice(index, 1);
         panel.setParentGroup(null);
+
+        this._updateHeaderMode(); // (NOVO) Atualiza o modo (simples/abas)
+        this.state.header.updateScrollButtons(); // Atualiza scroll
 
         if (this.state.panels.length === 0) {
             this.close();
@@ -382,37 +430,44 @@ export class PanelGroup {
             const newActive = this.state.panels[index] || this.state.panels[index - 1];
             this.setActive(newActive);
         } else {
-            this.state.header.updateTabs();
             this.requestLayoutUpdate();
         }
     }
 
     /**
-     * Sets a specific Panel (tab) as active and requests a layout update.
+     * (MODIFICADO - vArch) Ativa um Panel (aba).
      * @param {Panel} panel - The panel instance to activate.
      */
     setActive(panel) {
         if (!panel) return;
 
+        // (NOVO - CORREÇÃO) Verifica se está em modo simples
+        const isSimpleMode = this.state.panels.length === 1;
+
         this.state.panels.forEach(p => {
-            p.element.style.display = 'none';
+            // (MODIFICADO - CORREÇÃO) Só mexe nas classes --active se NÃO for modo simples
+            if (!isSimpleMode) {
+                p.state.header.element.classList.remove('panel-group__tab--active');
+            }
+            p.getContentElement().style.display = 'none';
         });
 
-        if (this.state.contentContainer.contains(panel.element) === false) {
-            this.state.contentContainer.appendChild(panel.element);
+        // (MODIFICADO - CORREÇÃO) Só mexe nas classes --active se NÃO for modo simples
+        if (!isSimpleMode) {
+            panel.state.header.element.classList.add('panel-group__tab--active');
         }
-        panel.element.style.display = 'flex';
+
+        panel.getContentElement().style.display = ''; // (CSS fará 'flex')
 
         this.state.activePanel = panel;
-
-        this.state.title = panel.state.title;
-        this.state.header.updateTabs();
+        this.state.title = panel.state.title; // (Mantido para ARIA labels)
+        this.state.header.updateAriaLabels(); // (NOVO) Atualiza ARIA
 
         this.requestLayoutUpdate();
     }
 
     /**
-     * (MODIFICADO) Emite um evento para o LayoutService APENAS se a coluna pai existir.
+     * Emite um evento para o LayoutService APENAS se a coluna pai existir.
      */
     requestLayoutUpdate() {
         const column = this.getColumn();

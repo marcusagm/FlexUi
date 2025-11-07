@@ -11,8 +11,9 @@ import { appBus } from '../../EventBus.js';
  * (Refatorado vBugFix) Agora é responsável por limpar o cache
  * de todas as estratégias registadas no início e fim do D&D.
  *
- * (Refatorado vFeature) Agora é generalizado. Rastreia não apenas
- * o 'item' arrastado, mas também o 'type' (PanelGroup vs. Panel).
+ * (Refatorado vBugFix 2) Agora armazena o 'element' explícito
+ * no payload 'dragstart' para evitar aceder a 'item.element' (que
+ * é 'undefined' para a classe Panel).
  *
  * This is implemented as a Singleton.
  */
@@ -24,11 +25,11 @@ export class DragDropService {
     static _instance = null;
 
     /**
-     * (MODIFICADO) Armazena o item E o seu tipo.
-     * @type {{item: object | null, type: string | null}}
+     * (MODIFICADO) Armazena item, tipo E o elemento DOM.
+     * @type {{item: object | null, type: string | null, element: HTMLElement | null}}
      * @private
      */
-    _draggedData = { item: null, type: null };
+    _draggedData = { item: null, type: null, element: null };
 
     /**
      * @type {HTMLElement}
@@ -85,7 +86,9 @@ export class DragDropService {
         if (this._placeholder.parentElement) {
             this._placeholder.parentElement.removeChild(this._placeholder);
         }
+        // Redefine para o estado base, removendo classes de modo
         this._placeholder.className = 'container__placeholder';
+        // Redefine a altura que pode ter sido definida via JS (modo horizontal)
         this._placeholder.style.height = '';
     }
 
@@ -136,8 +139,8 @@ export class DragDropService {
     }
 
     /**
-     * (MODIFICADO) Returns o objeto de dados (item e tipo).
-     * @returns {{item: object | null, type: string | null}}
+     * (MODIFICADO) Returns o objeto de dados (item, tipo, elemento).
+     * @returns {{item: object | null, type: string | null, element: HTMLElement | null}}
      */
     getDraggedData() {
         return this._draggedData;
@@ -236,27 +239,33 @@ export class DragDropService {
     }
 
     /**
-     * (MODIFICADO) Handles o 'dragstart' e armazena o TIPO.
-     * @param {object} payload - { item: Panel|PanelGroup, type: string, event: DragEvent }.
+     * (MODIFICADO) Handles o 'dragstart' e armazena o TIPO e o ELEMENTO.
+     * @param {object} payload - { item: Panel|PanelGroup, type: string, element: HTMLElement, event: DragEvent }.
      * @private
      */
     _onDragStart(payload) {
-        if (!payload || !payload.item) return;
+        // (MODIFICADO) Verifica também o 'element'
+        if (!payload || !payload.item || !payload.element) return;
 
         this._clearStrategyCaches();
 
-        const { item, type, event: e } = payload;
+        // (MODIFICADO) Desestrutura o 'element'
+        const { item, type, element, event: e } = payload;
 
         // 1. Definir Estado
         this._draggedData.item = item;
-        this._draggedData.type = type || null; // Armazena o tipo
+        this._draggedData.type = type || null;
+        this._draggedData.element = element; // (NOVO) Armazena o elemento
         this._isDragging = true;
 
         // 2. Aplicar lógica de D&D
         e.dataTransfer.setData('text/plain', '');
         e.dataTransfer.dropEffect = 'move';
-        item.element.classList.add('dragging');
-        e.dataTransfer.setDragImage(item.element, 20, 20);
+
+        // (MODIFICADO - CORREÇÃO) Usa o 'element' do payload
+        element.classList.add('dragging');
+        // (MODIFICADO - CORREÇÃO) Usa o 'element' do payload
+        e.dataTransfer.setDragImage(element, 20, 20);
     }
 
     /**
@@ -267,14 +276,15 @@ export class DragDropService {
         this.hidePlaceholder();
         this._clearStrategyCaches();
 
-        // Remover feedback visual
-        if (this._draggedData.item && this._draggedData.item.element) {
-            this._draggedData.item.element.classList.remove('dragging');
+        // (MODIFICADO - CORREÇÃO) Usa o 'element' armazenado
+        if (this._draggedData.element) {
+            this._draggedData.element.classList.remove('dragging');
         }
 
         // Resetar Estado
         this._draggedData.item = null;
         this._draggedData.type = null;
+        this._draggedData.element = null; // (NOVO) Limpa o elemento
         this._isDragging = false;
     }
 }

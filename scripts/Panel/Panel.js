@@ -1,10 +1,25 @@
 import { PanelContent } from './PanelContent.js';
+// (NOVO) Importa o PanelHeader que será reintroduzido na Etapa 2
+import { PanelHeader } from './PanelHeader.js';
 import { appBus } from '../EventBus.js';
 
+/**
+ * Description:
+ * A classe base para um Painel de conteúdo.
+ *
+ * (Refatorado vArch) Esta classe já não é um elemento DOM.
+ * É um controlador autocontido que GERE os seus dois componentes DOM:
+ * 1. this.header (instância de PanelHeader - a "aba" ou "cabeçalho")
+ * 2. this.content (instância de PanelContent - o "conteúdo")
+ *
+ * O PanelGroup (pai) é responsável por orquestrar ONDE
+ * estes dois elementos são anexados.
+ */
 export class Panel {
     state = {
         parentGroup: null, // O PanelGroup pai
-        content: null,
+        header: null, // (NOVO) A instância do PanelHeader
+        content: null, // (MODIFICADO) A instância do PanelContent
         height: null, // Altura preferida (se definida)
         minHeight: 100, // Altura mínima do conteúdo
         closable: true,
@@ -20,14 +35,18 @@ export class Panel {
     constructor(title, height = null, config = {}) {
         Object.assign(this.state, config);
 
+        // (MODIFICADO) Instancia o seu controlador de conteúdo
         this.state.content = new PanelContent();
 
-        this.element = document.createElement('div');
-        this.element.classList.add('panel', 'panel-group__child'); // É um filho de grupo
+        // (REMOVIDO) this.element = document.createElement('div');
+        // (REMOVIDO) this.element.classList.add('panel', 'panel-group__child');
 
         const panelTitle = title !== undefined && title !== null ? String(title) : '';
         this.state.hasTitle = panelTitle.length > 0;
         this.state.title = panelTitle;
+
+        // (NOVO) Instancia o seu próprio cabeçalho/aba (Etapa 2)
+        this.state.header = new PanelHeader(this, panelTitle);
 
         if (height !== null) {
             this.state.height = height;
@@ -46,9 +65,9 @@ export class Panel {
         return 'Panel';
     }
 
-    // O Panel não tem mais um PanelHeader visível
+    // (MODIFICADO) Já não é relevante, pois o cabeçalho é um componente separado
     getHeaderHeight() {
-        return 0; // O cabeçalho é virtual, gerenciado pelo grupo
+        return this.state.header ? this.state.header.element.offsetHeight : 0;
     }
 
     getMinPanelHeight() {
@@ -68,11 +87,18 @@ export class Panel {
 
     destroy() {
         appBus.off('panel:close-request', this.onCloseRequest.bind(this));
+        // (NOVO) Garante que o header também é limpo (ex: listeners D&D)
+        if (this.state.header && typeof this.state.header.destroy === 'function') {
+            this.state.header.destroy();
+        }
     }
 
+    /**
+     * (MODIFICADO) A construção agora é mínima.
+     * O PanelGroup fará a anexação.
+     */
     build() {
-        // Não há resizeHandle, nem PanelHeader
-        this.element.append(this.state.content.element);
+        // (REMOVIDO) this.element.append(this.state.content.element);
         this.updateHeight();
     }
 
@@ -85,6 +111,10 @@ export class Panel {
         this.state.content.element.innerHTML = htmlString;
     }
 
+    /**
+     * (MODIFICADO) Retorna o elemento de conteúdo real
+     * @returns {HTMLElement}
+     */
     getContentElement() {
         return this.state.content.element;
     }
@@ -95,6 +125,10 @@ export class Panel {
 
     setParentGroup(group) {
         this.state.parentGroup = group;
+        // (NOVO) Informa o header a que grupo ele pertence (para o D&D)
+        if (this.state.header) {
+            this.state.header.setParentGroup(group);
+        }
     }
 
     close() {
@@ -111,10 +145,16 @@ export class Panel {
         this.destroy();
     }
 
+    /**
+     * (MODIFICADO) A altura é aplicada ao elemento de conteúdo
+     */
     updateHeight() {
-        this.element.style.minHeight = `${this.getMinPanelHeight()}px`;
-        this.element.style.height = 'auto';
-        this.element.style.flex = '1 1 auto';
+        const contentEl = this.getContentElement();
+        if (!contentEl) return;
+
+        contentEl.style.minHeight = `${this.getMinPanelHeight()}px`;
+        contentEl.style.height = 'auto';
+        contentEl.style.flex = '1 1 auto';
     }
 
     toJSON() {
@@ -143,11 +183,19 @@ export class Panel {
         }
         if (data.title !== undefined) {
             this.state.title = data.title;
+            // (NOVO) Atualiza o header com o título restaurado
+            if (this.state.header) {
+                this.state.header.setTitle(data.title);
+            }
         }
 
         // Restaura as configurações de estado
         if (data.config) {
             Object.assign(this.state, data.config);
+            // (NOVO) Atualiza o header com as configs restauradas
+            if (this.state.header) {
+                this.state.header.updateConfig(data.config);
+            }
         }
 
         // 'content' é restaurado por subclasses
