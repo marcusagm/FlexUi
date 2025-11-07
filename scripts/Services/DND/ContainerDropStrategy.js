@@ -14,6 +14,9 @@ import { DragDropService } from './DragDropService.js';
  *
  * (Refatorado vUX) Agora implementa a lógica "ghost" para anular
  * o drop nas lacunas adjacentes à coluna de origem.
+ *
+ * (Refatorado vUX 2) A lógica "ghost" (vUX) só se aplica se
+ * o painel arrastado for o ÚNICO painel na coluna de origem.
  */
 export class ContainerDropStrategy {
     /**
@@ -31,12 +34,17 @@ export class ContainerDropStrategy {
     _dropIndex = null;
 
     /**
-     * (NOVO - UX) O índice da coluna de onde o painel foi arrastado.
+     * O índice da coluna de onde o painel foi arrastado.
      * @type {number | null}
      * @private
      */
     _originalColumnIndex = null;
 
+    /**
+     * (NOVO - UX 2) Flag se a coluna de origem só tinha um painel.
+     * @type {boolean}
+     * @private
+     */
     _originColumnHadOnePanel = false;
 
     /**
@@ -46,13 +54,13 @@ export class ContainerDropStrategy {
     clearCache() {
         this._columnCache = [];
         this._dropIndex = null;
-        this._originalColumnIndex = null; // (MODIFICADO) Limpa o índice original
-        this._originColumnHadOnePanel = false;
+        this._originalColumnIndex = null;
+        this._originColumnHadOnePanel = false; // (MODIFICADO) Limpa a nova flag
     }
 
     /**
-     * (MODIFICADO) A assinatura agora inclui o 'dds' (DragDropService).
-     * Constrói o cache de posições e armazena o índice original.
+     * (MODIFICADO - UX 2) A assinatura agora inclui o 'dds' (DragDropService).
+     * Constrói o cache de posições e armazena o índice original e o estado da coluna.
      * @param {DragEvent} e - O evento nativo.
      * @param {Container} dropZone - A instância do Container.
      * @param {PanelGroup} draggedItem - O item sendo arrastado.
@@ -76,7 +84,7 @@ export class ContainerDropStrategy {
             };
         });
 
-        // 2. (NOVO - UX) Encontra e armazena o índice da coluna de origem
+        // 2. (MODIFICADO - UX 2) Encontra o índice e o estado da coluna de origem
         const oldColumn = draggedItem.getColumn();
         if (oldColumn) {
             const oldColCacheItem = this._columnCache.find(
@@ -84,6 +92,8 @@ export class ContainerDropStrategy {
             );
             if (oldColCacheItem) {
                 this._originalColumnIndex = oldColCacheItem.index;
+
+                // (NOVO) Verifica se a coluna de origem ficaria vazia
                 if (oldColumn.getTotalPanelGroups() === 1) {
                     this._originColumnHadOnePanel = true;
                 }
@@ -109,8 +119,8 @@ export class ContainerDropStrategy {
     }
 
     /**
-     * (MODIFICADO) Manipula a lógica de 'dragover' no container.
-     * Implementa a lógica "ghost" para lacunas adjacentes.
+     * (MODIFICADO - UX 2) Manipula a lógica de 'dragover' no container.
+     * Implementa a lógica "ghost" condicional.
      * @param {DragEvent} e - O evento nativo.
      * @param {Container} dropZone - A instância do Container.
      * @param {PanelGroup} draggedItem - O item sendo arrastado.
@@ -138,18 +148,20 @@ export class ContainerDropStrategy {
             }
         }
 
-        // 2. (NOVO - UX) Verifica a lógica "ghost"
-        // Verifica se o dropIndex é a lacuna à esquerda (mesmo índice)
+        // 2. (MODIFICADO - UX 2) Verifica a lógica "ghost" CONDICIONAL
         const isLeftGap = this._dropIndex === this._originalColumnIndex;
-        // Verifica se o dropIndex é a lacuna à direita (índice + 1)
         const isRightGap = this._dropIndex === this._originalColumnIndex + 1;
 
+        // A lógica "ghost" SÓ se aplica se:
+        // 1. A coluna de origem é conhecida (originalColumnIndex !== null)
+        // 2. A coluna de origem SÓ TINHA UM PAINEL (originColumnHadOnePanel)
+        // 3. O drop é numa lacuna adjacente (isLeftGap || isRightGap)
         if (
             this._originalColumnIndex !== null &&
             this._originColumnHadOnePanel &&
             (isLeftGap || isRightGap)
         ) {
-            // Se for uma lacuna adjacente, anula a operação
+            // Se for uma lacuna adjacente E a coluna de origem ia ficar vazia, anula
             dds.hidePlaceholder();
             this._dropIndex = null; // Anula o drop
             return; // Interrompe
@@ -160,19 +172,14 @@ export class ContainerDropStrategy {
         const placeholder = dds.getPlaceholder();
 
         if (gapFound) {
-            // Encontra o elemento (coluna) nesse índice
             const targetElement = this._columnCache.find(
                 item => item.index === this._dropIndex
             )?.element;
 
             if (targetElement && dropZone.element.contains(targetElement)) {
                 dropZone.element.insertBefore(placeholder, targetElement);
-            } else if (!targetElement) {
-                // Caso especial: targetElement é nulo se gapFound for falso
-                // (mas já tratamos isso abaixo)
             }
         } else {
-            // Nenhuma lacuna encontrada (índice é o fim), adiciona ao fim
             dropZone.element.appendChild(placeholder);
         }
     }
