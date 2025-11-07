@@ -135,7 +135,8 @@
     --container-height-calc: calc(100vh - var(--menu-height) - var(--statusbar-height));
     --container-placeholder-height: 60px;
     --container-placeholder-margin: 0;
-    --container-drop-area-flex: 0 0 5px;
+    --container-placeholder-vertical-flex: 0 0 5px;
+    --container-placeholder-vertical-width: 5px;
 
     /* Component: Menu */
     --menu-item-font-size: 1.1em;
