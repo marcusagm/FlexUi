@@ -68,14 +68,14 @@
     --color-placeholder-border-active: 1px solid var(--primary-40);
 
     /* Feedback (Services e Forms) */
-    --color-feedback-info: var(--info-50);
-    --color-text-on-info: var(--info-on-10);
-    --color-feedback-success: var(--success-50);
-    --color-text-on-success: var(--success-on-10);
-    --color-feedback-warning: var(--warning-50);
-    --color-text-on-warning: var(--warning-on-50);
-    --color-feedback-danger: var(--danger-50);
-    --color-text-on-danger: var(--danger-on-10);
+    --color-feedback-info: var(--info-40);
+    --color-text-on-info: var(--info-on-40);
+    --color-feedback-success: var(--success-40);
+    --color-text-on-success: var(--success-on-40);
+    --color-feedback-warning: var(--warning-40);
+    --color-text-on-warning: var(--warning-on-40);
+    --color-feedback-danger: var(--danger-40);
+    --color-text-on-danger: var(--danger-on-40);
 
     /*
    * =========================================
@@ -165,8 +165,9 @@
     --panel-header-flex-shrink: 0;
     --panel-move-handle-size: 14px;
     --panel-move-handle-flex: 0 0 var(--panel-move-handle-size);
-    --panel-move-handle-icon-size: 12px 12px;
-    --panel-move-handle-opacity: 0.7;
+    --panel-move-handle-icon-width: 12px;
+    --panel-move-handle-icon-height: 12px;
+    --panel-move-handle-opacity: 1;
     --panel-title-font-size: 14px;
     --panel-title-min-width: 10px;
     --panel-header-spacer-flex-grow: 100;

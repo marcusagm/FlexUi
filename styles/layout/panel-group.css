@@ -50,16 +50,15 @@
     height: var(--panel-move-handle-size);
     flex: var(--panel-move-handle-flex);
     cursor: grab;
-    /* * O SVG foi alterado para fill="currentColor".
-     * A cor é agora controlada pela propriedade 'color'.
-     */
-    background: url('data:image/svg+xml;utf8,<svg fill="currentColor" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="5" cy="5" r="2"/><circle cx="12" cy="5" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="12" cy="19" r="2"/><circle cx="19" cy="19" r="2"/></svg>')
-        no-repeat center center;
-    background-size: var(--panel-move-handle-icon-size);
     color: var(--color-text-secondary); /* (Define a cor do SVG) */
     opacity: var(--panel-move-handle-opacity);
+    align-content: center;
+    text-align: center;
 }
-
+.panel__move-handle span {
+    width: var(--panel-move-handle-icon-width);
+    height: var(--panel-move-handle-icon-height);
+}
 .panel__move-handle:active {
     cursor: grabbing;
 }
@@ -296,8 +295,8 @@
     color: var(--color-text-bright);
     user-select: none;
 }
-/* .panel-group__header--simple .panel-group__tab .panel-group__tab-close {
-} */
+.panel-group__header--simple .panel-group__tab .panel-group__tab-close {
+}
 .panel-group__header--simple .panel-group__title-simple {
     flex-grow: 1;
     min-width: var(--panel-simple-header-title-min-width);

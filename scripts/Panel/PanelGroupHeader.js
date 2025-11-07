@@ -31,6 +31,10 @@ export class PanelGroupHeader {
         this.moveHandle.addEventListener('dragend', this.onDragEnd.bind(this));
         this.moveHandle.setAttribute('role', 'button');
 
+        const iconElement = document.createElement('span');
+        iconElement.className = `icon icon-handle`;
+        this.moveHandle.appendChild(iconElement);
+
         // 2. Botão de Scroll Esquerda
         this.scrollLeftBtn = document.createElement('button');
         this.scrollLeftBtn.type = 'button';
