@@ -42,7 +42,7 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-    background: var(--color-bg-panel);
+    background: var(--color-bg-app);
 }
 
 .dragging {
