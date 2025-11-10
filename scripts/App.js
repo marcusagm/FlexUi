@@ -35,6 +35,14 @@ export class App {
      */
     currentWorkspace = null;
 
+    // (NOVO) Referências bindadas para listeners (Correção de Memory Leak)
+    _boundAddNewPanel = null;
+    _boundResetLayoutSilent = null;
+    _boundSaveLayout = null;
+    _boundRestoreLayout = null;
+    _boundResetLayout = null;
+    debouncedResize = null; // (Já era armazenado)
+
     constructor() {
         if (App.instance) {
             return App.instance;
@@ -62,6 +70,16 @@ export class App {
 
         document.body.append(this.menu.element, this.container.element, this.statusBar.element);
 
+        // (NOVO) Armazena referências bindadas
+        this._boundAddNewPanel = this.addNewPanel.bind(this);
+        this._boundResetLayoutSilent = this.resetLayout.bind(this, true);
+        this._boundSaveLayout = this.saveLayout.bind(this);
+        this._boundRestoreLayout = this.restoreLayout.bind(this);
+        this._boundResetLayout = this.resetLayout.bind(this, false);
+
+        const debounceDelay = 200;
+        this.debouncedResize = debounce(this.onResizeHandler.bind(this), debounceDelay);
+
         this.initEventListeners();
 
         const uiListener = new NotificationUIListener(document.body);
@@ -80,18 +98,37 @@ export class App {
         appBus.emit('app:set-permanent-status', 'Pronto');
     }
 
+    /**
+     * (MODIFICADO) Usa referências bindadas
+     */
     initEventListeners() {
-        appBus.on('app:add-new-panel', this.addNewPanel.bind(this));
+        appBus.on('app:add-new-panel', this._boundAddNewPanel);
+        appBus.on('app:reinitialize-default-layout', this._boundResetLayoutSilent);
+        appBus.on('app:save-state', this._boundSaveLayout);
+        appBus.on('app:restore-state', this._boundRestoreLayout);
+        appBus.on('app:reset-state', this._boundResetLayout);
 
-        appBus.on('app:reinitialize-default-layout', this.resetLayout.bind(this, true));
-
-        appBus.on('app:save-state', this.saveLayout.bind(this));
-        appBus.on('app:restore-state', this.restoreLayout.bind(this));
-        appBus.on('app:reset-state', this.resetLayout.bind(this, false));
-
-        const debounceDelay = 200;
-        this.debouncedResize = debounce(this.onResizeHandler.bind(this), debounceDelay);
         window.addEventListener('resize', this.debouncedResize);
+    }
+
+    /**
+     * (NOVO) Limpa todos os listeners para permitir "teardown" (ex: testes).
+     */
+    destroy() {
+        const me = this;
+        appBus.off('app:add-new-panel', me._boundAddNewPanel);
+        appBus.off('app:reinitialize-default-layout', me._boundResetLayoutSilent);
+        appBus.off('app:save-state', me._boundSaveLayout);
+        appBus.off('app:restore-state', me._boundRestoreLayout);
+        appBus.off('app:reset-state', me._boundResetLayout);
+
+        window.removeEventListener('resize', me.debouncedResize);
+        me.debouncedResize?.cancel(); // Cancela qualquer debounce pendente
+
+        // Destrói os componentes principais
+        me.menu?.destroy();
+        me.container?.destroy();
+        // me.statusBar?.destroy(); // (StatusBar não tem destroy, mas poderia ter)
     }
 
     /**

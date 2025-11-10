@@ -3,12 +3,43 @@ import { appBus } from '../EventBus.js';
 import { TranslationService } from '../Services/TranslationService.js';
 
 export class Menu {
+    // (NOVO) Propriedades para armazenar referências bindadas
+    _boundOnGlobalClick = null;
+    _boundCloseAllMenus = null;
+    _boundCloseSiblings = null;
+
     constructor() {
         this.element = document.createElement('div');
         this.element.classList.add('menu');
         // REMOVIDO: this.build() - A construção agora é assíncrona
 
+        // (NOVO) Armazena referências bindadas
+        this._boundOnGlobalClick = this._onGlobalClick.bind(this);
+        this._boundCloseAllMenus = this.closeAllMenus.bind(this);
+        this._boundCloseSiblings = this.closeSiblings.bind(this);
+
         this.initGlobalListeners();
+    }
+
+    /**
+     * (NOVO) Método 'destroy' para limpeza de listeners globais.
+     */
+    destroy() {
+        const me = this; // Conforme diretrizes
+        document.removeEventListener('click', me._boundOnGlobalClick);
+        appBus.off('menu:item-selected', me._boundCloseAllMenus);
+        appBus.off('menu:close-siblings', me._boundCloseSiblings);
+        me.element.remove();
+    }
+
+    /**
+     * (NOVO) Listener de clique global extraído da função anônima.
+     * @param {MouseEvent} e
+     */
+    _onGlobalClick(e) {
+        if (!this.element.contains(e.target)) {
+            this.closeAllMenus();
+        }
     }
 
     /**
@@ -79,14 +110,13 @@ export class Menu {
         });
     }
 
+    /**
+     * (MODIFICADO) Usa referências bindadas.
+     */
     initGlobalListeners() {
-        document.addEventListener('click', e => {
-            if (!this.element.contains(e.target)) {
-                this.closeAllMenus();
-            }
-        });
-        appBus.on('menu:item-selected', this.closeAllMenus.bind(this));
-        appBus.on('menu:close-siblings', this.closeSiblings.bind(this));
+        document.addEventListener('click', this._boundOnGlobalClick);
+        appBus.on('menu:item-selected', this._boundCloseAllMenus);
+        appBus.on('menu:close-siblings', this._boundCloseSiblings);
     }
 
     closeAllMenus() {

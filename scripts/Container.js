@@ -13,6 +13,9 @@ import { DragDropService } from './Services/DND/DragDropService.js';
  * (Refatorado) A lógica de cálculo de layout (fills-space) foi movida
  * para o LayoutService. Este componente apenas emite 'layout:rows-changed'.
  *
+ * (Refatorado vBugFix) Corrige o vazamento de listeners do appBus
+ * armazenando as referências bindadas e implementando destroy().
+ *
  * Properties summary:
  * - state {object} : Gerencia os filhos (instâncias de Row).
  */
@@ -21,12 +24,23 @@ export class Container {
         children: [] // Contém instâncias de Row
     };
 
+    /**
+     * (NOVO) Armazena a referência bindada para o listener
+     * @type {function | null}
+     * @private
+     */
+    _boundOnRowEmpty = null;
+
     constructor() {
         this.element = document.createElement('div');
         this.element.classList.add('container'); // Usa a nova classe CSS .container
 
         this.dropZoneType = 'container'; // Novo drop zone type (para lacunas verticais)
         this.initDNDListeners();
+
+        // (NOVO) Define a referência bindada
+        this._boundOnRowEmpty = this.onRowEmpty.bind(this);
+
         this.clear();
         this.initEventListeners();
     }
@@ -59,9 +73,24 @@ export class Container {
         DragDropService.getInstance().handleDrop(e, this);
     }
 
+    /**
+     * (MODIFICADO) Usa a referência bindada
+     */
     initEventListeners() {
         // Ouve o evento emitido pela Row (Etapa 1)
-        appBus.on('row:empty', this.onRowEmpty.bind(this));
+        appBus.on('row:empty', this._boundOnRowEmpty);
+    }
+
+    /**
+     * (NOVO) Limpa todos os listeners para permitir "teardown".
+     */
+    destroy() {
+        const me = this;
+        appBus.off('row:empty', me._boundOnRowEmpty);
+
+        // Um container destruído também deve destruir seus filhos
+        [...me.getRows()].forEach(row => row.destroy());
+        me.element.remove();
     }
 
     /**
