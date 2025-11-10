@@ -1,11 +1,16 @@
 import { appBus } from '../EventBus.js';
 import { Column } from '../Column/Column.js';
+import { Container } from '../Container.js';
+import { Row } from '../Row.js';
 
 /**
  * Description:
  * A Singleton service responsible for managing and applying complex layout
  * rules, such as determining which panel fills remaining space or enforcing
  * collapse/uncollapse logic.
+ *
+ * (Refatorado) Agora também é responsável por aplicar a lógica "fills-space"
+ * para Linhas (Rows) e Colunas (Columns), centralizando toda a lógica de layout.
  *
  * Properties summary:
  * - _instance {LayoutService | null} : The private static instance for the Singleton.
@@ -15,7 +20,7 @@ import { Column } from '../Column/Column.js';
  * LayoutService.getInstance();
  *
  * // In components (e.g., Column.js / PanelGroup.js):
- * appBus.emit('layout:changed', { source: this });
+ * appBus.emit('layout:panel-groups-changed', { source: this });
  */
 export class LayoutService {
     /**
@@ -53,21 +58,65 @@ export class LayoutService {
      * @private
      */
     _initEventListeners() {
-        // (ALTERADO) Ouve o evento específico 'layout:column-changed'
-        appBus.on('layout:column-changed', this._onColumnChanged.bind(this));
+        // (RENOMEADO) Ouve o evento específico para PanelGroups
+        appBus.on('layout:panel-groups-changed', this._onPanelGroupsChanged.bind(this));
+        // (NOVO) Ouve o evento para Rows (Vertical no Container)
+        appBus.on('layout:rows-changed', this._onRowsChanged.bind(this));
+        // (NOVO) Ouve o evento para Columns (Horizontal na Row)
+        appBus.on('layout:columns-changed', this._onColumnsChanged.bind(this));
     }
 
     /**
-     * Handles the specific 'layout:column-changed' event.
+     * (NOVO) Handles the 'layout:rows-changed' event (Vertical).
+     * Lógica movida de Container.js -> updateRowsHeights()
+     *
+     * @param {Container} container - O Container que precisa de atualização.
+     * @private
+     */
+    _onRowsChanged(container) {
+        if (!container || !(container instanceof Container)) {
+            console.warn('LayoutService: "_onRowsChanged" received an invalid container object.');
+            return;
+        }
+
+        const rows = container.getRows();
+        rows.forEach((row, idx) => {
+            row.updateHeight(idx === rows.length - 1);
+        });
+    }
+
+    /**
+     * (NOVO) Handles the 'layout:columns-changed' event (Horizontal).
+     * Lógica movida de Row.js -> updateColumnsSizes()
+     *
+     * @param {Row} row - A Row que precisa de atualização.
+     * @private
+     */
+    _onColumnsChanged(row) {
+        if (!row || !(row instanceof Row)) {
+            console.warn('LayoutService: "_onColumnsChanged" received an invalid row object.');
+            return;
+        }
+
+        const columns = row.getColumns();
+        columns.forEach((column, idx) => {
+            column.updateWidth(idx === columns.length - 1);
+        });
+    }
+
+    /**
+     * (RENOMEADO) Handles the specific 'layout:panel-groups-changed' event.
      * Receives the Column instance directly from the event emitter.
      *
      * @param {Column} column - The column instance needing a layout update.
      * @private
      */
-    _onColumnChanged(column) {
+    _onPanelGroupsChanged(column) {
         if (!column || !(column instanceof Column)) {
             // Validação centralizada para garantir que encontramos uma coluna válida
-            console.warn('LayoutService: "_onColumnChanged" received an invalid column object.');
+            console.warn(
+                'LayoutService: "_onPanelGroupsChanged" received an invalid column object.'
+            );
             return;
         }
 

@@ -7,8 +7,9 @@ import { throttleRAF } from '../ThrottleRAF.js';
  * Description:
  * Manages a single vertical column in the container. It holds and organizes
  * PanelGroups, manages horizontal resizing, and delegates drag/drop logic.
+ *
  * (Refatorado) Agora delega a lógica de layout (fills-space, collapse rules)
- * para o LayoutService emitindo 'layout:changed'.
+ * para o LayoutService emitindo 'layout:panel-groups-changed'.
  *
  * Properties summary:
  * - state {object} : Internal state management.
@@ -182,11 +183,12 @@ export class Column {
 
     /**
      * (MODIFICADO) Handles the start of a horizontal resize drag.
+     * 'onUp' agora delega ao LayoutService (via Row).
      * @param {MouseEvent} e - The mousedown event.
      */
     startResize(e) {
         const me = this;
-        const container = me.state.container;
+        const container = me.state.container; // Esta é a instância da Row (pai)
 
         const columns = container.getColumns(); // Usa o getter
         const cols = columns.map(c => c.element);
@@ -213,9 +215,9 @@ export class Column {
             // Cancela qualquer frame O(1) pendente
             me.getThrottledUpdate()?.cancel();
 
-            // Chama a atualização O(N) uma única vez no final
-            // para sincronizar todas as colunas (especialmente a última).
-            container.updateColumnsSizes();
+            // (MODIFICADO) Chama a atualização O(N) da Row (pai)
+            // que agora emite 'layout:columns-changed' para o LayoutService.
+            container.requestLayoutUpdate();
         };
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
@@ -231,6 +233,7 @@ export class Column {
         } else if (this.state.width !== null) {
             this.element.style.flex = `0 0 ${this.state.width}px`;
         }
+        // (MODIFICADO) Emite o evento renomeado
         this.requestLayoutUpdate();
     }
 
@@ -350,11 +353,12 @@ export class Column {
     }
 
     /**
-     * Emite um evento para o LayoutService recalcular esta coluna.
+     * (MODIFICADO) Emite um evento para o LayoutService recalcular esta coluna.
      */
     requestLayoutUpdate() {
         if (this.state.container) {
-            appBus.emit('layout:column-changed', this);
+            // (MODIFICADO) Evento renomeado para maior clareza
+            appBus.emit('layout:panel-groups-changed', this);
         }
     }
 

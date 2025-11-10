@@ -10,6 +10,9 @@ import { DragDropService } from './Services/DND/DragDropService.js';
  *
  * (Contexto 12) Agora também gere os handles de resize vertical (altura) das Rows.
  *
+ * (Refatorado) A lógica de cálculo de layout (fills-space) foi movida
+ * para o LayoutService. Este componente apenas emite 'layout:rows-changed'.
+ *
  * Properties summary:
  * - state {object} : Gerencia os filhos (instâncias de Row).
  */
@@ -62,6 +65,13 @@ export class Container {
     }
 
     /**
+     * (NOVO) Notifica o LayoutService que o layout das linhas mudou.
+     */
+    requestLayoutUpdate() {
+        appBus.emit('layout:rows-changed', this);
+    }
+
+    /**
      * Chamado quando a última coluna de uma Row é removida.
      */
     onRowEmpty(row) {
@@ -101,7 +111,8 @@ export class Container {
             this.state.children.splice(index, 0, row);
         }
 
-        this.updateRowsHeights();
+        // (MODIFICADO) Delega ao LayoutService
+        this.requestLayoutUpdate();
         this.updateAllResizeBars(); // (NOVO) Contexto 12
         return row;
     }
@@ -125,7 +136,8 @@ export class Container {
         // Remove do estado
         this.state.children.splice(index, 1);
 
-        this.updateRowsHeights();
+        // (MODIFICADO) Delega ao LayoutService
+        this.requestLayoutUpdate();
         this.updateAllResizeBars(); // (NOVO) Contexto 12
     }
 
@@ -146,15 +158,8 @@ export class Container {
     }
 
     /**
-     * (MODIFICADO) Contexto 12: Atualiza a altura (flex-basis) de todas as linhas.
-     * Passa o 'isLast' para que a última linha preencha o espaço.
+     * (REMOVIDO) updateRowsHeights() foi movido para o LayoutService.
      */
-    updateRowsHeights() {
-        const rows = this.getRows();
-        rows.forEach((row, idx) => {
-            row.updateHeight(idx === rows.length - 1); // (CORREÇÃO BÓNUS)
-        });
-    }
 
     /**
      * (MODIFICADO) Limpa o container e todas as linhas filhas.
@@ -205,7 +210,8 @@ export class Container {
             this.createRow();
         }
 
-        this.updateRowsHeights();
+        // (MODIFICADO) Delega ao LayoutService
+        this.requestLayoutUpdate();
         this.updateAllResizeBars(); // (NOVO) Contexto 12
     }
 }

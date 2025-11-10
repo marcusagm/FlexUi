@@ -9,6 +9,9 @@ import { throttleRAF } from './ThrottleRAF.js'; // (NOVO) Contexto 12
  * Atua como uma "drop zone inteligente" (tipo 'row') para detetar
  * o drop nas "lacunas" (gaps) entre as colunas.
  * (Contexto 12) Agora também gere o redimensionamento vertical (altura).
+ *
+ * (Refatorado) A lógica de cálculo de layout (fills-space) foi movida
+ * para o LayoutService. Este componente apenas emite 'layout:columns-changed'.
  */
 export class Row {
     state = {
@@ -110,6 +113,13 @@ export class Row {
     }
 
     /**
+     * (NOVO) Notifica o LayoutService que o layout das colunas mudou.
+     */
+    requestLayoutUpdate() {
+        appBus.emit('layout:columns-changed', this);
+    }
+
+    /**
      * (NOVO) Contexto 12: Limpeza de listeners e filhos
      */
     destroy() {
@@ -162,6 +172,7 @@ export class Row {
 
     /**
      * (NOVO) Contexto 12: Lógica de resize vertical
+     * (MODIFICADO) 'onUp' agora chama 'requestLayoutUpdate' do container
      * @param {MouseEvent} e
      */
     startResize(e) {
@@ -187,7 +198,8 @@ export class Row {
             window.removeEventListener('mousemove', onMove);
             window.removeEventListener('mouseup', onUp);
             me.getThrottledUpdate()?.cancel();
-            container.updateRowsHeights(); // Sincroniza O(N)
+            // (MODIFICADO) Delega ao LayoutService (via Container)
+            container.requestLayoutUpdate(); // Sincroniza O(N)
         };
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
@@ -214,7 +226,8 @@ export class Row {
 
         this.updateAllResizeBars();
         column.setParentContainer(this); // O pai da Coluna é a Row
-        this.updateColumnsSizes();
+        // (MODIFICADO) Delega ao LayoutService
+        this.requestLayoutUpdate();
         return column;
     }
 
@@ -232,7 +245,8 @@ export class Row {
             this.element.removeChild(columnEl);
         }
         this.state.children.splice(index, 1);
-        this.updateColumnsSizes();
+        // (MODIFICADO) Delega ao LayoutService
+        this.requestLayoutUpdate();
         this.updateAllResizeBars();
     }
 
@@ -251,12 +265,9 @@ export class Row {
         return columns[columns.length - 1] || this.createColumn();
     }
 
-    updateColumnsSizes() {
-        const columns = this.getColumns();
-        columns.forEach((column, idx) => {
-            column.updateWidth(idx === columns.length - 1);
-        });
-    }
+    /**
+     * (REMOVIDO) updateColumnsSizes() foi movido para o LayoutService.
+     */
 
     /**
      * (MODIFICADO) Contexto 11/12: Atualiza a altura CSS desta linha.
@@ -307,7 +318,8 @@ export class Row {
             column.fromJSON(colData);
         });
 
-        this.updateColumnsSizes();
+        // (MODIFICADO) Delega ao LayoutService
+        this.requestLayoutUpdate();
         this.updateAllResizeBars();
         this.updateHeight(false); // Assume que não é a última
     }
