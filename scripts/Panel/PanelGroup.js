@@ -30,6 +30,10 @@ import { throttleRAF } from '../ThrottleRAF.js'; // Importa o throttleRAF
  * (Refatorado vBugFix 6) Adiciona stopPropagation() aos listeners
  * de DND do contentContainer para evitar que 'borbulhem' para a Column.
  *
+ * (Refatorado vBugFix 7) Adiciona 'mouseleave' aos handlers de
+ * 'startResize' para prevenir "estado preso" (stuck state)
+ * se o mouse sair da janela.
+ *
  * Properties summary:
  * - state {object} : Internal state management.
  */
@@ -377,7 +381,8 @@ export class PanelGroup {
     }
 
     /**
-     * (MODIFICADO) Handles the start of a vertical resize drag.
+     * (MODIFICADO - BugFix 7) Handles the start of a vertical resize drag.
+     * Adiciona 'mouseleave' ao 'window' para prevenir "stuck state".
      * @param {MouseEvent} e - The mousedown event.
      */
     startResize(e) {
@@ -400,6 +405,7 @@ export class PanelGroup {
         const onUp = () => {
             window.removeEventListener('mousemove', onMove);
             window.removeEventListener('mouseup', onUp);
+            window.removeEventListener('mouseleave', onUp); // (NOVO - BugFix 7)
 
             // (NOVO) Cancela qualquer frame O(1) pendente
             me.getThrottledUpdate()?.cancel();
@@ -410,6 +416,7 @@ export class PanelGroup {
 
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
+        window.addEventListener('mouseleave', onUp); // (NOVO - BugFix 7)
     }
 
     /**

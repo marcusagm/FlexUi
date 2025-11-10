@@ -17,6 +17,10 @@ import { DragDropService } from '../Services/DND/DragDropService.js';
  * explícito no payload do appBus.
  *
  * (Refatorado vCodeSmell) Removido setTimeout de updateScrollButtons.
+ *
+ * (Refatorado vBugFix 7) Adiciona stopPropagation() aos listeners
+ * de DND do 'this.element' (header) para evitar "flickering"
+ * (borbulhamento para a Column).
  */
 export class PanelGroupHeader {
     state = {
@@ -34,6 +38,14 @@ export class PanelGroupHeader {
         this.panelGroup = panelGroup;
         this.element = document.createElement('div');
         this.element.classList.add('panel-group__header');
+
+        // (NOVO - BugFix 7) Impede que eventos de DND no cabeçalho
+        // (ex: sobre os botões) borbulhem para a Column pai.
+        this.element.addEventListener('dragenter', e => e.stopPropagation());
+        this.element.addEventListener('dragover', e => e.stopPropagation());
+        this.element.addEventListener('dragleave', e => e.stopPropagation());
+        this.element.addEventListener('drop', e => e.stopPropagation());
+
         this.build();
 
         this._initResizeObserver();
