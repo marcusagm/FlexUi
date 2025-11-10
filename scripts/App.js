@@ -179,14 +179,12 @@ export class App {
     }
 
     /**
-     * Manipulador de resize chamado pelo debounce.
+     * (MODIFICADO) Manipulador de resize chamado pelo debounce.
      */
     onResizeHandler() {
-        // (MODIFICADO) Agora itera sobre Linhas E Colunas
-        this.container.getRows().forEach(row => {
-            row.getColumns().forEach(column => {
-                appBus.emit('layout:column-changed', column);
-            });
-        });
+        // Esta função é mantida (pois o listener está nela),
+        // mas a lógica O(N*M) foi removida.
+        // O layout Flexbox (CSS) e os ResizeObservers (JS)
+        // gerenciam o redimensionamento de forma passiva e eficiente.
     }
 }
