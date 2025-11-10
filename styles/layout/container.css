@@ -44,3 +44,25 @@
     flex: var(--container-placeholder-vertical-flex);
     align-self: stretch;
 }
+
+/* (NOVO) Contexto 12: Handle de resize vertical para Rows */
+.row__resize-handle {
+    /* Oculto por defeito; O JS (addResizeBars) adiciona/remove este elemento */
+    height: var(--panel-resize-handle-height); /* Reutiliza o token (3px) */
+    width: 100%;
+    cursor: ns-resize; /* Redimensionamento Norte-Sul (vertical) */
+    background: var(--color-border-default);
+    transition: background-color 0.2s ease-in-out;
+
+    /* Posicionamento na parte inferior da linha */
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    z-index: 5;
+}
+.row__resize-handle:hover {
+    background: var(--color-accent-hover);
+}
+.row__resize-handle:active {
+    background: var(--color-accent-active);
+}

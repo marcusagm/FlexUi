@@ -1,36 +1,81 @@
 import { Column } from './Column/Column.js';
 import { appBus } from './EventBus.js';
 import { DragDropService } from './Services/DND/DragDropService.js';
+import { throttleRAF } from './ThrottleRAF.js'; // (NOVO) Contexto 12
 
 /**
  * Description:
  * (REFATORADO) Gere uma única Linha (Row) horizontal que contém Colunas.
  * Atua como uma "drop zone inteligente" (tipo 'row') para detetar
  * o drop nas "lacunas" (gaps) entre as colunas.
- *
- * Properties summary:
- * - state {object} : Gerencia os filhos (apenas `[Col, Col, ...]`).
+ * (Contexto 12) Agora também gere o redimensionamento vertical (altura).
  */
 export class Row {
     state = {
-        children: [], // (Simplificado - agora só contém Colunas)
-        parentContainer: null, // (NOVO) Referência ao Container pai
-        height: null // (NOVO) Altura da linha (para resize vertical futuro)
+        children: [], // Contém instâncias de Column
+        parentContainer: null, // (NOVO) Contexto 11
+        height: null // (NOVO) Contexto 11
     };
+
+    /**
+     * (NOVO) Contexto 12
+     * @type {number}
+     * @private
+     */
+    _minHeight = 100; // Altura mínima de 100px para uma linha
+
+    /**
+     * (NOVO) Contexto 12
+     * @type {function | null}
+     * @private
+     */
+    _throttledUpdate = null;
 
     constructor(container, height = null) {
         this.element = document.createElement('div');
-        this.element.classList.add('row'); // (MODIFICADO) CSS class
-        this.state.parentContainer = container;
-        this.state.height = height;
+        this.element.classList.add('row'); // (MODIFICADO) Contexto 11
+        this.state.parentContainer = container; // (NOVO) Contexto 11
+        this.state.height = height; // (NOVO) Contexto 11
+        this.setMinHeight(this._minHeight); // (NOVO) Contexto 12
 
-        this.dropZoneType = 'row'; // (MODIFICADO) Drop zone type
+        this.dropZoneType = 'row'; // (MODIFICADO) Contexto 11
         this.initDNDListeners();
+
+        // (NOVO) Contexto 12
+        this.setThrottledUpdate(
+            throttleRAF(() => {
+                // Passa 'false' pois a sincronização O(N) é feita no 'onUp'
+                this.updateHeight(false);
+            })
+        );
 
         this.clear();
         this.initEventListeners();
-        this.updateHeight();
+        this.updateHeight(false); // (MODIFICADO) Contexto 11/12
     }
+
+    // --- Getters / Setters (Contexto 12) ---
+    setMinHeight(height) {
+        const sanitizedHeight = Number(height);
+        if (isNaN(sanitizedHeight) || sanitizedHeight < 0) {
+            this._minHeight = 0;
+            return;
+        }
+        this._minHeight = sanitizedHeight;
+    }
+    getMinHeight() {
+        return this._minHeight;
+    }
+    setThrottledUpdate(throttledFunction) {
+        this._throttledUpdate = throttledFunction;
+    }
+    getThrottledUpdate() {
+        return this._throttledUpdate;
+    }
+    setParentContainer(container) {
+        this.state.parentContainer = container;
+    }
+    // --- Fim Getters / Setters ---
 
     // Listeners D&D (delegam ao serviço)
     initDNDListeners() {
@@ -65,15 +110,25 @@ export class Row {
     }
 
     /**
-     * (MODIFICADO) Chamado quando a última coluna é removida.
-     * Notifica o Container (pai) se a linha ficar vazia.
+     * (NOVO) Contexto 12: Limpeza de listeners e filhos
+     */
+    destroy() {
+        const me = this;
+        appBus.off('column:empty', this.onColumnEmpty.bind(me));
+        me.getThrottledUpdate()?.cancel();
+
+        // Destrói todas as colunas filhas
+        [...me.getColumns()].forEach(column => column.destroy());
+    }
+
+    /**
+     * (MODIFICADO) Contexto 11
      */
     onColumnEmpty(column) {
         this.deleteColumn(column);
 
-        // (NOVO) Notifica o Container se esta linha ficar vazia
         if (this.getTotalColumns() === 0 && this.state.parentContainer) {
-            appBus.emit('row:empty', this);
+            appBus.emit('row:empty', this); // Notifica o Container (pai)
         }
     }
 
@@ -89,8 +144,57 @@ export class Row {
     }
 
     /**
+     * (NOVO) Contexto 12: Adiciona o handle de resize vertical
+     * @param {boolean} isLast - Se é a última linha no container
+     */
+    addResizeBars(isLast) {
+        this.element.querySelectorAll('.row__resize-handle').forEach(b => b.remove());
+        this.element.classList.remove('row--resize-bottom');
+
+        if (isLast) return;
+
+        this.element.classList.add('row--resize-bottom');
+        const bar = document.createElement('div');
+        bar.classList.add('row__resize-handle'); // (CSS na Etapa 3)
+        this.element.appendChild(bar);
+        bar.addEventListener('mousedown', e => this.startResize(e));
+    }
+
+    /**
+     * (NOVO) Contexto 12: Lógica de resize vertical
+     * @param {MouseEvent} e
+     */
+    startResize(e) {
+        const me = this;
+        const container = me.state.parentContainer;
+        if (!container) return;
+
+        const rows = container.getRows();
+        const idx = rows.indexOf(me);
+        if (rows.length === 1 || idx === rows.length - 1) return;
+
+        e.preventDefault();
+        const startY = e.clientY;
+        const startH = me.element.offsetHeight;
+
+        const onMove = ev => {
+            const delta = ev.clientY - startY;
+            me.state.height = Math.max(me.getMinHeight(), startH + delta);
+            me.getThrottledUpdate()(); // Atualiza O(1)
+        };
+
+        const onUp = () => {
+            window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('mouseup', onUp);
+            me.getThrottledUpdate()?.cancel();
+            container.updateRowsHeights(); // Sincroniza O(N)
+        };
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+    }
+
+    /**
      * Cria e insere uma nova Coluna.
-     * (Lógica de gestão de 'children' inalterada)
      */
     createColumn(width = null, index = null) {
         const column = new Column(this, width); // 'this' (Row) é o container da Coluna
@@ -109,15 +213,13 @@ export class Row {
         }
 
         this.updateAllResizeBars();
-        // (MODIFICADO) O 'parent container' da Coluna é a 'Row'
-        column.setParentContainer(this);
+        column.setParentContainer(this); // O pai da Coluna é a Row
         this.updateColumnsSizes();
         return column;
     }
 
     /**
      * Exclui uma coluna.
-     * (Lógica inalterada)
      */
     deleteColumn(column) {
         const index = this.state.children.indexOf(column);
@@ -134,32 +236,21 @@ export class Row {
         this.updateAllResizeBars();
     }
 
-    /**
-     * Retorna todas as instâncias de Coluna.
-     * (Lógica inalterada)
-     */
     getColumns() {
         return this.state.children;
     }
-
     getTotalColumns() {
         return this.getColumns().length;
     }
-
     getFirstColumn() {
         const columns = this.getColumns();
         return columns[0] || this.createColumn();
     }
-
     getLastColumn() {
         const columns = this.getColumns();
         return columns[columns.length - 1] || this.createColumn();
     }
 
-    /**
-     * Atualiza a largura de todas as colunas.
-     * (Lógica inalterada)
-     */
     updateColumnsSizes() {
         const columns = this.getColumns();
         columns.forEach((column, idx) => {
@@ -168,12 +259,18 @@ export class Row {
     }
 
     /**
-     * (NOVO) Atualiza a altura CSS desta linha.
+     * (MODIFICADO) Contexto 11/12: Atualiza a altura CSS desta linha.
+     * @param {boolean} isLast - Se esta linha é a última.
      */
-    updateHeight() {
-        if (this.state.height !== null) {
+    updateHeight(isLast) {
+        if (isLast) {
+            this.element.style.flex = `1 1 auto`;
+            this.state.height = null; // Garante que a última linha sempre preenche
+        } else if (this.state.height !== null) {
             this.element.style.flex = `0 0 ${this.state.height}px`;
         } else {
+            // Se não for a última e não tiver altura,
+            // comporta-se como 'fills-space'
             this.element.style.flex = `1 1 auto`;
         }
     }
@@ -184,7 +281,7 @@ export class Row {
     }
 
     /**
-     * (MODIFICADO) Serializa esta Linha (altura e colunas).
+     * (MODIFICADO) Contexto 11
      */
     toJSON() {
         return {
@@ -194,7 +291,7 @@ export class Row {
     }
 
     /**
-     * (MODIFICADO) Desserializa esta Linha (altura e colunas).
+     * (MODIFICADO) Contexto 11
      */
     fromJSON(data) {
         this.clear();
@@ -212,6 +309,6 @@ export class Row {
 
         this.updateColumnsSizes();
         this.updateAllResizeBars();
-        this.updateHeight();
+        this.updateHeight(false); // Assume que não é a última
     }
 }

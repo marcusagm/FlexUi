@@ -6,7 +6,9 @@ import { DragDropService } from './Services/DND/DragDropService.js';
  * Description:
  * (NOVO) O contêiner principal da aplicação. Gere o layout vertical das Linhas (Row).
  * Atua como uma "drop zone inteligente" (tipo 'container') para detetar
- * o drop nas "lacunas" (gaps) verticais entre as Linhas.
+ * o drop nas "lacunas" (gaps) verticaIS entre as Linhas.
+ *
+ * (Contexto 12) Agora também gere os handles de resize vertical (altura) das Rows.
  *
  * Properties summary:
  * - state {object} : Gerencia os filhos (instâncias de Row).
@@ -67,6 +69,17 @@ export class Container {
     }
 
     /**
+     * (NOVO) Contexto 12: Atualiza as barras de redimensionamento de todas as linhas.
+     * (Lógica adaptada do Row.js)
+     */
+    updateAllResizeBars() {
+        const rows = this.getRows();
+        rows.forEach((row, idx) => {
+            row.addResizeBars(idx === rows.length - 1);
+        });
+    }
+
+    /**
      * (NOVO) Cria e insere uma nova Linha (Row).
      * @param {number|null} [height=null]
      * @param {number|null} [index=null] - O índice exato na lista de linhas.
@@ -89,31 +102,31 @@ export class Container {
         }
 
         this.updateRowsHeights();
+        this.updateAllResizeBars(); // (NOVO) Contexto 12
         return row;
     }
 
     /**
      * (NOVO) Exclui uma linha.
+     * (MODIFICADO) Contexto 12: Simplificado para usar row.destroy()
      */
     deleteRow(row) {
         const index = this.state.children.indexOf(row);
         if (index === -1) return;
 
-        // Limpeza manual (pois Row não tem destroy() na Etapa 1)
-        // 1. Remove listeners do appBus
-        appBus.off('column:empty', row.onColumnEmpty.bind(row));
-        // 2. Destrói colunas filhas
-        row.getColumns().forEach(col => col.destroy());
+        const rowEl = row.element;
+        row.destroy(); // (MODIFICADO) Contexto 12: Chama o destroy da Row
 
-        // 3. Remove DOM
-        const rowEl = this.state.children[index].element;
+        // Remove DOM
         if (rowEl && this.element.contains(rowEl)) {
             this.element.removeChild(rowEl);
         }
 
-        // 4. Remove do estado
+        // Remove do estado
         this.state.children.splice(index, 1);
+
         this.updateRowsHeights();
+        this.updateAllResizeBars(); // (NOVO) Contexto 12
     }
 
     /**
@@ -133,14 +146,13 @@ export class Container {
     }
 
     /**
-     * (NOVO) Atualiza a altura (flex-basis) de todas as linhas.
-     * Aplica 'flex: 1 1 auto' (preenchimento) a todas as linhas
-     * que não têm altura fixa (height === null).
+     * (MODIFICADO) Contexto 12: Atualiza a altura (flex-basis) de todas as linhas.
+     * Passa o 'isLast' para que a última linha preencha o espaço.
      */
     updateRowsHeights() {
         const rows = this.getRows();
-        rows.forEach(row => {
-            row.updateHeight();
+        rows.forEach((row, idx) => {
+            row.updateHeight(idx === rows.length - 1); // (CORREÇÃO BÓNUS)
         });
     }
 
@@ -148,7 +160,6 @@ export class Container {
      * (MODIFICADO) Limpa o container e todas as linhas filhas.
      */
     clear() {
-        // Faz uma cópia para iterar, pois deleteRow modifica o array
         [...this.getRows()].forEach(row => {
             this.deleteRow(row);
         });
@@ -195,5 +206,6 @@ export class Container {
         }
 
         this.updateRowsHeights();
+        this.updateAllResizeBars(); // (NOVO) Contexto 12
     }
 }

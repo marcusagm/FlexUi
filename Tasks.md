@@ -61,7 +61,7 @@
 
 - [x] Deve ocupar todo o viewport, tanto verticalmente quanto horizontalmente, desconsiderando o espaço do menu de sistema.
 - [x] Caso seja adicionado um painel e não houver colunas no container, deve ser adicionado uma para receber o novo painel.
-- [ ] Permitir divisão em linhas, não apenas colunas
+- [x] Permitir divisão em linhas, não apenas colunas
 
 ## Organização de paineis:
 
