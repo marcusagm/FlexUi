@@ -2,6 +2,7 @@ import { PanelGroupHeader } from './PanelGroupHeader.js';
 import { appBus } from '../EventBus.js';
 import { PanelFactory } from './PanelFactory.js';
 import { Panel } from './Panel.js'; // (NOVO) Importar Panel para verificação
+import { throttleRAF } from '../ThrottleRAF.js'; // (NOVO) Importa o throttleRAF
 
 /**
  * Description:
@@ -46,6 +47,13 @@ export class PanelGroup {
     id = Math.random().toString(36).substring(2, 9) + Date.now();
 
     /**
+     * A versão throttled (com rAF) da função de atualização.
+     * @type {function | null}
+     * @private
+     */
+    _throttledUpdate = null;
+
+    /**
      * @param {Panel | null} [initialPanel=null] - O painel inicial é opcional.
      * @param {number|null} [height=null] - The initial height of the group.
      * @param {boolean} [collapsed=false] - The initial collapsed state.
@@ -77,6 +85,32 @@ export class PanelGroup {
         }
 
         this.initEventListeners();
+
+        // (NOVO) Adiciona o throttleRAF para o resize O(1)
+        this.setThrottledUpdate(
+            throttleRAF(() => {
+                // Atualiza apenas a altura (O(1)), não o layout (O(N))
+                this.updateHeight();
+            })
+        );
+    }
+
+    // --- Getters / Setters ---
+
+    /**
+     * (NOVO) Define a função de atualização throttled.
+     * @param {function} throttledFunction
+     */
+    setThrottledUpdate(throttledFunction) {
+        this._throttledUpdate = throttledFunction;
+    }
+
+    /**
+     * (NOVO) Obtém a função de atualização throttled.
+     * @returns {function}
+     */
+    getThrottledUpdate() {
+        return this._throttledUpdate;
     }
 
     /**
@@ -113,6 +147,8 @@ export class PanelGroup {
     getColumn() {
         return this.state.column;
     }
+
+    // --- Concrete Methods ---
 
     /**
      * Initializes event listeners for the EventBus.
@@ -166,6 +202,9 @@ export class PanelGroup {
 
         // (NOVO) Destrói todos os painéis filhos (que limpam seus headers)
         this.state.panels.forEach(panel => panel.destroy());
+
+        // (NOVO) Cancela qualquer atualização de resize pendente
+        this.getThrottledUpdate()?.cancel();
     }
 
     /**
@@ -301,7 +340,7 @@ export class PanelGroup {
     }
 
     /**
-     * Handles the start of a vertical resize drag.
+     * (MODIFICADO) Handles the start of a vertical resize drag.
      * @param {MouseEvent} e - The mousedown event.
      */
     startResize(e) {
@@ -316,13 +355,19 @@ export class PanelGroup {
             const delta = ev.clientY - startY;
             me.state.height = Math.max(minPanelHeight, startH + delta);
 
-            me.requestLayoutUpdate();
+            // (MODIFICADO) Chama a função throttled (O(1))
+            me.getThrottledUpdate()();
+            // (REMOVIDO) me.requestLayoutUpdate();
         };
 
         const onUp = () => {
             window.removeEventListener('mousemove', onMove);
             window.removeEventListener('mouseup', onUp);
 
+            // (NOVO) Cancela qualquer frame O(1) pendente
+            me.getThrottledUpdate()?.cancel();
+
+            // (Mantido) Chama a atualização O(N) uma única vez no final
             me.requestLayoutUpdate();
         };
 
