@@ -3,6 +3,7 @@
     min-width: 150px;
     display: flex;
     flex-direction: column;
+    padding: 3px 0;
     gap: 3px;
     position: relative;
     overflow: auto;

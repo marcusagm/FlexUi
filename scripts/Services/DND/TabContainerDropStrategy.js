@@ -1,5 +1,6 @@
 import { Panel } from '../../Panel/Panel.js';
 import { DragDropService } from './DragDropService.js';
+import { PanelGroup } from '../../Panel/PanelGroup.js'; // (NOVO) Importa PanelGroup
 
 /**
  * Description:
@@ -8,34 +9,55 @@ import { DragDropService } from './DragDropService.js';
  *
  * Esta estratégia SÓ aceita drops do tipo 'Panel' e
  * gere a lógica de mover a aba entre PanelGroups.
+ *
+ * (Refatorado vBugFix 5) Esta estratégia agora também aceita
+ * 'PanelGroup', SE ele contiver apenas 1 painel,
+ * "desembrulhando-o" para mesclar os grupos.
  */
 export class TabContainerDropStrategy {
     /**
-     * Helper privado para obter os grupos de origem e destino.
+     * (MODIFICADO - BugFix 5) Helper privado para obter os grupos de origem e destino.
+     * Agora aceita arrastar um 'Panel' (aba) ou um 'PanelGroup' (com 1 painel).
+     *
      * @param {{item: object, type: string}} draggedData
      * @param {HTMLElement} dropZone (O elemento tabContainer)
      * @returns {{draggedPanel: Panel, sourceGroup: PanelGroup, targetGroup: PanelGroup} | null}
      * @private
      */
     _getGroups(draggedData, dropZone) {
+        const targetGroup = dropZone.panelGroupOwner;
+        if (!targetGroup) return null;
+
+        let draggedPanel = null;
+        let sourceGroup = null;
+
         // Valida o tipo de item arrastado
-        if (
-            !draggedData.item ||
-            draggedData.type !== 'Panel' ||
-            !(draggedData.item instanceof Panel)
-        ) {
+        if (!draggedData.item) {
             return null;
         }
 
-        const draggedPanel = draggedData.item;
+        if (draggedData.type === 'Panel') {
+            // --- Lógica Existente: Arrastando uma Aba (Panel) ---
+            if (!(draggedData.item instanceof Panel)) return null;
+            draggedPanel = draggedData.item;
+            sourceGroup = draggedPanel.state.parentGroup;
+        } else if (draggedData.type === 'PanelGroup') {
+            // --- Lógica Nova: Arrastando um Grupo (PanelGroup) ---
+            if (!(draggedData.item instanceof PanelGroup)) return null;
 
-        // O 'dropZone' é o 'tabContainer', que tem a referência de 'owner'
-        const targetGroup = dropZone.panelGroupOwner;
+            // Só aceita o drop se o PanelGroup tiver EXATAMENTE 1 painel
+            if (draggedData.item.state.panels.length === 1) {
+                sourceGroup = draggedData.item;
+                draggedPanel = sourceGroup.state.panels[0];
+            } else {
+                return null; // Recusa o drop (ex: arrastar um grupo com 3 abas)
+            }
+        } else {
+            return null; // Tipo desconhecido
+        }
 
-        // O painel arrastado tem a referência do seu pai
-        const sourceGroup = draggedPanel.state.parentGroup;
-
-        if (!targetGroup || !sourceGroup) {
+        // Validação final
+        if (!targetGroup || !sourceGroup || !draggedPanel) {
             return null;
         }
 
@@ -114,6 +136,7 @@ export class TabContainerDropStrategy {
         const { draggedPanel, sourceGroup, targetGroup } = groups;
 
         // 3. Executa a lógica de negócio (Mover a aba)
+        // (Esta lógica agora funciona para ambos os casos, Panel ou PanelGroup)
         sourceGroup.removePanel(draggedPanel);
         targetGroup.addPanel(draggedPanel, true); // Adiciona e torna ativa
     }

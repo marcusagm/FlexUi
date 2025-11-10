@@ -1,6 +1,6 @@
 import { PanelGroup } from '../../Panel/PanelGroup.js';
 import { DragDropService } from './DragDropService.js';
-import { Panel } from '../../Panel/Panel.js'; // (NOVO) Importa Panel
+import { Panel } from '../../Panel/Panel.js'; // Importa Panel
 
 /**
  * Description:
@@ -13,6 +13,10 @@ import { Panel } from '../../Panel/Panel.js'; // (NOVO) Importa Panel
  * (Refatorado vFeature 2) Esta estratégia agora aceita
  * 'PanelGroup' E 'Panel'. Se um 'Panel' for solto,
  * ele é envolvido (wrapped) num novo 'PanelGroup'.
+ *
+ * (Refatorado vBugFix 5) A lógica de 'midY' (ponto médio)
+ * foi substituída por 'dropThreshold' (limite fixo) para
+ * facilitar o drop nos 'gaps' superiores (próximos ao header).
  */
 export class ColumnDropStrategy {
     /**
@@ -36,7 +40,7 @@ export class ColumnDropStrategy {
     }
 
     /**
-     * (MODIFICADO) A assinatura agora inclui o 'draggedData' e 'dds'.
+     * (MODIFICADO - BugFix 5) Usa 'dropThreshold' em vez de 'midY'.
      * @param {DragEvent} e - O evento nativo.
      * @param {Column} dropZone - A instância da Coluna.
      * @param {{item: object, type: string}} draggedData - O item e tipo arrastados.
@@ -68,18 +72,20 @@ export class ColumnDropStrategy {
             if (draggedItem === targetGroup) continue;
 
             const rect = targetGroup.element.getBoundingClientRect();
-            const midY = rect.top + rect.height / 2;
+            // (MODIFICADO - BugFix 5) Usa um threshold fixo (ex: 20px)
+            // em vez do ponto médio (rect.height / 2).
+            const dropThreshold = rect.top + 20;
 
             this._dropZoneCache.push({
                 element: targetGroup.element,
-                midY: midY,
+                dropThreshold: dropThreshold, // (MODIFICADO)
                 originalIndex: i
             });
         }
     }
 
     /**
-     * (MODIFICADO) Manipula a lógica de 'dragover'.
+     * (MODIFICADO - BugFix 5) Usa 'dropThreshold' em vez de 'midY'.
      * @param {DragEvent} e - O evento nativo.
      * @param {Column} dropZone - A instância da Coluna.
      * @param {{item: object, type: string}} draggedData - O item e tipo arrastados.
@@ -123,7 +129,8 @@ export class ColumnDropStrategy {
 
         // 2. Itera sobre o cache.
         for (const cacheItem of this._dropZoneCache) {
-            if (e.clientY < cacheItem.midY) {
+            // (MODIFICADO - BugFix 5) Compara com o 'dropThreshold'
+            if (e.clientY < cacheItem.dropThreshold) {
                 dropZone.element.insertBefore(placeholder, cacheItem.element);
                 placed = true;
                 this._dropIndex = cacheItem.originalIndex;
