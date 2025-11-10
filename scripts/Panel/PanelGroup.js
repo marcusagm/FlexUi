@@ -16,6 +16,9 @@ import { throttleRAF } from '../ThrottleRAF.js'; // Importa o throttleRAF
  * (Refatorado vOpt 5) A lógica de 'setMode' foi movida de _updateHeaderMode (O(N))
  * para addPanel/removePanel (O(1) ou O(2)), tratando apenas as transições.
  *
+ * (Refatorado vBugFix) Corrige o vazamento de listeners do appBus
+ * armazenando as referências bindadas.
+ *
  * Properties summary:
  * - state {object} : Internal state management.
  */
@@ -56,6 +59,11 @@ export class PanelGroup {
      */
     _throttledUpdate = null;
 
+    // (NOVO) Armazena referências bindadas para os listeners do appBus
+    _boundOnChildCloseRequest = null;
+    _boundOnCloseRequest = null;
+    _boundOnToggleCollapseRequest = null;
+
     /**
      * @param {Panel | null} [initialPanel=null] - O painel inicial é opcional.
      * @param {number|null} [height=null] - The initial height of the group.
@@ -80,6 +88,11 @@ export class PanelGroup {
         if (height !== null) {
             this.state.height = height;
         }
+
+        // (NOVO) Define as referências bindadas
+        this._boundOnChildCloseRequest = this.onChildCloseRequest.bind(this);
+        this._boundOnCloseRequest = this.onCloseRequest.bind(this);
+        this._boundOnToggleCollapseRequest = this.onToggleCollapseRequest.bind(this);
 
         this.build();
 
@@ -154,12 +167,13 @@ export class PanelGroup {
     // --- Concrete Methods ---
 
     /**
-     * Initializes event listeners for the EventBus.
+     * (MODIFICADO) Initializes event listeners for the EventBus.
+     * Usa as referências bindadas.
      */
     initEventListeners() {
-        appBus.on('panel:group-child-close-request', this.onChildCloseRequest.bind(this));
-        appBus.on('panel:close-request', this.onCloseRequest.bind(this));
-        appBus.on('panel:toggle-collapse-request', this.onToggleCollapseRequest.bind(this));
+        appBus.on('panel:group-child-close-request', this._boundOnChildCloseRequest);
+        appBus.on('panel:close-request', this._boundOnCloseRequest);
+        appBus.on('panel:toggle-collapse-request', this._boundOnToggleCollapseRequest);
     }
 
     /**
@@ -193,21 +207,23 @@ export class PanelGroup {
     }
 
     /**
-     * Cleans up event listeners when the group is destroyed.
+     * (MODIFICADO) Cleans up event listeners when the group is destroyed.
+     * Usa as referências bindadas.
      */
     destroy() {
-        appBus.off('panel:group-child-close-request', this.onChildCloseRequest.bind(this));
-        appBus.off('panel:close-request', this.onCloseRequest.bind(this));
-        appBus.off('panel:toggle-collapse-request', this.onToggleCollapseRequest.bind(this));
+        const me = this;
+        appBus.off('panel:group-child-close-request', me._boundOnChildCloseRequest);
+        appBus.off('panel:close-request', me._boundOnCloseRequest);
+        appBus.off('panel:toggle-collapse-request', me._boundOnToggleCollapseRequest);
 
         // Garante que o ResizeObserver do header seja desconectado
-        this.state.header?.destroy();
+        me.state.header?.destroy();
 
         // (NOVO) Destrói todos os painéis filhos (que limpam seus headers)
-        this.state.panels.forEach(panel => panel.destroy());
+        me.state.panels.forEach(panel => panel.destroy());
 
         // Cancela qualquer atualização de resize pendente
-        this.getThrottledUpdate()?.cancel();
+        me.getThrottledUpdate()?.cancel();
     }
 
     /**
@@ -542,7 +558,7 @@ export class PanelGroup {
     requestLayoutUpdate() {
         const column = this.getColumn();
         if (column) {
-            appBus.emit('layout:column-changed', column);
+            appBus.emit('layout:panel-groups-changed', column);
         }
     }
 

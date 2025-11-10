@@ -14,6 +14,9 @@ import { appBus } from '../EventBus.js';
  *
  * O PanelGroup (pai) é responsável por orquestrar ONDE
  * estes dois elementos são anexados.
+ *
+ * (Refatorado vBugFix) Corrige o vazamento de listeners do appBus
+ * (removendo o listener 'panel:close-request' que era inútil).
  */
 export class Panel {
     state = {
@@ -54,7 +57,7 @@ export class Panel {
 
         this.build();
         this.populateContent();
-        this.initEventListeners();
+        // (REMOVIDO) initEventListeners() foi removido
     }
 
     /**
@@ -74,19 +77,16 @@ export class Panel {
         return Math.max(0, this.state.minHeight);
     }
 
-    initEventListeners() {
-        // Escuta apenas pelo seu próprio fechamento
-        appBus.on('panel:close-request', this.onCloseRequest.bind(this));
-    }
+    /**
+     * (REMOVIDO) initEventListeners()
+     */
 
-    onCloseRequest(panel) {
-        if (panel === this) {
-            this.close();
-        }
-    }
+    /**
+     * (REMOVIDO) onCloseRequest()
+     */
 
     destroy() {
-        appBus.off('panel:close-request', this.onCloseRequest.bind(this));
+        // (REMOVIDO) appBus.off('panel:close-request', ...)
         // (NOVO) Garante que o header também é limpo (ex: listeners D&D)
         if (this.state.header && typeof this.state.header.destroy === 'function') {
             this.state.header.destroy();
