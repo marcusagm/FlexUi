@@ -5,7 +5,7 @@ import { Modal } from '../Services/Modal/Modal.js';
 export class ToolbarPanel extends Panel {
     constructor(title, height = null, collapsed = false) {
         super(title, height, collapsed, {
-            closable: false,
+            closable: true,
             collapsible: false,
             movable: false,
             minHeight: 50
@@ -25,29 +25,20 @@ export class ToolbarPanel extends Panel {
         contentEl.classList.add('panel__content--toolbar');
 
         const btn1 = document.createElement('button');
-        btn1.textContent = 'Ferramenta 1';
-        btn1.onclick = () => appNotifications.info('Clicou na Ferramenta 1');
+        btn1.textContent = 'Info';
+        btn1.onclick = () => appNotifications.info('Clicou na info!');
 
         const btn2 = document.createElement('button');
-        btn2.textContent = 'Editar';
-        btn2.onclick = () => appNotifications.success('Clicou em Editar');
+        btn2.textContent = 'Success';
+        btn2.onclick = () => appNotifications.success('Clicou em Success');
 
         const btn3 = document.createElement('button');
-        btn3.textContent = 'Salvar';
-        btn3.onclick = () => appNotifications.warning('Clicou em Salvar', { sticky: true });
+        btn3.textContent = 'Warning';
+        btn3.onclick = () => appNotifications.warning('Clicou em Warning');
 
         const btn4 = document.createElement('button');
-        btn4.textContent = 'Preferencias';
+        btn4.textContent = 'Danger';
         btn4.onclick = () => {
-            Modal.open({
-                title: 'Preferências',
-                content: 'Teste de janela modal mostrando uma tela para editar preferências.',
-                footerText: 'Texto de rodapé'
-            });
-        };
-        const btn5 = document.createElement('button');
-        btn5.textContent = 'Preferencias';
-        btn5.onclick = () => {
             appNotifications.danger('Connection lost. Cannot save data.', {
                 sticky: true,
                 buttons: [
@@ -65,6 +56,16 @@ export class ToolbarPanel extends Panel {
                         onClick: id => appNotifications.dismiss(id)
                     }
                 ]
+            });
+        };
+
+        const btn5 = document.createElement('button');
+        btn5.textContent = 'Preferencias';
+        btn5.onclick = () => {
+            Modal.open({
+                title: 'Preferências',
+                content: 'Teste de janela modal mostrando uma tela para editar preferências.',
+                footerText: 'Texto de rodapé'
             });
         };
 

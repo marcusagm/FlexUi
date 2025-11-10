@@ -1,4 +1,5 @@
 import { Menu } from './Menu/Menu.js';
+// (MODIFICADO) 'Container' é agora o novo Container (gestor de linhas)
 import { Container } from './Container.js';
 import { Panel } from './Panel/Panel.js';
 import { TextPanel } from './Panel/TextPanel.js';
@@ -12,8 +13,10 @@ import { NotificationUIListener } from './Services/Notification/NotificationUILi
 import { TranslationService } from './Services/TranslationService.js';
 import { DragDropService } from './Services/DND/DragDropService.js';
 import { ColumnDropStrategy } from './Services/DND/ColumnDropStrategy.js';
+// (MODIFICADO) Renomeado de ContainerDropStrategy para RowDropStrategy (Etapa 1)
+import { RowDropStrategy } from './Services/DND/RowDropStrategy.js';
+// (NOVO) Importa a nova estratégia (Etapa 3)
 import { ContainerDropStrategy } from './Services/DND/ContainerDropStrategy.js';
-// (NOVO) Importa a nova estratégia de Abas
 import { TabContainerDropStrategy } from './Services/DND/TabContainerDropStrategy.js';
 import { PanelFactory } from './Panel/PanelFactory.js';
 import { LayoutService } from './Services/LayoutService.js';
@@ -39,16 +42,18 @@ export class App {
         App.instance = this;
 
         this.menu = new Menu();
+        // (MODIFICADO) 'this.container' é agora o novo Container (gestor de linhas)
         this.container = new Container();
         this.statusBar = new StatusBar();
 
         this.stateService = StateService.getInstance();
 
+        // (MODIFICADO) Regista as 4 estratégias
         const dds = DragDropService.getInstance();
         dds.registerStrategy('column', new ColumnDropStrategy());
-        dds.registerStrategy('container', new ContainerDropStrategy());
-        // (NOVO) Regista a nova estratégia para o 'TabContainer'
         dds.registerStrategy('TabContainer', new TabContainerDropStrategy());
+        dds.registerStrategy('row', new RowDropStrategy()); // (Renomeado)
+        dds.registerStrategy('container', new ContainerDropStrategy()); // (Novo)
 
         const factory = PanelFactory.getInstance();
         factory.registerPanelClasses([Panel, TextPanel, ToolbarPanel]);
@@ -98,7 +103,7 @@ export class App {
         if (workspaceData && workspaceData.layout) {
             // Armazena o objeto de workspace completo (com nome e layout)
             this.currentWorkspace = workspaceData;
-            // Passa apenas os dados de layout para o container
+            // Passa apenas os dados de layout para o container (que agora suporta 'rows')
             this.container.fromJSON(workspaceData.layout);
         } else {
             // Isso só deve acontecer se o default.json falhar ao carregar
@@ -163,7 +168,8 @@ export class App {
     }
 
     addNewPanel() {
-        const column = this.container.getFirstColumn();
+        // (MODIFICADO) Navega pela nova estrutura: Container -> Row -> Column
+        const column = this.container.getFirstRow().getFirstColumn();
         const title = `Novo Painel (${new Date().toLocaleTimeString()})`;
         const panel = new TextPanel(title, 'Conteúdo do novo painel.');
 
@@ -176,8 +182,11 @@ export class App {
      * Manipulador de resize chamado pelo debounce.
      */
     onResizeHandler() {
-        this.container.getColumns().forEach(column => {
-            appBus.emit('layout:column-changed', column);
+        // (MODIFICADO) Agora itera sobre Linhas E Colunas
+        this.container.getRows().forEach(row => {
+            row.getColumns().forEach(column => {
+                appBus.emit('layout:column-changed', column);
+            });
         });
     }
 }

@@ -1,203 +1,199 @@
-import { Column } from './Column/Column.js';
-// import { ColumnCreateArea } from './Column/ColumnCreateArea.js'; // REMOVIDO
+import { Row } from './Row.js';
 import { appBus } from './EventBus.js';
-import { DragDropService } from './Services/DND/DragDropService.js'; // ADICIONADO
+import { DragDropService } from './Services/DND/DragDropService.js';
 
 /**
  * Description:
- * O contêiner principal da aplicação. Gerencia o layout das Colunas (Column).
- * Delega o estado de D&D ao DragDropService.
- *
- * (Refatorado vPlan) Agora atua como uma "drop zone inteligente" (tipo 'container')
- * para detetar o drop nas "lacunas" (gaps) entre as colunas,
- * eliminando a necessidade de ColumnCreateArea.
+ * (NOVO) O contêiner principal da aplicação. Gere o layout vertical das Linhas (Row).
+ * Atua como uma "drop zone inteligente" (tipo 'container') para detetar
+ * o drop nas "lacunas" (gaps) verticais entre as Linhas.
  *
  * Properties summary:
- * - state {object} : Gerencia os filhos (apenas `[Col, Col, ...]`).
+ * - state {object} : Gerencia os filhos (instâncias de Row).
  */
 export class Container {
     state = {
-        children: [] // (Simplificado - agora só contém Colunas)
+        children: [] // Contém instâncias de Row
     };
 
     constructor() {
         this.element = document.createElement('div');
-        this.element.classList.add('container');
+        this.element.classList.add('container'); // Usa a nova classe CSS .container
 
-        // ADICIONADO: Identificador e listeners D&D
-        this.dropZoneType = 'container';
+        this.dropZoneType = 'container'; // Novo drop zone type (para lacunas verticais)
         this.initDNDListeners();
-
         this.clear();
         this.initEventListeners();
     }
 
-    // ADICIONADO: Listeners D&D
+    // Listeners D&D (delegam ao serviço)
     initDNDListeners() {
         this.element.addEventListener('dragenter', this.onDragEnter.bind(this));
         this.element.addEventListener('dragover', this.onDragOver.bind(this));
         this.element.addEventListener('dragleave', this.onDragLeave.bind(this));
         this.element.addEventListener('drop', this.onDrop.bind(this));
     }
-
-    // ADICIONADO: Handlers D&D (delegam ao serviço)
     onDragEnter(e) {
         e.preventDefault();
-        e.stopPropagation();
+        // e.stopPropagation(); // Não necessário no nível superior
         DragDropService.getInstance().handleDragEnter(e, this);
     }
     onDragOver(e) {
         e.preventDefault();
-        e.stopPropagation();
+        // e.stopPropagation();
         DragDropService.getInstance().handleDragOver(e, this);
     }
     onDragLeave(e) {
         e.preventDefault();
-        e.stopPropagation();
+        // e.stopPropagation();
         DragDropService.getInstance().handleDragLeave(e, this);
     }
     onDrop(e) {
         e.preventDefault();
-        e.stopPropagation();
+        // e.stopPropagation();
         DragDropService.getInstance().handleDrop(e, this);
     }
-    // FIM DAS ADIÇÕES D&D
 
     initEventListeners() {
-        appBus.on('column:empty', this.onColumnEmpty.bind(this));
-    }
-
-    onColumnEmpty(column) {
-        this.deleteColumn(column);
+        // Ouve o evento emitido pela Row (Etapa 1)
+        appBus.on('row:empty', this.onRowEmpty.bind(this));
     }
 
     /**
-     * Atualiza as barras de redimensionamento de todas as colunas.
+     * Chamado quando a última coluna de uma Row é removida.
      */
-    updateAllResizeBars() {
-        const columns = this.getColumns();
-        columns.forEach((column, idx) => {
-            column.addResizeBars(idx === columns.length - 1);
-        });
+    onRowEmpty(row) {
+        this.deleteRow(row);
     }
 
     /**
-     * (MODIFICADO) Cria e insere uma nova Coluna.
-     * @param {number|null} [width=null]
-     * @param {number|null} [index=null] - O índice exato na lista de colunas.
+     * (NOVO) Cria e insere uma nova Linha (Row).
+     * @param {number|null} [height=null]
+     * @param {number|null} [index=null] - O índice exato na lista de linhas.
+     * @returns {Row} A linha criada.
      */
-    createColumn(width = null, index = null) {
-        const column = new Column(this, width);
-
-        // Lógica de CCA removida
+    createRow(height = null, index = null) {
+        const row = new Row(this, height); // Passa 'this' (Container) como pai
 
         if (index === null) {
-            this.element.appendChild(column.element);
-            this.state.children.push(column); // Simplificado
+            this.element.appendChild(row.element);
+            this.state.children.push(row);
         } else {
-            // (MODIFICADO) O índice agora é direto
             const targetElement = this.element.children[index] || null;
-
             if (targetElement) {
-                this.element.insertBefore(column.element, targetElement);
+                this.element.insertBefore(row.element, targetElement);
             } else {
-                this.element.appendChild(column.element);
+                this.element.appendChild(row.element);
             }
-            this.state.children.splice(index, 0, column); // Simplificado
+            this.state.children.splice(index, 0, row);
         }
 
-        this.updateAllResizeBars();
-        column.setParentContainer(this);
-        this.updateColumnsSizes();
-        return column;
+        this.updateRowsHeights();
+        return row;
     }
 
     /**
-     * (MODIFICADO) Exclui uma coluna.
+     * (NOVO) Exclui uma linha.
      */
-    deleteColumn(column) {
-        const index = this.state.children.indexOf(column);
+    deleteRow(row) {
+        const index = this.state.children.indexOf(row);
         if (index === -1) return;
-        if (!(this.state.children[index] instanceof Column)) return;
 
-        column.destroy();
+        // Limpeza manual (pois Row não tem destroy() na Etapa 1)
+        // 1. Remove listeners do appBus
+        appBus.off('column:empty', row.onColumnEmpty.bind(row));
+        // 2. Destrói colunas filhas
+        row.getColumns().forEach(col => col.destroy());
 
-        const columnEl = this.state.children[index].element;
-        // Lógica de CCA removida
-
-        // (CORREÇÃO BUG 3.1) - (Mantida)
-        if (columnEl && this.element.contains(columnEl)) {
-            this.element.removeChild(columnEl);
+        // 3. Remove DOM
+        const rowEl = this.state.children[index].element;
+        if (rowEl && this.element.contains(rowEl)) {
+            this.element.removeChild(rowEl);
         }
-        // Remoção do createAreaEl removida
 
-        this.state.children.splice(index, 1); // (MODIFICADO de 2 para 1)
-        this.updateColumnsSizes();
-        this.updateAllResizeBars();
+        // 4. Remove do estado
+        this.state.children.splice(index, 1);
+        this.updateRowsHeights();
     }
 
     /**
-     * (MODIFICADO) Retorna todas as instâncias de Coluna.
+     * (NOVO) Retorna todas as instâncias de Linha.
      */
-    getColumns() {
-        // (MODIFICADO) Como 'children' agora só tem colunas,
-        // podemos retornar diretamente, o que é mais eficiente.
+    getRows() {
         return this.state.children;
     }
 
-    getTotalColumns() {
-        return this.getColumns().length;
+    getTotalRows() {
+        return this.getRows().length;
     }
 
-    getFirstColumn() {
-        const columns = this.getColumns();
-        return columns[0] || this.createColumn();
-    }
-
-    getLastColumn() {
-        const columns = this.getColumns();
-        return columns[columns.length - 1] || this.createColumn();
+    getFirstRow() {
+        const rows = this.getRows();
+        return rows[0] || this.createRow();
     }
 
     /**
-     * Atualiza a largura de todas as colunas.
+     * (NOVO) Atualiza a altura (flex-basis) de todas as linhas.
+     * Aplica 'flex: 1 1 auto' (preenchimento) a todas as linhas
+     * que não têm altura fixa (height === null).
      */
-    updateColumnsSizes() {
-        const columns = this.getColumns();
-        columns.forEach((column, idx) => {
-            column.updateWidth(idx === columns.length - 1);
+    updateRowsHeights() {
+        const rows = this.getRows();
+        rows.forEach(row => {
+            row.updateHeight();
         });
     }
 
     /**
-     * (MODIFICADO) Limpa o container.
+     * (MODIFICADO) Limpa o container e todas as linhas filhas.
      */
     clear() {
+        // Faz uma cópia para iterar, pois deleteRow modifica o array
+        [...this.getRows()].forEach(row => {
+            this.deleteRow(row);
+        });
+
         this.element.innerHTML = '';
         this.state.children = [];
-        // Lógica de CCA removida
     }
 
+    /**
+     * (NOVO) Serializa o Container (lista de Rows).
+     */
     toJSON() {
         return {
-            // getColumns() agora é mais eficiente
-            columns: this.getColumns().map(column => column.toJSON())
+            rows: this.getRows().map(row => row.toJSON())
         };
     }
 
+    /**
+     * (NOVO) Desserializa o Container (lista de Rows).
+     * Inclui retrocompatibilidade para layouts antigos (sem 'rows').
+     */
     fromJSON(data) {
-        this.clear(); // (Agora limpa 100%)
+        this.clear();
+        const rowsData = data.rows || [];
 
-        const columnsData = data.columns || [];
+        if (rowsData.length === 0 && data.columns) {
+            // (FALLBACK) Se o JSON antigo (só colunas) for carregado,
+            // embrulha-o numa única linha.
+            console.warn("Container: Carregando layout legado (sem 'rows'). Embrulhando numa Row.");
+            const row = this.createRow(); // Cria uma row com height null (preenchimento)
+            // Passa os dados antigos (data) para o fromJSON da Row
+            row.fromJSON(data);
+        } else {
+            // Carrega as linhas
+            rowsData.forEach(rowData => {
+                const row = this.createRow(rowData.height);
+                row.fromJSON(rowData);
+            });
+        }
 
-        columnsData.forEach(colData => {
-            // (MODIFICADO) O índice não é mais necessário aqui,
-            // pois createColumn(null, null) adiciona ao fim,
-            // o que é o comportamento correto na hidratação.
-            const column = this.createColumn();
-            column.fromJSON(colData);
-        });
-        this.updateColumnsSizes();
-        this.updateAllResizeBars();
+        // Se após tudo não houver linhas, cria uma vazia
+        if (this.getRows().length === 0) {
+            this.createRow();
+        }
+
+        this.updateRowsHeights();
     }
 }

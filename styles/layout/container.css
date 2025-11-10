@@ -1,13 +1,28 @@
+/* (NOVO) Classe para o Container principal (gestor de linhas) */
 .container {
     flex: 1;
     display: flex;
-    gap: var(--container-gap);
+    flex-direction: column; /* Gere linhas verticalmente */
+    gap: var(--container-gap); /* Gap entre as linhas */
     padding: var(--container-padding);
     background: var(--color-bg-app);
     overflow: auto;
     width: var(--container-width);
     height: var(--container-height-calc);
 }
+
+/* (MODIFICADO) Renomeado de .container para .row (gestor de colunas) */
+.row {
+    flex: 1 1 auto; /* Linhas crescem verticalmente, base auto */
+    display: flex; /* Gere colunas horizontalmente */
+    gap: var(--container-gap); /* Gap entre colunas */
+    padding: var(--row-padding);
+    position: relative;
+    /* (NOVO) Altura mínima para permitir 'drop' numa linha vazia */
+    min-height: 50px;
+}
+
+/* --- Placeholders (INALTERADOS CONFORME SOLICITADO) --- */
 
 .container__placeholder {
     background: var(--color-placeholder-bg);
@@ -16,11 +31,14 @@
     margin: 0;
 }
 
+/* Placeholder para 'ColumnDropStrategy' e a nova 'ContainerDropStrategy' */
 .container__placeholder--horizontal {
     width: auto;
     margin: var(--container-placeholder-margin);
+    height: var(--container-placeholder-height); /* Define a altura horizontal */
 }
 
+/* Placeholder para 'RowDropStrategy' (antiga ContainerDropStrategy) */
 .container__placeholder--vertical {
     width: var(--container-placeholder-vertical-width);
     flex: var(--container-placeholder-vertical-flex);
