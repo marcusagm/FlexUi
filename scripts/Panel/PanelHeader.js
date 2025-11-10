@@ -12,6 +12,9 @@ import { appBus } from '../EventBus.js';
  * explícito no payload do appBus, e o DDS (Etapa 1) gere a classe .dragging.
  *
  * (Refatorado vCodeSmell) Corrigido bug de 'me' indefinido em destroy().
+ *
+ * (Refatorado vBugFix 3) O 'setMode' agora desativa o 'draggable'
+ * no modo simples, para forçar o D&D do PanelGroup.
  */
 export class PanelHeader {
     state = {
@@ -205,8 +208,8 @@ export class PanelHeader {
     }
 
     /**
-     * (NOVO) Controla a aparência "simples" vs. "aba".
-     * O PanelGroup (Etapa 4) chamará isto.
+     * (MODIFICADO - BugFix 3) Controla a aparência "simples" vs. "aba"
+     * e desativa o D&D (draggable) do Panel no modo simples.
      * @param {boolean} isSimpleMode
      */
     setMode(isSimpleMode) {
@@ -215,12 +218,23 @@ export class PanelHeader {
             this.element.classList.remove('panel-group__tab');
             // Remove o botão 'X' (o grupo mostra o seu próprio 'X')
             this._closeBtn.style.display = 'none';
+            // (NOVO) Desativa o D&D deste elemento (o Panel)
+            this.element.draggable = false;
+            this.element.style.cursor = 'default';
         } else {
             // No modo aba, parece uma aba
             this.element.classList.add('panel-group__tab');
             // Restaura o botão 'X' (se 'closable')
             if (this.state.panel.state.closable) {
                 this._closeBtn.style.display = '';
+            }
+            // (NOVO) Restaura o D&D (se 'movable')
+            if (this.state.panel.state.movable) {
+                this.element.draggable = true;
+                this.element.style.cursor = 'grab';
+            } else {
+                this.element.draggable = false;
+                this.element.style.cursor = 'default';
             }
         }
     }

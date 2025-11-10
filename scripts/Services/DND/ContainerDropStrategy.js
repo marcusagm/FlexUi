@@ -1,12 +1,17 @@
 import { PanelGroup } from '../../Panel/PanelGroup.js';
 import { DragDropService } from './DragDropService.js';
 import { Row } from '../../Row.js';
+import { Panel } from '../../Panel/Panel.js'; // (NOVO) Importa Panel
 
 /**
  * Description:
  * (NOVO) Estratégia de D&D para o 'container' (raiz).
  * Gere o drop de PanelGroups nas "lacunas" (gaps) verticais
  * ENTRE Linhas (Rows).
+ *
+ * (Refatorado vFeature 2) Esta estratégia agora aceita
+ * 'PanelGroup' E 'Panel'. Se um 'Panel' for solto,
+ * ele é envolvido (wrapped) num novo 'Row', 'Column' e 'PanelGroup'.
  */
 export class ContainerDropStrategy {
     _rowCache = [];
@@ -32,15 +37,23 @@ export class ContainerDropStrategy {
      * @param {DragDropService} dds
      */
     handleDragEnter(e, dropZone, draggedData, dds) {
-        // Só aceita PanelGroups
+        // (MODIFICADO) Aceita PanelGroup OU Panel
         if (
             !draggedData.item ||
-            draggedData.type !== 'PanelGroup' ||
-            !(draggedData.item instanceof PanelGroup)
+            (draggedData.type !== 'PanelGroup' && draggedData.type !== 'Panel')
         ) {
             return;
         }
-        const draggedItem = draggedData.item;
+
+        // (MODIFICADO) Obtém o "item efetivo" (o PanelGroup) para a lógica "ghost"
+        let effectiveItem; // Este será o PanelGroup
+        if (draggedData.type === 'PanelGroup') {
+            effectiveItem = draggedData.item;
+        } else {
+            // type === 'Panel'
+            effectiveItem = draggedData.item.state.parentGroup;
+            if (!effectiveItem) return;
+        }
 
         this.clearCache();
         const rows = dropZone.getRows();
@@ -56,7 +69,7 @@ export class ContainerDropStrategy {
         });
 
         // 2. Encontra a Linha de origem e o seu estado
-        const oldColumn = draggedItem.getColumn();
+        const oldColumn = effectiveItem.getColumn();
         if (oldColumn) {
             // A "Row" é o 'parentContainer' da Coluna
             const oldRow = oldColumn.state.parentContainer;
@@ -64,11 +77,24 @@ export class ContainerDropStrategy {
                 const oldRowCacheItem = this._rowCache.find(
                     item => item.element === oldRow.element
                 );
+
+                // (MODIFICADO) Verifica o item efetivo e se é o último painel
                 if (oldRowCacheItem) {
                     this._originalRowIndex = oldRowCacheItem.index;
                     // A lógica "ghost" aplica-se se a Row de origem ficaria vazia
+                    // (tem apenas 1 coluna, e essa coluna tem apenas 1 grupo/painel efetivo)
                     if (oldRow.getTotalColumns() === 1) {
-                        this._originRowHadOneColumn = true;
+                        if (
+                            draggedData.type === 'PanelGroup' &&
+                            oldColumn.getTotalPanelGroups() === 1
+                        ) {
+                            this._originRowHadOneColumn = true;
+                        } else if (
+                            draggedData.type === 'Panel' &&
+                            effectiveItem.state.panels.length === 1
+                        ) {
+                            this._originRowHadOneColumn = true;
+                        }
                     }
                 }
             }
@@ -99,10 +125,23 @@ export class ContainerDropStrategy {
      * @param {DragDropService} dds
      */
     handleDragOver(e, dropZone, draggedData, dds) {
-        if (!draggedData.item || draggedData.type !== 'PanelGroup') {
+        // (MODIFICADO) Aceita PanelGroup OU Panel
+        if (
+            !draggedData.item ||
+            (draggedData.type !== 'PanelGroup' && draggedData.type !== 'Panel')
+        ) {
             return;
         }
-        const draggedItem = draggedData.item;
+
+        // (MODIFICADO) Obtém o "item efetivo" (o PanelGroup) para a lógica "ghost"
+        let effectiveItem;
+        if (draggedData.type === 'PanelGroup') {
+            effectiveItem = draggedData.item;
+        } else {
+            // type === 'Panel'
+            effectiveItem = draggedData.item.state.parentGroup;
+            if (!effectiveItem) return;
+        }
 
         // Se o cache está vazio (ex: F5 ou drag de fora), tenta construir
         if (this._rowCache.length === 0 && dropZone.getRows().length > 0) {
@@ -138,7 +177,8 @@ export class ContainerDropStrategy {
         }
 
         // 3. Se não for "ghost", mostra o placeholder HORIZONTAL
-        dds.showPlaceholder('horizontal', draggedItem.element.offsetHeight);
+        // (MODIFICADO) Usa a altura do item efetivo
+        dds.showPlaceholder('horizontal', effectiveItem.element.offsetHeight);
         const placeholder = dds.getPlaceholder();
 
         if (gapFound) {
@@ -166,38 +206,51 @@ export class ContainerDropStrategy {
         dds.hidePlaceholder();
         this.clearCache();
 
+        // (MODIFICADO) Aceita PanelGroup OU Panel
         if (
             !draggedData.item ||
-            draggedData.type !== 'PanelGroup' ||
-            !(draggedData.item instanceof PanelGroup)
+            (draggedData.type !== 'PanelGroup' && draggedData.type !== 'Panel')
         ) {
             return;
         }
-        const draggedItem = draggedData.item;
 
         if (rowIndex === null) {
             return; // Drop anulado (lógica 'ghost')
         }
 
-        // Lógica Central (Ação)
+        // (MODIFICADO) Lógica de Ação
+        if (draggedData.type === 'PanelGroup') {
+            // --- Lógica Existente (Mover PanelGroup) ---
+            const draggedItem = draggedData.item;
+            const oldColumn = draggedItem.getColumn();
 
-        // 1. Obtém a coluna de origem
-        const oldColumn = draggedItem.getColumn();
+            const newRow = dropZone.createRow(null, rowIndex);
+            const newColumn = newRow.createColumn();
 
-        // 2. Cria a nova Linha (Row) na lacuna vertical
-        const newRow = dropZone.createRow(null, rowIndex);
+            if (oldColumn) {
+                oldColumn.removePanelGroup(draggedItem, true);
+            }
+            draggedItem.state.height = null;
+            newColumn.addPanelGroup(draggedItem);
+        } else if (draggedData.type === 'Panel') {
+            // --- Lógica Nova (Mover Panel, Criar Row, Column e PanelGroup) ---
+            const draggedPanel = draggedData.item;
+            const sourceGroup = draggedPanel.state.parentGroup;
 
-        // 3. Cria uma nova Coluna (Column) *dentro* da nova Linha
-        const newColumn = newRow.createColumn();
+            // 1. Cria a nova Linha (Row) na lacuna vertical
+            const newRow = dropZone.createRow(null, rowIndex);
+            // 2. Cria uma nova Coluna (Column) *dentro* da nova Linha
+            const newColumn = newRow.createColumn();
+            // 3. Cria o novo PanelGroup (vazio)
+            const newPanelGroup = new PanelGroup(null);
+            newColumn.addPanelGroup(newPanelGroup);
 
-        // 4. Move o PanelGroup
-        if (oldColumn) {
-            // Remove o PanelGroup da coluna antiga
-            oldColumn.removePanelGroup(draggedItem, true);
-            // Se oldColumn.removePanelGroup fizer com que a oldRow fique vazia,
-            // o appBus.emit('row:empty') (Etapa 2) tratará da limpeza.
+            // 4. Move o painel
+            if (sourceGroup) {
+                sourceGroup.removePanel(draggedPanel);
+            }
+            draggedPanel.state.height = null; // Painéis soltos em novos grupos perdem a altura fixa
+            newPanelGroup.addPanel(draggedPanel, true);
         }
-        draggedItem.state.height = null;
-        newColumn.addPanelGroup(draggedItem);
     }
 }

@@ -19,6 +19,14 @@ import { throttleRAF } from '../ThrottleRAF.js'; // Importa o throttleRAF
  * (Refatorado vBugFix) Corrige o vazamento de listeners do appBus
  * armazenando as referências bindadas.
  *
+ * (Refatorado vBugFix 2) Garante que a classe 'active' da aba
+ * seja removida durante o DND.
+ *
+ * (Refatorado vBugFix 3) Corrige bugs de estado ativo em setActive e fromJSON.
+ *
+ * (Refatorado vBugFix 4) Corrige a persistência da classe 'active'
+ * na transição 2->1 ao remover painéis inativos.
+ *
  * Properties summary:
  * - state {object} : Internal state management.
  */
@@ -482,12 +490,15 @@ export class PanelGroup {
     }
 
     /**
-     * (MODIFICADO - vArch / vOpt 5) Remove um Panel (aba).
+     * (MODIFICADO - vArch / vOpt 5 / vBugFix 2 / vBugFix 4) Remove um Panel (aba).
      * @param {Panel} panel - The panel instance to remove.
      */
     removePanel(panel) {
         const index = this.state.panels.indexOf(panel);
         if (index === -1) return;
+
+        // (NOVO - BugFix 2) Remove a classe ativa ANTES de movê-la.
+        panel.state.header.element.classList.remove('panel-group__tab--active');
 
         // (MODIFICADO) Remove ambos os elementos
         panel.state.header.element.remove();
@@ -500,7 +511,12 @@ export class PanelGroup {
         const newPanelCount = this.state.panels.length;
         if (newPanelCount === 1) {
             // Transição 2 -> 1: O painel restante entra no modo simples
-            this.state.panels[0].state.header.setMode(true); // O(1)
+            const remainingPanel = this.state.panels[0];
+            remainingPanel.state.header.setMode(true); // O(1)
+
+            // (NOVO - BugFix 4) Chama setActive no painel restante
+            // para garantir que a classe 'active' seja removida no modo simples.
+            this.setActive(remainingPanel);
         }
         // Fim Otimização 5
 
@@ -516,29 +532,32 @@ export class PanelGroup {
             const newActive = this.state.panels[index] || this.state.panels[index - 1];
             this.setActive(newActive);
         } else {
-            this.requestLayoutUpdate();
+            // Se removemos um painel inativo, mas a contagem ainda é > 1,
+            // não precisamos chamar setActive, apenas atualizamos o layout.
+            if (newPanelCount > 1) {
+                this.requestLayoutUpdate();
+            }
         }
     }
 
     /**
-     * (MODIFICADO - vArch) Ativa um Panel (aba).
+     * (MODIFICADO - vArch / vBugFix 3) Ativa um Panel (aba).
      * @param {Panel} panel - The panel instance to activate.
      */
     setActive(panel) {
         if (!panel) return;
 
-        // (NOVO - CORREÇÃO) Verifica se está em modo simples
         const isSimpleMode = this.state.panels.length === 1;
 
         this.state.panels.forEach(p => {
-            // (MODIFICADO - CORREÇÃO) Só mexe nas classes --active se NÃO for modo simples
-            if (!isSimpleMode) {
-                p.state.header.element.classList.remove('panel-group__tab--active');
-            }
+            // (MODIFICADO - BugFix 3) SEMPRE remove a classe ativa de todos,
+            // independentemente do modo, para limpar o estado.
+            p.state.header.element.classList.remove('panel-group__tab--active');
             p.getContentElement().style.display = 'none';
         });
 
-        // (MODIFICADO - CORREÇÃO) Só mexe nas classes --active se NÃO for modo simples
+        // (MODIFICADO - BugFix 3) Adiciona a classe ativa APENAS se
+        // NÃO estiver em modo simples.
         if (!isSimpleMode) {
             panel.state.header.element.classList.add('panel-group__tab--active');
         }
@@ -584,7 +603,7 @@ export class PanelGroup {
     }
 
     /**
-     * Restaura o estado do grupo E de seus painéis filhos.
+     * (MODIFICADO - vBugFix 3) Restaura o estado do grupo E de seus painéis filhos.
      * @param {object} data - O objeto de estado serializado.
      */
     fromJSON(data) {
@@ -601,6 +620,9 @@ export class PanelGroup {
             Object.assign(this.state, data.config);
         }
 
+        const activePanelId = data.activePanelId;
+        let activePanelInstance = null;
+
         if (data.panels && Array.isArray(data.panels)) {
             const factory = PanelFactory.getInstance();
 
@@ -608,14 +630,22 @@ export class PanelGroup {
                 const panel = factory.createPanel(panelData);
 
                 if (panel) {
-                    const isActive = panel.id === data.activePanelId;
-                    this.addPanel(panel, isActive);
+                    // (MODIFICADO) Apenas adiciona (makeActive = false)
+                    this.addPanel(panel, false);
+                    if (panel.id === activePanelId) {
+                        activePanelInstance = panel;
+                    }
                 }
             });
         }
 
-        if (!this.state.activePanel && this.state.panels.length > 0) {
-            this.setActive(this.state.panels[0]);
+        // (MODIFICADO) Chama setActive UMA VEZ no final
+        if (!activePanelInstance && this.state.panels.length > 0) {
+            activePanelInstance = this.state.panels[0];
+        }
+
+        if (activePanelInstance) {
+            this.setActive(activePanelInstance);
         }
 
         this.updateHeight();
