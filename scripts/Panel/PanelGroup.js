@@ -2,7 +2,7 @@ import { PanelGroupHeader } from './PanelGroupHeader.js';
 import { appBus } from '../EventBus.js';
 import { PanelFactory } from './PanelFactory.js';
 import { Panel } from './Panel.js'; // (NOVO) Importar Panel para verificação
-import { throttleRAF } from '../ThrottleRAF.js'; // (NOVO) Importa o throttleRAF
+import { throttleRAF } from '../ThrottleRAF.js'; // Importa o throttleRAF
 
 /**
  * Description:
@@ -12,6 +12,9 @@ import { throttleRAF } from '../ThrottleRAF.js'; // (NOVO) Importa o throttleRAF
  * Ela não renderiza abas. Ela pede ao Panel (filho) o seu
  * 'header.element' (aba) e 'content.element' (conteúdo) e
  * anexa-os aos seus contentores corretos (o TabContainer e o ContentContainer).
+ *
+ * (Refatorado vOpt 5) A lógica de 'setMode' foi movida de _updateHeaderMode (O(N))
+ * para addPanel/removePanel (O(1) ou O(2)), tratando apenas as transições.
  *
  * Properties summary:
  * - state {object} : Internal state management.
@@ -86,7 +89,7 @@ export class PanelGroup {
 
         this.initEventListeners();
 
-        // (NOVO) Adiciona o throttleRAF para o resize O(1)
+        // Adiciona o throttleRAF para o resize O(1)
         this.setThrottledUpdate(
             throttleRAF(() => {
                 // Atualiza apenas a altura (O(1)), não o layout (O(N))
@@ -98,7 +101,7 @@ export class PanelGroup {
     // --- Getters / Setters ---
 
     /**
-     * (NOVO) Define a função de atualização throttled.
+     * Define a função de atualização throttled.
      * @param {function} throttledFunction
      */
     setThrottledUpdate(throttledFunction) {
@@ -106,7 +109,7 @@ export class PanelGroup {
     }
 
     /**
-     * (NOVO) Obtém a função de atualização throttled.
+     * Obtém a função de atualização throttled.
      * @returns {function}
      */
     getThrottledUpdate() {
@@ -203,7 +206,7 @@ export class PanelGroup {
         // (NOVO) Destrói todos os painéis filhos (que limpam seus headers)
         this.state.panels.forEach(panel => panel.destroy());
 
-        // (NOVO) Cancela qualquer atualização de resize pendente
+        // Cancela qualquer atualização de resize pendente
         this.getThrottledUpdate()?.cancel();
     }
 
@@ -376,8 +379,9 @@ export class PanelGroup {
     }
 
     /**
-     * (NOVO - CORREÇÃO REGRESSÃO) Atualiza o estado visual do cabeçalho
-     * (modo simples vs. modo abas) com base na contagem de painéis.
+     * (MODIFICADO - Otimização 5) Atualiza o estado visual do cabeçalho
+     * (modo simples vs. modo abas).
+     * Esta função agora é O(1) e não itera mais sobre os painéis filhos.
      * @private
      */
     _updateHeaderMode() {
@@ -388,12 +392,8 @@ export class PanelGroup {
         // 1. Aplica a classe ao container do cabeçalho (para CSS)
         this.state.header.element.classList.toggle('panel-group__header--simple', isSimpleMode);
 
-        // 2. Informa cada PanelHeader (aba) para mudar o seu modo
-        this.state.panels.forEach(p => {
-            if (p.state.header && typeof p.state.header.setMode === 'function') {
-                p.state.header.setMode(isSimpleMode);
-            }
-        });
+        // 2. (REMOVIDO) O loop O(N) que chamava setMode foi movido
+        // para addPanel e removePanel.
 
         // 3. Atualiza os botões de controlo do GRUPO
         if (isSimpleMode && this.state.panels.length === 1) {
@@ -414,8 +414,9 @@ export class PanelGroup {
     }
 
     /**
-     * (MODIFICADO - vArch) Adiciona um Panel, orquestrando
-     * a inserção do seu header e do seu content.
+     * (MODIFICADO - vArch / vOpt 5) Adiciona um Panel, orquestrando
+     * a inserção do seu header e do seu content, e atualizando
+     * os modos de UI (O(1) ou O(2)).
      * @param {Panel} panel - The panel instance to add.
      * @param {boolean} [makeActive=false]
      */
@@ -429,6 +430,22 @@ export class PanelGroup {
             return;
         }
 
+        // (MODIFICADO - Otimização 5) Lógica de transição O(1)/O(2)
+        const currentPanelCount = this.state.panels.length;
+
+        if (currentPanelCount === 0) {
+            // Transição 0 -> 1: O novo painel está no modo simples
+            panel.state.header.setMode(true);
+        } else if (currentPanelCount === 1) {
+            // Transição 1 -> 2: O painel antigo e o novo vão para o modo aba
+            this.state.panels[0].state.header.setMode(false); // O(1)
+            panel.state.header.setMode(false); // O(1)
+        } else {
+            // Transição N -> N+1 (N > 1): O novo painel entra no modo aba
+            panel.state.header.setMode(false); // O(1)
+        }
+        // Fim Otimização 5
+
         this.state.panels.push(panel);
         panel.setParentGroup(this);
 
@@ -436,7 +453,7 @@ export class PanelGroup {
         this.state.header.tabContainer.appendChild(panel.state.header.element);
         this.state.contentContainer.appendChild(panel.getContentElement());
 
-        this._updateHeaderMode(); // (NOVO) Atualiza o modo (simples/abas)
+        this._updateHeaderMode(); // (Agora O(1))
         this.state.header.updateScrollButtons(); // Atualiza scroll
 
         if (makeActive || this.state.panels.length === 1) {
@@ -449,7 +466,7 @@ export class PanelGroup {
     }
 
     /**
-     * (MODIFICADO - vArch) Remove um Panel (aba).
+     * (MODIFICADO - vArch / vOpt 5) Remove um Panel (aba).
      * @param {Panel} panel - The panel instance to remove.
      */
     removePanel(panel) {
@@ -463,7 +480,15 @@ export class PanelGroup {
         this.state.panels.splice(index, 1);
         panel.setParentGroup(null);
 
-        this._updateHeaderMode(); // (NOVO) Atualiza o modo (simples/abas)
+        // (MODIFICADO - Otimização 5) Lógica de transição O(1)
+        const newPanelCount = this.state.panels.length;
+        if (newPanelCount === 1) {
+            // Transição 2 -> 1: O painel restante entra no modo simples
+            this.state.panels[0].state.header.setMode(true); // O(1)
+        }
+        // Fim Otimização 5
+
+        this._updateHeaderMode(); // (Agora O(1))
         this.state.header.updateScrollButtons(); // Atualiza scroll
 
         if (this.state.panels.length === 0) {
