@@ -11,6 +11,9 @@ import { throttleRAF } from '../ThrottleRAF.js';
  * (Refatorado) Agora delega a lógica de layout (fills-space, collapse rules)
  * para o LayoutService emitindo 'layout:panel-groups-changed'.
  *
+ * (Refatorado vBugFix) Corrige o vazamento de listeners do appBus
+ * armazenando as referências bindadas.
+ *
  * Properties summary:
  * - state {object} : Internal state management.
  * - _minWidth {number} : The minimum width the column can be resized to.
@@ -47,6 +50,13 @@ export class Column {
     _throttledUpdate = null;
 
     /**
+     * (NOVO) Armazena a referência bindada para o listener
+     * @type {function | null}
+     * @private
+     */
+    _boundOnPanelGroupRemoved = null;
+
+    /**
      * @param {Container} container - The parent container instance.
      * @param {number|null} [width=null] - The initial width of the column.
      */
@@ -68,6 +78,9 @@ export class Column {
                 }
             })
         );
+
+        // (NOVO) Define a referência bindada
+        this._boundOnPanelGroupRemoved = this.onPanelGroupRemoved.bind(this);
 
         this.initDragDrop();
         this.initEventListeners();
@@ -126,10 +139,11 @@ export class Column {
     // --- Concrete Methods ---
 
     /**
-     * Initializes event listeners for the EventBus.
+     * (MODIFICADO) Initializes event listeners for the EventBus.
+     * Usa a referência bindada.
      */
     initEventListeners() {
-        appBus.on('panelgroup:removed', this.onPanelGroupRemoved.bind(this));
+        appBus.on('panelgroup:removed', this._boundOnPanelGroupRemoved);
     }
 
     /**
@@ -145,10 +159,11 @@ export class Column {
     }
 
     /**
-     * Cleans up event listeners when the column is destroyed.
+     * (MODIFICADO) Cleans up event listeners when the column is destroyed.
+     * Usa a referência bindada.
      */
     destroy() {
-        appBus.off('panelgroup:removed', this.onPanelGroupRemoved.bind(this));
+        appBus.off('panelgroup:removed', this._boundOnPanelGroupRemoved);
         this.getThrottledUpdate()?.cancel();
 
         [...this.state.panelGroups].forEach(panel => panel.destroy());

@@ -12,6 +12,9 @@ import { throttleRAF } from './ThrottleRAF.js'; // (NOVO) Contexto 12
  *
  * (Refatorado) A lógica de cálculo de layout (fills-space) foi movida
  * para o LayoutService. Este componente apenas emite 'layout:columns-changed'.
+ *
+ * (Refatorado vBugFix) Corrige o vazamento de listeners do appBus
+ * armazenando as referências bindadas.
  */
 export class Row {
     state = {
@@ -34,6 +37,13 @@ export class Row {
      */
     _throttledUpdate = null;
 
+    /**
+     * (NOVO) Armazena a referência bindada para o listener
+     * @type {function | null}
+     * @private
+     */
+    _boundOnColumnEmpty = null;
+
     constructor(container, height = null) {
         this.element = document.createElement('div');
         this.element.classList.add('row'); // (MODIFICADO) Contexto 11
@@ -51,6 +61,9 @@ export class Row {
                 this.updateHeight(false);
             })
         );
+
+        // (NOVO) Define a referência bindada
+        this._boundOnColumnEmpty = this.onColumnEmpty.bind(this);
 
         this.clear();
         this.initEventListeners();
@@ -108,8 +121,11 @@ export class Row {
         DragDropService.getInstance().handleDrop(e, this);
     }
 
+    /**
+     * (MODIFICADO) Usa a referência bindada
+     */
     initEventListeners() {
-        appBus.on('column:empty', this.onColumnEmpty.bind(this));
+        appBus.on('column:empty', this._boundOnColumnEmpty);
     }
 
     /**
@@ -120,11 +136,12 @@ export class Row {
     }
 
     /**
+     * (MODIFICADO) Usa a referência bindada
      * (NOVO) Contexto 12: Limpeza de listeners e filhos
      */
     destroy() {
         const me = this;
-        appBus.off('column:empty', this.onColumnEmpty.bind(me));
+        appBus.off('column:empty', me._boundOnColumnEmpty);
         me.getThrottledUpdate()?.cancel();
 
         // Destrói todas as colunas filhas
