@@ -27,6 +27,9 @@ import { throttleRAF } from '../ThrottleRAF.js'; // Importa o throttleRAF
  * (Refatorado vBugFix 4) Corrige a persistência da classe 'active'
  * na transição 2->1 ao remover painéis inativos.
  *
+ * (Refatorado vBugFix 6) Adiciona stopPropagation() aos listeners
+ * de DND do contentContainer para evitar que 'borbulhem' para a Column.
+ *
  * Properties summary:
  * - state {object} : Internal state management.
  */
@@ -84,6 +87,13 @@ export class PanelGroup {
         // (MODIFICADO) O contentContainer é criado aqui
         this.state.contentContainer = document.createElement('div');
         this.state.contentContainer.classList.add('panel-group__content');
+
+        // (NOVO - BugFix 6) Adiciona listeners ao contentContainer
+        // para impedir que o 'dragover' borbulhe para a Column pai.
+        this.state.contentContainer.addEventListener('dragenter', e => e.stopPropagation());
+        this.state.contentContainer.addEventListener('dragover', e => e.stopPropagation());
+        this.state.contentContainer.addEventListener('dragleave', e => e.stopPropagation());
+        this.state.contentContainer.addEventListener('drop', e => e.stopPropagation());
 
         this.state.collapsed = collapsed;
         this.element = document.createElement('div');

@@ -17,6 +17,10 @@ import { Panel } from '../../Panel/Panel.js'; // Importa Panel
  * (Refatorado vBugFix 5) A lógica de 'midY' (ponto médio)
  * foi substituída por 'dropThreshold' (limite fixo) para
  * facilitar o drop nos 'gaps' superiores (próximos ao header).
+ *
+ * (Refatorado vBugFix 6) Reverte a lógica de 'dropThreshold'
+ * de volta para 'midY', para alinhar com o comportamento
+ * do Container e Row, conforme solicitado.
  */
 export class ColumnDropStrategy {
     /**
@@ -40,7 +44,7 @@ export class ColumnDropStrategy {
     }
 
     /**
-     * (MODIFICADO - BugFix 5) Usa 'dropThreshold' em vez de 'midY'.
+     * (MODIFICADO - BugFix 6) Revertido para 'midY'.
      * @param {DragEvent} e - O evento nativo.
      * @param {Column} dropZone - A instância da Coluna.
      * @param {{item: object, type: string}} draggedData - O item e tipo arrastados.
@@ -72,20 +76,19 @@ export class ColumnDropStrategy {
             if (draggedItem === targetGroup) continue;
 
             const rect = targetGroup.element.getBoundingClientRect();
-            // (MODIFICADO - BugFix 5) Usa um threshold fixo (ex: 20px)
-            // em vez do ponto médio (rect.height / 2).
-            const dropThreshold = rect.top + 20;
+            // (MODIFICADO - BugFix 6) Revertido para ponto médio
+            const midY = rect.top + rect.height / 2;
 
             this._dropZoneCache.push({
                 element: targetGroup.element,
-                dropThreshold: dropThreshold, // (MODIFICADO)
+                midY: midY, // (MODIFICADO)
                 originalIndex: i
             });
         }
     }
 
     /**
-     * (MODIFICADO - BugFix 5) Usa 'dropThreshold' em vez de 'midY'.
+     * (MODIFICADO - BugFix 6) Revertido para 'midY'.
      * @param {DragEvent} e - O evento nativo.
      * @param {Column} dropZone - A instância da Coluna.
      * @param {{item: object, type: string}} draggedData - O item e tipo arrastados.
@@ -129,8 +132,8 @@ export class ColumnDropStrategy {
 
         // 2. Itera sobre o cache.
         for (const cacheItem of this._dropZoneCache) {
-            // (MODIFICADO - BugFix 5) Compara com o 'dropThreshold'
-            if (e.clientY < cacheItem.dropThreshold) {
+            // (MODIFICADO - BugFix 6) Compara com o 'midY'
+            if (e.clientY < cacheItem.midY) {
                 dropZone.element.insertBefore(placeholder, cacheItem.element);
                 placed = true;
                 this._dropIndex = cacheItem.originalIndex;
