@@ -15,6 +15,9 @@ import { appBus } from '../../EventBus.js';
  * no payload 'dragstart' para evitar aceder a 'item.element' (que
  * é 'undefined' para a classe Panel).
  *
+ * (Refatorado vOpt 4) Agora armazena o _placeholderMode para
+ * evitar escritas redundantes no DOM durante o 'dragover'.
+ *
  * This is implemented as a Singleton.
  */
 export class DragDropService {
@@ -42,6 +45,14 @@ export class DragDropService {
      * @private
      */
     _isDragging = false;
+
+    /**
+     * (NOVO - Otimização 4) Armazena o modo atual do placeholder
+     * para evitar escritas desnecessárias no DOM.
+     * @type {'horizontal' | 'vertical' | null}
+     * @private
+     */
+    _placeholderMode = null;
 
     /**
      * Registro para o Strategy Pattern.
@@ -79,8 +90,9 @@ export class DragDropService {
     // --- API Pública ---
 
     /**
+     * (MODIFICADO - Otimização 4)
      * Esconde o placeholder, removendo-o do DOM e redefinindo
-     * as suas classes de modo (horizontal/vertical).
+     * as suas classes de modo (horizontal/vertical) e o cache de modo.
      */
     hidePlaceholder() {
         if (this._placeholder.parentElement) {
@@ -90,15 +102,35 @@ export class DragDropService {
         this._placeholder.className = 'container__placeholder';
         // Redefine a altura que pode ter sido definida via JS (modo horizontal)
         this._placeholder.style.height = '';
+        // (MODIFICADO) Reseta o cache de modo
+        this._placeholderMode = null;
     }
 
     /**
+     * (MODIFICADO - Otimização 4)
      * Prepara o placeholder para ser exibido num modo.
+     * Evita reescrever o DOM se o modo já estiver correto.
+     *
      * @param {'horizontal' | 'vertical'} mode - O modo de exibição.
      * @param {number | null} [height=null] - A altura (usada apenas no modo horizontal).
      */
     showPlaceholder(mode, height = null) {
-        this.hidePlaceholder();
+        // (MODIFICADO) Otimização: Verifica se o modo já está aplicado
+        if (mode === this._placeholderMode) {
+            // Se o modo (horizontal) for o mesmo, apenas atualiza a altura se necessário
+            if (
+                mode === 'horizontal' &&
+                height &&
+                this._placeholder.style.height !== `${height}px`
+            ) {
+                this._placeholder.style.height = `${height}px`;
+            }
+            return; // Evita reescrever o className
+        }
+
+        // Se o modo for novo, redefine (hide) e aplica o novo modo
+        this.hidePlaceholder(); // hidePlaceholder agora define _placeholderMode = null
+
         if (mode === 'horizontal') {
             this._placeholder.classList.add('container__placeholder--horizontal');
             if (height) {
@@ -107,6 +139,9 @@ export class DragDropService {
         } else if (mode === 'vertical') {
             this._placeholder.classList.add('container__placeholder--vertical');
         }
+
+        // (MODIFICADO) Armazena o novo modo
+        this._placeholderMode = mode;
     }
 
     /**
