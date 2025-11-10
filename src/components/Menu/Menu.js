@@ -1,6 +1,6 @@
 import { MenuItem } from './MenuItem.js';
-import { appBus } from '../EventBus.js';
-import { TranslationService } from '../Services/TranslationService.js';
+import { TranslationService } from '../../services/TranslationService.js';
+import { appBus } from '../../utils/EventBus.js';
 
 export class Menu {
     // (NOVO) Propriedades para armazenar referências bindadas
@@ -50,7 +50,7 @@ export class Menu {
         try {
             // Usa importação dinâmica para carregar o módulo JS
             // O caminho relativo sobe dois níveis (de scripts/Menu/ para a raiz)
-            const menuModule = await import(`../../${url}`);
+            const menuModule = await import(`../../../${url}`);
             const rawMenuData = menuModule.default;
 
             // Pega a instância do i18n para processar os títulos

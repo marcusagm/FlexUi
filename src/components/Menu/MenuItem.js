@@ -1,5 +1,5 @@
 import { Submenu } from './Submenu.js';
-import { appBus } from '../EventBus.js';
+import { appBus } from '../../utils/EventBus.js';
 
 export class MenuItem {
     constructor(itemData, level = 1) {

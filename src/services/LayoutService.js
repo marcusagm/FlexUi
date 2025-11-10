@@ -1,7 +1,7 @@
-import { appBus } from '../EventBus.js';
-import { Column } from '../Column/Column.js';
-import { Container } from '../Container.js';
-import { Row } from '../Row.js';
+import { Column } from '../components/Column/Column.js';
+import { Container } from '../components/Container/Container.js';
+import { Row } from '../components/Row/Row.js';
+import { appBus } from '../utils/EventBus.js';
 
 /**
  * Description:

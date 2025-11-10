@@ -1,5 +1,5 @@
-import { App } from './scripts/App.js';
-import { TranslationService } from './scripts/Services/TranslationService.js';
+import { App } from './src/App.js';
+import { TranslationService } from './src/services/TranslationService.js';
 
 window.addEventListener('DOMContentLoaded', async () => {
     try {

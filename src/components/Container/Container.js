@@ -1,6 +1,6 @@
-import { Row } from './Row.js';
-import { appBus } from './EventBus.js';
-import { DragDropService } from './Services/DND/DragDropService.js';
+import { Row } from '../Row/Row.js';
+import { DragDropService } from '../../services/DND/DragDropService.js';
+import { appBus } from '../../utils/EventBus.js';
 
 /**
  * Description:

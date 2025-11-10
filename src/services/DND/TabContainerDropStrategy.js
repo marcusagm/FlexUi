@@ -1,6 +1,6 @@
-import { Panel } from '../../Panel/Panel.js';
+import { PanelGroup } from '../../components/Panel/PanelGroup.js'; // (NOVO) Importa PanelGroup
+import { Panel } from '../../components/Panel/Panel.js';
 import { DragDropService } from './DragDropService.js';
-import { PanelGroup } from '../../Panel/PanelGroup.js'; // (NOVO) Importa PanelGroup
 
 /**
  * Description:

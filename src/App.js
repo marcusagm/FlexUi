@@ -1,26 +1,23 @@
-import { Menu } from './Menu/Menu.js';
-// (MODIFICADO) 'Container' é agora o novo Container (gestor de linhas)
-import { Container } from './Container.js';
-import { Panel } from './Panel/Panel.js';
-import { TextPanel } from './Panel/TextPanel.js';
-import { ToolbarPanel } from './Panel/ToolbarPanel.js';
-import { PanelGroup } from './Panel/PanelGroup.js';
-import { appBus } from './EventBus.js';
-import { StateService } from './StateService.js';
-import { debounce } from './Debounce.js';
-import { appNotifications } from './Services/Notification/Notification.js';
-import { NotificationUIListener } from './Services/Notification/NotificationUIListener.js';
-import { TranslationService } from './Services/TranslationService.js';
-import { DragDropService } from './Services/DND/DragDropService.js';
-import { ColumnDropStrategy } from './Services/DND/ColumnDropStrategy.js';
-// (MODIFICADO) Renomeado de ContainerDropStrategy para RowDropStrategy (Etapa 1)
-import { RowDropStrategy } from './Services/DND/RowDropStrategy.js';
-// (NOVO) Importa a nova estratégia (Etapa 3)
-import { ContainerDropStrategy } from './Services/DND/ContainerDropStrategy.js';
-import { TabContainerDropStrategy } from './Services/DND/TabContainerDropStrategy.js';
-import { PanelFactory } from './Panel/PanelFactory.js';
-import { LayoutService } from './Services/LayoutService.js';
-import { StatusBar } from './StatusBar/StatusBar.js';
+import { Menu } from './components/Menu/Menu.js';
+import { Container } from './components/Container/Container.js';
+import { Panel } from './components/Panel/Panel.js';
+import { TextPanel } from './components/Panel/TextPanel.js';
+import { ToolbarPanel } from './components/Panel/ToolbarPanel.js';
+import { PanelGroup } from './components/Panel/PanelGroup.js';
+import { PanelFactory } from './components/Panel/PanelFactory.js';
+import { StatusBar } from './components/StatusBar/StatusBar.js';
+import { StateService } from './services/StateService.js';
+import { appNotifications } from './services/Notification/Notification.js';
+import { NotificationUIListener } from './services/Notification/NotificationUIListener.js';
+import { TranslationService } from './services/TranslationService.js';
+import { DragDropService } from './services/DND/DragDropService.js';
+import { ColumnDropStrategy } from './services/DND/ColumnDropStrategy.js';
+import { RowDropStrategy } from './services/DND/RowDropStrategy.js';
+import { ContainerDropStrategy } from './services/DND/ContainerDropStrategy.js';
+import { TabContainerDropStrategy } from './services/DND/TabContainerDropStrategy.js';
+import { LayoutService } from './services/LayoutService.js';
+import { appBus } from './utils/EventBus.js';
+import { debounce } from './utils/Debounce.js';
 
 export class App {
     /**

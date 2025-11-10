@@ -1,8 +1,8 @@
 import { PanelGroupHeader } from './PanelGroupHeader.js';
-import { appBus } from '../EventBus.js';
 import { PanelFactory } from './PanelFactory.js';
-import { Panel } from './Panel.js'; // (NOVO) Importar Panel para verificação
-import { throttleRAF } from '../ThrottleRAF.js'; // Importa o throttleRAF
+import { Panel } from './Panel.js';
+import { appBus } from '../../utils/EventBus.js';
+import { throttleRAF } from '../../utils/ThrottleRAF.js';
 
 /**
  * Description:

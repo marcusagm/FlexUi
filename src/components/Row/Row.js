@@ -1,7 +1,7 @@
-import { Column } from './Column/Column.js';
-import { appBus } from './EventBus.js';
-import { DragDropService } from './Services/DND/DragDropService.js';
-import { throttleRAF } from './ThrottleRAF.js'; // (NOVO) Contexto 12
+import { Column } from '../Column/Column.js';
+import { DragDropService } from '../../services/DND/DragDropService.js';
+import { appBus } from '../../utils/EventBus.js';
+import { throttleRAF } from '../../utils/ThrottleRAF.js';
 
 /**
  * Description:

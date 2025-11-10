@@ -10,7 +10,7 @@
  * @returns {function.cancel} The throttled function comes with a .cancel() method
  * to cancel any pending scheduled frame.
  */
-export const throttleRAF = (func) => {
+export const throttleRAF = func => {
     /**
      * @type {number | null}
      */

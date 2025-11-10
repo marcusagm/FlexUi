@@ -1,7 +1,6 @@
 import { PanelContent } from './PanelContent.js';
-// (NOVO) Importa o PanelHeader que será reintroduzido na Etapa 2
 import { PanelHeader } from './PanelHeader.js';
-import { appBus } from '../EventBus.js';
+import { appBus } from '../../utils/EventBus.js';
 
 /**
  * Description:

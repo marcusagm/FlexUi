@@ -1,4 +1,4 @@
-import { appBus } from '../../EventBus.js';
+import { appBus } from '../../utils/EventBus.js';
 
 /**
  * Description:

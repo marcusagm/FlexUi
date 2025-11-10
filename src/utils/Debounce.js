@@ -56,4 +56,3 @@ export const debounce = (func, delay, immediate = false) => {
 
     return debounced;
 };
-

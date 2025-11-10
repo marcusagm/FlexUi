@@ -1,5 +1,5 @@
-import { appBus } from '../EventBus.js';
-import { DragDropService } from '../Services/DND/DragDropService.js';
+import { DragDropService } from '../../services/DND/DragDropService.js';
+import { appBus } from '../../utils/EventBus.js';
 
 /**
  * Description:

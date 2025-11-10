@@ -1,6 +1,6 @@
 import { Panel } from './Panel.js';
-import { appNotifications } from '../Services/Notification/Notification.js';
-import { Modal } from '../Services/Modal/Modal.js';
+import { appNotifications } from '../../services/Notification/Notification.js';
+import { Modal } from '../../services/Modal/Modal.js';
 
 export class ToolbarPanel extends Panel {
     constructor(title, height = null, collapsed = false) {

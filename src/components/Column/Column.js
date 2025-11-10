@@ -1,7 +1,7 @@
-import { appBus } from '../EventBus.js';
 import { PanelGroup } from '../Panel/PanelGroup.js';
-import { DragDropService } from '../Services/DND/DragDropService.js';
-import { throttleRAF } from '../ThrottleRAF.js';
+import { DragDropService } from '../../services/DND/DragDropService.js';
+import { appBus } from '../../utils/EventBus.js';
+import { throttleRAF } from '../../utils/ThrottleRAF.js';
 
 /**
  * Description:
