@@ -11,6 +11,9 @@ import { appBus } from '../../utils/EventBus.js';
  * native listeners to the document body and using event delegation
  * to find the correct drop zone instance.
  *
+ * Adds a 'dnd-active' class to the document body during drag operations so CSS
+ * can disable pointer-events on resize handles, preventing event flickering.
+ *
  * Properties summary:
  * - _instance {DragDropService | null} : The private static instance.
  * - _dragState {object} : Stores the item, type, and element being dragged.
@@ -239,9 +242,6 @@ export class DragDropService {
     destroy() {
         const me = this;
         appBus.offByNamespace(me._namespace);
-        // Note: Native DOM listeners on document.body are not removed by this,
-        // as the service is intended to live for the app's entire lifecycle.
-        // A full teardown would require removing them.
     }
 
     /**
@@ -403,6 +403,7 @@ export class DragDropService {
         const me = this;
         if (!payload || !payload.item || !payload.element) return;
 
+        document.body.classList.add('dnd-active');
         me._clearStrategyCaches();
 
         const { item, type, element, event: e } = payload;
@@ -425,6 +426,8 @@ export class DragDropService {
      */
     _onDragEnd() {
         const me = this;
+
+        document.body.classList.remove('dnd-active');
         me.hidePlaceholder();
         me._clearStrategyCaches();
 

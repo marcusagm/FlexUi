@@ -50,7 +50,7 @@
     height: var(--panel-move-handle-size);
     flex: var(--panel-move-handle-flex);
     cursor: grab;
-    color: var(--color-text-secondary); /* (Define a cor do SVG) */
+    color: var(--color-text-secondary);
     opacity: var(--panel-move-handle-opacity);
     align-content: center;
     text-align: center;
@@ -63,7 +63,6 @@
     cursor: grabbing;
 }
 
-/* (MODIFICADO) Classe base do título, agora com alinhamento */
 .panel__title {
     flex-grow: 1;
     color: var(--color-text-bright);
@@ -73,7 +72,6 @@
     text-overflow: ellipsis;
     user-select: none;
     min-width: var(--panel-title-min-width);
-    /* (NOVO) Adicionado conforme solicitação */
     height: 100%;
     align-content: center;
 }
@@ -184,7 +182,6 @@
     flex-shrink: var(--panel-group-header-flex-shrink);
 }
 
-/* (MODIFICADO) Agora preenche o espaço (flex-grow: 1) */
 .panel-group__tab-container {
     display: flex;
     flex-grow: var(--panel-tab-container-flex-grow);
@@ -193,14 +190,12 @@
     height: var(--panel-tab-container-height);
     scrollbar-width: none;
     align-items: center;
-    /* (NOVO) Transição para o feedback de drop */
     transition: background-color 0.2s ease-out;
 }
 .panel-group__tab-container::-webkit-scrollbar {
     display: none;
 }
 
-/* (NOVO) Feedback de D&D para o drop de abas (Panel) */
 .panel-group__tab-container--droptarget {
     background-color: var(--color-bg-hover);
     box-shadow: inset 0 0 4px var(--color-accent-hover);
@@ -223,7 +218,7 @@
     border-top-right-radius: var(--border-radius-base);
     user-select: none;
 }
-/* (NOVO) Adiciona cursor 'grab' se a aba for arrastável */
+
 .panel-group__tab[draggable='true'] {
     cursor: grab;
 }
@@ -242,9 +237,6 @@
     color: var(--color-text-primary);
 }
 
-/* (REMOVIDO) .panel-group__tab-title (substituído pela consolidação abaixo) */
-
-/* (NOVO) Estilos específicos para o .panel__title QUANDO está numa aba */
 .panel-group__tab .panel__title {
     flex-shrink: var(--panel-tab-title-flex-shrink);
     padding: var(--panel-tab-title-padding);
@@ -304,22 +296,15 @@
     color: var(--color-text-bright);
     user-select: none;
 }
-.panel-group__header--simple .panel-group__tab .panel-group__tab-close {
-}
+/* .panel-group__header--simple .panel-group__tab .panel-group__tab-close {
+} */
 
-/* (REMOVIDO) .panel-group__header--simple .panel-group__title-simple (substituído) */
-
-/* (NOVO) Estilos específicos para o .panel__title QUANDO está no modo simples */
 .panel-group__header--simple .panel__title {
-    /* flex-grow, min-width, etc., são herdados de .panel__title */
     padding: var(--panel-simple-header-title-padding);
-    font-size: var(
-        --panel-simple-header-tab-font-size
-    ); /* (Mantém o tamanho de fonte original do modo simples) */
+    font-size: var(--panel-simple-header-tab-font-size);
     color: var(--color-text-bright);
 }
 
-/* (NOVO) Adiciona cursor 'grab' ao título simples se for arrastável */
 .panel-group__header--simple .panel__title[draggable='true'] {
     cursor: grab;
 }
@@ -338,4 +323,8 @@
     flex-grow: 1;
     border: none;
     border-radius: 0;
+}
+
+.dnd-active .panel-group__resize-handle {
+    pointer-events: none;
 }

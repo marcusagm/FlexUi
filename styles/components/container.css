@@ -11,18 +11,14 @@
     height: var(--container-height-calc);
 }
 
-/* (MODIFICADO) Renomeado de .container para .row (gestor de colunas) */
 .row {
-    flex: 1 1 auto; /* Linhas crescem verticalmente, base auto */
-    display: flex; /* Gere colunas horizontalmente */
-    gap: var(--container-gap); /* Gap entre colunas */
+    flex: 1 1 auto;
+    display: flex;
+    gap: var(--container-gap);
     padding: var(--row-padding);
     position: relative;
-    /* (NOVO) Altura mínima para permitir 'drop' numa linha vazia */
     min-height: 50px;
 }
-
-/* --- Placeholders (INALTERADOS CONFORME SOLICITADO) --- */
 
 .container__placeholder {
     background: var(--color-placeholder-bg);
@@ -31,30 +27,23 @@
     margin: 0;
 }
 
-/* Placeholder para 'ColumnDropStrategy' e a nova 'ContainerDropStrategy' */
 .container__placeholder--horizontal {
     width: auto;
     margin: var(--container-placeholder-margin);
-    height: var(--container-placeholder-height); /* Define a altura horizontal */
+    height: var(--container-placeholder-height);
 }
-
-/* Placeholder para 'RowDropStrategy' (antiga ContainerDropStrategy) */
 .container__placeholder--vertical {
     width: var(--container-placeholder-vertical-width);
     flex: var(--container-placeholder-vertical-flex);
     align-self: stretch;
 }
 
-/* (NOVO) Contexto 12: Handle de resize vertical para Rows */
 .row__resize-handle {
-    /* Oculto por defeito; O JS (addResizeBars) adiciona/remove este elemento */
-    height: var(--panel-resize-handle-height); /* Reutiliza o token (3px) */
+    height: var(--panel-resize-handle-height);
     width: 100%;
-    cursor: ns-resize; /* Redimensionamento Norte-Sul (vertical) */
+    cursor: ns-resize;
     background: transparent;
     transition: background-color 0.2s ease-in-out;
-
-    /* Posicionamento na parte inferior da linha */
     position: absolute;
     bottom: 0;
     left: 0;
@@ -65,4 +54,8 @@
 }
 .row__resize-handle:active {
     background: var(--color-accent-active);
+}
+
+.dnd-active .row__resize-handle {
+    pointer-events: none;
 }

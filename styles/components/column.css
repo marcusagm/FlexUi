@@ -41,3 +41,7 @@
 .column--resize-right .column__resize-handle {
     right: 0;
 }
+
+.dnd-active .column__resize-handle {
+    pointer-events: none;
+}
