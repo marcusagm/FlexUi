@@ -19,29 +19,110 @@ import { LayoutService } from './services/LayoutService.js';
 import { appBus } from './utils/EventBus.js';
 import { debounce } from './utils/Debounce.js';
 
+/**
+ * Description:
+ * Orchestrates the entire FlexUI application. It is a Singleton responsible
+ * for initializing all core services (DND, Layout, State, PanelFactory),
+ * instantiating the main UI components (Menu, Container, StatusBar),
+ * and handling global application events (like saving, loading, or adding
+ * new panels).
+ *
+ * Properties summary:
+ * - STORAGE_KEY {string} : The key used for saving the state in localStorage.
+ * - currentWorkspace {object | null} : Holds the currently loaded workspace data.
+ * - namespace {string} : A unique namespace for this singleton's appBus listeners.
+ * - menu {Menu} : The instance of the main application menu.
+ * - container {Container} : The instance of the root layout container component.
+ * - statusBar {StatusBar} : The instance of the application status bar.
+ * - stateService {StateService} : The singleton instance of the StateService.
+ * - _bound... {Function | null} : Bound event handlers for robust cleanup.
+ * - debouncedResize {Function | null} : The debounced window resize handler.
+ *
+ * Typical usage:
+ * // In main.js
+ * const app = new App();
+ * await app.init();
+ *
+ * Events:
+ * - Listens to: 'app:add-new-panel', 'app:save-state', 'app:restore-state', 'app:reset-state'
+ * - Emits: 'app:set-permanent-status' (on init)
+ *
+ * Business rules implemented:
+ * - Implements the Singleton pattern to ensure only one App instance.
+ * - Centralizes service registration (DND strategies, Panel types).
+ * - Manages the top-level application lifecycle (init, destroy).
+ * - Orchestrates layout persistence (save, restore, reset) by coordinating
+ * StateService and the root Container.
+ *
+ * Dependencies:
+ * - components/Menu/Menu.js
+ * - components/Container/Container.js
+ * - components/StatusBar/StatusBar.js
+ * - services/StateService.js
+ * - services/LayoutService.js
+ * - services/DND/DragDropService.js (and all strategies)
+ * - components/Panel/PanelFactory.js (and all Panel types)
+ * - services/Notification/NotificationUIListener.js
+ * - utils/EventBus.js
+ * - utils/Debounce.js
+ */
 export class App {
     /**
      * Chave de armazenamento principal para o layout.
      * @type {string}
+     * @public
      */
     STORAGE_KEY = 'panel_state';
 
     /**
      * Armazena o objeto de workspace carregado (incluindo nome e layout)
      * @type {object | null}
+     * @public
      */
     currentWorkspace = null;
 
-    // (NOVO) Namespace estático para este Singleton
+    /**
+     * Namespace único para os listeners do appBus deste singleton.
+     * @type {string}
+     * @public
+     */
     namespace = 'app_singleton';
 
-    // (NOVO) Referências bindadas para listeners (Correção de Memory Leak)
+    /**
+     * @type {Function | null}
+     * @private
+     */
     _boundAddNewPanel = null;
+
+    /**
+     * @type {Function | null}
+     * @private
+     */
     _boundResetLayoutSilent = null;
+
+    /**
+     * @type {Function | null}
+     * @private
+     */
     _boundSaveLayout = null;
+
+    /**
+     * @type {Function | null}
+     * @private
+     */
     _boundRestoreLayout = null;
+
+    /**
+     * @type {Function | null}
+     * @private
+     */
     _boundResetLayout = null;
-    debouncedResize = null; // (Já era armazenado)
+
+    /**
+     * @type {Function | null}
+     * @public
+     */
+    debouncedResize = null;
 
     constructor() {
         if (App.instance) {
@@ -49,57 +130,57 @@ export class App {
         }
         App.instance = this;
 
-        this.menu = new Menu();
-        // (MODIFICADO) 'this.container' é agora o novo Container (gestor de linhas)
-        this.container = new Container();
-        this.statusBar = new StatusBar();
+        const me = this;
 
-        this.stateService = StateService.getInstance();
+        me.menu = new Menu();
+        me.container = new Container();
+        me.statusBar = new StatusBar();
 
-        // (MODIFICADO) Regista as 4 estratégias
+        me.stateService = StateService.getInstance();
+
         const dds = DragDropService.getInstance();
         dds.registerStrategy('column', new ColumnDropStrategy());
         dds.registerStrategy('TabContainer', new TabContainerDropStrategy());
-        dds.registerStrategy('row', new RowDropStrategy()); // (Renomeado)
-        dds.registerStrategy('container', new ContainerDropStrategy()); // (Novo)
+        dds.registerStrategy('row', new RowDropStrategy());
+        dds.registerStrategy('container', new ContainerDropStrategy());
 
         const factory = PanelFactory.getInstance();
         factory.registerPanelClasses([Panel, TextPanel, ToolbarPanel]);
 
         LayoutService.getInstance();
 
-        document.body.append(this.menu.element, this.container.element, this.statusBar.element);
+        document.body.append(me.menu.element, me.container.element, me.statusBar.element);
 
-        // (NOVO) Armazena referências bindadas
-        this._boundAddNewPanel = this.addNewPanel.bind(this);
-        this._boundResetLayoutSilent = this.resetLayout.bind(this, true);
-        this._boundSaveLayout = this.saveLayout.bind(this);
-        this._boundRestoreLayout = this.restoreLayout.bind(this);
-        this._boundResetLayout = this.resetLayout.bind(this, false);
+        // Armazena referências bindadas para preservar o 'this'
+        me._boundAddNewPanel = me.addNewPanel.bind(me);
+        me._boundResetLayoutSilent = me.resetLayout.bind(me, true);
+        me._boundSaveLayout = me.saveLayout.bind(me);
+        me._boundRestoreLayout = me.restoreLayout.bind(me);
+        me._boundResetLayout = me.resetLayout.bind(me, false);
 
-        const debounceDelay = 200;
-        this.debouncedResize = debounce(this.onResizeHandler.bind(this), debounceDelay);
-
-        this.initEventListeners();
+        me.initEventListeners();
 
         const uiListener = new NotificationUIListener(document.body);
         uiListener.listen(appNotifications);
     }
 
     /**
-     * Inicializa a aplicação, carregando o menu e o layout assincronamente.
-     * Deve ser chamado pelo main.js.
+     * Initializes the application asynchronously, loading the menu and layout.
+     * This must be called after instantiation.
+     * @returns {Promise<void>}
      */
     async init() {
-        await this.menu.load();
-        // Carrega o layout (do localStorage ou do default.json)
-        await this.loadInitialLayout();
+        const me = this;
+        await me.menu.load();
+        await me.loadInitialLayout();
 
         appBus.emit('app:set-permanent-status', 'Pronto');
     }
 
     /**
-     * (MODIFICADO) Usa referências bindadas e adiciona namespace
+     * Initializes all global appBus event listeners for this singleton.
+     * Uses namespaces for easy cleanup.
+     * @returns {void}
      */
     initEventListeners() {
         const me = this;
@@ -110,43 +191,36 @@ export class App {
         appBus.on('app:save-state', me._boundSaveLayout, options);
         appBus.on('app:restore-state', me._boundRestoreLayout, options);
         appBus.on('app:reset-state', me._boundResetLayout, options);
-
-        window.addEventListener('resize', me.debouncedResize);
     }
 
     /**
-     * (NOVO) Limpa todos os listeners para permitir "teardown" (ex: testes).
-     * (MODIFICADO) Usa offByNamespace.
+     * Cleans up all event listeners and child components.
+     * (MODIFICADO) Usa offByNamespace para limpar todos os listeners do appBus.
+     * @returns {void}
      */
     destroy() {
         const me = this;
-        // (INÍCIO DA MODIFICAÇÃO - Etapa 3)
-        // Remove todos os listeners deste componente de uma vez
         appBus.offByNamespace(me.namespace);
-        // (FIM DA MODIFICAÇÃO)
 
         window.removeEventListener('resize', me.debouncedResize);
-        me.debouncedResize?.cancel(); // Cancela qualquer debounce pendente
+        me.debouncedResize?.cancel();
 
-        // Destrói os componentes principais
         me.menu?.destroy();
         me.container?.destroy();
-        // me.statusBar?.destroy(); // (StatusBar não tem destroy, mas poderia ter)
     }
 
     /**
-     * Carrega o layout inicial do StateService (localStorage ou JSON).
+     * Loads the initial layout from StateService (localStorage or default JSON).
+     * @returns {Promise<void>}
      */
     async loadInitialLayout() {
-        const workspaceData = await this.stateService.loadState(this.STORAGE_KEY);
+        const me = this;
+        const workspaceData = await me.stateService.loadState(me.STORAGE_KEY);
 
         if (workspaceData && workspaceData.layout) {
-            // Armazena o objeto de workspace completo (com nome e layout)
-            this.currentWorkspace = workspaceData;
-            // Passa apenas os dados de layout para o container (que agora suporta 'rows')
-            this.container.fromJSON(workspaceData.layout);
+            me.currentWorkspace = workspaceData;
+            me.container.fromJSON(workspaceData.layout);
         } else {
-            // Isso só deve acontecer se o default.json falhar ao carregar
             console.error(
                 'App: Falha crítica ao carregar o layout. Nenhum dado de workspace foi encontrado.'
             );
@@ -157,49 +231,56 @@ export class App {
     }
 
     /**
-     * Salva o estado do layout atual no objeto de workspace.
+     * Serializes the current layout from the container and saves it to localStorage.
+     * @returns {void}
      */
     saveLayout() {
-        // 1. Pega os dados de layout atuais do container
-        const layoutData = this.container.toJSON();
+        const me = this;
+        const layoutData = me.container.toJSON();
 
-        // 2. Atualiza o objeto de workspace em memória
-        if (this.currentWorkspace) {
-            this.currentWorkspace.layout = layoutData;
+        if (me.currentWorkspace) {
+            me.currentWorkspace.layout = layoutData;
         } else {
-            // Fallback caso a inicialização tenha falhado
             console.warn(
                 'App.saveLayout: currentWorkspace é nulo. Criando novo objeto de workspace.'
             );
-            this.currentWorkspace = {
-                name: 'Workspace Salvo (Fallback)', // Nome padrão
+            me.currentWorkspace = {
+                name: 'Workspace Salvo (Fallback)',
                 layout: layoutData
             };
         }
 
-        // 3. Salva o objeto de workspace completo (com nome e layout) no localStorage
-        this.stateService.saveState(this.STORAGE_KEY, this.currentWorkspace);
+        me.stateService.saveState(me.STORAGE_KEY, me.currentWorkspace);
 
         const i18n = TranslationService.getInstance();
         appNotifications.success(i18n.translate('appstate.save'));
     }
 
+    /**
+     * Restores the layout from the last saved state.
+     * @returns {Promise<void>}
+     */
     async restoreLayout() {
-        this.container.clear();
-        await this.loadInitialLayout();
+        const me = this;
+        me.container.clear();
+        await me.loadInitialLayout();
 
         const i18n = TranslationService.getInstance();
         appNotifications.success(i18n.translate('appstate.restore'));
     }
 
     /**
-     * @param {boolean} [silent=false]
+     * Clears the saved state from localStorage and reloads the default layout.
+     *
+     * @param {boolean} [silent=false] - If true, avoids showing a status notification.
+     * @returns {Promise<void>}
      */
     async resetLayout(silent = false) {
-        this.stateService.clearState(this.STORAGE_KEY);
-        this.container.clear();
+        const me = this;
+        me.stateService.clearState(me.STORAGE_KEY);
+        me.container.clear();
 
-        await this.loadInitialLayout();
+        await me.loadInitialLayout();
 
         if (!silent) {
             const i18n = TranslationService.getInstance();
@@ -207,24 +288,19 @@ export class App {
         }
     }
 
+    /**
+     * Handles the 'app:add-new-panel' event by creating a new default
+     * TextPanel in the first available column.
+     * @returns {void}
+     */
     addNewPanel() {
-        // (MODIFICADO) Navega pela nova estrutura: Container -> Row -> Column
-        const column = this.container.getFirstRow().getFirstColumn();
+        const me = this;
+        const column = me.container.getFirstRow().getFirstColumn();
         const title = `Novo Painel (${new Date().toLocaleTimeString()})`;
         const panel = new TextPanel(title, 'Conteúdo do novo painel.');
 
         const panelGroup = new PanelGroup(panel);
 
         column.addPanelGroup(panelGroup);
-    }
-
-    /**
-     * (MODIFICADO) Manipulador de resize chamado pelo debounce.
-     */
-    onResizeHandler() {
-        // Esta função é mantida (pois o listener está nela),
-        // mas a lógica O(N*M) foi removida.
-        // O layout Flexbox (CSS) e os ResizeObservers (JS)
-        // gerenciam o redimensionamento de forma passiva e eficiente.
     }
 }
