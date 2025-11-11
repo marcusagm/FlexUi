@@ -1,3 +1,5 @@
+import { appBus } from '../../utils/EventBus.js';
+
 /**
  * Description:
  * Provides a decoupled service for dispatching notification events (Toasts and Snackbars).
@@ -170,13 +172,18 @@ export class NotificationService {
             };
         });
 
-        const event = new CustomEvent('show-notification', {
-            detail: finalOptions,
-            bubbles: true, // Allow the event to bubble up through the DOM
-            composed: true // Allow the event to cross Shadow DOM boundaries
-        });
+        // (INÍCIO DA MODIFICAÇÃO - Etapa 2)
+        // const event = new CustomEvent('show-notification', { (REMOVIDO)
+        //     detail: finalOptions,
+        //     bubbles: true,
+        //     composed: true
+        // });
+        // document.dispatchEvent(event); (REMOVIDO)
 
-        document.dispatchEvent(event);
+        // (NOVO) Emite no appBus. O payload é o objeto 'finalOptions'.
+        appBus.emit('show-notification', finalOptions);
+        // (FIM DA MODIFICAÇÃO)
+
         return notificationId;
     }
 
@@ -194,12 +201,17 @@ export class NotificationService {
             return;
         }
 
-        const event = new CustomEvent('dismiss-notification', {
-            detail: { id: id },
-            bubbles: true,
-            composed: true
-        });
-        document.dispatchEvent(event);
+        // (INÍCIO DA MODIFICAÇÃO - Etapa 2)
+        // const event = new CustomEvent('dismiss-notification', { (REMOVIDO)
+        //     detail: { id: id },
+        //     bubbles: true,
+        //     composed: true
+        // });
+        // document.dispatchEvent(event); (REMOVIDO)
+
+        // (NOVO) Emite no appBus. O payload é um objeto com o ID.
+        appBus.emit('dismiss-notification', { id: id });
+        // (FIM DA MODIFICAÇÃO)
     }
 
     // --- Helper Methods for Convenience ---

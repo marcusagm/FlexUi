@@ -18,14 +18,18 @@ import { appBus } from '../../utils/EventBus.js';
  * (REFATORADO vDND-Bridge) Remove listeners DND locais e delega ao DragDropService
  * através de 'dataset.dropzone' e 'dropZoneInstance'.
  *
- * (CORREÇÃO vDND-Bug-Resize) Adiciona a chamada '_updateAllColumnResizeBars'
- * em createRow/deleteRow para forçar as linhas a recalcularem os handles
- * de coluna quando a ordem das linhas muda.
+ * (CORREÇÃO vDND-Bug-Resize) Remove '_updateAllColumnResizeBars'
+ * pois o 'LayoutService' agora é o único responsável por esta lógica.
+ *
+ * (CORREÇÃO vEventBus) Usa namespace para listeners do appBus.
  */
 export class Container {
     state = {
         children: [] // Contém instâncias de Row
     };
+
+    // (NOVO) Namespace estático
+    namespace = 'app-container';
 
     /**
      * (NOVO) Armazena a referência bindada para o listener
@@ -55,19 +59,22 @@ export class Container {
     // (REMOVIDO - Etapa 1) Métodos initDNDListeners e handlers (onDrag...)
 
     /**
-     * (MODIFICADO) Usa a referência bindada
+     * (MODIFICADO) Usa a referência bindada e adiciona namespace
      */
     initEventListeners() {
         // Ouve o evento emitido pela Row (Etapa 1)
-        appBus.on('row:empty', this._boundOnRowEmpty);
+        appBus.on('row:empty', this._boundOnRowEmpty, { namespace: this.namespace });
     }
 
     /**
      * (NOVO) Limpa todos os listeners para permitir "teardown".
+     * (MODIFICADO) Usa offByNamespace.
      */
     destroy() {
         const me = this;
-        appBus.off('row:empty', me._boundOnRowEmpty);
+        // (INÍCIO DA MODIFICAÇÃO - Etapa 3)
+        appBus.offByNamespace(me.namespace);
+        // (FIM DA MODIFICAÇÃO)
 
         // Um container destruído também deve destruir seus filhos
         [...me.getRows()].forEach(row => row.destroy());
@@ -99,21 +106,7 @@ export class Container {
         });
     }
 
-    // (INÍCIO DA CORREÇÃO - Bug 2)
-    /**
-     * (NOVO) Força todas as linhas filhas a recalcularem
-     * seus handles de redimensionamento de *coluna*.
-     * @private
-     */
-    _updateAllColumnResizeBars() {
-        this.getRows().forEach(row => {
-            // Chama o método de Row.js que atualiza os handles de coluna
-            if (typeof row.updateAllResizeBars === 'function') {
-                row.updateAllResizeBars();
-            }
-        });
-    }
-    // (FIM DA CORREÇÃO)
+    // (REMOVIDO) _updateAllColumnResizeBars foi removido na correção anterior.
 
     /**
      * (NOVO) Cria e insere uma nova Linha (Row).
@@ -141,10 +134,7 @@ export class Container {
         this.requestLayoutUpdate();
         this.updateAllResizeBars(); // (Mantido) Atualiza os handles de LINHA (vertical)
 
-        // (INÍCIO DA CORREÇÃO - Bug 2)
-        // Força TODAS as linhas a atualizarem seus handles de COLUNA (horizontal)
-        this._updateAllColumnResizeBars();
-        // (FIM DA CORREÇÃO)
+        // (REMOVIDO) _updateAllColumnResizeBars
 
         return row;
     }
@@ -172,10 +162,7 @@ export class Container {
         this.requestLayoutUpdate();
         this.updateAllResizeBars(); // (Mantido) Atualiza os handles de LINHA (vertical)
 
-        // (INÍCIO DA CORREÇÃO - Bug 2)
-        // Força TODAS as linhas a atualizarem seus handles de COLUNA (horizontal)
-        this._updateAllColumnResizeBars();
-        // (FIM DA CORREÇÃO)
+        // (REMOVIDO) _updateAllColumnResizeBars
     }
 
     /**
@@ -251,9 +238,6 @@ export class Container {
         this.requestLayoutUpdate();
         this.updateAllResizeBars(); // (Mantido) Atualiza os handles de LINHA (vertical)
 
-        // (INÍCIO DA CORREÇÃO - Bug 2)
-        // Garante que o estado inicial dos handles de coluna esteja correto
-        this._updateAllColumnResizeBars();
-        // (FIM DA CORREÇÃO)
+        // (REMOVIDO) _updateAllColumnResizeBars
     }
 }

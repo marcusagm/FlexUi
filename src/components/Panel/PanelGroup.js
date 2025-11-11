@@ -37,6 +37,8 @@ import { throttleRAF } from '../../utils/ThrottleRAF.js';
  * (CORREÇÃO vDND-Bridge-Fix-3) Adiciona a propriedade 'dropZoneType'
  * para que o DragDropService possa identificá-la.
  *
+ * (CORREÇÃO vEventBus) Usa o 'this.id' existente como namespace.
+ *
  * Properties summary:
  * - state {object} : Internal state management.
  */
@@ -91,11 +93,8 @@ export class PanelGroup {
     constructor(initialPanel = null, height = null, collapsed = false, config = {}) {
         Object.assign(this.state, config);
 
-        // (INÍCIO DA CORREÇÃO - Bug 1)
-        // Adiciona a propriedade que faltava, para que o DragDropService
-        // possa identificá-la quando esta classe for a 'dropZoneInstance'.
+        // (CORREÇÃO) Adiciona a propriedade que faltava.
         this.dropZoneType = 'TabContainer';
-        // (FIM DA CORREÇÃO)
 
         // (MODIFICADO) O contentContainer é criado aqui
         this.state.contentContainer = document.createElement('div');
@@ -199,12 +198,15 @@ export class PanelGroup {
 
     /**
      * (MODIFICADO) Initializes event listeners for the EventBus.
-     * Usa as referências bindadas.
+     * Usa as referências bindadas e o 'this.id' como namespace.
      */
     initEventListeners() {
-        appBus.on('panel:group-child-close-request', this._boundOnChildCloseRequest);
-        appBus.on('panel:close-request', this._boundOnCloseRequest);
-        appBus.on('panel:toggle-collapse-request', this._boundOnToggleCollapseRequest);
+        const me = this;
+        const options = { namespace: me.id };
+
+        appBus.on('panel:group-child-close-request', me._boundOnChildCloseRequest, options);
+        appBus.on('panel:close-request', me._boundOnCloseRequest, options);
+        appBus.on('panel:toggle-collapse-request', me._boundOnToggleCollapseRequest, options);
     }
 
     /**
@@ -239,13 +241,13 @@ export class PanelGroup {
 
     /**
      * (MODIFICADO) Cleans up event listeners when the group is destroyed.
-     * Usa as referências bindadas.
+     * Usa offByNamespace.
      */
     destroy() {
         const me = this;
-        appBus.off('panel:group-child-close-request', me._boundOnChildCloseRequest);
-        appBus.off('panel:close-request', me._boundOnCloseRequest);
-        appBus.off('panel:toggle-collapse-request', me._boundOnToggleCollapseRequest);
+        // (INÍCIO DA MODIFICAÇÃO - Etapa 3)
+        appBus.offByNamespace(me.id);
+        // (FIM DA MODIFICAÇÃO)
 
         // Garante que o ResizeObserver do header seja desconectado
         me.state.header?.destroy();

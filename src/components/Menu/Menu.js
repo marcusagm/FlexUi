@@ -3,6 +3,9 @@ import { TranslationService } from '../../services/TranslationService.js';
 import { appBus } from '../../utils/EventBus.js';
 
 export class Menu {
+    // (NOVO) Namespace estático
+    namespace = 'app-menu';
+
     // (NOVO) Propriedades para armazenar referências bindadas
     _boundOnGlobalClick = null;
     _boundCloseAllMenus = null;
@@ -23,12 +26,16 @@ export class Menu {
 
     /**
      * (NOVO) Método 'destroy' para limpeza de listeners globais.
+     * (MODIFICADO) Usa offByNamespace.
      */
     destroy() {
         const me = this; // Conforme diretrizes
         document.removeEventListener('click', me._boundOnGlobalClick);
-        appBus.off('menu:item-selected', me._boundCloseAllMenus);
-        appBus.off('menu:close-siblings', me._boundCloseSiblings);
+
+        // (INÍCIO DA MODIFICAÇÃO - Etapa 3)
+        appBus.offByNamespace(me.namespace);
+        // (FIM DA MODIFICAÇÃO)
+
         me.element.remove();
     }
 
@@ -111,12 +118,17 @@ export class Menu {
     }
 
     /**
-     * (MODIFICADO) Usa referências bindadas.
+     * (MODIFICADO) Usa referências bindadas e adiciona namespace.
      */
     initGlobalListeners() {
-        document.addEventListener('click', this._boundOnGlobalClick);
-        appBus.on('menu:item-selected', this._boundCloseAllMenus);
-        appBus.on('menu:close-siblings', this._boundCloseSiblings);
+        const me = this;
+        const options = { namespace: me.namespace };
+
+        document.addEventListener('click', me._boundOnGlobalClick);
+        // (INÍCIO DA MODIFICAÇÃO - Etapa 3)
+        appBus.on('menu:item-selected', me._boundCloseAllMenus, options);
+        appBus.on('menu:close-siblings', me._boundCloseSiblings, options);
+        // (FIM DA MODIFICAÇÃO)
     }
 
     closeAllMenus() {

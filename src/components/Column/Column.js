@@ -17,6 +17,8 @@ import { throttleRAF } from '../../utils/ThrottleRAF.js';
  * (REFATORADO vDND-Bridge) Remove listeners DND locais e delega ao DragDropService
  * através de 'dataset.dropzone' e 'dropZoneInstance'.
  *
+ * (CORREÇÃO vEventBus) Usa ID e namespace para listeners do appBus.
+ *
  * Properties summary:
  * - state {object} : Internal state management.
  * - _minWidth {number} : The minimum width the column can be resized to.
@@ -37,6 +39,9 @@ export class Column {
         panelGroups: [],
         width: null
     };
+
+    // (NOVO) ID único para namespace
+    id = 'col_' + (Math.random().toString(36).substring(2, 9) + Date.now());
 
     /**
      * The minimum width in pixels for horizontal resizing.
@@ -72,10 +77,8 @@ export class Column {
         this.element.classList.add('column');
         this.dropZoneType = 'column';
 
-        // (INÍCIO DA MODIFICAÇÃO - Etapa 2)
-        // 1. Adiciona o dataset para seleção pelo handler unificado
+        // (MODIFICADO - Etapa 2)
         this.element.dataset.dropzone = this.dropZoneType;
-        // 2. Anexa a instância JS ao elemento DOM
         this.element.dropZoneInstance = this;
         // (FIM DA MODIFICAÇÃO)
 
@@ -150,10 +153,10 @@ export class Column {
 
     /**
      * (MODIFICADO) Initializes event listeners for the EventBus.
-     * Usa a referência bindada.
+     * Usa a referência bindada e adiciona namespace.
      */
     initEventListeners() {
-        appBus.on('panelgroup:removed', this._boundOnPanelGroupRemoved);
+        appBus.on('panelgroup:removed', this._boundOnPanelGroupRemoved, { namespace: this.id });
     }
 
     /**
@@ -170,18 +173,19 @@ export class Column {
 
     /**
      * (MODIFICADO) Cleans up event listeners when the column is destroyed.
-     * Usa a referência bindada.
+     * Usa offByNamespace.
      */
     destroy() {
-        appBus.off('panelgroup:removed', this._boundOnPanelGroupRemoved);
+        // (INÍCIO DA MODIFICAÇÃO - Etapa 3)
+        appBus.offByNamespace(this.id);
+        // (FIM DA MODIFICAÇÃO)
+
         this.getThrottledUpdate()?.cancel();
 
         [...this.state.panelGroups].forEach(panel => panel.destroy());
     }
 
-    // (INÍCIO DA MODIFICAÇÃO - Etapa 2)
-    // (REMOVIDO) Méthod initDragDrop
-    // (FIM DA MODIFICAÇÃO)
+    // (REMOVIDO) Método initDragDrop
 
     /**
      * Adds the horizontal resize bar to the column.
@@ -256,9 +260,7 @@ export class Column {
         this.requestLayoutUpdate();
     }
 
-    // (INÍCIO DA MODIFICAÇÃO - Etapa 2)
     // (REMOVIDO) Métodos onDragEnter, onDragOver, onDragLeave, onDrop
-    // (FIM DA MODIFICAÇÃO)
 
     /**
      * Adds multiple PanelGroups at once (used for state restoration).
@@ -275,11 +277,12 @@ export class Column {
 
     /**
      * Adds a single PanelGroup to the column at a specific index.
-     * @param {number|null} [index=null]
+     * (MODIFICADO - CORREÇÃO) Usa lógica de 'sibling lookup'
      */
     addPanelGroup(panelGroup, index = null) {
         if (index === null) {
             this.state.panelGroups.push(panelGroup);
+            // (CORREÇÃO) Insere antes do handle de resize, se existir
             const resizeHandle = this.element.querySelector('.column__resize-handle');
             this.element.insertBefore(panelGroup.element, resizeHandle);
         } else {
@@ -287,13 +290,13 @@ export class Column {
             const nextSiblingPanel = this.state.panelGroups[index + 1];
             let nextSiblingElement = nextSiblingPanel ? nextSiblingPanel.element : null;
 
+            // (CORREÇÃO) Se for o último, insere antes do handle
             if (!nextSiblingElement) {
                 const resizeHandle = this.element.querySelector('.column__resize-handle');
                 if (resizeHandle) {
                     nextSiblingElement = resizeHandle;
                 }
             }
-
             this.element.insertBefore(panelGroup.element, nextSiblingElement);
         }
         panelGroup.setParentColumn(this);

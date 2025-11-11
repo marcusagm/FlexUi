@@ -32,6 +32,9 @@ export class App {
      */
     currentWorkspace = null;
 
+    // (NOVO) Namespace estático para este Singleton
+    namespace = 'app_singleton';
+
     // (NOVO) Referências bindadas para listeners (Correção de Memory Leak)
     _boundAddNewPanel = null;
     _boundResetLayoutSilent = null;
@@ -96,28 +99,31 @@ export class App {
     }
 
     /**
-     * (MODIFICADO) Usa referências bindadas
+     * (MODIFICADO) Usa referências bindadas e adiciona namespace
      */
     initEventListeners() {
-        appBus.on('app:add-new-panel', this._boundAddNewPanel);
-        appBus.on('app:reinitialize-default-layout', this._boundResetLayoutSilent);
-        appBus.on('app:save-state', this._boundSaveLayout);
-        appBus.on('app:restore-state', this._boundRestoreLayout);
-        appBus.on('app:reset-state', this._boundResetLayout);
+        const me = this;
+        const options = { namespace: me.namespace };
 
-        window.addEventListener('resize', this.debouncedResize);
+        appBus.on('app:add-new-panel', me._boundAddNewPanel, options);
+        appBus.on('app:reinitialize-default-layout', me._boundResetLayoutSilent, options);
+        appBus.on('app:save-state', me._boundSaveLayout, options);
+        appBus.on('app:restore-state', me._boundRestoreLayout, options);
+        appBus.on('app:reset-state', me._boundResetLayout, options);
+
+        window.addEventListener('resize', me.debouncedResize);
     }
 
     /**
      * (NOVO) Limpa todos os listeners para permitir "teardown" (ex: testes).
+     * (MODIFICADO) Usa offByNamespace.
      */
     destroy() {
         const me = this;
-        appBus.off('app:add-new-panel', me._boundAddNewPanel);
-        appBus.off('app:reinitialize-default-layout', me._boundResetLayoutSilent);
-        appBus.off('app:save-state', me._boundSaveLayout);
-        appBus.off('app:restore-state', me._boundRestoreLayout);
-        appBus.off('app:reset-state', me._boundResetLayout);
+        // (INÍCIO DA MODIFICAÇÃO - Etapa 3)
+        // Remove todos os listeners deste componente de uma vez
+        appBus.offByNamespace(me.namespace);
+        // (FIM DA MODIFICAÇÃO)
 
         window.removeEventListener('resize', me.debouncedResize);
         me.debouncedResize?.cancel(); // Cancela qualquer debounce pendente

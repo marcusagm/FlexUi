@@ -23,6 +23,8 @@ import { throttleRAF } from '../../utils/ThrottleRAF.js';
  * a lógica de 'state-based sibling lookup' (como sugerido pelo usuário)
  * para inserir a coluna no local DOM correto, ignorando
  * elementos não-componentes como 'row__resize-handle'.
+ *
+ * (CORREÇÃO vEventBus) Usa ID e namespace para listeners do appBus.
  */
 export class Row {
     state = {
@@ -30,6 +32,9 @@ export class Row {
         parentContainer: null, // (NOVO) Contexto 11
         height: null // (NOVO) Contexto 11
     };
+
+    // (NOVO) ID único para namespace
+    id = 'row_' + (Math.random().toString(36).substring(2, 9) + Date.now());
 
     /**
      * (NOVO) Contexto 12
@@ -108,10 +113,10 @@ export class Row {
     // (REMOVIDO - Etapa 1) Métodos initDNDListeners e handlers (onDrag...)
 
     /**
-     * (MODIFICADO) Usa a referência bindada
+     * (MODIFICADO) Usa a referência bindada e adiciona namespace
      */
     initEventListeners() {
-        appBus.on('column:empty', this._boundOnColumnEmpty);
+        appBus.on('column:empty', this._boundOnColumnEmpty, { namespace: this.id });
     }
 
     /**
@@ -124,10 +129,14 @@ export class Row {
     /**
      * (MODIFICADO) Usa a referência bindada
      * (NOVO) Contexto 12: Limpeza de listeners e filhos
+     * (MODIFICADO) Usa offByNamespace
      */
     destroy() {
         const me = this;
-        appBus.off('column:empty', me._boundOnColumnEmpty);
+        // (INÍCIO DA MODIFICAÇÃO - Etapa 3)
+        appBus.offByNamespace(me.id);
+        // (FIM DA MODIFICAÇÃO)
+
         me.getThrottledUpdate()?.cancel();
 
         // Destrói todas as colunas filhas
@@ -147,7 +156,7 @@ export class Row {
 
     /**
      * Atualiza as barras de redimensionamento de todas as colunas.
-     * (Lógica inalterada)
+     * (MODIFICADO - CORREÇÃO) Esta função agora é chamada apenas pelo LayoutService.
      */
     updateAllResizeBars() {
         const columns = this.getColumns();
@@ -210,6 +219,7 @@ export class Row {
 
     /**
      * Cria e insere uma nova Coluna.
+     * (MODIFICADO - CORREÇÃO) Usa lógica de 'sibling lookup'
      */
     createColumn(width = null, index = null) {
         const column = new Column(this, width); // 'this' (Row) é o container da Coluna
@@ -249,7 +259,8 @@ export class Row {
         }
         // (FIM DA CORREÇÃO)
 
-        this.updateAllResizeBars();
+        // (REMOVIDO - CORREÇÃO) 'updateAllResizeBars' movido para LayoutService
+        // this.updateAllResizeBars();
         column.setParentContainer(this); // O pai da Coluna é a Row
         // (MODIFICADO) Delega ao LayoutService
         this.requestLayoutUpdate();
@@ -272,7 +283,8 @@ export class Row {
         this.state.children.splice(index, 1);
         // (MODIFICADO) Delega ao LayoutService
         this.requestLayoutUpdate();
-        this.updateAllResizeBars();
+        // (REMOVIDO - CORREÇÃO) 'updateAllResizeBars' movido para LayoutService
+        // this.updateAllResizeBars();
     }
 
     getColumns() {
@@ -345,7 +357,8 @@ export class Row {
 
         // (MODIFICADO) Delega ao LayoutService
         this.requestLayoutUpdate();
-        this.updateAllResizeBars();
+        // (REMOVIDO - CORREÇÃO) 'updateAllResizeBars' movido para LayoutService
+        // this.updateAllResizeBars();
         this.updateHeight(false); // Assume que não é a última
     }
 }

@@ -1,4 +1,5 @@
 import { TranslationService } from '../TranslationService.js';
+import { appBus } from '../../utils/EventBus.js'; // (NOVO) Importa o appBus
 
 /**
  * Description:
@@ -113,19 +114,25 @@ export class NotificationUIListener {
         }
         this._notificationService = notificationServiceInstance;
 
+        // (INÍCIO DA MODIFICAÇÃO - Etapa 2)
         // Bind 'this' context for event handlers
-        document.addEventListener('show-notification', this._handleShow.bind(this));
-        document.addEventListener('dismiss-notification', this._handleDismiss.bind(this));
+        // document.addEventListener('show-notification', this._handleShow.bind(this)); (REMOVIDO)
+        // document.addEventListener('dismiss-notification', this._handleDismiss.bind(this)); (REMOVIDO)
+
+        // (NOVO) Ouve o appBus
+        appBus.on('show-notification', this._handleShow.bind(this));
+        appBus.on('dismiss-notification', this._handleDismiss.bind(this));
+        // (FIM DA MODIFICAÇÃO)
     }
 
     /**
-     * Handles the 'show-notification' event by creating and rendering the notification element.
-     * @param {CustomEvent} event - The event dispatched by NotificationService.
+     * (MODIFICADO) Handles the 'show-notification' event from 'appBus'.
+     * @param {object} options - The event payload (options object).
      * @private
      */
-    _handleShow(event) {
+    _handleShow(options) {
         const me = this;
-        const options = event.detail;
+        // const options = event.detail; (REMOVIDO)
 
         // 1. Get or create the container for this position
         const container = me._getContainer(options.position);
@@ -186,13 +193,14 @@ export class NotificationUIListener {
     }
 
     /**
-     * Handles the 'dismiss-notification' event by finding and removing the element.
-     * @param {CustomEvent} event - The event dispatched by NotificationService.
+     * (MODIFICADO) Handles the 'dismiss-notification' event from 'appBus'.
+     * @param {object} payload - The event payload ({ id: string }).
      * @private
      */
-    _handleDismiss(event) {
+    _handleDismiss(payload) {
         const me = this;
-        const { id } = event.detail;
+        const { id } = payload; // (MODIFICADO) Lê do payload
+        // const { id } = event.detail; (REMOVIDO)
         const element = document.querySelector(`.notification[data-id="${id}"]`);
 
         if (!element) {
