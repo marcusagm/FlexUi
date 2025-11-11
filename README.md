@@ -2,7 +2,6 @@
 ![GitHub language count](https://img.shields.io/github/languages/count/marcusagm/FlexUi?style=flat-square)
 ![GitHub forks](https://img.shields.io/github/forks/marcusagm/FlexUi?style=flat-square)
 ![GitHub open issues](https://img.shields.io/github/issues/marcusagm/FlexUi?style=flat-square)
-![GitHub open pull requests](https://img.shields.io/github/pr-raw/marcusagm/FlexUi?style=flat-square)
 [![License](https://img.shields.io/github/license/marcusagm/FlexUi?style=flat-square)](LICENSE)
 
 # FlexUI
