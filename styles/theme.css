@@ -129,8 +129,10 @@
    */
 
     /* Component: Container */
-    --container-gap: 5px;
+    --container-gap: 2px;
+    --dnd-active-container-gap: 3px;
     --container-padding: var(--container-gap) 0;
+    --dnd-active-container-padding: var(--dnd-active-container-gap) 0;
     --container-width: 100vw;
     --container-height-calc: calc(100vh - var(--menu-height) - var(--statusbar-height));
     --container-placeholder-height: 5px;
@@ -138,6 +140,9 @@
     --container-placeholder-vertical-flex: 0 0 5px;
     --container-placeholder-vertical-width: 5px;
     --row-padding: 0 var(--container-gap);
+    --dnd-active-row-padding: 0 var(--dnd-active-container-gap);
+    --column-padding: 0;
+    --dnd-active-column-padding: var(--dnd-active-container-gap) 0;
 
     /* Component: Menu */
     --menu-item-font-size: 1.1em;

@@ -160,7 +160,7 @@ export class DragDropService {
         const me = this;
         if (mode === me._placeholderMode) {
             if (mode === 'horizontal' && height && me._placeholder.style.height !== `${height}px`) {
-                me._placeholder.style.height = `${height}px`;
+                // me._placeholder.style.height = `${height}px`;
             }
             return;
         }
@@ -170,7 +170,7 @@ export class DragDropService {
         if (mode === 'horizontal') {
             me._placeholder.classList.add('container__placeholder--horizontal');
             if (height) {
-                me._placeholder.style.height = `${height}px`;
+                // me._placeholder.style.height = `${height}px`;
             }
         } else if (mode === 'vertical') {
             me._placeholder.classList.add('container__placeholder--vertical');

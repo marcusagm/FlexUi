@@ -1,12 +1,17 @@
+@import '../theme.css';
 .column {
     flex: 1 1 0;
     min-width: 150px;
     display: flex;
     flex-direction: column;
-    padding: 5px 0;
-    gap: 5px;
+    padding: var(--column-padding);
+    gap: var(--container-gap);
     position: relative;
     overflow: auto;
+}
+.dnd-active .column {
+    gap: var(--dnd-active-container-gap);
+    padding: var(--dnd-active-column-padding);
 }
 
 .column__resize-handle {
