@@ -1,221 +1,203 @@
-// (REMOVIDO) DragDropService não é mais importado
 import { appBus } from '../../utils/EventBus.js';
 
 /**
  * Description:
- * Gere o cabeçalho de um PanelGroup.
+ * Manages the header element of a PanelGroup.
+ * This class provides the group-level controls (Move, Collapse, Close)
+ * and the 'tabContainer' where child PanelHeaders (tabs) are inserted
+ * by the parent PanelGroup. It also handles tab scrolling logic.
  *
- * (Refatorado vArch) Esta classe foi simplificada.
- * Ela NÃO renderiza mais as abas (isso é feito pelo PanelHeader).
- * Ela apenas fornece:
- * 1. Os controlos do Grupo (Mover, Colapsar, Fechar).
- * 2. O 'tabContainer' (onde o PanelGroup insere as abas).
- * 3. A lógica de scroll (overflow) do 'tabContainer'.
- * 4. O "Drop Zone" (Alvo D&D) do 'tabContainer' para receber Panels.
+ * Properties summary:
+ * - _state {object} : Internal state.
+ * - _resizeObserver {ResizeObserver | null} : Observes the tabContainer for scrolling.
+ * - panelGroup {PanelGroup} : Reference to the parent PanelGroup.
+ * - element {HTMLElement} : The main header element.
+ * - tabContainer {HTMLElement} : The DOM node where tabs are injected.
  *
- * (Refatorado vBugFix 2) O 'onGroupDragStart' agora passa o 'element'
- * explícito no payload do appBus.
+ * Typical usage:
+ * // Instantiated by PanelGroup.js
+ * this._state.header = new PanelGroupHeader(this);
  *
- * (Refatorado vCodeSmell) Removido setTimeout de updateScrollButtons.
+ * Events:
+ * - Emits (appBus): 'panel:toggle-collapse-request'
+ * - Emits (appBus): 'panel:close-request'
+ * - Emits (appBus): 'dragstart' (for the *entire group*)
  *
- * (Refatorado vBugFix 7) Adiciona stopPropagation() aos listeners
- * de DND do 'this.element' (header) para evitar "flickering"
- * (borbulhamento para a Column).
- *
- * (REFATORADO vDND-Bridge) Remove listeners DND locais e delega ao DragDropService
- * através de 'dataset.dropzone' e 'dropZoneInstance'.
- *
- * (CORREÇÃO vDND-Bridge-Fix-3) O 'this.element' (header) é o dropzone,
- * e lê o 'dropZoneType' do 'panelGroup' pai (que agora o possui).
- * Os stopPropagation() conflitantes do construtor são removidos.
+ * Dependencies:
+ * - ../../utils/EventBus.js
  */
 export class PanelGroupHeader {
-    state = {
+    /**
+     * @type {{title: string | null}}
+     * @private
+     */
+    _state = {
         title: null
     };
 
     /**
+     * Observes the tabContainer to show/hide scroll buttons.
      * @type {ResizeObserver | null}
-     * @description Observador para 'resize' do container de abas.
      * @private
      */
     _resizeObserver = null;
 
+    /**
+     * @param {import('./PanelGroup.js').PanelGroup} panelGroup - The parent PanelGroup instance.
+     */
     constructor(panelGroup) {
-        this.panelGroup = panelGroup;
-        this.element = document.createElement('div');
-        this.element.classList.add('panel-group__header');
+        const me = this;
+        me.panelGroup = panelGroup;
+        me.element = document.createElement('div');
+        me.element.classList.add('panel-group__header');
 
-        // (INÍCIO DA CORREÇÃO - Bug 1)
-        // O drop zone é o header INTEIRO.
-        // Ele lê o 'dropZoneType' da instância do panelGroup (definida na Parte 1)
-        // e define a instância 'dropZoneInstance' como o próprio panelGroup.
-        this.element.dropZoneInstance = this.panelGroup;
-        // Lê o 'dropZoneType' do pai (PanelGroup.js)
-        this.element.dataset.dropzone = this.panelGroup.dropZoneType;
-        // (FIM DA CORREÇÃO)
+        me.element.dropZoneInstance = me.panelGroup;
+        me.element.dataset.dropzone = me.panelGroup.dropZoneType;
 
-        // (REMOVIDO) Os 4 listeners DND com stopPropagation()
-        // que estavam no construtor foram removidos.
-
-        this.build();
-
-        this._initResizeObserver();
+        me.build();
+        me._initResizeObserver();
     }
 
+    /**
+     * Builds the DOM elements for the header.
+     * @returns {void}
+     */
     build() {
-        // 1. Move Handle (para o GRUPO)
-        this.moveHandle = document.createElement('div');
-        this.moveHandle.classList.add('panel-group__move-handle', 'panel__move-handle');
-        this.moveHandle.draggable = true;
-        this.moveHandle.addEventListener('dragstart', this.onGroupDragStart.bind(this));
-        this.moveHandle.addEventListener('dragend', this.onDragEnd.bind(this));
-        this.moveHandle.setAttribute('role', 'button');
+        const me = this;
+        me.moveHandle = document.createElement('div');
+        me.moveHandle.classList.add('panel-group__move-handle', 'panel__move-handle');
+        me.moveHandle.draggable = true;
+        me.moveHandle.addEventListener('dragstart', me.onGroupDragStart.bind(me));
+        me.moveHandle.addEventListener('dragend', me.onDragEnd.bind(me));
+        me.moveHandle.setAttribute('role', 'button');
 
         const iconElement = document.createElement('span');
-        iconElement.className = `icon icon-handle`;
-        this.moveHandle.appendChild(iconElement);
+        iconElement.className = 'icon icon-handle';
+        me.moveHandle.appendChild(iconElement);
 
-        // 2. Botão de Scroll Esquerda
-        this.scrollLeftBtn = document.createElement('button');
-        this.scrollLeftBtn.type = 'button';
-        this.scrollLeftBtn.classList.add(
-            'panel-group__tab-scroll',
-            'panel-group__tab-scroll--left'
-        );
-        this.scrollLeftBtn.textContent = '<';
-        this.scrollLeftBtn.style.display = 'none';
+        me.scrollLeftBtn = document.createElement('button');
+        me.scrollLeftBtn.type = 'button';
+        me.scrollLeftBtn.classList.add('panel-group__tab-scroll', 'panel-group__tab-scroll--left');
+        me.scrollLeftBtn.textContent = '<';
+        me.scrollLeftBtn.style.display = 'none';
 
-        // 3. Contêiner das Abas (AGORA É DROP ZONE VAZIO)
-        this.tabContainer = document.createElement('div');
-        this.tabContainer.classList.add('panel-group__tab-container');
+        me.tabContainer = document.createElement('div');
+        me.tabContainer.classList.add('panel-group__tab-container');
 
-        // (INÍCIO DA CORREÇÃO - Bug 1)
-        // O tabContainer NÃO é mais o dropzone. O 'this.element' (header) é.
-        // Todos os listeners DND (onTabContainer...) e propriedades
-        // (dropZoneType, panelGroupOwner) são removidos.
-        //
-        // this.tabContainer.dropZoneType = 'TabContainer'; (REMOVIDO)
-        // this.tabContainer.panelGroupOwner = this.panelGroup; (REMOVIDO)
-        // this.tabContainer.addEventListener('dragenter', ...); (REMOVIDO)
-        // this.tabContainer.addEventListener('dragover', ...); (REMOVIDO)
-        // this.tabContainer.addEventListener('dragleave', ...); (REMOVIDO)
-        // this.tabContainer.addEventListener('drop', ...); (REMOVIDO)
-        // (FIM DA CORREÇÃO)
-
-        // 4. Botão de Scroll Direita
-        this.scrollRightBtn = document.createElement('button');
-        this.scrollRightBtn.type = 'button';
-        this.scrollRightBtn.classList.add(
+        me.scrollRightBtn = document.createElement('button');
+        me.scrollRightBtn.type = 'button';
+        me.scrollRightBtn.classList.add(
             'panel-group__tab-scroll',
             'panel-group__tab-scroll--right'
         );
-        this.scrollRightBtn.textContent = '>';
-        this.scrollRightBtn.style.display = 'none';
+        me.scrollRightBtn.textContent = '>';
+        me.scrollRightBtn.style.display = 'none';
 
-        // 5. Espaçador (REMOVIDO)
-
-        // 6. Botão de Colapso (para o GRUPO)
-        this.collapseBtn = document.createElement('button');
-        this.collapseBtn.type = 'button';
-        this.collapseBtn.classList.add('panel-group__collapse-btn', 'panel__collapse-btn');
-        this.collapseBtn.addEventListener('click', () => {
-            appBus.emit('panel:toggle-collapse-request', this.panelGroup);
+        me.collapseBtn = document.createElement('button');
+        me.collapseBtn.type = 'button';
+        me.collapseBtn.classList.add('panel-group__collapse-btn', 'panel__collapse-btn');
+        me.collapseBtn.addEventListener('click', () => {
+            appBus.emit('panel:toggle-collapse-request', me.panelGroup);
         });
 
-        // 7. Botão de Fechar (para o GRUPO)
-        this.closeBtn = document.createElement('button');
-        this.closeBtn.type = 'button';
-        this.closeBtn.classList.add('panel-group__close-btn', 'panel__close-btn');
-        this.closeBtn.addEventListener('click', () => {
-            appBus.emit('panel:close-request', this.panelGroup);
+        me.closeBtn = document.createElement('button');
+        me.closeBtn.type = 'button';
+        me.closeBtn.classList.add('panel-group__close-btn', 'panel__close-btn');
+        me.closeBtn.addEventListener('click', () => {
+            appBus.emit('panel:close-request', me.panelGroup);
         });
 
-        this.element.append(
-            this.moveHandle,
-            this.scrollLeftBtn,
-            this.tabContainer,
-            this.scrollRightBtn,
-            this.collapseBtn,
-            this.closeBtn
+        me.element.append(
+            me.moveHandle,
+            me.scrollLeftBtn,
+            me.tabContainer,
+            me.scrollRightBtn,
+            me.collapseBtn,
+            me.closeBtn
         );
 
-        // Adiciona listeners de scroll
-        this.scrollLeftBtn.addEventListener('click', () =>
-            this.tabContainer.scrollBy({ left: -100, behavior: 'smooth' })
+        me.scrollLeftBtn.addEventListener('click', () =>
+            me.tabContainer.scrollBy({ left: -100, behavior: 'smooth' })
         );
-        this.scrollRightBtn.addEventListener('click', () =>
-            this.tabContainer.scrollBy({ left: 100, behavior: 'smooth' })
+        me.scrollRightBtn.addEventListener('click', () =>
+            me.tabContainer.scrollBy({ left: 100, behavior: 'smooth' })
         );
-        this.tabContainer.addEventListener('scroll', this.updateScrollButtons.bind(this));
+        me.tabContainer.addEventListener('scroll', me.updateScrollButtons.bind(me));
     }
 
-    // (INÍCIO DA CORREÇÃO - Bug 1)
-    // --- Handlers de D&D (Drop Zone) ---
-    // (REMOVIDO) Métodos onTabContainerDragEnter, onTabContainerDragOver,
-    // onTabContainerDragLeave, onTabContainerDrop (pois os listeners foram removidos)
-    // (FIM DA CORREÇÃO)
-
     /**
-     * Configura o ResizeObserver para chamar updateScrollButtons
-     * sempre que o 'tabContainer' mudar de tamanho (ex: adição de aba).
+     * Initializes the ResizeObserver for the tab container.
      * @private
+     * @returns {void}
      */
     _initResizeObserver() {
-        this._resizeObserver = new ResizeObserver(this.updateScrollButtons.bind(this));
-        this._resizeObserver.observe(this.tabContainer);
+        const me = this;
+        me._resizeObserver = new ResizeObserver(me.updateScrollButtons.bind(me));
+        me._resizeObserver.observe(me.tabContainer);
     }
 
     /**
-     * Limpa o observador para evitar memory leaks.
+     * Cleans up the observer to prevent memory leaks.
+     * @returns {void}
      */
     destroy() {
-        if (this._resizeObserver) {
-            this._resizeObserver.disconnect();
+        const me = this;
+        if (me._resizeObserver) {
+            me._resizeObserver.disconnect();
         }
     }
 
     /**
-     * (Mantido) Atualiza os botões de scroll
-     * Esta função é agora chamada pelo PanelGroup (Etapa 4)
-     * (MODIFICADO) Removido o setTimeout
+     * Shows or hides tab scroll buttons based on overflow.
+     * @returns {void}
      */
     updateScrollButtons() {
-        const { scrollLeft, scrollWidth, clientWidth } = this.tabContainer;
+        const me = this;
+        const { scrollLeft, scrollWidth, clientWidth } = me.tabContainer;
         const showLeft = scrollLeft > 1;
         const showRight = scrollWidth > clientWidth + 1;
-        this.scrollLeftBtn.style.display = showLeft ? '' : 'none';
-        this.scrollRightBtn.style.display = showRight ? '' : 'none';
+        me.scrollLeftBtn.style.display = showLeft ? '' : 'none';
+        me.scrollRightBtn.style.display = showRight ? '' : 'none';
     }
 
     /**
-     * (Mantido) Atualiza os botões de controlo do GRUPO
-     * Esta função é agora chamada pelo PanelGroup (Etapa 4)
+     * Updates ARIA labels for group control buttons.
+     * @returns {void}
      */
     updateAriaLabels() {
-        const title = this.panelGroup.state.title;
-        this.moveHandle.setAttribute('aria-label', `Mover grupo ${title}`);
-        this.collapseBtn.setAttribute('aria-label', `Recolher grupo ${title}`);
-        this.closeBtn.setAttribute('aria-label', `Fechar grupo ${title}`);
+        const me = this;
+        const title = me.panelGroup._state.title;
+        me.moveHandle.setAttribute('aria-label', `Mover grupo ${title}`);
+        me.collapseBtn.setAttribute('aria-label', `Recolher grupo ${title}`);
+        me.closeBtn.setAttribute('aria-label', `Fechar grupo ${title}`);
     }
 
-    // --- Handlers de D&D (Drag Source do Grupo) ---
+    /**
+     * Handles drag start for the *entire group*.
+     * @param {DragEvent} e
+     * @returns {void}
+     */
     onGroupDragStart(e) {
-        if (!this.panelGroup.state.movable) return;
+        const me = this;
+        if (!me.panelGroup._state.movable) return;
 
-        // (MODIFICADO - CORREÇÃO) Passa o 'element' (this.panelGroup.element)
         appBus.emit('dragstart', {
-            item: this.panelGroup,
+            item: me.panelGroup,
             type: 'PanelGroup',
-            element: this.panelGroup.element, // O elemento DOM do PanelGroup
+            element: me.panelGroup.element,
             event: e
         });
 
-        this.moveHandle.style.cursor = 'grabbing';
+        me.moveHandle.style.cursor = 'grabbing';
     }
 
+    /**
+     * Handles drag end for the group.
+     * @param {DragEvent} e
+     * @returns {void}
+     */
     onDragEnd(e) {
-        appBus.emit('dragend');
         this.moveHandle.style.cursor = 'grab';
+        appBus.emit('dragend');
     }
 }

@@ -2,142 +2,188 @@ import { debounce } from './Debounce.js';
 import { throttleRAF } from './ThrottleRAF.js';
 
 /**
- * Uma classe EventBus genérica para um padrão Pub/Sub.
+ * Description:
+ * A generic publish/subscribe EventBus class.
+ * It allows decoupled communication between different parts of the application.
+ * This evolved version includes support for namespaces (for bulk listener removal)
+ * and declarative rate limiting (debounce and throttle) on listeners.
  *
- * (Refatorado vDND-Bridge-Fix) Evoluído para incluir namespaces,
- * rate limiting declarativo (debounce/throttle) e prevenção
- * de memory leaks.
+ * Properties summary:
+ * - _listeners {Map<string, Array<object>>} : Stores listeners by eventName.
+ *
+ * Typical usage:
+ * // In component A (listener)
+ * import { appBus } from './EventBus.js';
+ *
+ * class ComponentA {
+ * constructor() {
+ * this.id = 'componentA';
+ * appBus.on('data:updated', this.onDataUpdated.bind(this), {
+ * namespace: this.id,
+ * debounceMs: 100
+ * });
+ * }
+ * onDataUpdated(data) {
+ * console.log('Data updated:', data);
+ * }
+ * destroy() {
+ * appBus.offByNamespace(this.id);
+ * }
+ * }
+ *
+ * // In component B (emitter)
+ * import { appBus } from './EventBus.js';
+ * appBus.emit('data:updated', { value: 123 });
+ *
+ * Dependencies:
+ * - ./Debounce.js
+ * - ./ThrottleRAF.js
  */
 class EventBus {
+    /**
+     * Stores all listeners keyed by eventName.
+     * Each listener is an object: { callback, originalCallback, namespace, isOnce }
+     * @type {Map<string, Array<object>>}
+     * @private
+     */
+    _listeners = new Map();
+
     constructor() {
-        this.listeners = new Map();
+        // Constructor is intentionally empty
     }
 
     /**
-     * Registra um ouvinte para um evento.
-     * @param {string} eventName - O nome do evento.
-     * @param {function} callback - A função a ser chamada.
-     * @param {object} [options={}] - Opções (namespace, debounceMs, throttleRAF, isOnce).
+     * Registers a listener for an event, with options.
+     *
+     * @param {string} eventName - The name of the event.
+     * @param {Function} callback - The function to be called.
+     * @param {object} [options={}] - Configuration for the listener.
+     * @param {string} [options.namespace] - A namespace for bulk removal.
+     * @param {number} [options.debounceMs] - Debounce delay in milliseconds.
+     * @param {boolean} [options.throttleRAF] - Throttle using requestAnimationFrame.
+     * @param {boolean} [options.isOnce] - Internal flag for 'once'.
+     * @returns {void}
      */
     on(eventName, callback, options = {}) {
-        if (!this.listeners.has(eventName)) {
-            this.listeners.set(eventName, []);
+        const me = this;
+        if (!me._listeners.has(eventName)) {
+            me._listeners.set(eventName, []);
         }
 
         let finalCallback = callback;
 
-        // 1. Aplicar Rate Limiting (se solicitado)
         if (options.throttleRAF) {
             finalCallback = throttleRAF(callback);
         } else if (options.debounceMs) {
             finalCallback = debounce(callback, options.debounceMs);
         }
-        // (Nota: throttleMs (baseado em timer) não foi implementado conforme plano)
 
-        // 2. Armazena o listener como um objeto
         const listener = {
             callback: finalCallback,
-            originalCallback: callback, // Referência para o 'off()' funcionar
+            originalCallback: callback,
             namespace: options.namespace || null,
             isOnce: options.isOnce || false
         };
 
-        this.listeners.get(eventName).push(listener);
+        me._listeners.get(eventName).push(listener);
     }
 
     /**
-     * Remove um ouvinte de um evento.
-     * (MODIFICADO) Agora compara usando o 'originalCallback'.
-     * @param {string} eventName - O nome do evento.
-     * @param {function} callback - A função original a ser removida.
+     * Removes a specific listener for an event.
+     *
+     * @param {string} eventName - The name of the event.
+     * @param {Function} callback - The *original* function that was registered.
+     * @returns {void}
      */
     off(eventName, callback) {
-        if (!this.listeners.has(eventName)) {
+        const me = this;
+        if (!me._listeners.has(eventName)) {
             return;
         }
 
-        const eventListeners = this.listeners.get(eventName);
-        // (CORREÇÃO) Filtra comparando o callback original
+        const eventListeners = me._listeners.get(eventName);
         const filteredListeners = eventListeners.filter(
             listener => listener.originalCallback !== callback
         );
 
         if (filteredListeners.length === 0) {
-            this.listeners.delete(eventName);
+            me._listeners.delete(eventName);
         } else {
-            this.listeners.set(eventName, filteredListeners);
+            me._listeners.set(eventName, filteredListeners);
         }
     }
 
     /**
-     * Emite (dispara) um evento.
-     * (MODIFICADO) Itera sobre objetos 'listener' e verifica 'isOnce'.
-     * @param {string} eventName - O nome do evento.
-     * @param {...any} args - Argumentos a serem passados para os ouvintes.
+     * Emits (dispatches) an event to all registered listeners.
+     *
+     * @param {string} eventName - The name of the event.
+     * @param {...*} args - Arguments to be passed to the listeners.
+     * @returns {void}
      */
     emit(eventName, ...args) {
-        if (!this.listeners.has(eventName)) {
+        const me = this;
+        if (!me._listeners.has(eventName)) {
             return;
         }
-        // Linha de log removida
 
-        // Itera sobre uma cópia, caso um callback modifique a lista (ex: `once`)
-        const listeners = [...this.listeners.get(eventName)];
+        const listeners = [...me._listeners.get(eventName)];
         for (const listener of listeners) {
             try {
                 console.info(eventName, args);
-                listener.callback(...args); // Chama o callback (possivelmente wrapped)
+                listener.callback(...args);
             } catch (e) {
                 console.error(`Erro no ouvinte do evento "${eventName}":`, e);
             }
 
-            // (NOVO) Se for 'once', remove-o após a execução
             if (listener.isOnce) {
-                this.off(eventName, listener.originalCallback);
+                me.off(eventName, listener.originalCallback);
             }
         }
     }
 
     /**
-     * Registra um ouvinte que será executado apenas uma vez.
-     * (MODIFICADO) Agora passa 'options' para o 'on()'.
-     * @param {string} eventName - O nome do evento.
-     * @param {function} callback - A função a ser chamada.
-     * @param {object} [options={}] - Opções (namespace, debounceMs, throttleRAF).
+     * Registers a listener that will be executed only once.
+     *
+     * @param {string} eventName - The name of the event.
+     * @param {Function} callback - The function to be called.
+     * @param {object} [options={}] - Configuration (namespace, debounce, throttle).
+     * @returns {void}
      */
     once(eventName, callback, options = {}) {
-        // (MODIFICADO) Apenas chama 'on' com a flag isOnce
         this.on(eventName, callback, { ...options, isOnce: true });
     }
 
     /**
-     * (NOVO) Remove todos os ouvintes associados a um namespace.
-     * @param {string} namespace - O namespace a ser limpo.
+     * Removes all listeners associated with a specific namespace.
+     *
+     * @param {string} namespace - The namespace to clear.
+     * @returns {void}
      */
     offByNamespace(namespace) {
+        const me = this;
         if (!namespace) return;
 
-        this.listeners.forEach((listeners, eventName) => {
+        me._listeners.forEach((listeners, eventName) => {
             const filtered = listeners.filter(l => l.namespace !== namespace);
 
             if (filtered.length === 0) {
-                this.listeners.delete(eventName);
+                me._listeners.delete(eventName);
             } else {
-                this.listeners.set(eventName, filtered);
+                me._listeners.set(eventName, filtered);
             }
         });
     }
 
     /**
-     * Remove todos os ouvintes de todos os eventos.
-     * Útil para um teardown completo da aplicação.
+     * Removes all listeners for all events.
+     * @returns {void}
      */
     clear() {
-        this.listeners.clear();
+        this._listeners.clear();
     }
 }
 
 /**
- * Instância singleton do EventBus para ser usada em toda a aplicação.
+ * Singleton instance of the EventBus used throughout the application.
  */
 export const appBus = new EventBus();

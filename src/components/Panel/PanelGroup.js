@@ -6,203 +6,233 @@ import { throttleRAF } from '../../utils/ThrottleRAF.js';
 
 /**
  * Description:
- * Manages a group of Panel (tabs) within a Column.
- *
- * (Refatorado vArch) Esta classe é agora uma "Orquestradora".
- * Ela não renderiza abas. Ela pede ao Panel (filho) o seu
- * 'header.element' (aba) e 'content.element' (conteúdo) e
- * anexa-os aos seus contentores corretos (o TabContainer e o ContentContainer).
- *
- * (Refatorado vOpt 5) A lógica de 'setMode' foi movida de _updateHeaderMode (O(N))
- * para addPanel/removePanel (O(1) ou O(2)), tratando apenas as transições.
- *
- * (Refatorado vBugFix) Corrige o vazamento de listeners do appBus
- * armazenando as referências bindadas.
- *
- * (Refatorado vBugFix 2) Garante que a classe 'active' da aba
- * seja removida durante o DND.
- *
- * (Refatorado vBugFix 3) Corrige bugs de estado ativo em setActive e fromJSON.
- *
- * (Refatorado vBugFix 4) Corrige a persistência da classe 'active'
- * na transição 2->1 ao remover painéis inativos.
- *
- * (Refatorado vBugFix 6) Adiciona stopPropagation() aos listeners
- * de DND do contentContainer para evitar que 'borbulhem' para a Column.
- *
- * (Refatorado vBugFix 7) Adiciona 'mouseleave' aos handlers de
- * 'startResize' para prevenir "estado preso" (stuck state)
- * se o mouse sair da janela.
- *
- * (CORREÇÃO vDND-Bridge-Fix-3) Adiciona a propriedade 'dropZoneType'
- * para que o DragDropService possa identificá-la.
- *
- * (CORREÇÃO vEventBus) Usa o 'this.id' existente como namespace.
+ * Manages a group of Panel (tabs) within a Column. This class acts as an
+ * "Orchestrator" for its child Panel components. It does not render tabs
+ * itself; instead, it retrieves the header element (the tab) and the content
+ * element from each child Panel and appends them to its own internal
+ * containers (TabContainer and ContentContainer).
  *
  * Properties summary:
- * - state {object} : Internal state management.
+ * - _state {object} : Internal state (child Panels, layout, parent Column).
+ * - element {HTMLElement} : The main DOM element (<div class="panel-group">).
+ * - id {string} : Unique ID for this instance.
+ * - _namespace {string} : Unique namespace for appBus listeners (uses this.id).
+ *
+ * Typical usage:
+ * // In Column.js
+ * const panel = new TextPanel(...);
+ * const panelGroup = new PanelGroup(panel);
+ * column.addPanelGroup(panelGroup);
+ *
+ * Events:
+ * - Listens to: 'panel:group-child-close-request' (from PanelHeader via Panel)
+ * - Listens to: 'panel:close-request' (from PanelGroupHeader)
+ * - Listens to: 'panel:toggle-collapse-request' (from PanelGroupHeader)
+ * - Emits: 'panelgroup:removed' (when closed or empty)
+ * - Emits: 'layout:panel-groups-changed' (to notify LayoutService)
+ *
+ * Business rules implemented:
+ * - Orchestrates Panel DOM (header vs. content).
+ * - Manages active tab state ('setActive').
+ * - Renders in "simple mode" (no tabs) if only one child Panel exists.
+ * - Manages its own vertical resize ('startResize').
+ * - Enforces 'canCollapse' rule (must not be the last visible group).
+ * - If last Panel is removed, destroys itself ('removePanel' -> 'close').
+ *
+ * Dependencies:
+ * - components/Panel/PanelGroupHeader.js
+ * - components/Panel/PanelFactory.js
+ * - components/Panel/Panel.js
+ * - utils/EventBus.js
+ * - utils/ThrottleRAF.js
  */
 export class PanelGroup {
     /**
-     * @type {object}
+     * @type {{
+     * column: import('../Column/Column.js').Column | null,
+     * header: PanelGroupHeader | null,
+     * contentContainer: HTMLElement | null,
+     * panels: Array<Panel>,
+     * activePanel: Panel | null,
+     * collapsed: boolean,
+     * height: number | null,
+     * minHeight: number,
+     * closable: boolean,
+     * collapsible: boolean,
+     * movable: boolean,
+     * title: string | null
+     * }}
      * @private
      */
-    state = {
+    _state = {
         column: null,
-        header: null, // Instância de PanelGroupHeader
-        contentContainer: null, // O <div> .panel-group__content
-
+        header: null,
+        contentContainer: null,
         panels: [],
         activePanel: null,
-
         collapsed: false,
         height: null,
-        floater: false,
         minHeight: 100,
-
         closable: true,
         collapsible: true,
         movable: true,
         hasTitle: true,
-        title: null // (Usado para ARIA no PanelGroupHeader)
+        title: null
     };
 
     /**
+     * Unique ID for this PanelGroup instance.
+     * Also used as the appBus namespace.
      * @type {string}
+     * @public
      */
     id = Math.random().toString(36).substring(2, 9) + Date.now();
 
     /**
-     * A versão throttled (com rAF) da função de atualização.
-     * @type {function | null}
+     * Unique namespace for appBus listeners.
+     * @type {string}
+     * @private
+     */
+    _namespace = this.id;
+
+    /**
+     * The throttled (rAF) update function for resizing.
+     * @type {Function | null}
      * @private
      */
     _throttledUpdate = null;
 
-    // (NOVO) Armazena referências bindadas para os listeners do appBus
+    /**
+     * @type {Function | null}
+     * @private
+     */
     _boundOnChildCloseRequest = null;
+
+    /**
+     * @type {Function | null}
+     * @private
+     */
     _boundOnCloseRequest = null;
+
+    /**
+     * @type {Function | null}
+     * @private
+     */
     _boundOnToggleCollapseRequest = null;
 
     /**
-     * @param {Panel | null} [initialPanel=null] - O painel inicial é opcional.
+     * @param {Panel | null} [initialPanel=null] - The optional first panel.
      * @param {number|null} [height=null] - The initial height of the group.
      * @param {boolean} [collapsed=false] - The initial collapsed state.
      * @param {object} [config={}] - Configuration overrides for the group.
      */
     constructor(initialPanel = null, height = null, collapsed = false, config = {}) {
-        Object.assign(this.state, config);
+        const me = this;
+        Object.assign(me._state, config);
 
-        // (CORREÇÃO) Adiciona a propriedade que faltava.
-        this.dropZoneType = 'TabContainer';
+        me.dropZoneType = 'TabContainer';
 
-        // (MODIFICADO) O contentContainer é criado aqui
-        this.state.contentContainer = document.createElement('div');
-        this.state.contentContainer.classList.add('panel-group__content');
+        me._state.contentContainer = document.createElement('div');
+        me._state.contentContainer.classList.add('panel-group__content');
 
-        // (NOVO - BugFix 6) Adiciona listeners ao contentContainer
-        // para impedir que o 'dragover' borbulhe para a Column pai.
-        this.state.contentContainer.addEventListener('dragenter', e => e.stopPropagation());
-        this.state.contentContainer.addEventListener('dragover', e => e.stopPropagation());
-        this.state.contentContainer.addEventListener('dragleave', e => e.stopPropagation());
-        this.state.contentContainer.addEventListener('drop', e => e.stopPropagation());
+        me._state.contentContainer.addEventListener('dragenter', e => e.stopPropagation());
+        me._state.contentContainer.addEventListener('dragover', e => e.stopPropagation());
+        me._state.contentContainer.addEventListener('dragleave', e => e.stopPropagation());
+        me._state.contentContainer.addEventListener('drop', e => e.stopPropagation());
 
-        this.state.collapsed = collapsed;
-        this.element = document.createElement('div');
-        this.element.classList.add('panel-group');
-        this.element.classList.add('panel');
+        me._state.collapsed = collapsed;
+        me.element = document.createElement('div');
+        me.element.classList.add('panel-group');
+        me.element.classList.add('panel');
 
-        // (MODIFICADO) O header (contentor de abas) é instanciado aqui
-        this.state.header = new PanelGroupHeader(this);
+        me._state.header = new PanelGroupHeader(me);
 
         if (height !== null) {
-            this.state.height = height;
+            me._state.height = height;
         }
 
-        // (NOVO) Define as referências bindadas
-        this._boundOnChildCloseRequest = this.onChildCloseRequest.bind(this);
-        this._boundOnCloseRequest = this.onCloseRequest.bind(this);
-        this._boundOnToggleCollapseRequest = this.onToggleCollapseRequest.bind(this);
+        me._boundOnChildCloseRequest = me.onChildCloseRequest.bind(me);
+        me._boundOnCloseRequest = me.onCloseRequest.bind(me);
+        me._boundOnToggleCollapseRequest = me.onToggleCollapseRequest.bind(me);
 
-        this.build();
+        me.build();
 
         if (initialPanel) {
-            this.addPanel(initialPanel, true);
+            me.addPanel(initialPanel, true);
         }
 
-        this.initEventListeners();
+        me.initEventListeners();
 
-        // Adiciona o throttleRAF para o resize O(1)
-        this.setThrottledUpdate(
+        me.setThrottledUpdate(
             throttleRAF(() => {
-                // Atualiza apenas a altura (O(1)), não o layout (O(N))
-                this.updateHeight();
+                me.updateHeight();
             })
         );
     }
 
-    // --- Getters / Setters ---
-
     /**
-     * Define a função de atualização throttled.
-     * @param {function} throttledFunction
+     * <ThrottledUpdate> setter.
+     * @param {Function} throttledFunction
+     * @returns {void}
      */
     setThrottledUpdate(throttledFunction) {
         this._throttledUpdate = throttledFunction;
     }
 
     /**
-     * Obtém a função de atualização throttled.
-     * @returns {function}
+     * <ThrottledUpdate> getter.
+     * @returns {Function | null}
      */
     getThrottledUpdate() {
         return this._throttledUpdate;
     }
 
     /**
-     * @returns {number}
+     * <HeaderHeight> getter.
+     * @returns {number} The height of the header element.
      */
     getHeaderHeight() {
-        return this.state.header ? this.state.header.element.offsetHeight : 0;
+        return this._state.header ? this._state.header.element.offsetHeight : 0;
     }
 
     /**
-     * @returns {number}
+     * <MinPanelHeight> getter.
+     * @returns {number} The calculated minimum panel height.
      */
     getMinPanelHeight() {
-        const headerHeight = this.getHeaderHeight();
-        const activeMinHeight = this.state.activePanel
-            ? this.state.activePanel.getMinPanelHeight()
+        const me = this;
+        const headerHeight = me.getHeaderHeight();
+        const activeMinHeight = me._state.activePanel
+            ? me._state.activePanel.getMinPanelHeight()
             : 0;
 
-        return Math.max(this.state.minHeight, activeMinHeight) + headerHeight;
+        return Math.max(me._state.minHeight, activeMinHeight) + headerHeight;
     }
 
     /**
-     * Define a coluna pai.
-     * @param {Column} column - The parent column instance.
+     * <ParentColumn> setter.
+     * @param {import('../Column/Column.js').Column} column - The parent column instance.
+     * @returns {void}
      */
     setParentColumn(column) {
-        this.state.column = column;
+        this._state.column = column;
     }
 
     /**
-     * Retorna a coluna pai deste grupo.
-     * @returns {Column | null}
+     * <Column> getter.
+     * @returns {import('../Column/Column.js').Column | null}
      */
     getColumn() {
-        return this.state.column;
+        return this._state.column;
     }
 
-    // --- Concrete Methods ---
-
     /**
-     * (MODIFICADO) Initializes event listeners for the EventBus.
-     * Usa as referências bindadas e o 'this.id' como namespace.
+     * Initializes appBus event listeners for this component.
+     * @returns {void}
      */
     initEventListeners() {
         const me = this;
-        const options = { namespace: me.id };
+        const options = { namespace: me._namespace };
 
         appBus.on('panel:group-child-close-request', me._boundOnChildCloseRequest, options);
         appBus.on('panel:close-request', me._boundOnCloseRequest, options);
@@ -210,18 +240,22 @@ export class PanelGroup {
     }
 
     /**
-     * Handles the request to close a child Panel (tab).
+     * Event handler for when a child Panel (tab) requests to close.
      * @param {object} eventData
+     * @param {Panel} eventData.panel - The child Panel.
+     * @param {PanelGroup} eventData.group - The parent PanelGroup.
+     * @returns {void}
      */
     onChildCloseRequest({ panel, group }) {
-        if (group === this && this.state.panels.includes(panel)) {
+        if (group === this && this._state.panels.includes(panel)) {
             this.removePanel(panel);
         }
     }
 
     /**
-     * Handles the request to close this entire PanelGroup.
+     * Event handler for when this entire PanelGroup requests to close.
      * @param {Panel | PanelGroup} panel
+     * @returns {void}
      */
     onCloseRequest(panel) {
         if (panel === this) {
@@ -230,8 +264,9 @@ export class PanelGroup {
     }
 
     /**
-     * Handles the request to toggle the collapse state of this PanelGroup.
+     * Event handler to toggle the collapse state of this PanelGroup.
      * @param {Panel | PanelGroup} panel
+     * @returns {void}
      */
     onToggleCollapseRequest(panel) {
         if (panel === this) {
@@ -240,47 +275,39 @@ export class PanelGroup {
     }
 
     /**
-     * (MODIFICADO) Cleans up event listeners when the group is destroyed.
-     * Usa offByNamespace.
+     * Cleans up appBus listeners and destroys child components.
+     * @returns {void}
      */
     destroy() {
         const me = this;
-        // (INÍCIO DA MODIFICAÇÃO - Etapa 3)
-        appBus.offByNamespace(me.id);
-        // (FIM DA MODIFICAÇÃO)
+        appBus.offByNamespace(me._namespace);
 
-        // Garante que o ResizeObserver do header seja desconectado
-        me.state.header?.destroy();
-
-        // (NOVO) Destrói todos os painéis filhos (que limpam seus headers)
-        me.state.panels.forEach(panel => panel.destroy());
-
-        // Cancela qualquer atualização de resize pendente
+        me._state.header?.destroy();
+        me._state.panels.forEach(panel => panel.destroy());
         me.getThrottledUpdate()?.cancel();
     }
 
     /**
-     * Builds the DOM structure of the PanelGroup.
+     * Builds the component's main DOM structure.
+     * @returns {void}
      */
     build() {
-        this.resizeHandle = document.createElement('div');
-        this.resizeHandle.classList.add('panel-group__resize-handle');
-        this.resizeHandle.addEventListener('mousedown', this.startResize.bind(this));
+        const me = this;
+        me.resizeHandle = document.createElement('div');
+        me.resizeHandle.classList.add('panel-group__resize-handle');
+        me.resizeHandle.addEventListener('mousedown', me.startResize.bind(me));
 
-        this.element.append(
-            this.state.header.element, // O cabeçalho (contentor de abas)
-            this.state.contentContainer, // O contentor de conteúdo
-            this.resizeHandle
-        );
+        me.element.append(me._state.header.element, me._state.contentContainer, me.resizeHandle);
 
-        if (!this.state.movable) {
-            this.element.classList.add('panel--not-movable');
+        if (!me._state.movable) {
+            me.element.classList.add('panel--not-movable');
         }
 
-        this.updateCollapse();
+        me.updateCollapse();
     }
 
     /**
+     * Gets the panel type identifier.
      * @returns {string}
      */
     getPanelType() {
@@ -288,113 +315,127 @@ export class PanelGroup {
     }
 
     /**
-     * Verifica se este painel pode ser recolhido.
+     * Checks if this panel group is allowed to collapse.
+     * @returns {boolean}
      */
     canCollapse() {
-        if (!this.state.column) return false;
-        if (!this.state.collapsible) return false;
+        const me = this;
+        if (!me._state.column) return false;
+        if (!me._state.collapsible) return false;
 
-        const uncollapsedGroups = this.state.column.getPanelGroupsUncollapsed();
-        return uncollapsedGroups.length > 1 || this.state.collapsed;
+        const uncollapsedGroups = me._state.column.getPanelGroupsUncollapsed();
+        return uncollapsedGroups.length > 1 || me._state.collapsed;
     }
 
     /**
      * Toggles the collapse state and requests a layout update.
+     * @returns {void}
      */
     toggleCollapse() {
-        if (this.state.collapsed) {
-            this.unCollapse();
+        const me = this;
+        if (me._state.collapsed) {
+            me.unCollapse();
         } else {
-            if (!this.canCollapse()) {
+            if (!me.canCollapse()) {
                 return;
             }
-            this.collapse();
+            me.collapse();
         }
 
-        this.requestLayoutUpdate();
+        me.requestLayoutUpdate();
     }
 
     /**
-     * Applies the correct visibility state based on state.collapsed.
+     * Applies the correct visibility state based on the internal state.
+     * @returns {void}
      */
     updateCollapse() {
-        if (this.state.collapsed) {
-            this.collapse();
+        const me = this;
+        if (me._state.collapsed) {
+            me.collapse();
         } else {
-            this.unCollapse();
+            me.unCollapse();
         }
     }
 
     /**
      * Hides the content and applies collapsed styles.
+     * @returns {void}
      */
     collapse() {
-        this.state.collapsed = true;
-        this.element.classList.add('panel--collapsed');
-        this.state.contentContainer.style.display = 'none';
-        this.resizeHandle.style.display = 'none';
-        this.updateHeight();
+        const me = this;
+        me._state.collapsed = true;
+        me.element.classList.add('panel--collapsed');
+        me._state.contentContainer.style.display = 'none';
+        me.resizeHandle.style.display = 'none';
+        me.updateHeight();
     }
 
     /**
      * Shows the content and removes collapsed styles.
+     * @returns {void}
      */
     unCollapse() {
-        this.state.collapsed = false;
-        this.element.classList.remove('panel--collapsed');
-        this.state.contentContainer.style.display = ''; // (CSS fará 'flex')
-        this.resizeHandle.style.display = '';
-        this.updateHeight();
+        const me = this;
+        me._state.collapsed = false;
+        me.element.classList.remove('panel--collapsed');
+        me._state.contentContainer.style.display = '';
+        me.resizeHandle.style.display = '';
+        me.updateHeight();
     }
 
     /**
-     * Closes the entire PanelGroup and notifies the column.
+     * Closes the entire PanelGroup and notifies its parent Column.
+     * @returns {void}
      */
     close() {
-        if (!this.state.closable) return;
+        const me = this;
+        if (!me._state.closable) return;
 
-        appBus.emit('panelgroup:removed', { panel: this, column: this.state.column });
-        this.destroy();
+        appBus.emit('panelgroup:removed', { panel: me, column: me._state.column });
+        me.destroy();
     }
 
     /**
      * Updates the CSS height/flex properties based on the current state.
+     * @returns {void}
      */
     updateHeight() {
-        if (this.state.collapsed) {
-            this.element.style.height = 'auto';
-            this.element.style.flex = '0 0 auto';
-            this.element.classList.add('panel--collapsed');
-            this.element.style.minHeight = 'auto';
+        const me = this;
+        if (me._state.collapsed) {
+            me.element.style.height = 'auto';
+            me.element.style.flex = '0 0 auto';
+            me.element.classList.add('panel--collapsed');
+            me.element.style.minHeight = 'auto';
 
-            if (this.state.header) {
-                this.state.header.updateScrollButtons();
+            if (me._state.header) {
+                me._state.header.updateScrollButtons();
             }
             return;
         }
 
-        this.element.classList.remove('panel--collapsed');
+        me.element.classList.remove('panel--collapsed');
 
-        const minPanelHeight = this.getMinPanelHeight();
-        this.element.style.minHeight = `${minPanelHeight}px`;
+        const minPanelHeight = me.getMinPanelHeight();
+        me.element.style.minHeight = `${minPanelHeight}px`;
 
-        if (this.state.height !== null) {
-            this.element.style.height = `${this.state.height}px`;
-            this.element.style.flex = '0 0 auto';
+        if (me._state.height !== null) {
+            me.element.style.height = `${me._state.height}px`;
+            me.element.style.flex = '0 0 auto';
         } else {
-            this.element.style.height = 'auto';
-            this.element.style.flex = '0 0 auto';
+            me.element.style.height = 'auto';
+            me.element.style.flex = '0 0 auto';
         }
 
-        if (this.state.header) {
-            this.state.header.updateScrollButtons();
+        if (me._state.header) {
+            me._state.header.updateScrollButtons();
         }
     }
 
     /**
-     * (MODIFICADO - BugFix 7) Handles the start of a vertical resize drag.
-     * Adiciona 'mouseleave' ao 'window' para prevenir "stuck state".
+     * Handles the start of a vertical resize drag for this PanelGroup.
      * @param {MouseEvent} e - The mousedown event.
+     * @returns {void}
      */
     startResize(e) {
         e.preventDefault();
@@ -406,201 +447,173 @@ export class PanelGroup {
 
         const onMove = ev => {
             const delta = ev.clientY - startY;
-            me.state.height = Math.max(minPanelHeight, startH + delta);
-
-            // (MODIFICADO) Chama a função throttled (O(1))
+            me._state.height = Math.max(minPanelHeight, startH + delta);
             me.getThrottledUpdate()();
-            // (REMOVIDO) me.requestLayoutUpdate();
         };
 
         const onUp = () => {
             window.removeEventListener('mousemove', onMove);
             window.removeEventListener('mouseup', onUp);
-            window.removeEventListener('mouseleave', onUp); // (NOVO - BugFix 7)
+            window.removeEventListener('mouseleave', onUp);
 
-            // (NOVO) Cancela qualquer frame O(1) pendente
             me.getThrottledUpdate()?.cancel();
-
-            // (Mantido) Chama a atualização O(N) uma única vez no final
             me.requestLayoutUpdate();
         };
 
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
-        window.addEventListener('mouseleave', onUp); // (NOVO - BugFix 7)
+        window.addEventListener('mouseleave', onUp);
     }
 
     /**
-     * (MODIFICADO - Otimização 5) Atualiza o estado visual do cabeçalho
-     * (modo simples vs. modo abas).
-     * Esta função agora é O(1) e não itera mais sobre os painéis filhos.
+     * Updates the header's visual mode (simple vs. tabs).
      * @private
+     * @returns {void}
      */
     _updateHeaderMode() {
-        if (!this.state.header) return;
+        const me = this;
+        if (!me._state.header) return;
 
-        const isSimpleMode = this.state.panels.length === 1;
+        const isSimpleMode = me._state.panels.length === 1;
 
-        // 1. Aplica a classe ao container do cabeçalho (para CSS)
-        this.state.header.element.classList.toggle('panel-group__header--simple', isSimpleMode);
+        me._state.header.element.classList.toggle('panel-group__header--simple', isSimpleMode);
 
-        // 2. (REMOVIDO) O loop O(N) que chamava setMode foi movido
-        // para addPanel e removePanel.
-
-        // 3. Atualiza os botões de controlo do GRUPO
-        if (isSimpleMode && this.state.panels.length === 1) {
-            // No modo simples, os botões do grupo refletem o painel filho
-            const panel = this.state.panels[0];
-            this.state.header.collapseBtn.style.display =
-                panel.state.collapsible && this.state.collapsible ? '' : 'none';
-            this.state.header.closeBtn.style.display =
-                panel.state.closable && this.state.closable ? '' : 'none';
-            this.state.header.moveHandle.style.display =
-                panel.state.movable && this.state.movable ? '' : 'none';
+        if (isSimpleMode && me._state.panels.length === 1) {
+            const panel = me._state.panels[0];
+            me._state.header.collapseBtn.style.display =
+                panel._state.collapsible && me._state.collapsible ? '' : 'none';
+            me._state.header.closeBtn.style.display =
+                panel._state.closable && me._state.closable ? '' : 'none';
+            me._state.header.moveHandle.style.display =
+                panel._state.movable && me._state.movable ? '' : 'none';
         } else {
-            // No modo de abas, os botões do grupo refletem o grupo
-            this.state.header.collapseBtn.style.display = this.state.collapsible ? '' : 'none';
-            this.state.header.closeBtn.style.display = this.state.closable ? '' : 'none';
-            this.state.header.moveHandle.style.display = this.state.movable ? '' : 'none';
+            me._state.header.collapseBtn.style.display = me._state.collapsible ? '' : 'none';
+            me._state.header.closeBtn.style.display = me._state.closable ? '' : 'none';
+            me._state.header.moveHandle.style.display = me._state.movable ? '' : 'none';
         }
     }
 
     /**
-     * (MODIFICADO - vArch / vOpt 5) Adiciona um Panel, orquestrando
-     * a inserção do seu header e do seu content, e atualizando
-     * os modos de UI (O(1) ou O(2)).
+     * Adds a child Panel (tab) to this group.
      * @param {Panel} panel - The panel instance to add.
-     * @param {boolean} [makeActive=false]
+     * @param {boolean} [makeActive=false] - Whether to make this panel active.
+     * @returns {void}
      */
     addPanel(panel, makeActive = false) {
+        const me = this;
         if (!panel || !(panel instanceof Panel)) {
-            console.warn('PanelGroup.addPanel: item não é uma instância de Panel.', panel);
+            console.warn('PanelGroup.addPanel: item is not an instance of Panel.', panel);
             return;
         }
-        if (this.state.panels.includes(panel)) {
-            if (makeActive) this.setActive(panel);
+        if (me._state.panels.includes(panel)) {
+            if (makeActive) me.setActive(panel);
             return;
         }
 
-        // (MODIFICADO - Otimização 5) Lógica de transição O(1)/O(2)
-        const currentPanelCount = this.state.panels.length;
+        const currentPanelCount = me._state.panels.length;
 
+        // (INÍCIO DA CORREÇÃO)
         if (currentPanelCount === 0) {
-            // Transição 0 -> 1: O novo painel está no modo simples
-            panel.state.header.setMode(true);
+            panel._state.header.setMode(true);
         } else if (currentPanelCount === 1) {
-            // Transição 1 -> 2: O painel antigo e o novo vão para o modo aba
-            this.state.panels[0].state.header.setMode(false); // O(1)
-            panel.state.header.setMode(false); // O(1)
+            me._state.panels[0]._state.header.setMode(false);
+            panel._state.header.setMode(false);
         } else {
-            // Transição N -> N+1 (N > 1): O novo painel entra no modo aba
-            panel.state.header.setMode(false); // O(1)
+            panel._state.header.setMode(false);
         }
-        // Fim Otimização 5
+        // (FIM DA CORREÇÃO)
 
-        this.state.panels.push(panel);
-        panel.setParentGroup(this);
+        me._state.panels.push(panel);
+        panel.setParentGroup(me);
 
-        // (MODIFICADO) Anexa o header (aba) e o conteúdo nos locais corretos
-        this.state.header.tabContainer.appendChild(panel.state.header.element);
-        this.state.contentContainer.appendChild(panel.getContentElement());
+        me._state.header.tabContainer.appendChild(panel._state.header.element);
+        me._state.contentContainer.appendChild(panel.getContentElement());
 
-        this._updateHeaderMode(); // (Agora O(1))
-        this.state.header.updateScrollButtons(); // Atualiza scroll
+        me._updateHeaderMode();
+        me._state.header.updateScrollButtons();
 
-        if (makeActive || this.state.panels.length === 1) {
-            this.setActive(panel);
+        if (makeActive || me._state.panels.length === 1) {
+            me.setActive(panel);
         } else {
-            // Se não for ativar, esconde o conteúdo
             panel.getContentElement().style.display = 'none';
-            this.requestLayoutUpdate();
+            me.requestLayoutUpdate();
         }
     }
 
     /**
-     * (MODIFICADO - vArch / vOpt 5 / vBugFix 2 / vBugFix 4) Remove um Panel (aba).
+     * Removes a child Panel (tab) from this group.
      * @param {Panel} panel - The panel instance to remove.
+     * @returns {void}
      */
     removePanel(panel) {
-        const index = this.state.panels.indexOf(panel);
+        const me = this;
+        const index = me._state.panels.indexOf(panel);
         if (index === -1) return;
 
-        // (NOVO - BugFix 2) Remove a classe ativa ANTES de movê-la.
-        panel.state.header.element.classList.remove('panel-group__tab--active');
-
-        // (MODIFICADO) Remove ambos os elementos
-        panel.state.header.element.remove();
+        panel._state.header.element.classList.remove('panel-group__tab--active');
+        panel._state.header.element.remove();
         panel.getContentElement().remove();
 
-        this.state.panels.splice(index, 1);
+        me._state.panels.splice(index, 1);
         panel.setParentGroup(null);
 
-        // (MODIFICADO - Otimização 5) Lógica de transição O(1)
-        const newPanelCount = this.state.panels.length;
+        const newPanelCount = me._state.panels.length;
         if (newPanelCount === 1) {
-            // Transição 2 -> 1: O painel restante entra no modo simples
-            const remainingPanel = this.state.panels[0];
-            remainingPanel.state.header.setMode(true); // O(1)
-
-            // (NOVO - BugFix 4) Chama setActive no painel restante
-            // para garantir que a classe 'active' seja removida no modo simples.
-            this.setActive(remainingPanel);
+            const remainingPanel = me._state.panels[0];
+            remainingPanel._state.header.setMode(true);
+            me.setActive(remainingPanel);
         }
-        // Fim Otimização 5
 
-        this._updateHeaderMode(); // (Agora O(1))
-        this.state.header.updateScrollButtons(); // Atualiza scroll
+        me._updateHeaderMode();
+        me._state.header.updateScrollButtons();
 
-        if (this.state.panels.length === 0) {
-            this.close();
+        if (me._state.panels.length === 0) {
+            me.close();
             return;
         }
 
-        if (panel === this.state.activePanel) {
-            const newActive = this.state.panels[index] || this.state.panels[index - 1];
-            this.setActive(newActive);
+        if (panel === me._state.activePanel) {
+            const newActive = me._state.panels[index] || me._state.panels[index - 1];
+            me.setActive(newActive);
         } else {
-            // Se removemos um painel inativo, mas a contagem ainda é > 1,
-            // não precisamos chamar setActive, apenas atualizamos o layout.
             if (newPanelCount > 1) {
-                this.requestLayoutUpdate();
+                me.requestLayoutUpdate();
             }
         }
     }
 
     /**
-     * (MODIFICADO - vArch / vBugFix 3) Ativa um Panel (aba).
+     * Sets a child Panel (tab) as the active one, showing its content.
      * @param {Panel} panel - The panel instance to activate.
+     * @returns {void}
      */
     setActive(panel) {
+        const me = this;
         if (!panel) return;
 
-        const isSimpleMode = this.state.panels.length === 1;
+        const isSimpleMode = me._state.panels.length === 1;
 
-        this.state.panels.forEach(p => {
-            // (MODIFICADO - BugFix 3) SEMPRE remove a classe ativa de todos,
-            // independentemente do modo, para limpar o estado.
-            p.state.header.element.classList.remove('panel-group__tab--active');
+        me._state.panels.forEach(p => {
+            p._state.header.element.classList.remove('panel-group__tab--active');
             p.getContentElement().style.display = 'none';
         });
 
-        // (MODIFICADO - BugFix 3) Adiciona a classe ativa APENAS se
-        // NÃO estiver em modo simples.
         if (!isSimpleMode) {
-            panel.state.header.element.classList.add('panel-group__tab--active');
+            panel._state.header.element.classList.add('panel-group__tab--active');
         }
 
-        panel.getContentElement().style.display = ''; // (CSS fará 'flex')
+        panel.getContentElement().style.display = '';
 
-        this.state.activePanel = panel;
-        this.state.title = panel.state.title; // (Mantido para ARIA labels)
-        this.state.header.updateAriaLabels(); // (NOVO) Atualiza ARIA
+        me._state.activePanel = panel;
+        me._state.title = panel._state.title;
+        me._state.header.updateAriaLabels();
 
-        this.requestLayoutUpdate();
+        me.requestLayoutUpdate();
     }
 
     /**
-     * Emite um evento para o LayoutService APENAS se a coluna pai existir.
+     * Emits an event to the LayoutService if this group is attached to a column.
+     * @returns {void}
      */
     requestLayoutUpdate() {
         const column = this.getColumn();
@@ -610,42 +623,46 @@ export class PanelGroup {
     }
 
     /**
-     * Serializa o estado do grupo para um objeto JSON.
-     * @returns {object} Um objeto JSON-friendly representando o estado.
+     * Serializes the PanelGroup state (and its child Panels) to JSON.
+     * @returns {object}
      */
     toJSON() {
+        const me = this;
         return {
-            id: this.id,
-            type: this.getPanelType(),
-            height: this.state.height,
-            collapsed: this.state.collapsed,
-            activePanelId: this.state.activePanel ? this.state.activePanel.id : null,
+            id: me.id,
+            type: me.getPanelType(),
+            height: me._state.height,
+            collapsed: me._state.collapsed,
+            activePanelId: me._state.activePanel ? me._state.activePanel.id : null,
             config: {
-                closable: this.state.closable,
-                collapsible: this.state.collapsible,
-                movable: this.state.movable,
-                minHeight: this.state.minHeight
+                closable: me._state.closable,
+                collapsible: me._state.collapsible,
+                movable: me._state.movable,
+                minHeight: me._state.minHeight
             },
-            panels: this.state.panels.map(panel => panel.toJSON())
+            panels: me._state.panels.map(panel => panel.toJSON())
         };
     }
 
     /**
-     * (MODIFICADO - vBugFix 3) Restaura o estado do grupo E de seus painéis filhos.
-     * @param {object} data - O objeto de estado serializado.
+     * Deserializes state from JSON data.
+     * @param {object} data - The state object.
+     * @returns {void}
      */
     fromJSON(data) {
+        const me = this;
         if (data.id) {
-            this.id = data.id;
+            me.id = data.id;
+            me._namespace = me.id;
         }
         if (data.height !== undefined) {
-            this.state.height = data.height;
+            me._state.height = data.height;
         }
         if (data.collapsed !== undefined) {
-            this.state.collapsed = data.collapsed;
+            me._state.collapsed = data.collapsed;
         }
         if (data.config) {
-            Object.assign(this.state, data.config);
+            Object.assign(me._state, data.config);
         }
 
         const activePanelId = data.activePanelId;
@@ -658,8 +675,7 @@ export class PanelGroup {
                 const panel = factory.createPanel(panelData);
 
                 if (panel) {
-                    // (MODIFICADO) Apenas adiciona (makeActive = false)
-                    this.addPanel(panel, false);
+                    me.addPanel(panel, false);
                     if (panel.id === activePanelId) {
                         activePanelInstance = panel;
                     }
@@ -667,16 +683,15 @@ export class PanelGroup {
             });
         }
 
-        // (MODIFICADO) Chama setActive UMA VEZ no final
-        if (!activePanelInstance && this.state.panels.length > 0) {
-            activePanelInstance = this.state.panels[0];
+        if (!activePanelInstance && me._state.panels.length > 0) {
+            activePanelInstance = me._state.panels[0];
         }
 
         if (activePanelInstance) {
-            this.setActive(activePanelInstance);
+            me.setActive(activePanelInstance);
         }
 
-        this.updateHeight();
-        this.updateCollapse();
+        me.updateHeight();
+        me.updateCollapse();
     }
 }

@@ -7,27 +7,33 @@ import { appBus } from '../../utils/EventBus.js';
  *
  * Properties summary:
  * - element {HTMLElement}: The main DOM element (<div class="status-bar">).
- * - _permanentMessageElement {HTMLElement}: The <span> holding the fixed message.
- * - _tempMessageElement {HTMLElement}: The <span> holding the temporary message.
- * - _messageTimer {number|null}: The timeout ID for temporary messages.
+ * - _namespace {string} : Unique namespace for appBus listeners.
  *
  * Typical usage:
  * // In App.js
  * const statusBar = new StatusBar();
  * document.body.appendChild(statusBar.element);
  *
- * // To show a temporary message (e.g., "Resetado")
- * appBus.emit('app:set-status-message', 'Workspace resetado.');
+ * Events:
+ * - Listens to: 'app:set-status-message', 'app:set-permanent-status', 'app:clear-status'
  *
- * // To set the permanent message (e.g., "Pronto")
- * appBus.emit('app:set-permanent-status', 'Pronto');
+ * Dependencies:
+ * - ../../utils/EventBus.js
  */
 export class StatusBar {
     /**
      * The main <div> element for the status bar.
      * @type {HTMLElement}
+     * @public
      */
     element;
+
+    /**
+     * Unique namespace for appBus listeners.
+     * @type {string}
+     * @private
+     */
+    _namespace = 'app-statusbar';
 
     /**
      * The <span> element that holds the permanent (left-aligned) message.
@@ -51,6 +57,24 @@ export class StatusBar {
     _messageTimer = null;
 
     /**
+     * @type {Function | null}
+     * @private
+     */
+    _boundSetMessage = null;
+
+    /**
+     * @type {Function | null}
+     * @private
+     */
+    _boundSetPermanentMessage = null;
+
+    /**
+     * @type {Function | null}
+     * @private
+     */
+    _boundClearMessage = null;
+
+    /**
      * @param {string} [defaultStatus='Pronto'] - The default permanent message.
      */
     constructor(defaultStatus = 'Pronto') {
@@ -66,6 +90,11 @@ export class StatusBar {
 
         me.element.append(me._permanentMessageElement, me._tempMessageElement);
 
+        // Store bound handlers
+        me._boundSetMessage = me.setMessage.bind(me);
+        me._boundSetPermanentMessage = me.setPermanentMessage.bind(me);
+        me._boundClearMessage = me.clearMessage.bind(me);
+
         me._initEventListeners();
         me.setPermanentMessage(defaultStatus);
     }
@@ -73,34 +102,48 @@ export class StatusBar {
     /**
      * Initializes the appBus event listeners.
      * @private
+     * @returns {void}
      */
     _initEventListeners() {
         const me = this;
-        // Evento para mensagens temporárias (ex: "Salvo!")
-        appBus.on('app:set-status-message', me.setMessage.bind(me));
-        // Evento para mensagens fixas (ex: "Pronto")
-        appBus.on('app:set-permanent-status', me.setPermanentMessage.bind(me));
-        // Evento para limpar a mensagem (raro, mas útil)
-        appBus.on('app:clear-status', me.clearMessage.bind(me));
+        const options = { namespace: me._namespace };
+
+        appBus.on('app:set-status-message', me._boundSetMessage, options);
+        appBus.on('app:set-permanent-status', me._boundSetPermanentMessage, options);
+        appBus.on('app:clear-status', me._boundClearMessage, options);
+    }
+
+    /**
+     * Cleans up appBus listeners and clears any pending timers.
+     * @returns {void}
+     */
+    destroy() {
+        const me = this;
+        appBus.offByNamespace(me._namespace);
+
+        if (me._messageTimer) {
+            clearTimeout(me._messageTimer);
+            me._messageTimer = null;
+        }
+
+        me.element.remove();
     }
 
     /**
      * Displays a temporary message that clears after a duration.
      * @param {string} message - The text to display.
      * @param {number} [duration=3000] - Time in ms before clearing.
+     * @returns {void}
      */
     setMessage(message, duration = 3000) {
         const me = this;
 
-        // Define o texto
         me._tempMessageElement.textContent = message;
 
-        // Limpa qualquer timer existente para reiniciar a contagem
         if (me._messageTimer) {
             clearTimeout(me._messageTimer);
         }
 
-        // Define um novo timer para limpar a mensagem
         me._messageTimer = setTimeout(() => {
             me.clearMessage();
         }, duration);
@@ -109,6 +152,7 @@ export class StatusBar {
     /**
      * Displays a permanent message (e.g., "Pronto").
      * @param {string} message - The text to display.
+     * @returns {void}
      */
     setPermanentMessage(message) {
         this._permanentMessageElement.textContent = message;
@@ -116,6 +160,7 @@ export class StatusBar {
 
     /**
      * Clears the temporary status message immediately.
+     * @returns {void}
      */
     clearMessage() {
         const me = this;

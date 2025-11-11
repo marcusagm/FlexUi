@@ -3,101 +3,121 @@ import { appBus } from '../../utils/EventBus.js';
 
 /**
  * Description:
- * (NOVO) O contêiner principal da aplicação. Gere o layout vertical das Linhas (Row).
- * Atua como uma "drop zone inteligente" (tipo 'container') para detetar
- * o drop nas "lacunas" (gaps) verticaIS entre as Linhas.
+ * The main application container and root UI component.
+ * It manages the vertical layout of all 'Row' components.
+ * It also acts as a 'drop zone' (type 'container') to allow
+ * panels to be dropped "between" rows, creating new rows.
  *
- * (Contexto 12) Agora também gere os handles de resize vertical (altura) das Rows.
+ * Properties summary:
+ * - _state {object} : Manages child Row instances.
+ * - element {HTMLElement} : The main DOM element (<div class="container">).
+ * - dropZoneType {string} : The identifier for the DragDropService.
  *
- * (Refatorado) A lógica de cálculo de layout (fills-space) foi movida
- * para o LayoutService. Este componente apenas emite 'layout:rows-changed'.
+ * Typical usage:
+ * // In App.js
+ * this.container = new Container();
+ * document.body.append(this.container.element);
  *
- * (Refatorado vBugFix) Corrige o vazamento de listeners do appBus
- * armazenando as referências bindadas e implementando destroy().
+ * Events:
+ * - Listens to: 'row:empty' (to clean up empty rows)
+ * - Emits: 'layout:rows-changed' (to notify LayoutService)
  *
- * (REFATORADO vDND-Bridge) Remove listeners DND locais e delega ao DragDropService
- * através de 'dataset.dropzone' e 'dropZoneInstance'.
+ * Business rules implemented:
+ * - Renders 'Row' children vertically.
+ * - Registers as a 'container' type drop zone.
+ * - Listens for 'row:empty' and automatically removes any Row that
+ * reports its last Column has been removed.
+ * - Manages the vertical resize handles for its child Rows (the last
+ * Row never has a handle).
+ * - Forces recalculation of *column* resize handles on all child Rows
+ * whenever a row is added or deleted.
  *
- * (CORREÇÃO vDND-Bug-Resize) Remove '_updateAllColumnResizeBars'
- * pois o 'LayoutService' agora é o único responsável por esta lógica.
- *
- * (CORREÇÃO vEventBus) Usa namespace para listeners do appBus.
+ * Dependencies:
+ * - components/Row/Row.js
+ * - utils/EventBus.js
  */
 export class Container {
-    state = {
-        children: [] // Contém instâncias de Row
+    /**
+     * Internal state holding child Row components.
+     * @type {{children: Array<Row>}}
+     * @private
+     */
+    _state = {
+        children: []
     };
 
-    // (NOVO) Namespace estático
-    namespace = 'app-container';
+    /**
+     * Unique namespace for this component's appBus listeners.
+     * @type {string}
+     * @private
+     */
+    _namespace = 'app-container';
 
     /**
-     * (NOVO) Armazena a referência bindada para o listener
-     * @type {function | null}
+     * Stores the bound reference for the 'onRowEmpty' listener.
+     * @type {Function | null}
      * @private
      */
     _boundOnRowEmpty = null;
 
     constructor() {
-        this.element = document.createElement('div');
-        this.element.classList.add('container'); // Usa a nova classe CSS .container
+        const me = this;
+        me.element = document.createElement('div');
+        me.element.classList.add('container');
 
-        this.dropZoneType = 'container'; // Novo drop zone type (para lacunas verticais)
+        me.dropZoneType = 'container';
 
-        // (MODIFICADO - Etapa 1)
-        this.element.dataset.dropzone = this.dropZoneType;
-        this.element.dropZoneInstance = this;
-        // (REMOVIDO) initDNDListeners();
+        me.element.dataset.dropzone = me.dropZoneType;
+        me.element.dropZoneInstance = me;
 
-        // (NOVO) Define a referência bindada
-        this._boundOnRowEmpty = this.onRowEmpty.bind(this);
+        me._boundOnRowEmpty = me.onRowEmpty.bind(me);
 
-        this.clear();
-        this.initEventListeners();
+        me.clear();
+        me.initEventListeners();
     }
 
-    // (REMOVIDO - Etapa 1) Métodos initDNDListeners e handlers (onDrag...)
-
     /**
-     * (MODIFICADO) Usa a referência bindada e adiciona namespace
+     * Initializes appBus event listeners for this component.
+     * @returns {void}
      */
     initEventListeners() {
-        // Ouve o evento emitido pela Row (Etapa 1)
-        appBus.on('row:empty', this._boundOnRowEmpty, { namespace: this.namespace });
+        const me = this;
+        appBus.on('row:empty', me._boundOnRowEmpty, { namespace: me._namespace });
     }
 
     /**
-     * (NOVO) Limpa todos os listeners para permitir "teardown".
-     * (MODIFICADO) Usa offByNamespace.
+     * Cleans up appBus listeners and destroys all child Row components.
+     * @returns {void}
      */
     destroy() {
         const me = this;
-        // (INÍCIO DA MODIFICAÇÃO - Etapa 3)
-        appBus.offByNamespace(me.namespace);
-        // (FIM DA MODIFICAÇÃO)
+        appBus.offByNamespace(me._namespace);
 
-        // Um container destruído também deve destruir seus filhos
         [...me.getRows()].forEach(row => row.destroy());
         me.element.remove();
     }
 
     /**
-     * (NOVO) Notifica o LayoutService que o layout das linhas mudou.
+     * Notifies the LayoutService that the row layout has changed.
+     * @returns {void}
      */
     requestLayoutUpdate() {
         appBus.emit('layout:rows-changed', this);
     }
 
     /**
-     * Chamado quando a última coluna de uma Row é removida.
+     * Event handler for when a child Row reports it is empty.
+     * @param {Row} row - The Row instance that emitted the event.
+     * @returns {void}
      */
     onRowEmpty(row) {
         this.deleteRow(row);
     }
 
     /**
-     * (NOVO) Contexto 12: Atualiza as barras de redimensionamento de todas as linhas.
-     * (Lógica adaptada do Row.js)
+     * Updates the vertical resize bars for all child Rows.
+     * The last Row is instructed not to show its bar.
+     * @returns {void}
      */
     updateAllResizeBars() {
         const rows = this.getRows();
@@ -106,99 +126,116 @@ export class Container {
         });
     }
 
-    // (REMOVIDO) _updateAllColumnResizeBars foi removido na correção anterior.
+    /**
+     * Forces all child Rows to recalculate their *column* resize handles.
+     * (Required to fix DND bugs where the "last" row changes).
+     * @private
+     * @returns {void}
+     */
+    _updateAllColumnResizeBars() {
+        this.getRows().forEach(row => {
+            if (typeof row.updateAllResizeBars === 'function') {
+                row.updateAllResizeBars();
+            }
+        });
+    }
 
     /**
-     * (NOVO) Cria e insere uma nova Linha (Row).
-     * @param {number|null} [height=null]
-     * @param {number|null} [index=null] - O índice exato na lista de linhas.
-     * @returns {Row} A linha criada.
+     * Creates and inserts a new Row component into the container.
+     * @param {number|null} [height=null] - The initial height of the row.
+     * @param {number|null} [index=null] - The exact state array index to insert at.
+     * @returns {Row} The created Row instance.
      */
     createRow(height = null, index = null) {
-        const row = new Row(this, height); // Passa 'this' (Container) como pai
+        const me = this;
+        const row = new Row(me, height);
 
         if (index === null) {
-            this.element.appendChild(row.element);
-            this.state.children.push(row);
+            me.element.appendChild(row.element);
+            me._state.children.push(row);
         } else {
-            const targetElement = this.element.children[index] || null;
+            const targetElement = me.element.children[index] || null;
             if (targetElement) {
-                this.element.insertBefore(row.element, targetElement);
+                me.element.insertBefore(row.element, targetElement);
             } else {
-                this.element.appendChild(row.element);
+                me.element.appendChild(row.element);
             }
-            this.state.children.splice(index, 0, row);
+            me._state.children.splice(index, 0, row);
         }
 
-        // (MODIFICADO) Delega ao LayoutService
-        this.requestLayoutUpdate();
-        this.updateAllResizeBars(); // (Mantido) Atualiza os handles de LINHA (vertical)
-
-        // (REMOVIDO) _updateAllColumnResizeBars
+        me.requestLayoutUpdate();
+        me.updateAllResizeBars();
+        me._updateAllColumnResizeBars();
 
         return row;
     }
 
     /**
-     * (NOVO) Exclui uma linha.
-     * (MODIFICADO) Contexto 12: Simplificado para usar row.destroy()
+     * Deletes a child Row.
+     * @param {Row} row - The Row instance to remove.
+     * @returns {void}
      */
     deleteRow(row) {
-        const index = this.state.children.indexOf(row);
+        const me = this;
+        const index = me._state.children.indexOf(row);
         if (index === -1) return;
 
         const rowEl = row.element;
-        row.destroy(); // (MODIFICADO) Contexto 12: Chama o destroy da Row
+        row.destroy();
 
-        // Remove DOM
-        if (rowEl && this.element.contains(rowEl)) {
-            this.element.removeChild(rowEl);
+        if (rowEl && me.element.contains(rowEl)) {
+            me.element.removeChild(rowEl);
         }
 
-        // Remove do estado
-        this.state.children.splice(index, 1);
+        me._state.children.splice(index, 1);
 
-        // (MODIFICADO) Delega ao LayoutService
-        this.requestLayoutUpdate();
-        this.updateAllResizeBars(); // (Mantido) Atualiza os handles de LINHA (vertical)
-
-        // (REMOVIDO) _updateAllColumnResizeBars
+        me.requestLayoutUpdate();
+        me.updateAllResizeBars();
+        me._updateAllColumnResizeBars();
     }
 
     /**
-     * (NOVO) Retorna todas as instâncias de Linha.
+     * Returns all child Row instances.
+     * @returns {Array<Row>}
      */
     getRows() {
-        return this.state.children;
+        return this._state.children;
     }
 
+    /**
+     * Returns the total number of child Rows.
+     * @returns {number}
+     */
     getTotalRows() {
         return this.getRows().length;
     }
 
+    /**
+     * Returns the first child Row. If none exists, creates one.
+     * @returns {Row}
+     */
     getFirstRow() {
         const rows = this.getRows();
         return rows[0] || this.createRow();
     }
 
     /**
-     * (REMOVIDO) updateRowsHeights() foi movido para o LayoutService.
-     */
-
-    /**
-     * (MODIFICADO) Limpa o container e todas as linhas filhas.
+     * Clears the container, destroying and removing all child Rows.
+     * @returns {void}
      */
     clear() {
-        [...this.getRows()].forEach(row => {
-            this.deleteRow(row);
+        const me = this;
+        [...me.getRows()].forEach(row => {
+            me.deleteRow(row);
         });
 
-        this.element.innerHTML = '';
-        this.state.children = [];
+        me.element.innerHTML = '';
+        me._state.children = [];
     }
 
     /**
-     * (NOVO) Serializa o Container (lista de Rows).
+     * Serializes the Container state (and its child Rows) to JSON.
+     * @returns {object}
      */
     toJSON() {
         return {
@@ -207,37 +244,34 @@ export class Container {
     }
 
     /**
-     * (NOVO) Desserializa o Container (lista de Rows).
-     * Inclui retrocompatibilidade para layouts antigos (sem 'rows').
+     * Deserializes state from JSON data.
+     * @param {object} data - The state object (from default.json or localStorage).
+     * @returns {void}
      */
     fromJSON(data) {
-        this.clear();
+        const me = this;
+        me.clear();
         const rowsData = data.rows || [];
 
         if (rowsData.length === 0 && data.columns) {
-            // (FALLBACK) Se o JSON antigo (só colunas) for carregado,
-            // embrulha-o numa única linha.
-            console.warn("Container: Carregando layout legado (sem 'rows'). Embrulhando numa Row.");
-            const row = this.createRow(); // Cria uma row com height null (preenchimento)
-            // Passa os dados antigos (data) para o fromJSON da Row
+            // Fallback for legacy layouts (without 'rows')
+            console.warn("Container: Loading legacy layout (no 'rows'). Wrapping in a Row.");
+            const row = me.createRow();
             row.fromJSON(data);
         } else {
-            // Carrega as linhas
+            // Load rows
             rowsData.forEach(rowData => {
-                const row = this.createRow(rowData.height);
+                const row = me.createRow(rowData.height);
                 row.fromJSON(rowData);
             });
         }
 
-        // Se após tudo não houver linhas, cria uma vazia
-        if (this.getRows().length === 0) {
-            this.createRow();
+        if (me.getRows().length === 0) {
+            me.createRow();
         }
 
-        // (MODIFICADO) Delega ao LayoutService
-        this.requestLayoutUpdate();
-        this.updateAllResizeBars(); // (Mantido) Atualiza os handles de LINHA (vertical)
-
-        // (REMOVIDO) _updateAllColumnResizeBars
+        me.requestLayoutUpdate();
+        me.updateAllResizeBars();
+        me._updateAllColumnResizeBars();
     }
 }

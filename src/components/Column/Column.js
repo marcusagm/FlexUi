@@ -1,5 +1,4 @@
 import { PanelGroup } from '../Panel/PanelGroup.js';
-// (REMOVIDO) DragDropService não é mais importado aqui
 import { appBus } from '../../utils/EventBus.js';
 import { throttleRAF } from '../../utils/ThrottleRAF.js';
 
@@ -8,40 +7,60 @@ import { throttleRAF } from '../../utils/ThrottleRAF.js';
  * Manages a single vertical column in the container. It holds and organizes
  * PanelGroups, manages horizontal resizing, and delegates drag/drop logic.
  *
- * (Refatorado) Agora delega a lógica de layout (fills-space, collapse rules)
- * para o LayoutService emitindo 'layout:panel-groups-changed'.
- *
- * (Refatorado vBugFix) Corrige o vazamento de listeners do appBus
- * armazenando as referências bindadas.
- *
- * (REFATORADO vDND-Bridge) Remove listeners DND locais e delega ao DragDropService
- * através de 'dataset.dropzone' e 'dropZoneInstance'.
- *
- * (CORREÇÃO vEventBus) Usa ID e namespace para listeners do appBus.
- *
  * Properties summary:
- * - state {object} : Internal state management.
- * - _minWidth {number} : The minimum width the column can be resized to.
- * - _throttledUpdate {function} : A versão throttled da função de update.
+ * - _state {object} : Internal state management (child PanelGroups, width, parent).
+ * - element {HTMLElement} : The main DOM element (<div class="column">).
+ * - dropZoneType {string} : The identifier for the DragDropService.
+ * - _id {string} : Unique ID for this instance.
+ * - _namespace {string} : Unique namespace for appBus listeners.
  *
  * Typical usage:
- * const column = new Column(myContainer);
- * const panelGroup = new PanelGroup(new TextPanel('Title'));
- * column.addPanelGroup(panelGroup);
+ * // In Row.js
+ * const column = new Column(this, width);
+ * this.element.appendChild(column.element);
+ *
+ * Events:
+ * - Listens to: 'panelgroup:removed' (to clean up empty groups)
+ * - Emits: 'layout:panel-groups-changed' (to notify LayoutService)
+ * - Emits: 'column:empty' (to notify Row when this column is empty)
+ *
+ * Business rules implemented:
+ * - Renders 'PanelGroup' children vertically.
+ * - Registers as a 'column' type drop zone.
+ * - Listens for 'panelgroup:removed' and removes the child.
+ * - If it becomes empty (last PanelGroup removed), emits 'column:empty'.
+ * - Manages its own horizontal resize handle (via 'addResizeBars').
+ *
+ * Dependencies:
+ * - components/Panel/PanelGroup.js
+ * - utils/EventBus.js
+ * - utils/ThrottleRAF.js
  */
 export class Column {
     /**
-     * @type {object}
+     * Internal state holding child PanelGroups and dimensions.
+     * @type {{container: import('../Row/Row.js').Row | null, panelGroups: Array<PanelGroup>, width: number | null}}
      * @private
      */
-    state = {
+    _state = {
         container: null,
         panelGroups: [],
         width: null
     };
 
-    // (NOVO) ID único para namespace
-    id = 'col_' + (Math.random().toString(36).substring(2, 9) + Date.now());
+    /**
+     * Unique ID for this instance, used for namespacing events.
+     * @type {string}
+     * @private
+     */
+    _id = 'col_' + (Math.random().toString(36).substring(2, 9) + Date.now());
+
+    /**
+     * Unique namespace for appBus listeners.
+     * @type {string}
+     * @private
+     */
+    _namespace = this._id;
 
     /**
      * The minimum width in pixels for horizontal resizing.
@@ -51,58 +70,53 @@ export class Column {
     _minWidth = 150;
 
     /**
-     * A versão throttled (com rAF) da função de atualização.
-     * @type {function | null}
+     * The throttled (rAF) update function for resizing.
+     * @type {Function | null}
      * @private
      */
     _throttledUpdate = null;
 
     /**
-     * (NOVO) Armazena a referência bindada para o listener
-     * @type {function | null}
+     * Stores the bound reference for the 'onPanelGroupRemoved' listener.
+     * @type {Function | null}
      * @private
      */
     _boundOnPanelGroupRemoved = null;
 
     /**
-     * @param {Container} container - The parent container instance.
+     * @param {import('../Row/Row.js').Row} container - The parent Row instance.
      * @param {number|null} [width=null] - The initial width of the column.
      */
     constructor(container, width = null) {
-        this.setMinWidth(this._minWidth);
-        this.setParentContainer(container);
-        this.state.width = width;
+        const me = this;
+        me.setMinWidth(me._minWidth);
+        me.setParentContainer(container);
+        me._state.width = width;
 
-        this.element = document.createElement('div');
-        this.element.classList.add('column');
-        this.dropZoneType = 'column';
+        me.element = document.createElement('div');
+        me.element.classList.add('column');
+        me.dropZoneType = 'column';
 
-        // (MODIFICADO - Etapa 2)
-        this.element.dataset.dropzone = this.dropZoneType;
-        this.element.dropZoneInstance = this;
-        // (FIM DA MODIFICAÇÃO)
+        me.element.dataset.dropzone = me.dropZoneType;
+        me.element.dropZoneInstance = me;
 
-        // (MODIFICADO) A função throttled agora atualiza apenas o estilo O(1) desta coluna.
-        // A atualização O(N) (container.updateColumnsSizes) é chamada apenas no 'onUp'.
-        this.setThrottledUpdate(
+        me.setThrottledUpdate(
             throttleRAF(() => {
-                if (this.state.width !== null) {
-                    this.element.style.flex = `0 0 ${this.state.width}px`;
+                if (me._state.width !== null) {
+                    me.element.style.flex = `0 0 ${me._state.width}px`;
                 }
             })
         );
 
-        // (NOVO) Define a referência bindada
-        this._boundOnPanelGroupRemoved = this.onPanelGroupRemoved.bind(this);
+        me._boundOnPanelGroupRemoved = me.onPanelGroupRemoved.bind(me);
 
-        // (REMOVIDO) initDragDrop();
-        this.initEventListeners();
+        me.initEventListeners();
     }
 
-    // --- Getters / Setters ---
-
     /**
+     * <MinWidth> setter with validation.
      * @param {number} width
+     * @returns {void}
      */
     setMinWidth(width) {
         const sanitizedWidth = Number(width);
@@ -115,6 +129,7 @@ export class Column {
     }
 
     /**
+     * <MinWidth> getter.
      * @returns {number}
      */
     getMinWidth() {
@@ -122,48 +137,51 @@ export class Column {
     }
 
     /**
-     * Define a função de atualização throttled.
-     * @param {function} throttledFunction
+     * <ThrottledUpdate> setter.
+     * @param {Function} throttledFunction
+     * @returns {void}
      */
     setThrottledUpdate(throttledFunction) {
         this._throttledUpdate = throttledFunction;
     }
 
     /**
-     * Obtém a função de atualização throttled.
-     * @returns {function}
+     * <ThrottledUpdate> getter.
+     * @returns {Function | null}
      */
     getThrottledUpdate() {
         return this._throttledUpdate;
     }
 
     /**
-     * Sets the parent container reference.
-     * @param {Container} container - The parent container instance.
+     * <ParentContainer> setter.
+     * @param {import('../Row/Row.js').Row} container - The parent Row instance.
+     * @returns {void}
      */
     setParentContainer(container) {
         if (!container) {
             console.warn('Column: setParentContainer received a null container.');
             return;
         }
-        this.state.container = container;
+        this._state.container = container;
     }
 
-    // --- Concrete Methods ---
-
     /**
-     * (MODIFICADO) Initializes event listeners for the EventBus.
-     * Usa a referência bindada e adiciona namespace.
+     * Initializes appBus event listeners for this component.
+     * @returns {void}
      */
     initEventListeners() {
-        appBus.on('panelgroup:removed', this._boundOnPanelGroupRemoved, { namespace: this.id });
+        appBus.on('panelgroup:removed', this._boundOnPanelGroupRemoved, {
+            namespace: this._namespace
+        });
     }
 
     /**
-     * Handles the removal of a PanelGroup triggered by the EventBus.
+     * Event handler for when a child PanelGroup is removed.
      * @param {object} eventData - The event data.
      * @param {PanelGroup} eventData.panel - The PanelGroup instance being removed.
      * @param {Column} eventData.column - The Column it is being removed from.
+     * @returns {void}
      */
     onPanelGroupRemoved({ panel, column }) {
         if (column === this && panel instanceof PanelGroup) {
@@ -172,24 +190,21 @@ export class Column {
     }
 
     /**
-     * (MODIFICADO) Cleans up event listeners when the column is destroyed.
-     * Usa offByNamespace.
+     * Cleans up appBus listeners and destroys all child PanelGroups.
+     * @returns {void}
      */
     destroy() {
-        // (INÍCIO DA MODIFICAÇÃO - Etapa 3)
-        appBus.offByNamespace(this.id);
-        // (FIM DA MODIFICAÇÃO)
+        const me = this;
+        appBus.offByNamespace(me._namespace);
+        me.getThrottledUpdate()?.cancel();
 
-        this.getThrottledUpdate()?.cancel();
-
-        [...this.state.panelGroups].forEach(panel => panel.destroy());
+        [...me._state.panelGroups].forEach(panel => panel.destroy());
     }
-
-    // (REMOVIDO) Método initDragDrop
 
     /**
      * Adds the horizontal resize bar to the column.
-     * @param {boolean} isLast - Indicates if this is the last column in the container.
+     * @param {boolean} isLast - Indicates if this is the last column in the row.
+     * @returns {void}
      */
     addResizeBars(isLast) {
         this.element.querySelectorAll('.column__resize-handle').forEach(b => b.remove());
@@ -205,15 +220,15 @@ export class Column {
     }
 
     /**
-     * (MODIFICADO) Handles the start of a horizontal resize drag.
-     * 'onUp' agora delega ao LayoutService (via Row).
+     * Handles the start of a horizontal resize drag.
      * @param {MouseEvent} e - The mousedown event.
+     * @returns {void}
      */
     startResize(e) {
         const me = this;
-        const container = me.state.container; // Esta é a instância da Row (pai)
+        const container = me._state.container; // This is the parent Row instance
 
-        const columns = container.getColumns(); // Usa o getter
+        const columns = container.getColumns();
         const cols = columns.map(c => c.element);
 
         const idx = cols.indexOf(me.element);
@@ -225,21 +240,14 @@ export class Column {
 
         const onMove = ev => {
             const delta = ev.clientX - startX;
-            me.state.width = Math.max(me.getMinWidth(), startW + delta);
-
-            // Chama a função throttled (O(1))
+            me._state.width = Math.max(me.getMinWidth(), startW + delta);
             me.getThrottledUpdate()();
         };
 
         const onUp = () => {
             window.removeEventListener('mousemove', onMove);
             window.removeEventListener('mouseup', onUp);
-
-            // Cancela qualquer frame O(1) pendente
             me.getThrottledUpdate()?.cancel();
-
-            // (MODIFICADO) Chama a atualização O(N) da Row (pai)
-            // que agora emite 'layout:columns-changed' para o LayoutService.
             container.requestLayoutUpdate();
         };
         window.addEventListener('mousemove', onMove);
@@ -249,135 +257,145 @@ export class Column {
     /**
      * Updates the CSS flex-basis (width) of the column.
      * @param {boolean} isLast - Indicates if this is the last column.
+     * @returns {void}
      */
     updateWidth(isLast) {
+        const me = this;
         if (isLast) {
-            this.element.style.flex = `1 1 auto`;
-        } else if (this.state.width !== null) {
-            this.element.style.flex = `0 0 ${this.state.width}px`;
+            me.element.style.flex = `1 1 auto`;
+        } else if (me._state.width !== null) {
+            me.element.style.flex = `0 0 ${me._state.width}px`;
         }
-        // (MODIFICADO) Emite o evento renomeado
-        this.requestLayoutUpdate();
+        me.requestLayoutUpdate();
     }
-
-    // (REMOVIDO) Métodos onDragEnter, onDragOver, onDragLeave, onDrop
 
     /**
      * Adds multiple PanelGroups at once (used for state restoration).
      * @param {Array<PanelGroup>} panelGroups
+     * @returns {void}
      */
     addPanelGroupsBulk(panelGroups) {
+        const me = this;
         panelGroups.forEach(panelGroup => {
-            this.state.panelGroups.push(panelGroup);
-            this.element.appendChild(panelGroup.element);
-            panelGroup.setParentColumn(this);
+            me._state.panelGroups.push(panelGroup);
+            me.element.appendChild(panelGroup.element);
+            panelGroup.setParentColumn(me);
         });
-        this.requestLayoutUpdate();
+        me.requestLayoutUpdate();
     }
 
     /**
      * Adds a single PanelGroup to the column at a specific index.
-     * (MODIFICADO - CORREÇÃO) Usa lógica de 'sibling lookup'
+     * @param {PanelGroup} panelGroup
+     * @param {number|null} [index=null]
+     * @returns {void}
      */
     addPanelGroup(panelGroup, index = null) {
+        const me = this;
         if (index === null) {
-            this.state.panelGroups.push(panelGroup);
-            // (CORREÇÃO) Insere antes do handle de resize, se existir
-            const resizeHandle = this.element.querySelector('.column__resize-handle');
-            this.element.insertBefore(panelGroup.element, resizeHandle);
+            me._state.panelGroups.push(panelGroup);
+            const resizeHandle = me.element.querySelector('.column__resize-handle');
+            me.element.insertBefore(panelGroup.element, resizeHandle);
         } else {
-            this.state.panelGroups.splice(index, 0, panelGroup);
-            const nextSiblingPanel = this.state.panelGroups[index + 1];
+            me._state.panelGroups.splice(index, 0, panelGroup);
+            const nextSiblingPanel = me._state.panelGroups[index + 1];
             let nextSiblingElement = nextSiblingPanel ? nextSiblingPanel.element : null;
 
-            // (CORREÇÃO) Se for o último, insere antes do handle
             if (!nextSiblingElement) {
-                const resizeHandle = this.element.querySelector('.column__resize-handle');
+                const resizeHandle = me.element.querySelector('.column__resize-handle');
                 if (resizeHandle) {
                     nextSiblingElement = resizeHandle;
                 }
             }
-            this.element.insertBefore(panelGroup.element, nextSiblingElement);
+            me.element.insertBefore(panelGroup.element, nextSiblingElement);
         }
-        panelGroup.setParentColumn(this);
-        this.requestLayoutUpdate();
+        panelGroup.setParentColumn(me);
+        me.requestLayoutUpdate();
     }
 
     /**
+     * Gets all collapsed PanelGroups.
      * @returns {Array<PanelGroup>}
      */
     getPanelGroupsCollapsed() {
-        return this.state.panelGroups.filter(p => p.state.collapsed);
+        return this._state.panelGroups.filter(p => p._state.collapsed);
     }
 
     /**
+     * Gets all uncollapsed PanelGroups.
      * @returns {Array<PanelGroup>}
      */
     getPanelGroupsUncollapsed() {
-        return this.state.panelGroups.filter(p => !p.state.collapsed);
+        return this._state.panelGroups.filter(p => !p._state.collapsed);
     }
 
     /**
-     * Getter público para o state de panelGroups (melhor encapsulamento).
+     * <PanelGroups> getter.
      * @returns {Array<PanelGroup>}
      */
     getPanelGroups() {
-        return this.state.panelGroups;
+        return this._state.panelGroups;
     }
 
     /**
      * Removes a PanelGroup from the column.
+     * @param {PanelGroup} panelGroup
      * @param {boolean} [emitEmpty=true] - Whether to emit 'column:empty'.
+     * @returns {void}
      */
     removePanelGroup(panelGroup, emitEmpty = true) {
-        const index = this.getPanelGroupIndex(panelGroup);
+        const me = this;
+        const index = me.getPanelGroupIndex(panelGroup);
         if (index === -1) return;
 
-        this.state.panelGroups.splice(index, 1);
+        me._state.panelGroups.splice(index, 1);
         panelGroup.setParentColumn(null);
 
-        if (this.element.contains(panelGroup.element)) {
-            this.element.removeChild(panelGroup.element);
+        if (me.element.contains(panelGroup.element)) {
+            me.element.removeChild(panelGroup.element);
         }
 
-        this.requestLayoutUpdate();
+        me.requestLayoutUpdate();
 
-        if (emitEmpty && this.getTotalPanelGroups() === 0) {
-            appBus.emit('column:empty', this);
+        if (emitEmpty && me.getTotalPanelGroups() === 0) {
+            appBus.emit('column:empty', me);
         }
     }
 
     /**
-     * (MODIFICADO) Emite um evento para o LayoutService recalcular esta coluna.
+     * Emits an event to the LayoutService to recalculate this column.
+     * @returns {void}
      */
     requestLayoutUpdate() {
-        if (this.state.container) {
-            // (MODIFICADO) Evento renomeado para maior clareza
+        if (this._state.container) {
             appBus.emit('layout:panel-groups-changed', this);
         }
     }
 
     /**
+     * Finds the state index of a PanelGroup instance.
      * @param {PanelGroup} panelGroup
-     * @returns {number}
+     * @returns {number} The index, or -1 if not found.
      */
     getPanelGroupIndex(panelGroup) {
-        return this.state.panelGroups.findIndex(p => p === panelGroup);
+        return this._state.panelGroups.findIndex(p => p === panelGroup);
     }
 
     /**
+     * Finds the state index of a PanelGroup based on its DOM element.
      * @param {HTMLElement} element
-     * @returns {number}
+     * @returns {number} The index.
      */
     getPanelGroupIndexByElement(element) {
-        const allChildren = Array.from(this.element.children);
+        const me = this;
+        const allChildren = Array.from(me.element.children);
         let panelIndex = 0;
         for (const child of allChildren) {
             if (child === element) {
                 break;
             }
             if (
-                this.state.panelGroups.some(p => p.element === child) &&
+                me._state.panelGroups.some(p => p.element === child) &&
                 child.classList.contains('panel-group')
             ) {
                 panelIndex++;
@@ -387,28 +405,36 @@ export class Column {
     }
 
     /**
+     * Gets the total number of PanelGroups in this column.
      * @returns {number}
      */
     getTotalPanelGroups() {
-        return this.state.panelGroups.length;
+        return this._state.panelGroups.length;
     }
 
+    /**
+     * Serializes the Column state (and its child PanelGroups) to JSON.
+     * @returns {object}
+     */
     toJSON() {
+        const me = this;
         return {
-            width: this.state.width,
-            panelGroups: this.state.panelGroups
+            width: me._state.width,
+            panelGroups: me._state.panelGroups
                 .filter(group => group instanceof PanelGroup)
                 .map(group => group.toJSON())
         };
     }
 
     /**
-     * Restaura o estado da coluna E de seus PanelGroups filhos.
-     * @param {object} data - O objeto de estado serializado.
+     * Deserializes state from JSON data.
+     * @param {object} data - The state object.
+     * @returns {void}
      */
     fromJSON(data) {
+        const me = this;
         if (data.width !== undefined) {
-            this.state.width = data.width;
+            me._state.width = data.width;
         }
 
         const groupsToRestore = [];
@@ -421,9 +447,9 @@ export class Column {
         }
 
         if (groupsToRestore.length > 0) {
-            this.addPanelGroupsBulk(groupsToRestore);
+            me.addPanelGroupsBulk(groupsToRestore);
         }
 
-        this.updateWidth(false);
+        me.updateWidth(false);
     }
 }

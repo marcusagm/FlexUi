@@ -2,75 +2,93 @@ import { appBus } from '../../utils/EventBus.js';
 
 /**
  * Description:
- * Representa o cabeçalho/aba de um Panel.
+ * Represents the header/tab component of a single Panel.
+ * This class is a self-contained DOM component owned by a Panel.
+ * It renders the UI for the "tab" and acts as the drag source
+ * for DND operations involving the Panel.
  *
- * (Refatorado vArch) Esta classe é agora um componente autocontido
- * propriedade do Panel. Ela renderiza a UI da "aba" e atua como
- * a "origem" (drag handle) para o D&D do Panel.
+ * Properties summary:
+ * - _state {object} : Manages references to its parent Panel and PanelGroup.
+ * - element {HTMLElement} : The main DOM element (<div class="panel-group__tab">).
+ * - _titleEl {HTMLElement} : The <span> element for the title.
+ * - _closeBtn {HTMLElement} : The <button> element for the close button.
  *
- * (Refatorado vBugFix 2) O 'onDragStart' agora passa o 'element'
- * explícito no payload do appBus, e o DDS (Etapa 1) gere a classe .dragging.
+ * Typical usage:
+ * // Instantiated by Panel.js
+ * this._state.header = new PanelHeader(this, panelTitle);
  *
- * (Refatorado vCodeSmell) Corrigido bug de 'me' indefinido em destroy().
+ * Events:
+ * - Emits (DOM): 'dragstart', 'dragend'
+ * - Emits (appBus): 'dragstart', 'dragend'
+ * - Emits (appBus): 'panel:group-child-close-request'
  *
- * (Refatorado vBugFix 3) O 'setMode' agora desativa o 'draggable'
- * no modo simples, para forçar o D&D do PanelGroup.
+ * Dependencies:
+ * - ../../utils/EventBus.js
  */
 export class PanelHeader {
-    state = {
+    /**
+     * @type {{
+     * title: string | null,
+     * panel: import('./Panel.js').Panel | null,
+     * parentGroup: import('./PanelGroup.js').PanelGroup | null
+     * }}
+     * @private
+     */
+    _state = {
         title: null,
-        panel: null, // Referência ao Panel pai
-        parentGroup: null // Referência ao PanelGroup (avô)
+        panel: null,
+        parentGroup: null
     };
 
     /**
-     * O elemento DOM principal (a aba: .panel-group__tab)
+     * The main DOM element (the tab: .panel-group__tab)
      * @type {HTMLElement}
+     * @public
      */
     element;
 
     /**
+     * The <span> element holding the title text.
      * @type {HTMLElement}
      * @private
      */
     _titleEl;
 
     /**
+     * The close <button> element.
      * @type {HTMLElement}
      * @private
      */
     _closeBtn;
 
     /**
-     * @param {Panel} panel - A instância do Panel pai.
-     * @param {string} title - O título inicial.
+     * @param {import('./Panel.js').Panel} panel - The parent Panel instance.
+     * @param {string} title - The initial title.
      */
     constructor(panel, title) {
-        this.state.panel = panel;
-        this.state.title = title;
-        this.element = document.createElement('div');
+        const me = this;
+        me._state.panel = panel;
+        me._state.title = title;
+        me.element = document.createElement('div');
 
-        this.build();
-        this.initEventListeners();
-        // Aplica a configuração inicial (movable, closable) do painel
-        this.updateConfig(panel.state);
+        me.build();
+        me.initEventListeners();
+        me.updateConfig(panel._state);
     }
 
     /**
-     * Constrói o DOM da aba.
+     * Builds the DOM for the tab.
+     * @returns {void}
      */
     build() {
         const me = this;
-        // (MODIFICADO) O estilo base da aba é 'panel-group__tab'
         me.element.classList.add('panel-group__tab');
 
-        // 1. Título (usa a classe base .panel__title)
         me._titleEl = document.createElement('span');
         me._titleEl.classList.add('panel__title');
-        me._titleEl.textContent = me.state.title || 'Sem Título';
+        me._titleEl.textContent = me._state.title || 'Sem Título';
         me.element.appendChild(me._titleEl);
 
-        // 2. Botão de Fechar (X)
         me._closeBtn = document.createElement('button');
         me._closeBtn.type = 'button';
         me._closeBtn.classList.add('panel-group__tab-close');
@@ -79,60 +97,55 @@ export class PanelHeader {
     }
 
     /**
-     * Inicializa os listeners de D&D (Origem) e fechar.
+     * Initializes DND (drag source) and click listeners.
+     * @returns {void}
      */
     initEventListeners() {
         const me = this;
-        // D&D (Origem)
         me.element.addEventListener('dragstart', me.onDragStart.bind(me));
         me.element.addEventListener('dragend', me.onDragEnd.bind(me));
-
-        // Fechar (X)
         me._closeBtn.addEventListener('click', me.onCloseClick.bind(me));
-
-        // Clicar na aba para ativar
         me.element.addEventListener('click', me.onTabClick.bind(me));
     }
 
     /**
-     * Remove os listeners para evitar memory leaks.
-     * (MODIFICADO - CORREÇÃO) Adicionado 'const me = this;'
+     * Removes event listeners to prevent memory leaks.
+     * @returns {void}
      */
     destroy() {
-        const me = this; // (ADIÇÃO DA CORREÇÃO)
-        this.element.removeEventListener('dragstart', this.onDragStart.bind(me));
-        this.element.removeEventListener('dragend', this.onDragEnd.bind(me));
-        this._closeBtn.removeEventListener('click', this.onCloseClick.bind(me));
-        this.element.removeEventListener('click', this.onTabClick.bind(me));
+        const me = this;
+        me.element.removeEventListener('dragstart', me.onDragStart.bind(me));
+        me.element.removeEventListener('dragend', me.onDragEnd.bind(me));
+        me._closeBtn.removeEventListener('click', me.onCloseClick.bind(me));
+        me.element.removeEventListener('click', me.onTabClick.bind(me));
     }
 
-    // --- Handlers de Eventos ---
-
     /**
-     * (Origem D&D) Chamado quando o utilizador começa a arrastar a aba.
+     * Handles the start of a drag operation (drag source).
      * @param {DragEvent} e
+     * @returns {void}
      */
     onDragStart(e) {
-        // Impede o D&D do PanelGroup (avô) de disparar
         e.stopPropagation();
 
-        if (!this.state.panel.state.movable) {
+        const me = this;
+        if (!me._state.panel._state.movable) {
             e.preventDefault();
             return;
         }
 
-        // (MODIFICADO - CORREÇÃO) Passa o 'element' (this.element) no payload
         appBus.emit('dragstart', {
-            item: this.state.panel,
+            item: me._state.panel,
             type: 'Panel',
-            element: this.element, // O elemento DOM da aba
+            element: me.element,
             event: e
         });
     }
 
     /**
-     * Chamado quando o D&D termina (sucesso ou falha).
+     * Handles the end of a drag operation.
      * @param {DragEvent} e
+     * @returns {void}
      */
     onDragEnd(e) {
         e.stopPropagation();
@@ -140,101 +153,101 @@ export class PanelHeader {
     }
 
     /**
-     * Chamado quando o 'X' da aba é clicado.
+     * Handles clicks on the tab's close (X) button.
      * @param {MouseEvent} e
+     * @returns {void}
      */
     onCloseClick(e) {
-        e.stopPropagation(); // Impede o onTabClick (ativação)
+        e.stopPropagation();
+        const me = this;
 
-        if (!this.state.panel.state.closable) return;
+        if (!me._state.panel._state.closable) return;
 
-        if (this.state.parentGroup) {
+        if (me._state.parentGroup) {
             appBus.emit('panel:group-child-close-request', {
-                panel: this.state.panel,
-                group: this.state.parentGroup
+                panel: me._state.panel,
+                group: me._state.parentGroup
             });
         }
     }
 
     /**
-     * Chamado quando a aba é clicada (para ativação).
+     * Handles clicks on the tab to activate it.
      * @param {MouseEvent} e
+     * @returns {void}
      */
     onTabClick(e) {
-        if (this.state.parentGroup) {
-            this.state.parentGroup.setActive(this.state.panel);
+        const me = this;
+        if (me._state.parentGroup) {
+            me._state.parentGroup.setActive(me._state.panel);
         }
     }
 
-    // --- API Pública (usada pelo Panel e PanelGroup) ---
-
     /**
-     * Define o PanelGroup (avô).
-     * @param {PanelGroup} group
+     * <ParentGroup> setter.
+     * @param {import('./PanelGroup.js').PanelGroup} group - The parent PanelGroup.
+     * @returns {void}
      */
     setParentGroup(group) {
-        this.state.parentGroup = group;
+        this._state.parentGroup = group;
     }
 
     /**
-     * Atualiza o título no DOM.
+     * Updates the title text in the DOM.
      * @param {string} title
+     * @returns {void}
      */
     setTitle(title) {
-        this.state.title = title;
+        this._state.title = title;
         this._titleEl.textContent = title;
     }
 
     /**
-     * Atualiza a UI com base na configuração do Panel (ex: vindo do fromJSON).
+     * Updates the UI based on the Panel's configuration (e.g., from fromJSON).
      * @param {object} config - { closable, movable }
+     * @returns {void}
      */
     updateConfig(config) {
-        // Mostra/esconde o botão 'X'
+        const me = this;
         if (config.closable === false) {
-            this._closeBtn.style.display = 'none';
+            me._closeBtn.style.display = 'none';
         } else {
-            this._closeBtn.style.display = '';
+            me._closeBtn.style.display = '';
         }
 
-        // Define se a aba é arrastável
         if (config.movable === false) {
-            this.element.draggable = false;
-            this.element.style.cursor = 'default';
+            me.element.draggable = false;
+            me.element.style.cursor = 'default';
         } else {
-            this.element.draggable = true;
-            this.element.style.cursor = 'grab';
+            me.element.draggable = true;
+            me.element.style.cursor = 'grab';
         }
     }
 
     /**
-     * (MODIFICADO - BugFix 3) Controla a aparência "simples" vs. "aba"
-     * e desativa o D&D (draggable) do Panel no modo simples.
+     * Toggles the visual appearance between 'simple' (header) and 'tab' mode.
+     * Also manages the 'draggable' state.
      * @param {boolean} isSimpleMode
+     * @returns {void}
      */
     setMode(isSimpleMode) {
+        const me = this;
         if (isSimpleMode) {
-            // No modo simples, parece um cabeçalho normal
-            this.element.classList.remove('panel-group__tab');
-            // Remove o botão 'X' (o grupo mostra o seu próprio 'X')
-            this._closeBtn.style.display = 'none';
-            // (NOVO) Desativa o D&D deste elemento (o Panel)
-            this.element.draggable = false;
-            this.element.style.cursor = 'default';
+            me.element.classList.remove('panel-group__tab');
+            me._closeBtn.style.display = 'none';
+            me.element.draggable = false;
+            me.element.style.cursor = 'default';
         } else {
-            // No modo aba, parece uma aba
-            this.element.classList.add('panel-group__tab');
-            // Restaura o botão 'X' (se 'closable')
-            if (this.state.panel.state.closable) {
-                this._closeBtn.style.display = '';
+            me.element.classList.add('panel-group__tab');
+            if (me._state.panel._state.closable) {
+                me._closeBtn.style.display = '';
             }
-            // (NOVO) Restaura o D&D (se 'movable')
-            if (this.state.panel.state.movable) {
-                this.element.draggable = true;
-                this.element.style.cursor = 'grab';
+            if (me._state.panel._state.movable) {
+                me.element.draggable = true;
+                me.element.style.cursor = 'grab';
             } else {
-                this.element.draggable = false;
-                this.element.style.cursor = 'default';
+                me.element.draggable = false;
+                me.element.style.cursor = 'default';
             }
         }
     }

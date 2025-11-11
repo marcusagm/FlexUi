@@ -1,93 +1,123 @@
 import { Column } from '../Column/Column.js';
-// (REMOVIDO) DragDropService não é mais importado aqui
 import { appBus } from '../../utils/EventBus.js';
 import { throttleRAF } from '../../utils/ThrottleRAF.js';
 
 /**
  * Description:
- * (REFATORADO) Gere uma única Linha (Row) horizontal que contém Colunas.
- * Atua como uma "drop zone inteligente" (tipo 'row') para detetar
- * o drop nas "lacunas" (gaps) entre as colunas.
- * (Contexto 12) Agora também gere o redimensionamento vertical (altura).
+ * Manages a single horizontal Row, which contains and organizes Columns.
+ * It acts as a 'drop zone' (type 'row') to detect drops in the horizontal
+ * gaps *between* columns. It also manages its own vertical (height) resizing.
  *
- * (Refatorado) A lógica de cálculo de layout (fills-space) foi movida
- * para o LayoutService. Este componente apenas emite 'layout:columns-changed'.
+ * Properties summary:
+ * - _state {object} : Internal state (child Columns, parent Container, height).
+ * - element {HTMLElement} : The main DOM element (<div class="row">).
+ * - dropZoneType {string} : The identifier for the DragDropService.
+ * - _id {string} : Unique ID for this instance.
+ * - _namespace {string} : Unique namespace for appBus listeners.
  *
- * (Refatorado vBugFix) Corrige o vazamento de listeners do appBus
- * armazenando as referências bindadas.
+ * Typical usage:
+ * // In Container.js
+ * const row = new Row(this, height);
+ * this.element.appendChild(row.element);
  *
- * (REFATORADO vDND-Bridge) Remove listeners DND locais e delega ao DragDropService
- * através de 'dataset.dropzone' e 'dropZoneInstance'.
+ * Events:
+ * - Listens to: 'column:empty' (to clean up empty columns)
+ * - Emits: 'layout:columns-changed' (to notify LayoutService)
+ * - Emits: 'row:empty' (to notify Container when this row is empty)
  *
- * (CORREÇÃO vDND-Bug-Index) O método 'createColumn' agora usa
- * a lógica de 'state-based sibling lookup' (como sugerido pelo usuário)
- * para inserir a coluna no local DOM correto, ignorando
- * elementos não-componentes como 'row__resize-handle'.
+ * Business rules implemented:
+ * - Renders 'Column' children horizontally.
+ * - Registers as a 'row' type drop zone.
+ * - Listens for 'column:empty' and removes the child Column.
+ * - If it becomes empty (last Column removed), emits 'row:empty'.
+ * - Manages its own vertical resize handle (via 'addResizeBars').
  *
- * (CORREÇÃO vEventBus) Usa ID e namespace para listeners do appBus.
+ * Dependencies:
+ * - components/Column/Column.js
+ * - utils/EventBus.js
+ * - utils/ThrottleRAF.js
  */
 export class Row {
-    state = {
-        children: [], // Contém instâncias de Column
-        parentContainer: null, // (NOVO) Contexto 11
-        height: null // (NOVO) Contexto 11
+    /**
+     * @type {{children: Array<Column>, parentContainer: import('../Container/Container.js').Container | null, height: number | null}}
+     * @private
+     */
+    _state = {
+        children: [],
+        parentContainer: null,
+        height: null
     };
 
-    // (NOVO) ID único para namespace
-    id = 'row_' + (Math.random().toString(36).substring(2, 9) + Date.now());
+    /**
+     * Unique ID for this instance, used for namespacing events.
+     * @type {string}
+     * @private
+     */
+    _id = 'row_' + (Math.random().toString(36).substring(2, 9) + Date.now());
 
     /**
-     * (NOVO) Contexto 12
+     * Unique namespace for appBus listeners.
+     * @type {string}
+     * @private
+     */
+    _namespace = this._id;
+
+    /**
+     * Minimum height in pixels for vertical resizing.
      * @type {number}
      * @private
      */
-    _minHeight = 100; // Altura mínima de 100px para uma linha
+    _minHeight = 100;
 
     /**
-     * (NOVO) Contexto 12
-     * @type {function | null}
+     * Stores the throttled update function for resizing.
+     * @type {Function | null}
      * @private
      */
     _throttledUpdate = null;
 
     /**
-     * (NOVO) Armazena a referência bindada para o listener
-     * @type {function | null}
+     * Stores the bound reference for the 'onColumnEmpty' listener.
+     * @type {Function | null}
      * @private
      */
     _boundOnColumnEmpty = null;
 
+    /**
+     * @param {import('../Container/Container.js').Container} container - The parent Container instance.
+     * @param {number|null} [height=null] - The initial height of the row.
+     */
     constructor(container, height = null) {
-        this.element = document.createElement('div');
-        this.element.classList.add('row'); // (MODIFICADO) Contexto 11
-        this.state.parentContainer = container; // (NOVO) Contexto 11
-        this.state.height = height; // (NOVO) Contexto 11
-        this.setMinHeight(this._minHeight); // (NOVO) Contexto 12
+        const me = this;
+        me.element = document.createElement('div');
+        me.element.classList.add('row');
+        me._state.parentContainer = container;
+        me._state.height = height;
+        me.setMinHeight(me._minHeight);
 
-        this.dropZoneType = 'row'; // (MODIFICADO) Contexto 11
+        me.dropZoneType = 'row';
 
-        // (MODIFICADO - Etapa 1)
-        this.element.dataset.dropzone = this.dropZoneType;
-        this.element.dropZoneInstance = this;
-        // (REMOVIDO) initDNDListeners();
+        me.element.dataset.dropzone = me.dropZoneType;
+        me.element.dropZoneInstance = me;
 
-        // (NOVO) Contexto 12
-        this.setThrottledUpdate(
+        me.setThrottledUpdate(
             throttleRAF(() => {
-                // Passa 'false' pois a sincronização O(N) é feita no 'onUp'
-                this.updateHeight(false);
+                me.updateHeight(false);
             })
         );
 
-        // (NOVO) Define a referência bindada
-        this._boundOnColumnEmpty = this.onColumnEmpty.bind(this);
+        me._boundOnColumnEmpty = me.onColumnEmpty.bind(me);
 
-        this.clear();
-        this.initEventListeners();
-        this.updateHeight(false); // (MODIFICADO) Contexto 11/12
+        me.clear();
+        me.initEventListeners();
+        me.updateHeight(false);
     }
 
-    // --- Getters / Setters (Contexto 12) ---
+    /**
+     * <MinHeight> setter with validation.
+     * @param {number} height - The minimum height in pixels.
+     * @returns {void}
+     */
     setMinHeight(height) {
         const sanitizedHeight = Number(height);
         if (isNaN(sanitizedHeight) || sanitizedHeight < 0) {
@@ -96,67 +126,86 @@ export class Row {
         }
         this._minHeight = sanitizedHeight;
     }
+
+    /**
+     * <MinHeight> getter.
+     * @returns {number} The minimum height in pixels.
+     */
     getMinHeight() {
         return this._minHeight;
     }
+
+    /**
+     * <ThrottledUpdate> setter.
+     * @param {Function} throttledFunction
+     * @returns {void}
+     */
     setThrottledUpdate(throttledFunction) {
         this._throttledUpdate = throttledFunction;
     }
+
+    /**
+     * <ThrottledUpdate> getter.
+     * @returns {Function | null}
+     */
     getThrottledUpdate() {
         return this._throttledUpdate;
     }
-    setParentContainer(container) {
-        this.state.parentContainer = container;
-    }
-    // --- Fim Getters / Setters ---
-
-    // (REMOVIDO - Etapa 1) Métodos initDNDListeners e handlers (onDrag...)
 
     /**
-     * (MODIFICADO) Usa a referência bindada e adiciona namespace
+     * <ParentContainer> setter.
+     * @param {import('../Container/Container.js').Container} container - The parent container instance.
+     * @returns {void}
+     */
+    setParentContainer(container) {
+        this._state.parentContainer = container;
+    }
+
+    /**
+     * Initializes appBus event listeners for this component.
+     * @returns {void}
      */
     initEventListeners() {
-        appBus.on('column:empty', this._boundOnColumnEmpty, { namespace: this.id });
+        appBus.on('column:empty', this._boundOnColumnEmpty, { namespace: this._namespace });
     }
 
     /**
-     * (NOVO) Notifica o LayoutService que o layout das colunas mudou.
+     * Notifies the LayoutService that the column layout has changed.
+     * @returns {void}
      */
     requestLayoutUpdate() {
         appBus.emit('layout:columns-changed', this);
     }
 
     /**
-     * (MODIFICADO) Usa a referência bindada
-     * (NOVO) Contexto 12: Limpeza de listeners e filhos
-     * (MODIFICADO) Usa offByNamespace
+     * Cleans up appBus listeners and destroys all child Column components.
+     * @returns {void}
      */
     destroy() {
         const me = this;
-        // (INÍCIO DA MODIFICAÇÃO - Etapa 3)
-        appBus.offByNamespace(me.id);
-        // (FIM DA MODIFICAÇÃO)
-
+        appBus.offByNamespace(me._namespace);
         me.getThrottledUpdate()?.cancel();
 
-        // Destrói todas as colunas filhas
         [...me.getColumns()].forEach(column => column.destroy());
     }
 
     /**
-     * (MODIFICADO) Contexto 11
+     * Event handler for when a child Column reports it is empty.
+     * @param {Column} column - The Column instance that emitted the event.
+     * @returns {void}
      */
     onColumnEmpty(column) {
         this.deleteColumn(column);
 
-        if (this.getTotalColumns() === 0 && this.state.parentContainer) {
-            appBus.emit('row:empty', this); // Notifica o Container (pai)
+        if (this.getTotalColumns() === 0 && this._state.parentContainer) {
+            appBus.emit('row:empty', this); // Notifies the Container (parent)
         }
     }
 
     /**
-     * Atualiza as barras de redimensionamento de todas as colunas.
-     * (MODIFICADO - CORREÇÃO) Esta função agora é chamada apenas pelo LayoutService.
+     * Updates the horizontal resize bars for all child Columns.
+     * This is called by LayoutService.
+     * @returns {void}
      */
     updateAllResizeBars() {
         const columns = this.getColumns();
@@ -166,8 +215,9 @@ export class Row {
     }
 
     /**
-     * (NOVO) Contexto 12: Adiciona o handle de resize vertical
-     * @param {boolean} isLast - Se é a última linha no container
+     * Adds the vertical resize handle to this Row.
+     * @param {boolean} isLast - True if this is the last Row in the Container.
+     * @returns {void}
      */
     addResizeBars(isLast) {
         this.element.querySelectorAll('.row__resize-handle').forEach(b => b.remove());
@@ -177,19 +227,19 @@ export class Row {
 
         this.element.classList.add('row--resize-bottom');
         const bar = document.createElement('div');
-        bar.classList.add('row__resize-handle'); // (CSS na Etapa 3)
+        bar.classList.add('row__resize-handle');
         this.element.appendChild(bar);
         bar.addEventListener('mousedown', e => this.startResize(e));
     }
 
     /**
-     * (NOVO) Contexto 12: Lógica de resize vertical
-     * (MODIFICADO) 'onUp' agora chama 'requestLayoutUpdate' do container
-     * @param {MouseEvent} e
+     * Handles the start of a vertical resize drag for this Row.
+     * @param {MouseEvent} e - The mousedown event.
+     * @returns {void}
      */
     startResize(e) {
         const me = this;
-        const container = me.state.parentContainer;
+        const container = me._state.parentContainer;
         if (!container) return;
 
         const rows = container.getRows();
@@ -202,163 +252,171 @@ export class Row {
 
         const onMove = ev => {
             const delta = ev.clientY - startY;
-            me.state.height = Math.max(me.getMinHeight(), startH + delta);
-            me.getThrottledUpdate()(); // Atualiza O(1)
+            me._state.height = Math.max(me.getMinHeight(), startH + delta);
+            me.getThrottledUpdate()(); // Updates style O(1)
         };
 
         const onUp = () => {
             window.removeEventListener('mousemove', onMove);
             window.removeEventListener('mouseup', onUp);
             me.getThrottledUpdate()?.cancel();
-            // (MODIFICADO) Delega ao LayoutService (via Container)
-            container.requestLayoutUpdate(); // Sincroniza O(N)
+            // Delegate layout sync to Container -> LayoutService
+            container.requestLayoutUpdate();
         };
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
     }
 
     /**
-     * Cria e insere uma nova Coluna.
-     * (MODIFICADO - CORREÇÃO) Usa lógica de 'sibling lookup'
+     * Creates and inserts a new Column component into this Row.
+     * @param {number|null} [width=null] - The initial width of the column.
+     * @param {number|null} [index=null] - The exact state array index to insert at.
+     * @returns {Column} The created Column instance.
      */
     createColumn(width = null, index = null) {
-        const column = new Column(this, width); // 'this' (Row) é o container da Coluna
+        const me = this;
+        const column = new Column(me, width);
 
-        // (INÍCIO DA CORREÇÃO)
         if (index === null) {
-            // Se o índice for nulo (fim da lista)
-            this.state.children.push(column);
-
-            // Insere ANTES do handle, ou no fim se não houver handle
-            const resizeHandle = this.element.querySelector('.row__resize-handle');
-            this.element.insertBefore(column.element, resizeHandle);
+            me._state.children.push(column);
+            const resizeHandle = me.element.querySelector('.row__resize-handle');
+            me.element.insertBefore(column.element, resizeHandle);
         } else {
-            // Se o índice for um número (ex: 0 ou 1)
-
-            // 1. Insere no array de estado
-            this.state.children.splice(index, 0, column);
-
-            // 2. Encontra o próximo irmão no *estado*
-            const nextSiblingColumn = this.state.children[index + 1];
-
-            // 3. Obtém o elemento DOM do próximo irmão
+            me._state.children.splice(index, 0, column);
+            const nextSiblingColumn = me._state.children[index + 1];
             let nextSiblingElement = nextSiblingColumn ? nextSiblingColumn.element : null;
 
-            // 4. Se não houver próximo irmão (inserindo no fim),
-            // devemos inserir antes do handle (se ele existir)
             if (!nextSiblingElement) {
-                const resizeHandle = this.element.querySelector('.row__resize-handle');
+                const resizeHandle = me.element.querySelector('.row__resize-handle');
                 if (resizeHandle) {
                     nextSiblingElement = resizeHandle;
                 }
             }
-
-            // 5. Insere no DOM. Se nextSiblingElement for null,
-            // 'insertBefore' age como 'appendChild'.
-            this.element.insertBefore(column.element, nextSiblingElement);
+            me.element.insertBefore(column.element, nextSiblingElement);
         }
-        // (FIM DA CORREÇÃO)
 
-        // (REMOVIDO - CORREÇÃO) 'updateAllResizeBars' movido para LayoutService
-        // this.updateAllResizeBars();
-        column.setParentContainer(this); // O pai da Coluna é a Row
-        // (MODIFICADO) Delega ao LayoutService
-        this.requestLayoutUpdate();
+        column.setParentContainer(me);
+        me.requestLayoutUpdate(); // Notifies LayoutService
         return column;
     }
 
     /**
-     * Exclui uma coluna.
+     * Deletes a child Column.
+     * @param {Column} column - The Column instance to remove.
+     * @returns {void}
      */
     deleteColumn(column) {
-        const index = this.state.children.indexOf(column);
+        const me = this;
+        const index = me._state.children.indexOf(column);
         if (index === -1) return;
-        if (!(this.state.children[index] instanceof Column)) return;
+        if (!(me._state.children[index] instanceof Column)) return;
 
         column.destroy();
-        const columnEl = this.state.children[index].element;
-        if (columnEl && this.element.contains(columnEl)) {
-            this.element.removeChild(columnEl);
+        const columnEl = me._state.children[index].element;
+        if (columnEl && me.element.contains(columnEl)) {
+            me.element.removeChild(columnEl);
         }
-        this.state.children.splice(index, 1);
-        // (MODIFICADO) Delega ao LayoutService
-        this.requestLayoutUpdate();
-        // (REMOVIDO - CORREÇÃO) 'updateAllResizeBars' movido para LayoutService
-        // this.updateAllResizeBars();
+        me._state.children.splice(index, 1);
+        me.requestLayoutUpdate(); // Notifies LayoutService
     }
 
+    /**
+     * Returns all child Column instances.
+     * @returns {Array<Column>}
+     */
     getColumns() {
-        return this.state.children;
+        return this._state.children;
     }
+
+    /**
+     * Returns the total number of child Columns.
+     * @returns {number}
+     */
     getTotalColumns() {
         return this.getColumns().length;
     }
+
+    /**
+     * Returns the first child Column. If none exists, creates one.
+     * @returns {Column}
+     */
     getFirstColumn() {
         const columns = this.getColumns();
         return columns[0] || this.createColumn();
     }
+
+    /**
+     * Returns the last child Column. If none exists, creates one.
+     * @returns {Column}
+     */
     getLastColumn() {
         const columns = this.getColumns();
         return columns[columns.length - 1] || this.createColumn();
     }
 
     /**
-     * (REMOVIDO) updateColumnsSizes() foi movido para o LayoutService.
-     */
-
-    /**
-     * (MODIFICADO) Contexto 11/12: Atualiza a altura CSS desta linha.
-     * @param {boolean} isLast - Se esta linha é a última.
+     * Updates the CSS flex properties based on the row's state.
+     * @param {boolean} isLast - True if this is the last Row in the Container.
+     * @returns {void}
      */
     updateHeight(isLast) {
+        const me = this;
         if (isLast) {
-            this.element.style.flex = `1 1 auto`;
-            this.state.height = null; // Garante que a última linha sempre preenche
-        } else if (this.state.height !== null) {
-            this.element.style.flex = `0 0 ${this.state.height}px`;
+            me.element.style.flex = '1 1 auto';
+            me._state.height = null;
+        } else if (me._state.height !== null) {
+            me.element.style.flex = `0 0 ${me._state.height}px`;
         } else {
-            // Se não for a última e não tiver altura,
-            // comporta-se como 'fills-space'
-            this.element.style.flex = `1 1 auto`;
+            me.element.style.flex = '1 1 auto';
         }
     }
 
+    /**
+     * Clears the Row, destroying and removing all child Columns.
+     * @returns {void}
+     */
     clear() {
-        this.element.innerHTML = '';
-        this.state.children = [];
+        const me = this;
+        [...me.getColumns()].forEach(column => {
+            me.deleteColumn(column);
+        });
+
+        me.element.innerHTML = '';
+        me._state.children = [];
     }
 
     /**
-     * (MODIFICADO) Contexto 11
+     * Serializes the Row state (and its child Columns) to JSON.
+     * @returns {object}
      */
     toJSON() {
         return {
-            height: this.state.height,
+            height: this._state.height,
             columns: this.getColumns().map(column => column.toJSON())
         };
     }
 
     /**
-     * (MODIFICADO) Contexto 11
+     * Deserializes state from JSON data.
+     * @param {object} data - The state object.
+     * @returns {void}
      */
     fromJSON(data) {
-        this.clear();
+        const me = this;
+        me.clear();
 
         if (data.height !== undefined) {
-            this.state.height = data.height;
+            me._state.height = data.height;
         }
 
         const columnsData = data.columns || [];
 
         columnsData.forEach(colData => {
-            const column = this.createColumn();
+            const column = me.createColumn();
             column.fromJSON(colData);
         });
 
-        // (MODIFICADO) Delega ao LayoutService
-        this.requestLayoutUpdate();
-        // (REMOVIDO - CORREÇÃO) 'updateAllResizeBars' movido para LayoutService
-        // this.updateAllResizeBars();
-        this.updateHeight(false); // Assume que não é a última
+        me.requestLayoutUpdate();
+        me.updateHeight(false);
     }
 }

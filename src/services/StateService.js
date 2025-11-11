@@ -1,8 +1,21 @@
 /**
- * Serviço responsável por persistir e restaurar o estado da aplicação.
- * (REFATORADO) Agora é um serviço genérico e passivo (Singleton) que
- * apenas lê e escreve no localStorage. A orquestração é feita pelo App.js.
- * (REFATORADO v2) Agora carrega o 'workspaces/default.json' como fallback.
+ * Description:
+ * A Singleton service responsible for persisting and restoring the application
+ * state (the layout workspace) to and from localStorage.
+ * It provides a fallback to load a default layout JSON if no saved
+ * state is found or if the saved data is corrupt.
+ *
+ * Properties summary:
+ * - _instance {StateService | null} : The private static instance for the Singleton.
+ *
+ * Typical usage:
+ * // In App.js
+ * const stateService = StateService.getInstance();
+ * const layout = await stateService.loadState('my_key');
+ * stateService.saveState('my_key', { layout: ... });
+ *
+ * Dependencies:
+ * - None (loads 'workspaces/default.json' via native fetch)
  */
 export class StateService {
     /**
@@ -23,7 +36,7 @@ export class StateService {
     }
 
     /**
-     * Obtém a instância Singleton do serviço.
+     * Gets the single instance of the StateService.
      * @returns {StateService}
      */
     static getInstance() {
@@ -34,70 +47,61 @@ export class StateService {
     }
 
     /**
-     * Carrega e analisa dados do localStorage, ou carrega o padrão
-     * de 'workspaces/default.json' como fallback.
-     * @param {string} key - A chave para buscar no localStorage.
-     * @returns {Promise<object | null>} O objeto de workspace analisado ou nulo se falhar.
+     * Loads and parses data from localStorage, or loads the default
+     * from 'workspaces/default.json' as a fallback.
+     * @param {string} key - The key to fetch from localStorage.
+     * @returns {Promise<object | null>} The parsed workspace object or null on failure.
      */
     async loadState(key) {
         const saved = localStorage.getItem(key);
 
         if (saved) {
             try {
-                // Tenta carregar do localStorage primeiro
                 return JSON.parse(saved);
             } catch (e) {
-                // Se estiver corrompido, loga o erro mas continua para carregar o padrão
                 console.error(
-                    'Falha ao carregar estado do localStorage (dados corrompidos). Carregando o padrão.',
+                    'Failed to parse state from localStorage (corrupted data). Loading default.',
                     e
                 );
-                // Continua para o fallback (abaixo)
             }
         }
 
-        // Se 'saved' for nulo ou corrompido, carrega o JSON padrão
         try {
-            // (ALTERADO DE WARN PARA INFO)
             console.info(
-                `StateService: Nenhum estado salvo encontrado (key: ${key}). Carregando 'workspaces/default.json'.`
+                `StateService: No saved state found (key: ${key}). Loading 'workspaces/default.json'.`
             );
 
-            // O caminho é relativo à raiz (index.html)
             const response = await fetch('workspaces/default.json');
 
             if (!response.ok) {
-                throw new Error(`Falha ao buscar default.json: ${response.statusText}`);
+                throw new Error(`Failed to fetch default.json: ${response.statusText}`);
             }
             const defaultWorkspace = await response.json();
             return defaultWorkspace;
         } catch (fetchError) {
-            console.error(
-                'Falha crítica ao carregar o workspace padrão (default.json).',
-                fetchError
-            );
-            return null; // A aplicação terá que lidar com um estado nulo
+            console.error('Critical failure loading default workspace (default.json).', fetchError);
+            return null;
         }
     }
 
     /**
-     * Salva dados no localStorage.
-     * (Obs: Este método não precisa mudar, pois ele salva
-     * qualquer objeto que o App.js enviar)
-     * @param {string} key - A chave para salvar.
-     * @param {object} data - O objeto (estado) a ser salvo (será stringificado).
+     * Saves data to localStorage.
+     * @param {string} key - The key to save under.
+     * @param {object} data - The state object to be stringified and saved.
+     * @returns {void}
      */
     saveState(key, data) {
         try {
             localStorage.setItem(key, JSON.stringify(data));
         } catch (e) {
-            console.error('Falha ao salvar estado no localStorage.', e);
+            console.error('Failed to save state to localStorage.', e);
         }
     }
 
     /**
-     * Remove uma chave do localStorage.
-     * @param {string} key - A chave a ser removida.
+     * Removes a key from localStorage.
+     * @param {string} key - The key to remove.
+     * @returns {void}
      */
     clearState(key) {
         localStorage.removeItem(key);

@@ -2,27 +2,43 @@ import { appBus } from '../../utils/EventBus.js';
 
 /**
  * Description:
- * Manages the global state and logic for drag-and-drop (D&D) operations.
+ * A Singleton service that manages the global state and logic for
+ * Drag-and-Drop (D&D) operations. It implements the Strategy pattern,
+ * delegating behavior to registered strategy classes (ColumnDropStrategy,
+ * RowDropStrategy, etc.) based on the 'dropZoneType' of the target.
  *
- * (Refatorado vPlan) Agora gere um *único* placeholder (this._placeholder)
- * e expõe métodos (show/hidePlaceholder) para que as Estratégias
- * controlem a sua aparência (horizontal vs. vertical).
+ * It also implements the "DOM Bridge" pattern for DND, attaching only 4
+ * native listeners to the document body and using event delegation
+ * to find the correct drop zone instance.
  *
- * (Refatorado vBugFix) Agora é responsável por limpar o cache
- * de todas as estratégias registadas no início e fim do D&D.
+ * Properties summary:
+ * - _instance {DragDropService | null} : The private static instance.
+ * - _dragState {object} : Stores the item, type, and element being dragged.
+ * - _placeholder {HTMLElement} : The single shared DOM element used for drop feedback.
+ * - _isDragging {boolean} : Flag indicating if a drag operation is active.
+ * - _placeholderMode {string | null} : Caches the current placeholder mode ('horizontal'/'vertical').
+ * - _strategyRegistry {Map} : Maps dropZoneType (string) to Strategy instances.
+ * - _namespace {string} : Unique namespace for appBus listeners.
  *
- * (Refatorado vBugFix 2) Agora armazena o 'element' explícito
- * no payload 'dragstart' para evitar aceder a 'item.element' (que
- * é 'undefined' para a classe Panel).
+ * Typical usage:
+ * // In App.js
+ * const dds = DragDropService.getInstance();
+ * dds.registerStrategy('column', new ColumnDropStrategy());
  *
- * (Refatorado vOpt 4) Agora armazena o _placeholderMode para
- * evitar escritas redundantes no DOM durante o 'dragover'.
+ * // In PanelHeader.js (Drag Source)
+ * appBus.emit('dragstart', { item: panel, type: 'Panel', ... });
  *
- * (REFATORADO vDND-Bridge) Esta classe agora anexa 4 listeners DND globais
- * ao document.body e usa 'event delegation' para encontrar a 'dropZoneInstance'
- * e chamar a Strategy apropriada.
+ * // In Column.js (Drop Target)
+ * this.dropZoneType = 'column';
+ * this.element.dataset.dropzone = 'column';
+ * this.element.dropZoneInstance = this;
  *
- * This is implemented as a Singleton.
+ * Events:
+ * - Listens to (appBus): 'dragstart', 'dragend'
+ *
+ * Dependencies:
+ * - utils/EventBus.js
+ * - (Strategies are injected by App.js)
  */
 export class DragDropService {
     /**
@@ -32,41 +48,61 @@ export class DragDropService {
     static _instance = null;
 
     /**
-     * (MODIFICADO) Armazena item, tipo E o elemento DOM.
+     * Stores the item, type, and element being dragged.
      * @type {{item: object | null, type: string | null, element: HTMLElement | null}}
      * @private
      */
-    _draggedData = { item: null, type: null, element: null };
+    _dragState = { item: null, type: null, element: null };
 
     /**
+     * The single shared DOM element for drop feedback.
      * @type {HTMLElement}
      * @private
      */
     _placeholder = null;
 
     /**
+     * Flag indicating if a drag operation is active.
      * @type {boolean}
      * @private
      */
     _isDragging = false;
 
     /**
-     * (NOVO - Otimização 4) Armazena o modo atual do placeholder
-     * para evitar escritas desnecessárias no DOM.
+     * Caches the current placeholder mode ('horizontal' | 'vertical')
+     * to avoid redundant DOM writes.
      * @type {'horizontal' | 'vertical' | null}
      * @private
      */
     _placeholderMode = null;
 
     /**
-     * Registro para o Strategy Pattern.
+     * Registry for the Strategy Pattern.
      * @type {Map<string, object>}
      * @private
      */
     _strategyRegistry = new Map();
 
     /**
-     * Private constructor for Singleton pattern.
+     * Unique namespace for appBus listeners.
+     * @type {string}
+     * @private
+     */
+    _namespace = 'dnd-service';
+
+    /**
+     * @type {Function | null}
+     * @private
+     */
+    _boundOnDragStart = null;
+
+    /**
+     * @type {Function | null}
+     * @private
+     */
+    _boundOnDragEnd = null;
+
+    /**
      * @private
      */
     constructor() {
@@ -76,8 +112,13 @@ export class DragDropService {
         }
         DragDropService._instance = this;
 
-        this._createPlaceholder();
-        this._initEventListeners();
+        const me = this;
+        me._createPlaceholder();
+
+        me._boundOnDragStart = me._onDragStart.bind(me);
+        me._boundOnDragEnd = me._onDragEnd.bind(me);
+
+        me._initEventListeners();
     }
 
     /**
@@ -91,71 +132,60 @@ export class DragDropService {
         return DragDropService._instance;
     }
 
-    // --- API Pública ---
-
     /**
-     * (MODIFICADO - Otimização 4)
-     * Esconde o placeholder, removendo-o do DOM e redefinindo
-     * as suas classes de modo (horizontal/vertical) e o cache de modo.
+     * Hides the placeholder by removing it from the DOM
+     * and resetting its state.
+     * @returns {void}
      */
     hidePlaceholder() {
-        if (this._placeholder.parentElement) {
-            this._placeholder.parentElement.removeChild(this._placeholder);
+        const me = this;
+        if (me._placeholder.parentElement) {
+            me._placeholder.parentElement.removeChild(me._placeholder);
         }
-        // Redefine para o estado base, removendo classes de modo
-        this._placeholder.className = 'container__placeholder';
-        // Redefine a altura que pode ter sido definida via JS (modo horizontal)
-        this._placeholder.style.height = '';
-        // (MODIFICADO) Reseta o cache de modo
-        this._placeholderMode = null;
+        me._placeholder.className = 'container__placeholder';
+        me._placeholder.style.height = '';
+        me._placeholderMode = null;
     }
 
     /**
-     * (MODIFICADO - Otimização 4)
-     * Prepara o placeholder para ser exibido num modo.
-     * Evita reescrever o DOM se o modo já estiver correto.
-     *
-     * @param {'horizontal' | 'vertical'} mode - O modo de exibição.
-     * @param {number | null} [height=null] - A altura (usada apenas no modo horizontal).
+     * Shows the placeholder in a specific mode ('horizontal' or 'vertical').
+     * @param {'horizontal' | 'vertical'} mode - The display mode.
+     * @param {number | null} [height=null] - The height (for horizontal mode).
+     * @returns {void}
      */
     showPlaceholder(mode, height = null) {
-        // (MODIFICADO) Otimização: Verifica se o modo já está aplicado
-        if (mode === this._placeholderMode) {
-            // Se o modo (horizontal) for o mesmo, apenas atualiza a altura se necessário
-            if (
-                mode === 'horizontal' &&
-                height &&
-                this._placeholder.style.height !== `${height}px`
-            ) {
-                this._placeholder.style.height = `${height}px`;
+        const me = this;
+        if (mode === me._placeholderMode) {
+            if (mode === 'horizontal' && height && me._placeholder.style.height !== `${height}px`) {
+                me._placeholder.style.height = `${height}px`;
             }
-            return; // Evita reescrever o className
+            return;
         }
 
-        // Se o modo for novo, redefine (hide) e aplica o novo modo
-        this.hidePlaceholder(); // hidePlaceholder agora define _placeholderMode = null
+        me.hidePlaceholder();
 
         if (mode === 'horizontal') {
-            this._placeholder.classList.add('container__placeholder--horizontal');
+            me._placeholder.classList.add('container__placeholder--horizontal');
             if (height) {
-                this._placeholder.style.height = `${height}px`;
+                me._placeholder.style.height = `${height}px`;
             }
         } else if (mode === 'vertical') {
-            this._placeholder.classList.add('container__placeholder--vertical');
+            me._placeholder.classList.add('container__placeholder--vertical');
         }
 
-        // (MODIFICADO) Armazena o novo modo
-        this._placeholderMode = mode;
+        me._placeholderMode = mode;
     }
 
     /**
-     * Registra uma estratégia de D&D para um tipo de zona de soltura.
-     * @param {string} dropZoneType - O identificador (ex: 'column').
-     * @param {object} strategyInstance - A instância da classe de estratégia.
+     * Registers a DND strategy for a specific drop zone type.
+     * @param {string} dropZoneType - The identifier (e.g., 'column').
+     * @param {object} strategyInstance - The instance of the strategy class.
+     * @returns {void}
      */
     registerStrategy(dropZoneType, strategyInstance) {
+        const me = this;
         if (!dropZoneType) {
-            console.warn('DragDropService: Tentativa de registrar estratégia sem dropZoneType.');
+            console.warn('DragDropService: Attempted to register strategy without dropZoneType.');
             return;
         }
         if (
@@ -163,31 +193,32 @@ export class DragDropService {
             (typeof strategyInstance.handleDrop !== 'function' &&
                 typeof strategyInstance.handleDragOver !== 'function')
         ) {
-            console.warn(`DragDropService: Estratégia inválida para "${dropZoneType}".`);
+            console.warn(`DragDropService: Invalid strategy for "${dropZoneType}".`);
             return;
         }
-        this._strategyRegistry.set(dropZoneType, strategyInstance);
+        me._strategyRegistry.set(dropZoneType, strategyInstance);
     }
 
     /**
-     * Remove o registro de uma estratégia.
-     * @param {string} dropZoneType - O identificador (ex: 'column').
+     * Removes a strategy from the registry.
+     * @param {string} dropZoneType - The identifier (e.g., 'column').
+     * @returns {void}
      */
     unregisterStrategy(dropZoneType) {
         this._strategyRegistry.delete(dropZoneType);
     }
 
     /**
-     * (MODIFICADO) Returns o objeto de dados (item, tipo, elemento).
+     * <DraggedData> getter.
      * @returns {{item: object | null, type: string | null, element: HTMLElement | null}}
      */
     getDraggedData() {
-        return this._draggedData;
+        return this._dragState;
     }
 
     /**
-     * Returns the shared placeholder DOM element.
-     * @returns {HTMLElement}
+     * <Placeholder> getter.
+     * @returns {HTMLElement} The shared placeholder DOM element.
      */
     getPlaceholder() {
         return this._placeholder;
@@ -201,46 +232,55 @@ export class DragDropService {
         return this._isDragging;
     }
 
-    // (INÍCIO DA MODIFICAÇÃO - Etapa 5)
-    // (REMOVIDO) Métodos handleDragEnter, handleDragOver, handleDragLeave, handleDrop
-    // (FIM DA MODIFICAÇÃO)
+    /**
+     * Cleans up all appBus listeners.
+     * @returns {void}
+     */
+    destroy() {
+        const me = this;
+        appBus.offByNamespace(me._namespace);
+        // Note: Native DOM listeners on document.body are not removed by this,
+        // as the service is intended to live for the app's entire lifecycle.
+        // A full teardown would require removing them.
+    }
 
-    // --- Métodos Privados ---
-
+    /**
+     * Creates the shared placeholder element.
+     * @private
+     * @returns {void}
+     */
     _createPlaceholder() {
         this._placeholder = document.createElement('div');
         this._placeholder.classList.add('container__placeholder');
     }
 
     /**
-     * (MODIFICADO - Etapa 5) Anexa listeners ao appBus e os listeners DND
-     * unificados ao document.body.
+     * Attaches listeners to the appBus and native DND events on the body.
+     * @private
+     * @returns {void}
      */
     _initEventListeners() {
-        appBus.on('dragstart', this._onDragStart.bind(this));
-        appBus.on('dragend', this._onDragEnd.bind(this));
+        const me = this;
+        const options = { namespace: me._namespace };
+        appBus.on('dragstart', me._boundOnDragStart, options);
+        appBus.on('dragend', me._boundOnDragEnd, options);
 
-        // (INÍCIO DA MODIFICAÇÃO - Etapa 5)
-        // Anexa os listeners unificados ao body
         const rootElement = document.body;
-        rootElement.addEventListener('dragenter', this._onNativeDragEnter.bind(this));
-        rootElement.addEventListener('dragover', this._onNativeDragOver.bind(this));
-        rootElement.addEventListener('dragleave', this._onNativeDragLeave.bind(this));
-        rootElement.addEventListener('drop', this._onNativeDrop.bind(this));
-        // (FIM DA MODIFICAÇÃO)
+        rootElement.addEventListener('dragenter', me._onNativeDragEnter.bind(me));
+        rootElement.addEventListener('dragover', me._onNativeDragOver.bind(me));
+        rootElement.addEventListener('dragleave', me._onNativeDragLeave.bind(me));
+        rootElement.addEventListener('drop', me._onNativeDrop.bind(me));
     }
 
-    // (INÍCIO DA MODIFICAÇÃO - Etapa 5)
-    // --- Handlers Nativos Unificados (DOM Bridge) ---
-
     /**
-     * (NOVO - Etapa 5) Handler unificado para 'dragenter'.
-     * Encontra a dropzone e delega para a estratégia.
+     * Unified native 'dragenter' handler (DOM Bridge).
      * @param {DragEvent} e
      * @private
+     * @returns {void}
      */
     _onNativeDragEnter(e) {
-        if (!this.isDragging()) return;
+        const me = this;
+        if (!me.isDragging()) return;
 
         const dropZoneElement = e.target.closest('[data-dropzone]');
         if (!dropZoneElement || !dropZoneElement.dropZoneInstance) {
@@ -248,102 +288,105 @@ export class DragDropService {
         }
 
         const dropZoneInstance = dropZoneElement.dropZoneInstance;
-        const strategy = this._strategyRegistry.get(dropZoneInstance.dropZoneType);
+        const strategy = me._strategyRegistry.get(dropZoneInstance.dropZoneType);
 
         if (strategy && typeof strategy.handleDragEnter === 'function') {
             e.preventDefault();
             e.stopPropagation();
-            strategy.handleDragEnter(e, dropZoneInstance, this.getDraggedData(), this);
+            strategy.handleDragEnter(e, dropZoneInstance, me.getDraggedData(), me);
         }
     }
 
     /**
-     * (NOVO - Etapa 5) Handler unificado para 'dragover'.
-     * Encontra a dropzone e delega para a estratégia.
+     * Unified native 'dragover' handler (DOM Bridge).
      * @param {DragEvent} e
      * @private
+     * @returns {void}
      */
     _onNativeDragOver(e) {
-        if (!this.isDragging()) return;
+        const me = this;
+        if (!me.isDragging()) return;
 
         const dropZoneElement = e.target.closest('[data-dropzone]');
         if (!dropZoneElement || !dropZoneElement.dropZoneInstance) {
-            this.hidePlaceholder(); // Oculta se estiver sobre uma área não-drop
+            me.hidePlaceholder();
             return;
         }
 
         const dropZoneInstance = dropZoneElement.dropZoneInstance;
-        const strategy = this._strategyRegistry.get(dropZoneInstance.dropZoneType);
-        // console.info(dropZoneInstance.dropZoneType);
+        const strategy = me._strategyRegistry.get(dropZoneInstance.dropZoneType);
 
         if (strategy && typeof strategy.handleDragOver === 'function') {
             e.preventDefault();
             e.stopPropagation();
-            strategy.handleDragOver(e, dropZoneInstance, this.getDraggedData(), this);
+            strategy.handleDragOver(e, dropZoneInstance, me.getDraggedData(), me);
         } else {
-            this.hidePlaceholder(); // Oculta se a estratégia for inválida
+            me.hidePlaceholder();
         }
     }
 
     /**
-     * (NOVO - Etapa 5) Handler unificado para 'dragleave'.
-     * Encontra a dropzone e delega para a estratégia.
+     * Unified native 'dragleave' handler (DOM Bridge).
      * @param {DragEvent} e
      * @private
+     * @returns {void}
      */
     _onNativeDragLeave(e) {
-        if (!this.isDragging()) return;
+        const me = this;
+        if (!me.isDragging()) return;
 
-        // e.target é o elemento que o mouse acabou de sair
         const dropZoneElement = e.target.closest('[data-dropzone]');
-
-        // Se saímos de um elemento que não é um dropzone (ou filho), ignora
         if (!dropZoneElement || !dropZoneElement.dropZoneInstance) {
             return;
         }
 
         const dropZoneInstance = dropZoneElement.dropZoneInstance;
-        const strategy = this._strategyRegistry.get(dropZoneInstance.dropZoneType);
+        const strategy = me._strategyRegistry.get(dropZoneInstance.dropZoneType);
 
         if (strategy && typeof strategy.handleDragLeave === 'function') {
             e.preventDefault();
             e.stopPropagation();
-            // A estratégia (ex: ColumnDropStrategy) fará a verificação do relatedTarget
-            strategy.handleDragLeave(e, dropZoneInstance, this.getDraggedData(), this);
+            strategy.handleDragLeave(e, dropZoneInstance, me.getDraggedData(), me);
         }
     }
 
     /**
-     * (NOVO - Etapa 5) Handler unificado para 'drop'.
-     * Encontra a dropzone e delega para a estratégia.
+     * Unified native 'drop' handler (DOM Bridge).
      * @param {DragEvent} e
      * @private
+     * @returns {void}
      */
     _onNativeDrop(e) {
-        if (!this.isDragging()) return;
+        const me = this;
+        if (!me.isDragging()) return;
 
         const dropZoneElement = e.target.closest('[data-dropzone]');
         if (!dropZoneElement || !dropZoneElement.dropZoneInstance) {
-            this.hidePlaceholder(); // Garante que o placeholder suma
+            me.hidePlaceholder();
             return;
         }
 
         const dropZoneInstance = dropZoneElement.dropZoneInstance;
-        const strategy = this._strategyRegistry.get(dropZoneInstance.dropZoneType);
+        const strategy = me._strategyRegistry.get(dropZoneInstance.dropZoneType);
 
         if (strategy && typeof strategy.handleDrop === 'function') {
             e.preventDefault();
             e.stopPropagation();
-            strategy.handleDrop(e, dropZoneInstance, this.getDraggedData(), this);
+            strategy.handleDrop(e, dropZoneInstance, me.getDraggedData(), me);
         } else {
-            this.hidePlaceholder(); // Garante que o placeholder suma
+            me.hidePlaceholder();
         }
     }
-    // (FIM DA MODIFICAÇÃO)
 
+    /**
+     * Clears the cache of all registered strategies.
+     * @private
+     * @returns {void}
+     */
     _clearStrategyCaches() {
-        if (!this._strategyRegistry) return;
-        for (const strategy of this._strategyRegistry.values()) {
+        const me = this;
+        if (!me._strategyRegistry) return;
+        for (const strategy of me._strategyRegistry.values()) {
             if (strategy && typeof strategy.clearCache === 'function') {
                 strategy.clearCache();
             }
@@ -351,52 +394,47 @@ export class DragDropService {
     }
 
     /**
-     * (MODIFICADO) Handles o 'dragstart' e armazena o TIPO e o ELEMENTO.
-     * @param {object} payload - { item: Panel|PanelGroup, type: string, element: HTMLElement, event: DragEvent }.
+     * Handles the 'dragstart' event from the appBus.
+     * @param {object} payload - { item, type, element, event }.
      * @private
+     * @returns {void}
      */
     _onDragStart(payload) {
-        // (MODIFICADO) Verifica também o 'element'
+        const me = this;
         if (!payload || !payload.item || !payload.element) return;
 
-        this._clearStrategyCaches();
+        me._clearStrategyCaches();
 
-        // (MODIFICADO) Desestrutura o 'element'
         const { item, type, element, event: e } = payload;
 
-        // 1. Definir Estado
-        this._draggedData.item = item;
-        this._draggedData.type = type || null;
-        this._draggedData.element = element; // (NOVO) Armazena o elemento
-        this._isDragging = true;
+        me._dragState.item = item;
+        me._dragState.type = type || null;
+        me._dragState.element = element;
+        me._isDragging = true;
 
-        // 2. Aplicar lógica de D&D
         e.dataTransfer.setData('text/plain', '');
         e.dataTransfer.dropEffect = 'move';
-
-        // (MODIFICADO - CORREÇÃO) Usa o 'element' do payload
         element.classList.add('dragging');
-        // (MODIFICADO - CORREÇÃO) Usa o 'element' do payload
         e.dataTransfer.setDragImage(element, 20, 20);
     }
 
     /**
-     * (MODIFICADO) Handles o 'dragend' e limpa o objeto _draggedData.
+     * Handles the 'dragend' event from the appBus.
      * @private
+     * @returns {void}
      */
     _onDragEnd() {
-        this.hidePlaceholder();
-        this._clearStrategyCaches();
+        const me = this;
+        me.hidePlaceholder();
+        me._clearStrategyCaches();
 
-        // (MODIFICADO - CORREÇÃO) Usa o 'element' armazenado
-        if (this._draggedData.element) {
-            this._draggedData.element.classList.remove('dragging');
+        if (me._dragState.element) {
+            me._dragState.element.classList.remove('dragging');
         }
 
-        // Resetar Estado
-        this._draggedData.item = null;
-        this._draggedData.type = null;
-        this._draggedData.element = null; // (NOVO) Limpa o elemento
-        this._isDragging = false;
+        me._dragState.item = null;
+        me._dragState.type = null;
+        me._dragState.element = null;
+        me._isDragging = false;
     }
 }

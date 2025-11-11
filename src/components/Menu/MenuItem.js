@@ -1,6 +1,34 @@
 import { Submenu } from './Submenu.js';
 import { appBus } from '../../utils/EventBus.js';
 
+/**
+ * Description:
+ * Represents a single clickable item within a Menu or Submenu.
+ * It handles its own rendering (title, arrow), click/hover logic,
+ * and the creation of its Submenu if it has children.
+ *
+ * Properties summary:
+ * - itemData {object} : The raw configuration object for this item.
+ * - level {number} : The depth level of this item (1 for top-level).
+ * - element {HTMLElement} : The main <li> DOM element.
+ * - title {HTMLElement} : The <div> element holding the title.
+ * - arrow {HTMLElement} : The <span> element for the submenu arrow.
+ * - submenu {Submenu} : The Submenu instance (if children exist).
+ *
+ * Typical usage:
+ * // Instantiated by Menu.js or Submenu.js
+ * const mi = new MenuItem(itemData, 1);
+ * parentElement.appendChild(mi.element);
+ *
+ * Events:
+ * - Emits (appBus): 'app:add-new-panel' (or other custom event from itemData.event)
+ * - Emits (appBus): 'menu:item-selected'
+ * - Emits (appBus): 'menu:close-siblings'
+ *
+ * Dependencies:
+ * - ./Submenu.js
+ * - ../../utils/EventBus.js
+ */
 export class MenuItem {
     constructor(itemData, level = 1) {
         this.itemData = itemData;
@@ -10,7 +38,6 @@ export class MenuItem {
 
         this.title = document.createElement('div');
         this.title.classList.add('menu__title');
-        // O 'title' aqui já virá processado (traduzido) pela classe Menu.js
         this.title.textContent = itemData.title;
 
         this.element.appendChild(this.title);
@@ -22,7 +49,6 @@ export class MenuItem {
 
             this.element.appendChild(this.arrow);
 
-            // Nota: O 'Submenu' irá processar os 'children' recursivamente
             this.submenu = new Submenu(itemData.children, this.level + 1);
             this.element.appendChild(this.submenu.element);
             this.element.classList.add('menu__item--has-submenu');
@@ -31,62 +57,90 @@ export class MenuItem {
         this.initListeners();
     }
 
+    /**
+     * Initializes event listeners based on whether the item is a
+     * command (has callback/event) or a dropdown (has children).
+     * @returns {void}
+     */
     initListeners() {
-        // (MODIFICADO) Verifica se o item tem uma 'callback' ou 'event'
-        if (this.itemData.callback || this.itemData.event) {
-            this.element.addEventListener('click', this.handleClick.bind(this));
-        } else if (this.itemData.children) {
-            const isTopLevel = this.level === 1;
+        const me = this;
+        if (me.itemData.callback || me.itemData.event) {
+            me.element.addEventListener('click', me.handleClick.bind(me));
+        } else if (me.itemData.children) {
+            const isTopLevel = me.level === 1;
 
             if (isTopLevel) {
-                this.element.addEventListener('click', this.handleTopLevelClick.bind(this));
-                this.element.addEventListener('mouseenter', this.handleTopLevelHover.bind(this));
+                me.element.addEventListener('click', me.handleTopLevelClick.bind(me));
+                me.element.addEventListener('mouseenter', me.handleTopLevelHover.bind(me));
             } else {
-                this.element.addEventListener('mouseenter', this.handleSubmenuHover.bind(this));
+                me.element.addEventListener('mouseenter', me.handleSubmenuHover.bind(me));
             }
         }
     }
 
+    /**
+     * Handles hover on a top-level (L1) menu item.
+     * If another menu is already open, this will open this item's menu.
+     * @param {MouseEvent} e
+     * @returns {void}
+     */
     handleTopLevelHover(e) {
-        const menuContainer = this.element.parentElement;
+        const me = this;
+        const menuContainer = me.element.parentElement;
         const isAnyTopLevelOpen = menuContainer.querySelector('.menu__item--open');
 
         if (isAnyTopLevelOpen) {
             e.stopPropagation();
-            if (!this.element.classList.contains('menu__item--open')) {
-                appBus.emit('menu:close-siblings', this.element);
-                this.element.classList.add('menu__item--open');
+            if (!me.element.classList.contains('menu__item--open')) {
+                appBus.emit('menu:close-siblings', me.element);
+                me.element.classList.add('menu__item--open');
             }
         }
     }
 
+    /**
+     * Handles click on a top-level (L1) menu item (to toggle its submenu).
+     * @param {MouseEvent} e
+     * @returns {void}
+     */
     handleTopLevelClick(e) {
+        const me = this;
         e.stopPropagation();
 
-        appBus.emit('menu:close-siblings', this.element);
-        this.element.classList.toggle('menu__item--open');
+        appBus.emit('menu:close-siblings', me.element);
+        me.element.classList.toggle('menu__item--open');
     }
 
+    /**
+     * Handles hover on a non-top-level (L2+) menu item.
+     * @param {MouseEvent} e
+     * @returns {void}
+     */
     handleSubmenuHover(e) {
+        const me = this;
         e.stopPropagation();
 
-        this.element.parentElement.querySelectorAll('.menu__item--open').forEach(sibling => {
-            if (sibling !== this.element) {
+        me.element.parentElement.querySelectorAll('.menu__item--open').forEach(sibling => {
+            if (sibling !== me.element) {
                 sibling.classList.remove('menu__item--open');
             }
         });
-        this.element.classList.add('menu__item--open');
+        me.element.classList.add('menu__item--open');
     }
 
+    /**
+     * Handles a click on a final command item (an item with an action).
+     * @param {MouseEvent} e
+     * @returns {void}
+     */
     handleClick(e) {
+        const me = this;
         e.stopPropagation();
 
-        // (MODIFICADO) Lógica para suportar 'callback' (função) ou 'event' (string)
-        // Damos prioridade ao 'callback' se ambos forem definidos.
-        if (typeof this.itemData.callback === 'function') {
-            this.itemData.callback();
-        } else if (this.itemData.event) {
-            appBus.emit(this.itemData.event);
+        if (typeof me.itemData.callback === 'function') {
+            me.itemData.callback();
+        } else if (me.itemData.event) {
+            appBus.emit(me.itemData.event);
         }
 
         appBus.emit('menu:item-selected');

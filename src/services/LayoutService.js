@@ -6,21 +6,37 @@ import { appBus } from '../utils/EventBus.js';
 /**
  * Description:
  * A Singleton service responsible for managing and applying complex layout
- * rules, such as determining which panel fills remaining space or enforcing
- * collapse/uncollapse logic.
- *
- * (Refatorado) Agora também é responsável por aplicar a lógica "fills-space"
- * para Linhas (Rows) e Colunas (Columns), centralizando toda a lógica de layout.
+ * rules that components cannot manage on their own (e.g., rules that
+ * depend on siblings). It listens to appBus events and orchestrates
+ * layout updates.
  *
  * Properties summary:
  * - _instance {LayoutService | null} : The private static instance for the Singleton.
+ * - _namespace {string} : Unique namespace for appBus listeners.
  *
  * Typical usage:
  * // In App.js (on init):
  * LayoutService.getInstance();
  *
- * // In components (e.g., Column.js / PanelGroup.js):
- * appBus.emit('layout:panel-groups-changed', { source: this });
+ * // Components emit events:
+ * appBus.emit('layout:columns-changed', this);
+ *
+ * Events:
+ * - Listens to: 'layout:panel-groups-changed'
+ * - Listens to: 'layout:rows-changed'
+ * - Listens to: 'layout:columns-changed'
+ *
+ * Business rules implemented:
+ * - Applies 'fills-space' logic to the last Row in a Container.
+ * - Applies 'fills-space' logic to the last Column in a Row.
+ * - Applies 'fills-space' logic to the last *visible* PanelGroup in a Column.
+ * - Enforces that at least one PanelGroup in a Column is visible.
+ *
+ * Dependencies:
+ * - ../components/Column/Column.js
+ * - ../components/Container/Container.js
+ * - ../components/Row/Row.js
+ * - ../utils/EventBus.js
  */
 export class LayoutService {
     /**
@@ -30,7 +46,31 @@ export class LayoutService {
     static _instance = null;
 
     /**
-     * Private constructor for Singleton pattern.
+     * Unique namespace for appBus listeners.
+     * @type {string}
+     * @private
+     */
+    _namespace = 'layout-service';
+
+    /**
+     * @type {Function | null}
+     * @private
+     */
+    _boundOnPanelGroupsChanged = null;
+
+    /**
+     * @type {Function | null}
+     * @private
+     */
+    _boundOnRowsChanged = null;
+
+    /**
+     * @type {Function | null}
+     * @private
+     */
+    _boundOnColumnsChanged = null;
+
+    /**
      * @private
      */
     constructor() {
@@ -39,7 +79,13 @@ export class LayoutService {
             return LayoutService._instance;
         }
         LayoutService._instance = this;
-        this._initEventListeners();
+
+        const me = this;
+        me._boundOnPanelGroupsChanged = me._onPanelGroupsChanged.bind(me);
+        me._boundOnRowsChanged = me._onRowsChanged.bind(me);
+        me._boundOnColumnsChanged = me._onColumnsChanged.bind(me);
+
+        me._initEventListeners();
     }
 
     /**
@@ -56,22 +102,31 @@ export class LayoutService {
     /**
      * Subscribes to layout-related events on the appBus.
      * @private
+     * @returns {void}
      */
     _initEventListeners() {
-        // (RENOMEADO) Ouve o evento específico para PanelGroups
-        appBus.on('layout:panel-groups-changed', this._onPanelGroupsChanged.bind(this));
-        // (NOVO) Ouve o evento para Rows (Vertical no Container)
-        appBus.on('layout:rows-changed', this._onRowsChanged.bind(this));
-        // (NOVO) Ouve o evento para Columns (Horizontal na Row)
-        appBus.on('layout:columns-changed', this._onColumnsChanged.bind(this));
+        const me = this;
+        const options = { namespace: me._namespace };
+
+        appBus.on('layout:panel-groups-changed', me._boundOnPanelGroupsChanged, options);
+        appBus.on('layout:rows-changed', me._boundOnRowsChanged, options);
+        appBus.on('layout:columns-changed', me._boundOnColumnsChanged, options);
     }
 
     /**
-     * (NOVO) Handles the 'layout:rows-changed' event (Vertical).
-     * Lógica movida de Container.js -> updateRowsHeights()
-     *
-     * @param {Container} container - O Container que precisa de atualização.
+     * Cleans up all appBus listeners.
+     * @returns {void}
+     */
+    destroy() {
+        const me = this;
+        appBus.offByNamespace(me._namespace);
+    }
+
+    /**
+     * Handles the 'layout:rows-changed' event (Vertical).
+     * @param {Container} container - The Container needing an update.
      * @private
+     * @returns {void}
      */
     _onRowsChanged(container) {
         if (!container || !(container instanceof Container)) {
@@ -86,11 +141,10 @@ export class LayoutService {
     }
 
     /**
-     * (NOVO) Handles the 'layout:columns-changed' event (Horizontal).
-     * Lógica movida de Row.js -> updateColumnsSizes()
-     *
-     * @param {Row} row - A Row que precisa de atualização.
+     * Handles the 'layout:columns-changed' event (Horizontal).
+     * @param {Row} row - The Row needing an update.
      * @private
+     * @returns {void}
      */
     _onColumnsChanged(row) {
         if (!row || !(row instanceof Row)) {
@@ -100,30 +154,29 @@ export class LayoutService {
 
         const columns = row.getColumns();
         columns.forEach((column, idx) => {
-            column.updateWidth(idx === columns.length - 1);
+            // (CORREÇÃO vDND-Bug-Resize)
+            // This service is now the source of truth for both width AND resize bars.
+            const isLast = idx === columns.length - 1;
+            column.updateWidth(isLast);
+            column.addResizeBars(isLast);
         });
     }
 
     /**
-     * (RENOMEADO) Handles the specific 'layout:panel-groups-changed' event.
-     * Receives the Column instance directly from the event emitter.
-     *
+     * Handles the 'layout:panel-groups-changed' event (Vertical in Column).
      * @param {Column} column - The column instance needing a layout update.
      * @private
+     * @returns {void}
      */
     _onPanelGroupsChanged(column) {
         if (!column || !(column instanceof Column)) {
-            // Validação centralizada para garantir que encontramos uma coluna válida
             console.warn(
                 'LayoutService: "_onPanelGroupsChanged" received an invalid column object.'
             );
             return;
         }
 
-        // 1. Enforce collapse rules first
         this._checkPanelsGroupsCollapsed(column);
-
-        // 2. Apply sizing rules (like fills-space)
         this._updatePanelGroupsSizes(column);
     }
 
@@ -131,11 +184,11 @@ export class LayoutService {
      * Ensures at least one PanelGroup is visible in a column.
      * @param {Column} column - The column to check.
      * @private
+     * @returns {void}
      */
     _checkPanelsGroupsCollapsed(column) {
         const panelGroups = column.getPanelGroups();
-
-        const uncollapsedGroups = panelGroups.filter(p => !p.state.collapsed);
+        const uncollapsedGroups = panelGroups.filter(p => !p._state.collapsed);
         const totalGroups = panelGroups.length;
 
         if (uncollapsedGroups.length === 0 && totalGroups > 0) {
@@ -146,22 +199,21 @@ export class LayoutService {
     /**
      * Recalculates sizes and applies 'panel-group--fills-space'
      * to the correct PanelGroup in a column.
-     * (Logic moved from Column.js)
-     * Esta versão usa 1 filter + 1 forEach (em vez de 1 filter + 2 forEach).
      * @param {Column} column - The column to update.
      * @private
+     * @returns {void}
      */
     _updatePanelGroupsSizes(column) {
         const panelGroups = column.getPanelGroups();
 
-        const uncollapsedPanelGroups = panelGroups.filter(p => !p.state.collapsed);
+        const uncollapsedPanelGroups = panelGroups.filter(p => !p._state.collapsed);
         const lastUncollapsedGroup = uncollapsedPanelGroups[uncollapsedPanelGroups.length - 1];
 
         panelGroups.forEach(panel => {
             const shouldFillSpace = panel === lastUncollapsedGroup;
 
             if (shouldFillSpace) {
-                panel.state.height = null;
+                panel._state.height = null;
                 panel.element.classList.add('panel-group--fills-space');
             } else {
                 panel.element.classList.remove('panel-group--fills-space');

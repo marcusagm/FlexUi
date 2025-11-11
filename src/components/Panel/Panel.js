@@ -4,199 +4,268 @@ import { appBus } from '../../utils/EventBus.js';
 
 /**
  * Description:
- * A classe base para um Painel de conteúdo.
+ * The base class for a content Panel.
+ * This class is an abstract controller and not a direct DOM element.
+ * It manages its two child UI components:
+ * 1. this._state.header (PanelHeader instance - the "tab" or "header")
+ * 2. this._state.content (PanelContent instance - the "content area")
  *
- * (Refatorado vArch) Esta classe já não é um elemento DOM.
- * É um controlador autocontido que GERE os seus dois componentes DOM:
- * 1. this.header (instância de PanelHeader - a "aba" ou "cabeçalho")
- * 2. this.content (instância de PanelContent - o "conteúdo")
+ * The parent PanelGroup is responsible for orchestrating *where* these
+ * two elements are attached in the final DOM.
  *
- * O PanelGroup (pai) é responsável por orquestrar ONDE
- * estes dois elementos são anexados.
+ * Properties summary:
+ * - _state {object} : Manages child components and configuration.
+ * - id {string} : A unique ID for this panel instance.
  *
- * (Refatorado vBugFix) Corrige o vazamento de listeners do appBus
- * (removendo o listener 'panel:close-request' que era inútil).
+ * Typical usage:
+ * // This is an abstract class; typically you would extend it.
+ * class MyPanel extends Panel {
+ * populateContent() {
+ * this.getContentElement().innerHTML = 'Hello World';
+ * }
+ * }
+ *
+ * Events:
+ * - Emits: 'panel:group-child-close-request' (via 'close()' method)
+ *
+ * Dependencies:
+ * - ./PanelContent.js
+ * - ./PanelHeader.js
+ * - ../../utils/EventBus.js
  */
 export class Panel {
-    state = {
-        parentGroup: null, // O PanelGroup pai
-        header: null, // (NOVO) A instância do PanelHeader
-        content: null, // (MODIFICADO) A instância do PanelContent
-        height: null, // Altura preferida (se definida)
-        minHeight: 100, // Altura mínima do conteúdo
+    /**
+     * @type {{
+     * parentGroup: import('./PanelGroup.js').PanelGroup | null,
+     * header: PanelHeader | null,
+     * content: PanelContent | null,
+     * height: number | null,
+     * minHeight: number,
+     * closable: boolean,
+     * collapsible: boolean,
+     * movable: boolean,
+     * hasTitle: boolean,
+     * title: string | null
+     * }}
+     * @private
+     */
+    _state = {
+        parentGroup: null,
+        header: null,
+        content: null,
+        height: null,
+        minHeight: 100,
         closable: true,
         collapsible: true,
-        movable: true, // Se a aba pode ser arrastada
+        movable: true,
         hasTitle: true,
         title: null
     };
 
-    // ID único para o PanelGroup gerenciar as abas
+    /**
+     * Unique ID for the Panel, used by PanelGroup to manage tabs.
+     * @type {string}
+     * @public
+     */
     id = Math.random().toString(36).substring(2, 9) + Date.now();
 
+    /**
+     * @param {string} title - The initial title for the panel header/tab.
+     * @param {number|null} [height=null] - The preferred height.
+     * @param {object} [config={}] - Configuration overrides (closable, movable, etc.).
+     */
     constructor(title, height = null, config = {}) {
-        Object.assign(this.state, config);
+        const me = this;
+        Object.assign(me._state, config);
 
-        // (MODIFICADO) Instancia o seu controlador de conteúdo
-        this.state.content = new PanelContent();
-
-        // (REMOVIDO) this.element = document.createElement('div');
-        // (REMOVIDO) this.element.classList.add('panel', 'panel-group__child');
+        me._state.content = new PanelContent();
 
         const panelTitle = title !== undefined && title !== null ? String(title) : '';
-        this.state.hasTitle = panelTitle.length > 0;
-        this.state.title = panelTitle;
+        me._state.hasTitle = panelTitle.length > 0;
+        me._state.title = panelTitle;
 
-        // (NOVO) Instancia o seu próprio cabeçalho/aba (Etapa 2)
-        this.state.header = new PanelHeader(this, panelTitle);
+        me._state.header = new PanelHeader(me, panelTitle);
 
         if (height !== null) {
-            this.state.height = height;
+            me._state.height = height;
         }
 
-        this.build();
-        this.populateContent();
-        // (REMOVIDO) initEventListeners() foi removido
+        me.build();
+        me.populateContent();
     }
 
     /**
-     * (NOVO) Retorna o identificador de tipo estático para o PanelFactory.
+     * <panelType> static getter.
+     * Used by PanelFactory to identify this class type.
      * @returns {string}
      */
     static get panelType() {
         return 'Panel';
     }
 
-    // (MODIFICADO) Já não é relevante, pois o cabeçalho é um componente separado
-    getHeaderHeight() {
-        return this.state.header ? this.state.header.element.offsetHeight : 0;
+    /**
+     * <HeaderHeight> getter.
+     * @returns {number} The pixel height of the header component.
+     */
+    get getHeaderHeight() {
+        return this._state.header ? this._state.header.element.offsetHeight : 0;
     }
 
+    /**
+     * <MinPanelHeight> getter.
+     * @returns {number} The minimum height for the panel's content area.
+     */
     getMinPanelHeight() {
-        return Math.max(0, this.state.minHeight);
+        return Math.max(0, this._state.minHeight);
     }
 
     /**
-     * (REMOVIDO) initEventListeners()
+     * Cleans up child components.
+     * @returns {void}
      */
-
-    /**
-     * (REMOVIDO) onCloseRequest()
-     */
-
     destroy() {
-        // (REMOVIDO) appBus.off('panel:close-request', ...)
-        // (NOVO) Garante que o header também é limpo (ex: listeners D&D)
-        if (this.state.header && typeof this.state.header.destroy === 'function') {
-            this.state.header.destroy();
+        const me = this;
+        if (me._state.header && typeof me._state.header.destroy === 'function') {
+            me._state.header.destroy();
         }
     }
 
     /**
-     * (MODIFICADO) A construção agora é mínima.
-     * O PanelGroup fará a anexação.
+     * Builds the panel's internal structure.
+     * @returns {void}
      */
     build() {
-        // (REMOVIDO) this.element.append(this.state.content.element);
         this.updateHeight();
     }
 
     /**
+     * Abstract method. Subclasses must implement this to populate
+     * the panel's content element.
      * @abstract
+     * @returns {void}
+     * @throws {Error}
      */
-    populateContent() {}
-
-    setContent(htmlString) {
-        this.state.content.element.innerHTML = htmlString;
+    populateContent() {
+        throw new Error(
+            'Panel.populateContent() is abstract and must be implemented by a subclass.'
+        );
     }
 
     /**
-     * (MODIFICADO) Retorna o elemento de conteúdo real
-     * @returns {HTMLElement}
+     * Sets the inner HTML of the content element.
+     * @param {string} htmlString - The HTML string to set.
+     * @returns {void}
      */
-    getContentElement() {
-        return this.state.content.element;
+    setContent(htmlString) {
+        this.getContentElement().innerHTML = htmlString;
     }
 
+    /**
+     * <ContentElement> getter.
+     * @returns {HTMLElement} The panel's content DOM element.
+     */
+    getContentElement() {
+        return this._state.content.element;
+    }
+
+    /**
+     * <PanelType> getter.
+     * @returns {string} The type identifier string.
+     */
     getPanelType() {
         return 'Panel';
     }
 
+    /**
+     * <ParentGroup> setter.
+     * @param {import('./PanelGroup.js').PanelGroup | null} group - The parent PanelGroup.
+     * @returns {void}
+     */
     setParentGroup(group) {
-        this.state.parentGroup = group;
-        // (NOVO) Informa o header a que grupo ele pertence (para o D&D)
-        if (this.state.header) {
-            this.state.header.setParentGroup(group);
+        const me = this;
+        me._state.parentGroup = group;
+        if (me._state.header) {
+            me._state.header.setParentGroup(group);
         }
-    }
-
-    close() {
-        if (!this.state.closable) return;
-
-        // Avisa o grupo pai que esta aba deve ser fechada
-        if (this.state.parentGroup) {
-            appBus.emit('panel:group-child-close-request', {
-                panel: this,
-                group: this.state.parentGroup
-            });
-        }
-
-        this.destroy();
     }
 
     /**
-     * (MODIFICADO) A altura é aplicada ao elemento de conteúdo
+     * Requests to be closed by its parent group.
+     * @returns {void}
+     */
+    close() {
+        const me = this;
+        if (!me._state.closable) return;
+
+        if (me._state.parentGroup) {
+            appBus.emit('panel:group-child-close-request', {
+                panel: me,
+                group: me._state.parentGroup
+            });
+        }
+
+        me.destroy();
+    }
+
+    /**
+     * Applies height and min-height styles to the content element.
+     * @returns {void}
      */
     updateHeight() {
-        const contentEl = this.getContentElement();
+        const me = this;
+        const contentEl = me.getContentElement();
         if (!contentEl) return;
 
-        contentEl.style.minHeight = `${this.getMinPanelHeight()}px`;
+        contentEl.style.minHeight = `${me.getMinPanelHeight()}px`;
         contentEl.style.height = 'auto';
         contentEl.style.flex = '1 1 auto';
     }
 
+    /**
+     * Serializes the Panel's state to a JSON-friendly object.
+     * @returns {object}
+     */
     toJSON() {
+        const me = this;
         return {
-            id: this.id,
-            type: this.getPanelType(),
-            title: this.state.title,
-            height: this.state.height, // Altura preferida
-            // Salva as configurações de estado (config)
+            id: me.id,
+            type: me.getPanelType(),
+            title: me._state.title,
+            height: me._state.height,
             config: {
-                closable: this.state.closable,
-                collapsible: this.state.collapsible,
-                movable: this.state.movable,
-                minHeight: this.state.minHeight
+                closable: me._state.closable,
+                collapsible: me._state.collapsible,
+                movable: me._state.movable,
+                minHeight: me._state.minHeight
             }
-            // 'content' é salvo por subclasses (ex: TextPanel)
         };
     }
 
+    /**
+     * Deserializes state from a JSON object.
+     * @param {object} data - The state object.
+     * @returns {void}
+     */
     fromJSON(data) {
+        const me = this;
         if (data.id) {
-            this.id = data.id;
+            me.id = data.id;
         }
         if (data.height !== undefined) {
-            this.state.height = data.height;
+            me._state.height = data.height;
         }
         if (data.title !== undefined) {
-            this.state.title = data.title;
-            // (NOVO) Atualiza o header com o título restaurado
-            if (this.state.header) {
-                this.state.header.setTitle(data.title);
+            me._state.title = data.title;
+            if (me._state.header) {
+                me._state.header.setTitle(data.title);
             }
         }
 
-        // Restaura as configurações de estado
         if (data.config) {
-            Object.assign(this.state, data.config);
-            // (NOVO) Atualiza o header com as configs restauradas
-            if (this.state.header) {
-                this.state.header.updateConfig(data.config);
+            Object.assign(me._state, data.config);
+            if (me._state.header) {
+                me._state.header.updateConfig(data.config);
             }
         }
-
-        // 'content' é restaurado por subclasses
     }
 }

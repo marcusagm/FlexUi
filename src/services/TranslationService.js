@@ -6,38 +6,36 @@
  * mechanism to a default language (English, by default), and handles
  * key lookups, including nested keys and placeholder substitution.
  *
- * It is now responsible for asynchronously fetching translation files (JSON)
+ * It is responsible for asynchronously fetching translation files (JSON)
  * from provided URLs.
  *
  * Properties summary:
+ * - _instance {TranslationService|null} : Static property for the singleton instance.
  * - _translations {Object<string, Object>} : Stores all loaded translation data.
  * - _languageSources {Object<string, string>} : Stores URLs for language files.
  * - _isLoading {Set<string>} : Tracks languages currently being fetched.
  * - _currentLanguage {string} : The active language code (e.g., "pt").
  * - _defaultLanguage {string} : The fallback language code (e.g., "en").
- * - _instance {TranslationService|null} : Static property for the singleton instance.
  *
  * Typical usage:
  * // 1. Get the instance
  * const i18n = TranslationService.getInstance();
  *
- * // 2. Register the *sources* (URLs) for your files
+ * // 2. Register sources
  * i18n.registerLanguageSource('en', './i18n/en.json');
- * i18n.registerLanguageSource('pt', './i18n/pt.json');
  *
- * // 3. Load the default language and set it. This MUST be awaited.
+ * // 3. Load default (await this in app bootstrap)
  * await i18n.loadLanguage('en');
  * i18n.defaultLanguage = 'en';
  *
- * // 4. Set the active language (this will also load it if needed)
+ * // 4. Set active language
  * await i18n.setLanguage('pt');
  *
  * // 5. Translate
- * const greeting = i18n.translate('greetings.hello', { name: "Marcus" });
+ * const greeting = i18n.translate('greetings.hello');
  *
- * Notes / Additional:
- * - All loading operations are asynchronous and return Promises.
- * - The app must `await` at least the default language load before translating.
+ * Dependencies:
+ * - None (uses native fetch)
  */
 export class TranslationService {
     /**
@@ -56,14 +54,13 @@ export class TranslationService {
 
     /**
      * Stores the URL paths to the translation JSON files, keyed by language code.
-     * e.g., { en: "/i18n/en.json", pt: "/i18n/pt.json" }
      * @type {Object<string, string>}
      * @private
      */
     _languageSources;
 
     /**
-     * Tracks which language codes are currently being fetched to avoid duplicate requests.
+     * Tracks which language codes are currently being fetched.
      * @type {Set<string>}
      * @private
      */
@@ -84,10 +81,7 @@ export class TranslationService {
     _defaultLanguage;
 
     /**
-     * Constructor for the TranslationService.
-     * As this is a singleton, this constructor will throw an error if
-     * instantiated directly after the first time.
-     * Use TranslationService.getInstance() for access.
+     * @private
      */
     constructor() {
         if (TranslationService._instance) {
@@ -101,8 +95,6 @@ export class TranslationService {
         this._languageSources = {};
         this._isLoading = new Set();
 
-        // Initialize properties via setters per user guidelines
-        // This invokes the 'set defaultLanguage(code)' and 'set currentLanguage(code)' methods.
         this.defaultLanguage = 'en';
         this.currentLanguage = 'en';
 
@@ -110,21 +102,9 @@ export class TranslationService {
     }
 
     /**
-     * Gets the singleton instance of the TranslationService.
-     * @returns {TranslationService} The singleton instance.
-     */
-    static getInstance() {
-        if (!TranslationService._instance) {
-            TranslationService._instance = new TranslationService();
-        }
-        return TranslationService._instance;
-    }
-
-    // --- Getters and Setters ---
-
-    /**
-     * Sets the current active language.
-     * @param {string} languageCode - The language code (e.g., "en", "pt-BR").
+     * <currentLanguage> setter with validation.
+     * @param {string} languageCode - The language code (e.g., "en", "pt").
+     * @returns {void}
      */
     set currentLanguage(languageCode) {
         if (typeof languageCode !== 'string' || languageCode.trim().length === 0) {
@@ -142,7 +122,7 @@ export class TranslationService {
     }
 
     /**
-     * Gets the current active language code.
+     * <currentLanguage> getter.
      * @returns {string} The current language code.
      */
     get currentLanguage() {
@@ -150,8 +130,9 @@ export class TranslationService {
     }
 
     /**
-     * Sets the default (fallback) language.
+     * <defaultLanguage> setter with validation.
      * @param {string} languageCode - The language code (e.g., "en").
+     * @returns {void}
      */
     set defaultLanguage(languageCode) {
         if (typeof languageCode !== 'string' || languageCode.trim().length === 0) {
@@ -171,20 +152,29 @@ export class TranslationService {
     }
 
     /**
-     * Gets the default (fallback) language code.
+     * <defaultLanguage> getter.
      * @returns {string} The default language code.
      */
     get defaultLanguage() {
         return this._defaultLanguage;
     }
 
-    // --- Concrete Methods ---
+    /**
+     * Gets the singleton instance of the TranslationService.
+     * @returns {TranslationService} The singleton instance.
+     */
+    static getInstance() {
+        if (!TranslationService._instance) {
+            TranslationService._instance = new TranslationService();
+        }
+        return TranslationService._instance;
+    }
 
     /**
      * Registers the source URL for a language's translation file.
-     * This does *not* load the file, it only registers its location.
      * @param {string} languageCode - The language code (e.g., "en").
      * @param {string} url - The URL path to the .json file.
+     * @returns {void}
      */
     registerLanguageSource(languageCode, url) {
         if (typeof languageCode !== 'string' || languageCode.trim().length === 0) {
@@ -203,9 +193,9 @@ export class TranslationService {
 
     /**
      * Registers translation data directly from an object.
-     * This can be used if data is loaded by other means (e.g., hardcoded).
      * @param {string} languageCode - The language code (e.g., "en").
      * @param {object} translationData - The key/value pair object.
+     * @returns {void}
      */
     registerLanguage(languageCode, translationData) {
         const me = this;
@@ -230,30 +220,24 @@ export class TranslationService {
 
     /**
      * Asynchronously loads a language file from its registered source URL.
-     * @param {string} languageCode - The code of the language to load (e.g., "en").
-     * @returns {Promise<boolean>} A promise that resolves to true if loading
-     * was successful (or already loaded), and false if it failed.
+     * @param {string} languageCode - The code of the language to load.
+     * @returns {Promise<boolean>} True if successful (or already loaded), false if failed.
      */
     async loadLanguage(languageCode) {
         const me = this;
         const sanitizedCode = languageCode.trim().toLowerCase();
 
-        // 1. Check if already loaded
         if (me._translations[sanitizedCode]) {
             return true;
         }
 
-        // 2. Check if currently being loaded
         if (me._isLoading.has(sanitizedCode)) {
             console.warn(
                 `TranslationService: Language "${sanitizedCode}" is already being loaded.`
             );
-            // We could return a promise that resolves when loading is done,
-            // but for simplicity, we'll just return true.
             return true;
         }
 
-        // 3. Check if a source URL exists
         const languageUrl = me._languageSources[sanitizedCode];
         if (!languageUrl) {
             console.error(
@@ -262,7 +246,6 @@ export class TranslationService {
             return false;
         }
 
-        // 4. Start loading
         me._isLoading.add(sanitizedCode);
         try {
             const response = await fetch(languageUrl);
@@ -272,8 +255,6 @@ export class TranslationService {
             }
 
             const translationData = await response.json();
-
-            // Use the existing register method to store the data
             me.registerLanguage(sanitizedCode, translationData);
             console.log(`TranslationService: Successfully loaded language "${sanitizedCode}".`);
             return true;
@@ -284,27 +265,23 @@ export class TranslationService {
             );
             return false;
         } finally {
-            // 5. Finished loading (success or fail)
             me._isLoading.delete(sanitizedCode);
         }
     }
 
     /**
      * Asynchronously loads a language (if needed) and sets it as the
-     * current language. This is the preferred method for changing languages.
+     * current language.
      * @param {string} languageCode - The code of the language to set.
-     * @returns {Promise<boolean>} A promise that resolves to true if the
-     * language was successfully loaded and set, and false otherwise.
+     * @returns {Promise<boolean>} True if the language was successfully loaded and set.
      */
     async setLanguage(languageCode) {
         const me = this;
         const sanitizedCode = languageCode.trim().toLowerCase();
 
-        // Load the language (this will be fast if already loaded)
         const success = await me.loadLanguage(sanitizedCode);
 
         if (success) {
-            // Use the setter to update the current language
             me.currentLanguage = sanitizedCode;
         } else {
             console.error(
@@ -315,11 +292,9 @@ export class TranslationService {
     }
 
     /**
-     * The core translation method.
      * Fetches a translation string for a given key.
      * @param {string} key - The translation key (e.g., "panel.title").
-     * @param {object} [substitutions={}] - Optional key/value pairs for placeholder
-     * substitution (e.g., { name: "User" }).
+     * @param {object} [substitutions={}] - Optional key/value pairs for substitution.
      * @returns {string} The translated string, or the key if not found.
      */
     translate(key, substitutions = {}) {
@@ -327,18 +302,15 @@ export class TranslationService {
 
         if (typeof key !== 'string' || key.trim().length === 0) {
             console.warn(`TranslationService: Invalid translation key provided.`);
-            return ''; // Return empty string for invalid key
+            return '';
         }
 
-        // 1. Try to find in current language
         let translation = me._findTranslation(me.currentLanguage, key);
 
-        // 2. If not found, try to find in default language (fallback)
         if (translation === null) {
             translation = me._findTranslation(me.defaultLanguage, key);
         }
 
-        // 3. If still not found, return the key itself as a warning
         if (translation === null) {
             console.warn(
                 `TranslationService: Missing translation for key "${key}" in both "${me.currentLanguage}" and default "${me.defaultLanguage}".`
@@ -346,14 +318,11 @@ export class TranslationService {
             return key;
         }
 
-        // 4. Perform placeholder substitution
         return me._performSubstitution(translation, substitutions);
     }
 
-    // --- Private Methods ---
-
     /**
-     * Finds a translation string for a key, supporting dot notation for nested objects.
+     * Finds a translation string, supporting dot notation for nested objects.
      * @param {string} languageCode - The language to search in.
      * @param {string} key - The key (e.g., "greetings.hello").
      * @returns {string|null} The translation string, or null if not found.
@@ -364,7 +333,6 @@ export class TranslationService {
         const languageData = me._translations[languageCode];
 
         if (!languageData) {
-            // This is expected if the language hasn't been loaded yet
             return null;
         }
 
@@ -393,8 +361,8 @@ export class TranslationService {
     }
 
     /**
-     * Performs placeholder substitution on a string.
-     * @param {string} text - The text containing placeholders like {key}.
+     * Performs placeholder substitution (e.g., {name}).
+     * @param {string} text - The text containing placeholders.
      * @param {object} substitutions - The key/value pairs to replace.
      * @returns {string} The string with placeholders replaced.
      * @private

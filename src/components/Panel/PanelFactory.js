@@ -18,6 +18,9 @@ import { Panel } from './Panel.js';
  *
  * // In PanelGroup.fromJSON (during hydration):
  * const panel = PanelFactory.getInstance().createPanel(panelData);
+ *
+ * Dependencies:
+ * - ./Panel.js
  */
 export class PanelFactory {
     /**
@@ -33,7 +36,6 @@ export class PanelFactory {
     _registry;
 
     /**
-     * Private constructor for Singleton pattern.
      * @private
      */
     constructor() {
@@ -45,19 +47,18 @@ export class PanelFactory {
         PanelFactory._instance = this;
     }
 
-    // -------------------------------------------------------------------
-    // Getters / Setters
-    // -------------------------------------------------------------------
-
     /**
-     * @returns {Map<string, typeof Panel>}
+     * <Registry> getter.
+     * @returns {Map<string, typeof Panel>} The internal class registry.
      */
     getRegistry() {
         return this._registry;
     }
 
     /**
+     * <Registry> setter with validation.
      * @param {Map<string, typeof Panel>} map
+     * @returns {void}
      */
     setRegistry(map) {
         if (!(map instanceof Map)) {
@@ -67,10 +68,6 @@ export class PanelFactory {
         }
         this._registry = map;
     }
-
-    // -------------------------------------------------------------------
-    // Concrete Methods
-    // -------------------------------------------------------------------
 
     /**
      * Gets the single instance of the PanelFactory.
@@ -87,6 +84,7 @@ export class PanelFactory {
      * Registers a Panel class constructor against a string identifier.
      * @param {string} typeName - The string identifier (e.g., 'TextPanel').
      * @param {typeof Panel} panelClass - The class constructor (e.g., TextPanel).
+     * @returns {void}
      */
     registerPanelType(typeName, panelClass) {
         const me = this;
@@ -98,8 +96,9 @@ export class PanelFactory {
     }
 
     /**
-     * (NOVO) Registers multiple Panel classes at once using their static 'panelType' property.
-     * @param {Array<typeof Panel>} classList - An array of Panel classes (e.g., [Panel, TextPanel]).
+     * Registers multiple Panel classes at once using their static 'panelType' property.
+     * @param {Array<typeof Panel>} classList - An array of Panel classes.
+     * @returns {void}
      */
     registerPanelClasses(classList) {
         const me = this;
@@ -109,10 +108,8 @@ export class PanelFactory {
         }
 
         classList.forEach(panelClass => {
-            // Verifica se a classe é válida e se tem a propriedade estática
             if (panelClass && typeof panelClass.panelType === 'string') {
                 const typeName = panelClass.panelType;
-                // Reusa a lógica de registro e validação existente
                 me.registerPanelType(typeName, panelClass);
             } else {
                 console.warn(
@@ -125,10 +122,8 @@ export class PanelFactory {
 
     /**
      * Creates and hydrates a Panel instance based on its type and saved data.
-     * This is the core factory method used during deserialization (fromJSON).
-     *
-     * @param {object} panelData - The serialized data object for the panel (from toJSON).
-     * @returns {Panel | null} An instantiated and hydrated Panel, or null if data is invalid.
+     * @param {object} panelData - The serialized data object for the panel.
+     * @returns {Panel | null} An instantiated and hydrated Panel, or null if invalid.
      */
     createPanel(panelData) {
         const me = this;

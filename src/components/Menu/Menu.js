@@ -2,81 +2,124 @@ import { MenuItem } from './MenuItem.js';
 import { TranslationService } from '../../services/TranslationService.js';
 import { appBus } from '../../utils/EventBus.js';
 
+/**
+ * Description:
+ * Manages the main application menu bar at the top of the UI.
+ * It dynamically loads the menu structure from a configuration file,
+ * processes it (e.g., translation), and builds the DOM using MenuItem
+ * components. It also handles global click logic to close open menus.
+ *
+ * Properties summary:
+ * - element {HTMLElement} : The main DOM element (<div class="menu">).
+ * - _namespace {string} : Unique namespace for appBus listeners.
+ * - _bound... {Function | null} : Bound event handlers for cleanup.
+ *
+ * Typical usage:
+ * // In App.js
+ * this.menu = new Menu();
+ * document.body.append(this.menu.element);
+ * await this.menu.load();
+ *
+ * Events:
+ * - Listens to (native): 'click' (on document)
+ * - Listens to (appBus): 'menu:item-selected', 'menu:close-siblings'
+ *
+ * Dependencies:
+ * - components/Menu/MenuItem.js
+ * - services/TranslationService.js
+ * - utils/EventBus.js
+ */
 export class Menu {
-    // (NOVO) Namespace estático
-    namespace = 'app-menu';
+    /**
+     * Unique namespace for appBus listeners.
+     * @type {string}
+     * @private
+     */
+    _namespace = 'app-menu';
 
-    // (NOVO) Propriedades para armazenar referências bindadas
+    /**
+     * Stores the bound reference for the global click listener.
+     * @type {Function | null}
+     * @private
+     */
     _boundOnGlobalClick = null;
+
+    /**
+     * Stores the bound reference for the 'closeAllMenus' listener.
+     * @type {Function | null}
+     * @private
+     */
     _boundCloseAllMenus = null;
+
+    /**
+     * Stores the bound reference for the 'closeSiblings' listener.
+     * @type {Function | null}
+     * @private
+     */
     _boundCloseSiblings = null;
 
     constructor() {
-        this.element = document.createElement('div');
-        this.element.classList.add('menu');
-        // REMOVIDO: this.build() - A construção agora é assíncrona
+        const me = this;
+        me.element = document.createElement('div');
+        me.element.classList.add('menu');
 
-        // (NOVO) Armazena referências bindadas
-        this._boundOnGlobalClick = this._onGlobalClick.bind(this);
-        this._boundCloseAllMenus = this.closeAllMenus.bind(this);
-        this._boundCloseSiblings = this.closeSiblings.bind(this);
+        me._boundOnGlobalClick = me._onGlobalClick.bind(me);
+        me._boundCloseAllMenus = me.closeAllMenus.bind(me);
+        me._boundCloseSiblings = me.closeSiblings.bind(me);
 
-        this.initGlobalListeners();
+        me.initGlobalListeners();
     }
 
     /**
-     * (NOVO) Método 'destroy' para limpeza de listeners globais.
-     * (MODIFICADO) Usa offByNamespace.
+     * Cleans up all global document and appBus event listeners.
+     * @returns {void}
      */
     destroy() {
-        const me = this; // Conforme diretrizes
+        const me = this;
         document.removeEventListener('click', me._boundOnGlobalClick);
-
-        // (INÍCIO DA MODIFICAÇÃO - Etapa 3)
-        appBus.offByNamespace(me.namespace);
-        // (FIM DA MODIFICAÇÃO)
-
+        appBus.offByNamespace(me._namespace);
         me.element.remove();
     }
 
     /**
-     * (NOVO) Listener de clique global extraído da função anônima.
+     * Handles global clicks on the document to close the menu.
      * @param {MouseEvent} e
+     * @private
+     * @returns {void}
      */
     _onGlobalClick(e) {
-        if (!this.element.contains(e.target)) {
-            this.closeAllMenus();
+        const me = this;
+        if (!me.element.contains(e.target)) {
+            me.closeAllMenus();
         }
     }
 
     /**
-     * (NOVO) Carrega, processa e constrói o menu a partir de um módulo de configuração.
-     * @param {string} [url='workspaces/menus/menu.js'] - O caminho para o módulo de configuração do menu.
+     * Asynchronously loads, processes, and builds the menu from a config file.
+     * @param {string} [url='workspaces/menus/menu.js'] - The path to the menu config module.
+     * @returns {Promise<void>}
      */
     async load(url = 'workspaces/menus/menu.js') {
+        const me = this;
         try {
-            // Usa importação dinâmica para carregar o módulo JS
-            // O caminho relativo sobe dois níveis (de scripts/Menu/ para a raiz)
             const menuModule = await import(`../../../${url}`);
             const rawMenuData = menuModule.default;
 
-            // Pega a instância do i18n para processar os títulos
             const i18n = TranslationService.getInstance();
-            const processedItems = this._processMenuData(rawMenuData, i18n);
+            const processedItems = me._processMenuData(rawMenuData, i18n);
 
-            // Constrói o menu com os dados processados e traduzidos
-            this.build(processedItems);
+            me.build(processedItems);
         } catch (error) {
-            console.error(`Falha ao carregar o módulo do menu: ${url}`, error);
-            this.element.innerHTML = '<div class="menu__item">Erro ao carregar menu.</div>';
+            console.error(`Failed to load menu module: ${url}`, error);
+            me.element.innerHTML = '<div class="menu__item">Error loading menu.</div>';
         }
     }
 
     /**
-     * (NOVO) Processa recursivamente os dados do menu para traduzir 'titleKey'.
-     * @param {Array<object>} items - O array de itens de menu (raw).
-     * @param {TranslationService} i18n - A instância do serviço de tradução.
-     * @returns {Array<object>} O array de itens processados.
+     * Recursively processes menu data to translate 'titleKey' properties.
+     * @param {Array<object>} items - The raw menu items array.
+     * @param {TranslationService} i18n - The translation service instance.
+     * @returns {Array<object>} The processed items array.
      * @private
      */
     _processMenuData(items, i18n) {
@@ -85,16 +128,12 @@ export class Menu {
         }
 
         return items.map(item => {
-            // Copia o item original
             const processedItem = { ...item };
 
-            // Traduz o 'titleKey' para 'title'
-            // O MenuItem espera uma propriedade 'title'
             if (item.titleKey) {
                 processedItem.title = i18n.translate(item.titleKey);
             }
 
-            // Processa recursivamente os filhos
             if (item.children && item.children.length > 0) {
                 processedItem.children = this._processMenuData(item.children, i18n);
             }
@@ -104,39 +143,48 @@ export class Menu {
     }
 
     /**
-     * Constrói o DOM do menu com base nos itens processados.
-     * @param {Array<object>} items - Os itens de menu processados (com títulos traduzidos).
+     * Builds the menu DOM from processed menu items.
+     * @param {Array<object>} items - The processed (translated) menu items.
+     * @returns {void}
      */
     build(items) {
-        // Limpa qualquer conteúdo anterior (ex: mensagem de erro)
-        this.element.innerHTML = '';
+        const me = this;
+        me.element.innerHTML = '';
 
         items.forEach(itemData => {
             const mi = new MenuItem(itemData, 1);
-            this.element.appendChild(mi.element);
+            me.element.appendChild(mi.element);
         });
     }
 
     /**
-     * (MODIFICADO) Usa referências bindadas e adiciona namespace.
+     * Initializes all global document and appBus listeners.
+     * @returns {void}
      */
     initGlobalListeners() {
         const me = this;
-        const options = { namespace: me.namespace };
+        const options = { namespace: me._namespace };
 
         document.addEventListener('click', me._boundOnGlobalClick);
-        // (INÍCIO DA MODIFICAÇÃO - Etapa 3)
         appBus.on('menu:item-selected', me._boundCloseAllMenus, options);
         appBus.on('menu:close-siblings', me._boundCloseSiblings, options);
-        // (FIM DA MODIFICAÇÃO)
     }
 
+    /**
+     * Closes all currently open submenus.
+     * @returns {void}
+     */
     closeAllMenus() {
         this.element.querySelectorAll('.menu__item--open').forEach(item => {
             item.classList.remove('menu__item--open');
         });
     }
 
+    /**
+     * Closes sibling menus when a new menu item is hovered or clicked.
+     * @param {HTMLElement} target - The target MenuItem element.
+     * @returns {void}
+     */
     closeSiblings(target) {
         target.parentElement.querySelectorAll('.menu__item--open').forEach(sibling => {
             if (sibling !== target) {

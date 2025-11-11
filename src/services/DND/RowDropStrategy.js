@@ -1,43 +1,63 @@
 import { PanelGroup } from '../../components/Panel/PanelGroup.js';
+import { Panel } from '../../components/Panel/Panel.js';
+import { DragDropService } from './DragDropService.js';
 
 /**
  * Description:
- * (REFATORADO) Estratégia de D&D para o 'row'.
- * Gere o drop de PanelGroups nas "lacunas" (gaps) horizontais
- * ENTRE Colunas.
+ * A DND strategy that defines drop behavior for 'row' type drop zones.
+ * It handles dropping panels into the horizontal gaps *between* Columns,
+ * creating a new Column for the dropped item.
  *
- * (Refatorado vFeature 2) Esta estratégia agora aceita
- * 'PanelGroup' E 'Panel'. Se um 'Panel' for solto,
- * ele é envolvido (wrapped) num novo 'Column' e 'PanelGroup'.
+ * Properties summary:
+ * - _columnCache {Array<object>} : Caches the geometry of child Columns.
+ * - _dropIndex {number | null} : The calculated drop index (column index).
+ * - _originalColumnIndex {number | null} : The starting column index (for "ghost" logic).
+ * - _originColumnHadOnePanel {boolean} : Flag for "ghost" logic.
+ *
+ * Business rules implemented:
+ * - Caches child Column geometry on 'handleDragEnter'.
+ * - Calculates drop index based on 'midX' (horizontal midpoint).
+ * - Shows a 'vertical' placeholder in the calculated gap.
+ * - On drop: Creates a new Column, creates a new PanelGroup inside it,
+ * and moves the dropped Panel or PanelGroup into the new group.
+ *
+ * Dependencies:
+ * - ../../components/Panel/PanelGroup.js
+ * - ../../components/Panel/Panel.js
+ * - ./DragDropService.js
  */
 export class RowDropStrategy {
-    // (CLASSE RENOMEADA)
     /**
-     * @type {Array<object>}
+     * Caches the geometry (midX) and index of child Columns.
+     * @type {Array<{element: HTMLElement, midX: number, index: number}>}
      * @private
      */
     _columnCache = [];
 
     /**
+     * The calculated drop index (state).
      * @type {number | null}
      * @private
      */
     _dropIndex = null;
 
     /**
+     * The starting column index (for "ghost" logic).
      * @type {number | null}
      * @private
      */
     _originalColumnIndex = null;
 
     /**
+     * Flag for "ghost" logic.
      * @type {boolean}
      * @private
      */
     _originColumnHadOnePanel = false;
 
     /**
-     * Limpa o estado interno (cache) da estratégia.
+     * Clears the internal geometry cache and drop index.
+     * @returns {void}
      */
     clearCache() {
         this._columnCache = [];
@@ -47,14 +67,14 @@ export class RowDropStrategy {
     }
 
     /**
-     * (MODIFICADO) Constrói o cache de posições.
-     * @param {DragEvent} e - O evento nativo.
-     * @param {Row} dropZone - A instância da Linha. (TIPO MODIFICADO)
-     * @param {{item: object, type: string}} draggedData - O item e tipo arrastados.
-     * @param {DragDropService} dds - A instância do serviço de D&D.
+     * Caches the geometry of child columns on drag enter.
+     * @param {DragEvent} e - The native drag event.
+     * @param {import('../../components/Row/Row.js').Row} dropZone - The Row instance.
+     * @param {{item: object, type: string}} draggedData - The item being dragged.
+     * @param {DragDropService} dds - The DND service instance.
+     * @returns {void}
      */
     handleDragEnter(e, dropZone, draggedData, dds) {
-        // (MODIFICADO) Só aceita PanelGroups ou Panels
         if (
             !draggedData.item ||
             (draggedData.type !== 'PanelGroup' && draggedData.type !== 'Panel')
@@ -62,20 +82,17 @@ export class RowDropStrategy {
             return;
         }
 
-        // (MODIFICADO) Obtém o "item efetivo" (o PanelGroup) para a lógica "ghost"
-        let effectiveItem; // Este será o PanelGroup
+        let effectiveItem;
         if (draggedData.type === 'PanelGroup') {
             effectiveItem = draggedData.item;
         } else {
-            // type === 'Panel'
-            effectiveItem = draggedData.item.state.parentGroup;
+            effectiveItem = draggedData.item._state.parentGroup;
             if (!effectiveItem) return;
         }
 
         this.clearCache();
         const columns = dropZone.getColumns();
 
-        // 1. Constrói o cache
         this._columnCache = columns.map((col, index) => {
             const rect = col.element.getBoundingClientRect();
             return {
@@ -85,23 +102,20 @@ export class RowDropStrategy {
             };
         });
 
-        // 2. Encontra o índice e o estado da coluna de origem
         const oldColumn = effectiveItem.getColumn();
         if (oldColumn) {
             const oldColCacheItem = this._columnCache.find(
                 item => item.element === oldColumn.element
             );
 
-            // (MODIFICADO) Verifica o item efetivo e se é o último painel
             if (oldColCacheItem) {
                 this._originalColumnIndex = oldColCacheItem.index;
-
-                // Verifica se é um PanelGroup com 1 painel (que é o próprio item)
                 if (draggedData.type === 'PanelGroup' && oldColumn.getTotalPanelGroups() === 1) {
                     this._originColumnHadOnePanel = true;
-                }
-                // Verifica se é um Panel e se é o último no seu grupo
-                else if (draggedData.type === 'Panel' && effectiveItem.state.panels.length === 1) {
+                } else if (
+                    draggedData.type === 'Panel' &&
+                    effectiveItem._state.panels.length === 1
+                ) {
                     this._originColumnHadOnePanel = true;
                 }
             }
@@ -109,11 +123,12 @@ export class RowDropStrategy {
     }
 
     /**
-     * Chamado quando o mouse sai da linha.
-     * @param {DragEvent} e
-     * @param {Row} dropZone (TIPO MODIFICADO)
-     * @param {{item: object, type: string}} draggedData
-     * @param {DragDropService} dds
+     * Hides the placeholder on drag leave.
+     * @param {DragEvent} e - The native drag event.
+     * @param {import('../../components/Row/Row.js').Row} dropZone - The Row instance.
+     * @param {{item: object, type: string}} draggedData - The item being dragged.
+     * @param {DragDropService} dds - The DND service instance.
+     * @returns {void}
      */
     handleDragLeave(e, dropZone, draggedData, dds) {
         if (e.relatedTarget && dropZone.element.contains(e.relatedTarget)) {
@@ -124,14 +139,14 @@ export class RowDropStrategy {
     }
 
     /**
-     * Manipula a lógica de 'dragover' na linha.
-     * @param {DragEvent} e
-     * @param {Row} dropZone (TIPO MODIFICADO)
-     * @param {{item: object, type: string}} draggedData
-     * @param {DragDropService} dds
+     * Calculates the drop position and shows the placeholder on drag over.
+     * @param {DragEvent} e - The native drag event.
+     * @param {import('../../components/Row/Row.js').Row} dropZone - The Row instance.
+     * @param {{item: object, type: string}} draggedData - The item being dragged.
+     * @param {DragDropService} dds - The DND service instance.
+     * @returns {void}
      */
     handleDragOver(e, dropZone, draggedData, dds) {
-        // (MODIFICADO) Só aceita PanelGroups ou Panels
         if (
             !draggedData.item ||
             (draggedData.type !== 'PanelGroup' && draggedData.type !== 'Panel')
@@ -139,15 +154,9 @@ export class RowDropStrategy {
             return;
         }
 
-        if (this._columnCache.length === 0) {
-            // (MODIFICADO) Permite o drop numa linha vazia (cria a primeira coluna)
-            // return;
-        }
-
         const mouseX = e.clientX;
         let gapFound = false;
 
-        // 1. Calcula o índice da lacuna (this._dropIndex)
         this._dropIndex = this._columnCache.length;
         for (const col of this._columnCache) {
             if (mouseX < col.midX) {
@@ -157,12 +166,9 @@ export class RowDropStrategy {
             }
         }
 
-        // 2. Verifica a lógica "ghost" CONDICIONAL
         const isLeftGap = this._dropIndex === this._originalColumnIndex;
         const isRightGap = this._dropIndex === this._originalColumnIndex + 1;
 
-        // (MODIFICADO) A lógica ghost (_originColumnHadOnePanel) agora é tratada
-        // pela lógica 'isEffectiveGroupDrag' da Etapa 1.
         if (
             this._originalColumnIndex !== null &&
             this._originColumnHadOnePanel &&
@@ -173,7 +179,6 @@ export class RowDropStrategy {
             return;
         }
 
-        // 3. Se não for "ghost", mostra o placeholder vertical
         dds.showPlaceholder('vertical');
         const placeholder = dds.getPlaceholder();
 
@@ -191,18 +196,18 @@ export class RowDropStrategy {
     }
 
     /**
-     * Manipula a lógica de 'drop' na linha.
-     * @param {DragEvent} e
-     * @param {Row} dropZone (TIPO MODIFICADO)
-     * @param {{item: object, type: string}} draggedData
-     * @param {DragDropService} dds
+     * Handles the drop logic for the Row (creates a new Column).
+     * @param {DragEvent} e - The native drag event.
+     * @param {import('../../components/Row/Row.js').Row} dropZone - The Row instance.
+     * @param {{item: object, type: string}} draggedData - The item being dragged.
+     * @param {DragDropService} dds - The DND service instance.
+     * @returns {void}
      */
     handleDrop(e, dropZone, draggedData, dds) {
         const panelIndex = this._dropIndex;
         dds.hidePlaceholder();
         this.clearCache();
 
-        // (MODIFICADO) Só aceita PanelGroups ou Panels
         if (
             !draggedData.item ||
             (draggedData.type !== 'PanelGroup' && draggedData.type !== 'Panel')
@@ -211,36 +216,28 @@ export class RowDropStrategy {
         }
 
         if (panelIndex === null) {
-            return; // Drop anulado (lógica 'ghost')
+            return;
         }
 
-        // (MODIFICADO) Lógica de Ação
         if (draggedData.type === 'PanelGroup') {
-            // --- Lógica Existente (Mover PanelGroup) ---
             const draggedItem = draggedData.item;
             const oldColumn = draggedItem.getColumn();
 
-            // 4. Cria a nova coluna na lacuna (índice) encontrada
             const newColumn = dropZone.createColumn(null, panelIndex);
 
-            // 5. Move o painel
             if (oldColumn) {
                 oldColumn.removePanelGroup(draggedItem, true);
             }
-            draggedItem.state.height = null;
+            draggedItem._state.height = null;
             newColumn.addPanelGroup(draggedItem);
         } else if (draggedData.type === 'Panel') {
-            // --- Lógica Nova (Mover Panel, Criar Column e PanelGroup) ---
             const draggedPanel = draggedData.item;
-            const sourceGroup = draggedPanel.state.parentGroup;
+            const sourceGroup = draggedPanel._state.parentGroup;
 
-            // 1. Cria a nova Coluna
             const newColumn = dropZone.createColumn(null, panelIndex);
-            // 2. Cria o novo PanelGroup (vazio)
             const newPanelGroup = new PanelGroup(null);
             newColumn.addPanelGroup(newPanelGroup);
 
-            // 3. Move o painel
             if (sourceGroup) {
                 sourceGroup.removePanel(draggedPanel);
             }
