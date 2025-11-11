@@ -1,6 +1,7 @@
 import { PanelGroup } from '../Panel/PanelGroup.js';
 import { appBus } from '../../utils/EventBus.js';
 import { throttleRAF } from '../../utils/ThrottleRAF.js';
+import { generateId } from '../../utils/generateId.js';
 
 /**
  * Description:
@@ -33,8 +34,9 @@ import { throttleRAF } from '../../utils/ThrottleRAF.js';
  *
  * Dependencies:
  * - components/Panel/PanelGroup.js
- * - utils/EventBus.js
- * - utils/ThrottleRAF.js
+ * - ../../utils/EventBus.js
+ * - ../../utils/ThrottleRAF.js
+ * - ../../utils/generateId.js
  */
 export class Column {
     /**
@@ -53,7 +55,7 @@ export class Column {
      * @type {string}
      * @private
      */
-    _id = 'col_' + (Math.random().toString(36).substring(2, 9) + Date.now());
+    _id = generateId();
 
     /**
      * Unique namespace for appBus listeners.
@@ -276,9 +278,10 @@ export class Column {
      */
     addPanelGroupsBulk(panelGroups) {
         const me = this;
+        const resizeHandle = me.element.querySelector('.column__resize-handle');
         panelGroups.forEach(panelGroup => {
             me._state.panelGroups.push(panelGroup);
-            me.element.appendChild(panelGroup.element);
+            me.element.insertBefore(panelGroup.element, resizeHandle);
             panelGroup.setParentColumn(me);
         });
         me.requestLayoutUpdate();
@@ -292,9 +295,10 @@ export class Column {
      */
     addPanelGroup(panelGroup, index = null) {
         const me = this;
+        const resizeHandle = me.element.querySelector('.column__resize-handle');
+
         if (index === null) {
             me._state.panelGroups.push(panelGroup);
-            const resizeHandle = me.element.querySelector('.column__resize-handle');
             me.element.insertBefore(panelGroup.element, resizeHandle);
         } else {
             me._state.panelGroups.splice(index, 0, panelGroup);
@@ -302,10 +306,7 @@ export class Column {
             let nextSiblingElement = nextSiblingPanel ? nextSiblingPanel.element : null;
 
             if (!nextSiblingElement) {
-                const resizeHandle = me.element.querySelector('.column__resize-handle');
-                if (resizeHandle) {
-                    nextSiblingElement = resizeHandle;
-                }
+                nextSiblingElement = resizeHandle;
             }
             me.element.insertBefore(panelGroup.element, nextSiblingElement);
         }

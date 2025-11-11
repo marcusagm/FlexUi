@@ -71,17 +71,6 @@ export class Menu {
     }
 
     /**
-     * Cleans up all global document and appBus event listeners.
-     * @returns {void}
-     */
-    destroy() {
-        const me = this;
-        document.removeEventListener('click', me._boundOnGlobalClick);
-        appBus.offByNamespace(me._namespace);
-        me.element.remove();
-    }
-
-    /**
      * Handles global clicks on the document to close the menu.
      * @param {MouseEvent} e
      * @private
@@ -91,27 +80,6 @@ export class Menu {
         const me = this;
         if (!me.element.contains(e.target)) {
             me.closeAllMenus();
-        }
-    }
-
-    /**
-     * Asynchronously loads, processes, and builds the menu from a config file.
-     * @param {string} [url='workspaces/menus/menu.js'] - The path to the menu config module.
-     * @returns {Promise<void>}
-     */
-    async load(url = 'workspaces/menus/menu.js') {
-        const me = this;
-        try {
-            const menuModule = await import(`../../../${url}`);
-            const rawMenuData = menuModule.default;
-
-            const i18n = TranslationService.getInstance();
-            const processedItems = me._processMenuData(rawMenuData, i18n);
-
-            me.build(processedItems);
-        } catch (error) {
-            console.error(`Failed to load menu module: ${url}`, error);
-            me.element.innerHTML = '<div class="menu__item">Error loading menu.</div>';
         }
     }
 
@@ -140,6 +108,38 @@ export class Menu {
 
             return processedItem;
         });
+    }
+
+    /**
+     * Cleans up all global document and appBus event listeners.
+     * @returns {void}
+     */
+    destroy() {
+        const me = this;
+        document.removeEventListener('click', me._boundOnGlobalClick);
+        appBus.offByNamespace(me._namespace);
+        me.element.remove();
+    }
+
+    /**
+     * Asynchronously loads, processes, and builds the menu from a config file.
+     * @param {string} [url='workspaces/menus/menu.js'] - The path to the menu config module.
+     * @returns {Promise<void>}
+     */
+    async load(url = 'workspaces/menus/menu.js') {
+        const me = this;
+        try {
+            const menuModule = await import(`../../../${url}`);
+            const rawMenuData = menuModule.default;
+
+            const i18n = TranslationService.getInstance();
+            const processedItems = me._processMenuData(rawMenuData, i18n);
+
+            me.build(processedItems);
+        } catch (error) {
+            console.error(`Failed to load menu module: ${url}`, error);
+            me.element.innerHTML = '<div class="menu__item">Error loading menu.</div>';
+        }
     }
 
     /**

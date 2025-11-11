@@ -1,6 +1,7 @@
 import { PanelContent } from './PanelContent.js';
 import { PanelHeader } from './PanelHeader.js';
 import { appBus } from '../../utils/EventBus.js';
+import { generateId } from '../../utils/generateId.js';
 
 /**
  * Description:
@@ -32,9 +33,11 @@ import { appBus } from '../../utils/EventBus.js';
  * - ./PanelContent.js
  * - ./PanelHeader.js
  * - ../../utils/EventBus.js
+ * - ../../utils/generateId.js
  */
 export class Panel {
     /**
+     * Internal state for the Panel.
      * @type {{
      * parentGroup: import('./PanelGroup.js').PanelGroup | null,
      * header: PanelHeader | null,
@@ -67,7 +70,7 @@ export class Panel {
      * @type {string}
      * @public
      */
-    id = Math.random().toString(36).substring(2, 9) + Date.now();
+    id = generateId();
 
     /**
      * @param {string} title - The initial title for the panel header/tab.
@@ -120,47 +123,6 @@ export class Panel {
     }
 
     /**
-     * Cleans up child components.
-     * @returns {void}
-     */
-    destroy() {
-        const me = this;
-        if (me._state.header && typeof me._state.header.destroy === 'function') {
-            me._state.header.destroy();
-        }
-    }
-
-    /**
-     * Builds the panel's internal structure.
-     * @returns {void}
-     */
-    build() {
-        this.updateHeight();
-    }
-
-    /**
-     * Abstract method. Subclasses must implement this to populate
-     * the panel's content element.
-     * @abstract
-     * @returns {void}
-     * @throws {Error}
-     */
-    populateContent() {
-        throw new Error(
-            'Panel.populateContent() is abstract and must be implemented by a subclass.'
-        );
-    }
-
-    /**
-     * Sets the inner HTML of the content element.
-     * @param {string} htmlString - The HTML string to set.
-     * @returns {void}
-     */
-    setContent(htmlString) {
-        this.getContentElement().innerHTML = htmlString;
-    }
-
-    /**
      * <ContentElement> getter.
      * @returns {HTMLElement} The panel's content DOM element.
      */
@@ -187,6 +149,34 @@ export class Panel {
         if (me._state.header) {
             me._state.header.setParentGroup(group);
         }
+    }
+
+    /**
+     * Cleans up child components.
+     * @returns {void}
+     */
+    destroy() {
+        const me = this;
+        if (me._state.header && typeof me._state.header.destroy === 'function') {
+            me._state.header.destroy();
+        }
+    }
+
+    /**
+     * Builds the panel's internal structure.
+     * @returns {void}
+     */
+    build() {
+        this.updateHeight();
+    }
+
+    /**
+     * Sets the inner HTML of the content element.
+     * @param {string} htmlString - The HTML string to set.
+     * @returns {void}
+     */
+    setContent(htmlString) {
+        this.getContentElement().innerHTML = htmlString;
     }
 
     /**
@@ -267,5 +257,18 @@ export class Panel {
                 me._state.header.updateConfig(data.config);
             }
         }
+    }
+
+    /**
+     * Abstract method. Subclasses must implement this to populate
+     * the panel's content element.
+     * @abstract
+     * @returns {void}
+     * @throws {Error}
+     */
+    populateContent() {
+        throw new Error(
+            'Panel.populateContent() is abstract and must be implemented by a subclass.'
+        );
     }
 }

@@ -1,6 +1,7 @@
 import { Column } from '../Column/Column.js';
 import { appBus } from '../../utils/EventBus.js';
 import { throttleRAF } from '../../utils/ThrottleRAF.js';
+import { generateId } from '../../utils/generateId.js';
 
 /**
  * Description:
@@ -35,10 +36,13 @@ import { throttleRAF } from '../../utils/ThrottleRAF.js';
  * Dependencies:
  * - components/Column/Column.js
  * - utils/EventBus.js
- * - utils/ThrottleRAF.js
+ * - ../../utils/EventBus.js
+ * - ../../utils/ThrottleRAF.js
+ * - ../../utils/generateId.js
  */
 export class Row {
     /**
+     * Internal state holding child Column components and dimensions.
      * @type {{children: Array<Column>, parentContainer: import('../Container/Container.js').Container | null, height: number | null}}
      * @private
      */
@@ -53,7 +57,7 @@ export class Row {
      * @type {string}
      * @private
      */
-    _id = 'row_' + (Math.random().toString(36).substring(2, 9) + Date.now());
+    _id = generateId();
 
     /**
      * Unique namespace for appBus listeners.

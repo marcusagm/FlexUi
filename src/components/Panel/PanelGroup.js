@@ -3,6 +3,7 @@ import { PanelFactory } from './PanelFactory.js';
 import { Panel } from './Panel.js';
 import { appBus } from '../../utils/EventBus.js';
 import { throttleRAF } from '../../utils/ThrottleRAF.js';
+import { generateId } from '../../utils/generateId.js';
 
 /**
  * Description:
@@ -40,11 +41,12 @@ import { throttleRAF } from '../../utils/ThrottleRAF.js';
  * - If last Panel is removed, destroys itself ('removePanel' -> 'close').
  *
  * Dependencies:
- * - components/Panel/PanelGroupHeader.js
- * - components/Panel/PanelFactory.js
- * - components/Panel/Panel.js
- * - utils/EventBus.js
- * - utils/ThrottleRAF.js
+ * - ./PanelGroupHeader.js
+ * - ./PanelFactory.js
+ * - ./Panel.js
+ * - ../../utils/EventBus.js
+ * - ../../utils/ThrottleRAF.js
+ * - ../../utils/generateId.js
  */
 export class PanelGroup {
     /**
@@ -86,7 +88,7 @@ export class PanelGroup {
      * @type {string}
      * @public
      */
-    id = Math.random().toString(36).substring(2, 9) + Date.now();
+    id = generateId();
 
     /**
      * Unique namespace for appBus listeners.
@@ -512,7 +514,6 @@ export class PanelGroup {
 
         const currentPanelCount = me._state.panels.length;
 
-        // (INÍCIO DA CORREÇÃO)
         if (currentPanelCount === 0) {
             panel._state.header.setMode(true);
         } else if (currentPanelCount === 1) {
@@ -521,7 +522,6 @@ export class PanelGroup {
         } else {
             panel._state.header.setMode(false);
         }
-        // (FIM DA CORREÇÃO)
 
         me._state.panels.push(panel);
         panel.setParentGroup(me);
