@@ -51,7 +51,7 @@
     height: var(--panel-resize-handle-height); /* Reutiliza o token (3px) */
     width: 100%;
     cursor: ns-resize; /* Redimensionamento Norte-Sul (vertical) */
-    background: var(--color-border-default);
+    background: transparent;
     transition: background-color 0.2s ease-in-out;
 
     /* Posicionamento na parte inferior da linha */
