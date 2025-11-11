@@ -280,11 +280,20 @@ export class Column {
     addPanelGroup(panelGroup, index = null) {
         if (index === null) {
             this.state.panelGroups.push(panelGroup);
-            this.element.appendChild(panelGroup.element);
+            const resizeHandle = this.element.querySelector('.column__resize-handle');
+            this.element.insertBefore(panelGroup.element, resizeHandle);
         } else {
             this.state.panelGroups.splice(index, 0, panelGroup);
             const nextSiblingPanel = this.state.panelGroups[index + 1];
-            const nextSiblingElement = nextSiblingPanel ? nextSiblingPanel.element : null;
+            let nextSiblingElement = nextSiblingPanel ? nextSiblingPanel.element : null;
+
+            if (!nextSiblingElement) {
+                const resizeHandle = this.element.querySelector('.column__resize-handle');
+                if (resizeHandle) {
+                    nextSiblingElement = resizeHandle;
+                }
+            }
+
             this.element.insertBefore(panelGroup.element, nextSiblingElement);
         }
         panelGroup.setParentColumn(this);

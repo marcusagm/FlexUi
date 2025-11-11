@@ -18,6 +18,11 @@ import { throttleRAF } from '../../utils/ThrottleRAF.js';
  *
  * (REFATORADO vDND-Bridge) Remove listeners DND locais e delega ao DragDropService
  * através de 'dataset.dropzone' e 'dropZoneInstance'.
+ *
+ * (CORREÇÃO vDND-Bug-Index) O método 'createColumn' agora usa
+ * a lógica de 'state-based sibling lookup' (como sugerido pelo usuário)
+ * para inserir a coluna no local DOM correto, ignorando
+ * elementos não-componentes como 'row__resize-handle'.
  */
 export class Row {
     state = {
@@ -56,13 +61,10 @@ export class Row {
 
         this.dropZoneType = 'row'; // (MODIFICADO) Contexto 11
 
-        // (INÍCIO DA MODIFICAÇÃO - Etapa 1)
-        // 1. Adiciona o dataset para seleção pelo handler unificado
+        // (MODIFICADO - Etapa 1)
         this.element.dataset.dropzone = this.dropZoneType;
-        // 2. Anexa a instância JS ao elemento DOM
         this.element.dropZoneInstance = this;
-        // 3. (REMOVIDO) initDNDListeners();
-        // (FIM DA MODIFICAÇÃO)
+        // (REMOVIDO) initDNDListeners();
 
         // (NOVO) Contexto 12
         this.setThrottledUpdate(
@@ -103,9 +105,7 @@ export class Row {
     }
     // --- Fim Getters / Setters ---
 
-    // (INÍCIO DA MODIFICAÇÃO - Etapa 1)
-    // (REMOVIDO) Métodos initDNDListeners, onDragEnter, onDragOver, onDragLeave, onDrop
-    // (FIM DA MODIFICAÇÃO)
+    // (REMOVIDO - Etapa 1) Métodos initDNDListeners e handlers (onDrag...)
 
     /**
      * (MODIFICADO) Usa a referência bindada
@@ -214,18 +214,40 @@ export class Row {
     createColumn(width = null, index = null) {
         const column = new Column(this, width); // 'this' (Row) é o container da Coluna
 
+        // (INÍCIO DA CORREÇÃO)
         if (index === null) {
-            this.element.appendChild(column.element);
+            // Se o índice for nulo (fim da lista)
             this.state.children.push(column);
+
+            // Insere ANTES do handle, ou no fim se não houver handle
+            const resizeHandle = this.element.querySelector('.row__resize-handle');
+            this.element.insertBefore(column.element, resizeHandle);
         } else {
-            const targetElement = this.element.children[index] || null;
-            if (targetElement) {
-                this.element.insertBefore(column.element, targetElement);
-            } else {
-                this.element.appendChild(column.element);
-            }
+            // Se o índice for um número (ex: 0 ou 1)
+
+            // 1. Insere no array de estado
             this.state.children.splice(index, 0, column);
+
+            // 2. Encontra o próximo irmão no *estado*
+            const nextSiblingColumn = this.state.children[index + 1];
+
+            // 3. Obtém o elemento DOM do próximo irmão
+            let nextSiblingElement = nextSiblingColumn ? nextSiblingColumn.element : null;
+
+            // 4. Se não houver próximo irmão (inserindo no fim),
+            // devemos inserir antes do handle (se ele existir)
+            if (!nextSiblingElement) {
+                const resizeHandle = this.element.querySelector('.row__resize-handle');
+                if (resizeHandle) {
+                    nextSiblingElement = resizeHandle;
+                }
+            }
+
+            // 5. Insere no DOM. Se nextSiblingElement for null,
+            // 'insertBefore' age como 'appendChild'.
+            this.element.insertBefore(column.element, nextSiblingElement);
         }
+        // (FIM DA CORREÇÃO)
 
         this.updateAllResizeBars();
         column.setParentContainer(this); // O pai da Coluna é a Row
