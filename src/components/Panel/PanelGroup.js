@@ -34,6 +34,9 @@ import { throttleRAF } from '../../utils/ThrottleRAF.js';
  * 'startResize' para prevenir "estado preso" (stuck state)
  * se o mouse sair da janela.
  *
+ * (CORREÇÃO vDND-Bridge-Fix-3) Adiciona a propriedade 'dropZoneType'
+ * para que o DragDropService possa identificá-la.
+ *
  * Properties summary:
  * - state {object} : Internal state management.
  */
@@ -87,6 +90,12 @@ export class PanelGroup {
      */
     constructor(initialPanel = null, height = null, collapsed = false, config = {}) {
         Object.assign(this.state, config);
+
+        // (INÍCIO DA CORREÇÃO - Bug 1)
+        // Adiciona a propriedade que faltava, para que o DragDropService
+        // possa identificá-la quando esta classe for a 'dropZoneInstance'.
+        this.dropZoneType = 'TabContainer';
+        // (FIM DA CORREÇÃO)
 
         // (MODIFICADO) O contentContainer é criado aqui
         this.state.contentContainer = document.createElement('div');

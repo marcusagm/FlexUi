@@ -1,5 +1,5 @@
 import { Column } from '../Column/Column.js';
-import { DragDropService } from '../../services/DND/DragDropService.js';
+// (REMOVIDO) DragDropService não é mais importado aqui
 import { appBus } from '../../utils/EventBus.js';
 import { throttleRAF } from '../../utils/ThrottleRAF.js';
 
@@ -15,6 +15,9 @@ import { throttleRAF } from '../../utils/ThrottleRAF.js';
  *
  * (Refatorado vBugFix) Corrige o vazamento de listeners do appBus
  * armazenando as referências bindadas.
+ *
+ * (REFATORADO vDND-Bridge) Remove listeners DND locais e delega ao DragDropService
+ * através de 'dataset.dropzone' e 'dropZoneInstance'.
  */
 export class Row {
     state = {
@@ -52,7 +55,14 @@ export class Row {
         this.setMinHeight(this._minHeight); // (NOVO) Contexto 12
 
         this.dropZoneType = 'row'; // (MODIFICADO) Contexto 11
-        this.initDNDListeners();
+
+        // (INÍCIO DA MODIFICAÇÃO - Etapa 1)
+        // 1. Adiciona o dataset para seleção pelo handler unificado
+        this.element.dataset.dropzone = this.dropZoneType;
+        // 2. Anexa a instância JS ao elemento DOM
+        this.element.dropZoneInstance = this;
+        // 3. (REMOVIDO) initDNDListeners();
+        // (FIM DA MODIFICAÇÃO)
 
         // (NOVO) Contexto 12
         this.setThrottledUpdate(
@@ -93,33 +103,9 @@ export class Row {
     }
     // --- Fim Getters / Setters ---
 
-    // Listeners D&D (delegam ao serviço)
-    initDNDListeners() {
-        this.element.addEventListener('dragenter', this.onDragEnter.bind(this));
-        this.element.addEventListener('dragover', this.onDragOver.bind(this));
-        this.element.addEventListener('dragleave', this.onDragLeave.bind(this));
-        this.element.addEventListener('drop', this.onDrop.bind(this));
-    }
-    onDragEnter(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        DragDropService.getInstance().handleDragEnter(e, this);
-    }
-    onDragOver(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        DragDropService.getInstance().handleDragOver(e, this);
-    }
-    onDragLeave(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        DragDropService.getInstance().handleDragLeave(e, this);
-    }
-    onDrop(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        DragDropService.getInstance().handleDrop(e, this);
-    }
+    // (INÍCIO DA MODIFICAÇÃO - Etapa 1)
+    // (REMOVIDO) Métodos initDNDListeners, onDragEnter, onDragOver, onDragLeave, onDrop
+    // (FIM DA MODIFICAÇÃO)
 
     /**
      * (MODIFICADO) Usa a referência bindada

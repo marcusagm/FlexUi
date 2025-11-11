@@ -1,5 +1,5 @@
 import { PanelGroup } from '../Panel/PanelGroup.js';
-import { DragDropService } from '../../services/DND/DragDropService.js';
+// (REMOVIDO) DragDropService não é mais importado aqui
 import { appBus } from '../../utils/EventBus.js';
 import { throttleRAF } from '../../utils/ThrottleRAF.js';
 
@@ -13,6 +13,9 @@ import { throttleRAF } from '../../utils/ThrottleRAF.js';
  *
  * (Refatorado vBugFix) Corrige o vazamento de listeners do appBus
  * armazenando as referências bindadas.
+ *
+ * (REFATORADO vDND-Bridge) Remove listeners DND locais e delega ao DragDropService
+ * através de 'dataset.dropzone' e 'dropZoneInstance'.
  *
  * Properties summary:
  * - state {object} : Internal state management.
@@ -69,6 +72,13 @@ export class Column {
         this.element.classList.add('column');
         this.dropZoneType = 'column';
 
+        // (INÍCIO DA MODIFICAÇÃO - Etapa 2)
+        // 1. Adiciona o dataset para seleção pelo handler unificado
+        this.element.dataset.dropzone = this.dropZoneType;
+        // 2. Anexa a instância JS ao elemento DOM
+        this.element.dropZoneInstance = this;
+        // (FIM DA MODIFICAÇÃO)
+
         // (MODIFICADO) A função throttled agora atualiza apenas o estilo O(1) desta coluna.
         // A atualização O(N) (container.updateColumnsSizes) é chamada apenas no 'onUp'.
         this.setThrottledUpdate(
@@ -82,7 +92,7 @@ export class Column {
         // (NOVO) Define a referência bindada
         this._boundOnPanelGroupRemoved = this.onPanelGroupRemoved.bind(this);
 
-        this.initDragDrop();
+        // (REMOVIDO) initDragDrop();
         this.initEventListeners();
     }
 
@@ -169,15 +179,9 @@ export class Column {
         [...this.state.panelGroups].forEach(panel => panel.destroy());
     }
 
-    /**
-     * Initializes native drag-and-drop event listeners for the column element.
-     */
-    initDragDrop() {
-        this.element.addEventListener('dragenter', this.onDragEnter.bind(this));
-        this.element.addEventListener('dragover', this.onDragOver.bind(this));
-        this.element.addEventListener('dragleave', this.onDragLeave.bind(this));
-        this.element.addEventListener('drop', this.onDrop.bind(this));
-    }
+    // (INÍCIO DA MODIFICAÇÃO - Etapa 2)
+    // (REMOVIDO) Méthod initDragDrop
+    // (FIM DA MODIFICAÇÃO)
 
     /**
      * Adds the horizontal resize bar to the column.
@@ -252,45 +256,9 @@ export class Column {
         this.requestLayoutUpdate();
     }
 
-    /**
-     * Handles the dragenter event by delegating to the DragDropService.
-     * @param {DragEvent} e
-     */
-    onDragEnter(e) {
-        e.preventDefault();
-        e.stopPropagation(); // (ADIÇÃO DA CORREÇÃO)
-        DragDropService.getInstance().handleDragEnter(e, this);
-    }
-
-    /**
-     * Handles the dragover event by delegating to the DragDropService.
-     * @param {DragEvent} e
-     */
-    onDragOver(e) {
-        e.preventDefault();
-        e.stopPropagation(); // (ADIÇÃO DA CORREÇÃO)
-        DragDropService.getInstance().handleDragOver(e, this);
-    }
-
-    /**
-     * Handles the dragleave event by delegating to the DragDropService.
-     * @param {DragEvent} e
-     */
-    onDragLeave(e) {
-        e.preventDefault();
-        e.stopPropagation(); // (ADIÇÃO DA CORREÇÃO)
-        DragDropService.getInstance().handleDragLeave(e, this);
-    }
-
-    /**
-     * Handles the drop event by delegating to the DragDropService.
-     * @param {DragEvent} e
-     */
-    onDrop(e) {
-        e.preventDefault();
-        e.stopPropagation(); // (ADIÇÃO DA CORREÇÃO)
-        DragDropService.getInstance().handleDrop(e, this);
-    }
+    // (INÍCIO DA MODIFICAÇÃO - Etapa 2)
+    // (REMOVIDO) Métodos onDragEnter, onDragOver, onDragLeave, onDrop
+    // (FIM DA MODIFICAÇÃO)
 
     /**
      * Adds multiple PanelGroups at once (used for state restoration).

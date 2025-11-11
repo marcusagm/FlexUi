@@ -1,6 +1,6 @@
 import { PanelGroup } from '../../components/Panel/PanelGroup.js'; // (NOVO) Importa PanelGroup
 import { Panel } from '../../components/Panel/Panel.js';
-import { DragDropService } from './DragDropService.js';
+// (REMOVIDO) DragDropService não é mais importado aqui
 
 /**
  * Description:
@@ -13,19 +13,25 @@ import { DragDropService } from './DragDropService.js';
  * (Refatorado vBugFix 5) Esta estratégia agora também aceita
  * 'PanelGroup', SE ele contiver apenas 1 painel,
  * "desembrulhando-o" para mesclar os grupos.
+ *
+ * (REFATORADO vDND-Bridge) Os handlers agora recebem a *instância* do PanelGroup
+ * como 'dropZone', em vez do elemento DOM 'tabContainer'.
  */
 export class TabContainerDropStrategy {
     /**
      * (MODIFICADO - BugFix 5) Helper privado para obter os grupos de origem e destino.
      * Agora aceita arrastar um 'Panel' (aba) ou um 'PanelGroup' (com 1 painel).
      *
+     * (MODIFICADO - vDND-Bridge) O parâmetro 'dropZone' agora é a instância do PanelGroup.
+     *
      * @param {{item: object, type: string}} draggedData
-     * @param {HTMLElement} dropZone (O elemento tabContainer)
+     * @param {PanelGroup} dropZone (A instância do PanelGroup de destino)
      * @returns {{draggedPanel: Panel, sourceGroup: PanelGroup, targetGroup: PanelGroup} | null}
      * @private
      */
     _getGroups(draggedData, dropZone) {
-        const targetGroup = dropZone.panelGroupOwner;
+        // (MODIFICADO - Etapa 4) O 'dropZone' agora é o PanelGroup de destino
+        const targetGroup = dropZone;
         if (!targetGroup) return null;
 
         let draggedPanel = null;
@@ -67,7 +73,7 @@ export class TabContainerDropStrategy {
     /**
      * Chamado quando o rato entra no tabContainer.
      * @param {DragEvent} e
-     * @param {HTMLElement} dropZone
+     * @param {PanelGroup} dropZone (A instância do PanelGroup de destino)
      * @param {{item: object, type: string}} draggedData
      * @param {DragDropService} dds
      */
@@ -81,14 +87,17 @@ export class TabContainerDropStrategy {
 
         // Esconde outros placeholders (horizontal/vertical)
         dds.hidePlaceholder();
-        // Adiciona feedback visual
-        dropZone.classList.add('panel-group__tab-container--droptarget');
+        // (MODIFICADO - Etapa 4) Aplica feedback ao elemento DOM correto
+        const tabContainerElement = dropZone.state.header.tabContainer;
+        if (tabContainerElement) {
+            tabContainerElement.classList.add('panel-group__tab-container--droptarget');
+        }
     }
 
     /**
      * Chamado quando o rato se move sobre o tabContainer.
      * @param {DragEvent} e
-     * @param {HTMLElement} dropZone
+     * @param {PanelGroup} dropZone (A instância do PanelGroup de destino)
      * @param {{item: object, type: string}} draggedData
      * @param {DragDropService} dds
      */
@@ -100,32 +109,45 @@ export class TabContainerDropStrategy {
 
         // Mantém o feedback
         dds.hidePlaceholder();
-        dropZone.classList.add('panel-group__tab-container--droptarget');
+        // (MODIFICADO - Etapa 4) Aplica feedback ao elemento DOM correto
+        const tabContainerElement = dropZone.state.header.tabContainer;
+        if (tabContainerElement) {
+            tabContainerElement.classList.add('panel-group__tab-container--droptarget');
+        }
     }
 
     /**
      * Chamado quando o rato sai do tabContainer.
      * @param {DragEvent} e
-     * @param {HTMLElement} dropZone
+     * @param {PanelGroup} dropZone (A instância do PanelGroup de destino)
      */
     handleDragLeave(e, dropZone) {
+        // (MODIFICADO - Etapa 4) Obtém o elemento DOM correto
+        const tabContainerElement = dropZone.state.header.tabContainer;
+        if (!tabContainerElement) return;
+
         // Verifica se está apenas a entrar num filho (ex: botão de scroll)
-        if (e.relatedTarget && dropZone.contains(e.relatedTarget)) {
+        if (e.relatedTarget && tabContainerElement.contains(e.relatedTarget)) {
             return;
         }
         // Limpa o feedback
-        dropZone.classList.remove('panel-group__tab-container--droptarget');
+        tabContainerElement.classList.remove('panel-group__tab-container--droptarget');
     }
 
     /**
      * Chamado quando o 'Panel' é solto no tabContainer.
      * @param {DragEvent} e
-     * @param {HTMLElement} dropZone
+     * @param {PanelGroup} dropZone (A instância do PanelGroup de destino)
      * @param {{item: object, type: string}} draggedData
      */
     handleDrop(e, dropZone, draggedData) {
+        // (MODIFICADO - Etapa 4) Obtém o elemento DOM correto
+        const tabContainerElement = dropZone.state.header.tabContainer;
+
         // 1. Limpa o feedback
-        dropZone.classList.remove('panel-group__tab-container--droptarget');
+        if (tabContainerElement) {
+            tabContainerElement.classList.remove('panel-group__tab-container--droptarget');
+        }
 
         // 2. Valida o drop
         const groups = this._getGroups(draggedData, dropZone);

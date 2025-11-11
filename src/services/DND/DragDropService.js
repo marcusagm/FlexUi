@@ -18,6 +18,10 @@ import { appBus } from '../../utils/EventBus.js';
  * (Refatorado vOpt 4) Agora armazena o _placeholderMode para
  * evitar escritas redundantes no DOM durante o 'dragover'.
  *
+ * (REFATORADO vDND-Bridge) Esta classe agora anexa 4 listeners DND globais
+ * ao document.body e usa 'event delegation' para encontrar a 'dropZoneInstance'
+ * e chamar a Strategy apropriada.
+ *
  * This is implemented as a Singleton.
  */
 export class DragDropService {
@@ -197,60 +201,9 @@ export class DragDropService {
         return this._isDragging;
     }
 
-    /**
-     * (MODIFICADO) Delega a lógica para a estratégia registrada.
-     * @param {DragEvent} e - The native drag event.
-     * @param {object} dropZone - The drop zone instance (this).
-     */
-    handleDragEnter(e, dropZone) {
-        const strategy = this._strategyRegistry.get(dropZone.dropZoneType);
-        if (strategy && typeof strategy.handleDragEnter === 'function') {
-            // Passa o objeto _draggedData completo
-            strategy.handleDragEnter(e, dropZone, this._draggedData, this);
-        }
-    }
-
-    /**
-     * (MODIFICADO) Delega a lógica para a estratégia registrada.
-     * @param {DragEvent} e - The native drag event.
-     * @param {object} dropZone - The drop zone instance (this).
-     */
-    handleDragOver(e, dropZone) {
-        const draggedData = this.getDraggedData();
-        if (!draggedData.item) return;
-
-        const strategy = this._strategyRegistry.get(dropZone.dropZoneType);
-        if (strategy && typeof strategy.handleDragOver === 'function') {
-            // Passa o objeto _draggedData completo
-            strategy.handleDragOver(e, dropZone, draggedData, this);
-        }
-    }
-
-    /**
-     * (MODIFICADO) Delega a lógica para a estratégia registrada.
-     * @param {DragEvent} e - The native drag event.
-     * @param {object} dropZone - The drop zone instance (this).
-     */
-    handleDragLeave(e, dropZone) {
-        const strategy = this._strategyRegistry.get(dropZone.dropZoneType);
-        if (strategy && typeof strategy.handleDragLeave === 'function') {
-            // Passa o objeto _draggedData completo
-            strategy.handleDragLeave(e, dropZone, this._draggedData, this);
-        }
-    }
-
-    /**
-     * (MODIFICADO) Delega a lógica para a estratégia registrada.
-     * @param {DragEvent} e - The native drag event.
-     * @param {object} dropZone - The drop zone instance (this).
-     */
-    handleDrop(e, dropZone) {
-        const strategy = this._strategyRegistry.get(dropZone.dropZoneType);
-        if (strategy && typeof strategy.handleDrop === 'function') {
-            // Passa o objeto _draggedData completo
-            strategy.handleDrop(e, dropZone, this._draggedData, this);
-        }
-    }
+    // (INÍCIO DA MODIFICAÇÃO - Etapa 5)
+    // (REMOVIDO) Métodos handleDragEnter, handleDragOver, handleDragLeave, handleDrop
+    // (FIM DA MODIFICAÇÃO)
 
     // --- Métodos Privados ---
 
@@ -259,10 +212,134 @@ export class DragDropService {
         this._placeholder.classList.add('container__placeholder');
     }
 
+    /**
+     * (MODIFICADO - Etapa 5) Anexa listeners ao appBus e os listeners DND
+     * unificados ao document.body.
+     */
     _initEventListeners() {
         appBus.on('dragstart', this._onDragStart.bind(this));
         appBus.on('dragend', this._onDragEnd.bind(this));
+
+        // (INÍCIO DA MODIFICAÇÃO - Etapa 5)
+        // Anexa os listeners unificados ao body
+        const rootElement = document.body;
+        rootElement.addEventListener('dragenter', this._onNativeDragEnter.bind(this));
+        rootElement.addEventListener('dragover', this._onNativeDragOver.bind(this));
+        rootElement.addEventListener('dragleave', this._onNativeDragLeave.bind(this));
+        rootElement.addEventListener('drop', this._onNativeDrop.bind(this));
+        // (FIM DA MODIFICAÇÃO)
     }
+
+    // (INÍCIO DA MODIFICAÇÃO - Etapa 5)
+    // --- Handlers Nativos Unificados (DOM Bridge) ---
+
+    /**
+     * (NOVO - Etapa 5) Handler unificado para 'dragenter'.
+     * Encontra a dropzone e delega para a estratégia.
+     * @param {DragEvent} e
+     * @private
+     */
+    _onNativeDragEnter(e) {
+        if (!this.isDragging()) return;
+
+        const dropZoneElement = e.target.closest('[data-dropzone]');
+        if (!dropZoneElement || !dropZoneElement.dropZoneInstance) {
+            return;
+        }
+
+        const dropZoneInstance = dropZoneElement.dropZoneInstance;
+        const strategy = this._strategyRegistry.get(dropZoneInstance.dropZoneType);
+
+        if (strategy && typeof strategy.handleDragEnter === 'function') {
+            e.preventDefault();
+            e.stopPropagation();
+            strategy.handleDragEnter(e, dropZoneInstance, this.getDraggedData(), this);
+        }
+    }
+
+    /**
+     * (NOVO - Etapa 5) Handler unificado para 'dragover'.
+     * Encontra a dropzone e delega para a estratégia.
+     * @param {DragEvent} e
+     * @private
+     */
+    _onNativeDragOver(e) {
+        if (!this.isDragging()) return;
+
+        const dropZoneElement = e.target.closest('[data-dropzone]');
+        if (!dropZoneElement || !dropZoneElement.dropZoneInstance) {
+            this.hidePlaceholder(); // Oculta se estiver sobre uma área não-drop
+            return;
+        }
+
+        const dropZoneInstance = dropZoneElement.dropZoneInstance;
+        const strategy = this._strategyRegistry.get(dropZoneInstance.dropZoneType);
+        // console.info(dropZoneInstance.dropZoneType);
+
+        if (strategy && typeof strategy.handleDragOver === 'function') {
+            e.preventDefault();
+            e.stopPropagation();
+            strategy.handleDragOver(e, dropZoneInstance, this.getDraggedData(), this);
+        } else {
+            this.hidePlaceholder(); // Oculta se a estratégia for inválida
+        }
+    }
+
+    /**
+     * (NOVO - Etapa 5) Handler unificado para 'dragleave'.
+     * Encontra a dropzone e delega para a estratégia.
+     * @param {DragEvent} e
+     * @private
+     */
+    _onNativeDragLeave(e) {
+        if (!this.isDragging()) return;
+
+        // e.target é o elemento que o mouse acabou de sair
+        const dropZoneElement = e.target.closest('[data-dropzone]');
+
+        // Se saímos de um elemento que não é um dropzone (ou filho), ignora
+        if (!dropZoneElement || !dropZoneElement.dropZoneInstance) {
+            return;
+        }
+
+        const dropZoneInstance = dropZoneElement.dropZoneInstance;
+        const strategy = this._strategyRegistry.get(dropZoneInstance.dropZoneType);
+
+        if (strategy && typeof strategy.handleDragLeave === 'function') {
+            e.preventDefault();
+            e.stopPropagation();
+            // A estratégia (ex: ColumnDropStrategy) fará a verificação do relatedTarget
+            strategy.handleDragLeave(e, dropZoneInstance, this.getDraggedData(), this);
+        }
+    }
+
+    /**
+     * (NOVO - Etapa 5) Handler unificado para 'drop'.
+     * Encontra a dropzone e delega para a estratégia.
+     * @param {DragEvent} e
+     * @private
+     */
+    _onNativeDrop(e) {
+        if (!this.isDragging()) return;
+
+        const dropZoneElement = e.target.closest('[data-dropzone]');
+        if (!dropZoneElement || !dropZoneElement.dropZoneInstance) {
+            this.hidePlaceholder(); // Garante que o placeholder suma
+            return;
+        }
+
+        const dropZoneInstance = dropZoneElement.dropZoneInstance;
+        const strategy = this._strategyRegistry.get(dropZoneInstance.dropZoneType);
+
+        if (strategy && typeof strategy.handleDrop === 'function') {
+            e.preventDefault();
+            e.stopPropagation();
+            strategy.handleDrop(e, dropZoneInstance, this.getDraggedData(), this);
+        } else {
+            this.hidePlaceholder(); // Garante que o placeholder suma
+        }
+    }
+    // (FIM DA MODIFICAÇÃO)
 
     _clearStrategyCaches() {
         if (!this._strategyRegistry) return;

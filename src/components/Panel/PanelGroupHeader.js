@@ -1,4 +1,4 @@
-import { DragDropService } from '../../services/DND/DragDropService.js';
+// (REMOVIDO) DragDropService não é mais importado
 import { appBus } from '../../utils/EventBus.js';
 
 /**
@@ -21,6 +21,13 @@ import { appBus } from '../../utils/EventBus.js';
  * (Refatorado vBugFix 7) Adiciona stopPropagation() aos listeners
  * de DND do 'this.element' (header) para evitar "flickering"
  * (borbulhamento para a Column).
+ *
+ * (REFATORADO vDND-Bridge) Remove listeners DND locais e delega ao DragDropService
+ * através de 'dataset.dropzone' e 'dropZoneInstance'.
+ *
+ * (CORREÇÃO vDND-Bridge-Fix-3) O 'this.element' (header) é o dropzone,
+ * e lê o 'dropZoneType' do 'panelGroup' pai (que agora o possui).
+ * Os stopPropagation() conflitantes do construtor são removidos.
  */
 export class PanelGroupHeader {
     state = {
@@ -39,12 +46,17 @@ export class PanelGroupHeader {
         this.element = document.createElement('div');
         this.element.classList.add('panel-group__header');
 
-        // (NOVO - BugFix 7) Impede que eventos de DND no cabeçalho
-        // (ex: sobre os botões) borbulhem para a Column pai.
-        this.element.addEventListener('dragenter', e => e.stopPropagation());
-        this.element.addEventListener('dragover', e => e.stopPropagation());
-        this.element.addEventListener('dragleave', e => e.stopPropagation());
-        this.element.addEventListener('drop', e => e.stopPropagation());
+        // (INÍCIO DA CORREÇÃO - Bug 1)
+        // O drop zone é o header INTEIRO.
+        // Ele lê o 'dropZoneType' da instância do panelGroup (definida na Parte 1)
+        // e define a instância 'dropZoneInstance' como o próprio panelGroup.
+        this.element.dropZoneInstance = this.panelGroup;
+        // Lê o 'dropZoneType' do pai (PanelGroup.js)
+        this.element.dataset.dropzone = this.panelGroup.dropZoneType;
+        // (FIM DA CORREÇÃO)
+
+        // (REMOVIDO) Os 4 listeners DND com stopPropagation()
+        // que estavam no construtor foram removidos.
 
         this.build();
 
@@ -77,12 +89,19 @@ export class PanelGroupHeader {
         // 3. Contêiner das Abas (AGORA É DROP ZONE VAZIO)
         this.tabContainer = document.createElement('div');
         this.tabContainer.classList.add('panel-group__tab-container');
-        this.tabContainer.dropZoneType = 'TabContainer';
-        this.tabContainer.panelGroupOwner = this.panelGroup;
-        this.tabContainer.addEventListener('dragenter', this.onTabContainerDragEnter.bind(this));
-        this.tabContainer.addEventListener('dragover', this.onTabContainerDragOver.bind(this));
-        this.tabContainer.addEventListener('dragleave', this.onTabContainerDragLeave.bind(this));
-        this.tabContainer.addEventListener('drop', this.onTabContainerDrop.bind(this));
+
+        // (INÍCIO DA CORREÇÃO - Bug 1)
+        // O tabContainer NÃO é mais o dropzone. O 'this.element' (header) é.
+        // Todos os listeners DND (onTabContainer...) e propriedades
+        // (dropZoneType, panelGroupOwner) são removidos.
+        //
+        // this.tabContainer.dropZoneType = 'TabContainer'; (REMOVIDO)
+        // this.tabContainer.panelGroupOwner = this.panelGroup; (REMOVIDO)
+        // this.tabContainer.addEventListener('dragenter', ...); (REMOVIDO)
+        // this.tabContainer.addEventListener('dragover', ...); (REMOVIDO)
+        // this.tabContainer.addEventListener('dragleave', ...); (REMOVIDO)
+        // this.tabContainer.addEventListener('drop', ...); (REMOVIDO)
+        // (FIM DA CORREÇÃO)
 
         // 4. Botão de Scroll Direita
         this.scrollRightBtn = document.createElement('button');
@@ -131,27 +150,11 @@ export class PanelGroupHeader {
         this.tabContainer.addEventListener('scroll', this.updateScrollButtons.bind(this));
     }
 
+    // (INÍCIO DA CORREÇÃO - Bug 1)
     // --- Handlers de D&D (Drop Zone) ---
-    onTabContainerDragEnter(e) {
-        e.preventDefault();
-        e.stopPropagation(); // Impede o Column/Container de apanhar
-        DragDropService.getInstance().handleDragEnter(e, this.tabContainer);
-    }
-    onTabContainerDragOver(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        DragDropService.getInstance().handleDragOver(e, this.tabContainer);
-    }
-    onTabContainerDragLeave(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        DragDropService.getInstance().handleDragLeave(e, this.tabContainer);
-    }
-    onTabContainerDrop(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        DragDropService.getInstance().handleDrop(e, this.tabContainer);
-    }
+    // (REMOVIDO) Métodos onTabContainerDragEnter, onTabContainerDragOver,
+    // onTabContainerDragLeave, onTabContainerDrop (pois os listeners foram removidos)
+    // (FIM DA CORREÇÃO)
 
     /**
      * Configura o ResizeObserver para chamar updateScrollButtons

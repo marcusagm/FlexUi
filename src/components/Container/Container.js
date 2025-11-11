@@ -1,5 +1,4 @@
 import { Row } from '../Row/Row.js';
-import { DragDropService } from '../../services/DND/DragDropService.js';
 import { appBus } from '../../utils/EventBus.js';
 
 /**
@@ -16,8 +15,12 @@ import { appBus } from '../../utils/EventBus.js';
  * (Refatorado vBugFix) Corrige o vazamento de listeners do appBus
  * armazenando as referências bindadas e implementando destroy().
  *
- * Properties summary:
- * - state {object} : Gerencia os filhos (instâncias de Row).
+ * (REFATORADO vDND-Bridge) Remove listeners DND locais e delega ao DragDropService
+ * através de 'dataset.dropzone' e 'dropZoneInstance'.
+ *
+ * (CORREÇÃO vDND-Bug-Resize) Adiciona a chamada '_updateAllColumnResizeBars'
+ * em createRow/deleteRow para forçar as linhas a recalcularem os handles
+ * de coluna quando a ordem das linhas muda.
  */
 export class Container {
     state = {
@@ -36,7 +39,11 @@ export class Container {
         this.element.classList.add('container'); // Usa a nova classe CSS .container
 
         this.dropZoneType = 'container'; // Novo drop zone type (para lacunas verticais)
-        this.initDNDListeners();
+
+        // (MODIFICADO - Etapa 1)
+        this.element.dataset.dropzone = this.dropZoneType;
+        this.element.dropZoneInstance = this;
+        // (REMOVIDO) initDNDListeners();
 
         // (NOVO) Define a referência bindada
         this._boundOnRowEmpty = this.onRowEmpty.bind(this);
@@ -45,33 +52,7 @@ export class Container {
         this.initEventListeners();
     }
 
-    // Listeners D&D (delegam ao serviço)
-    initDNDListeners() {
-        this.element.addEventListener('dragenter', this.onDragEnter.bind(this));
-        this.element.addEventListener('dragover', this.onDragOver.bind(this));
-        this.element.addEventListener('dragleave', this.onDragLeave.bind(this));
-        this.element.addEventListener('drop', this.onDrop.bind(this));
-    }
-    onDragEnter(e) {
-        e.preventDefault();
-        // e.stopPropagation(); // Não necessário no nível superior
-        DragDropService.getInstance().handleDragEnter(e, this);
-    }
-    onDragOver(e) {
-        e.preventDefault();
-        // e.stopPropagation();
-        DragDropService.getInstance().handleDragOver(e, this);
-    }
-    onDragLeave(e) {
-        e.preventDefault();
-        // e.stopPropagation();
-        DragDropService.getInstance().handleDragLeave(e, this);
-    }
-    onDrop(e) {
-        e.preventDefault();
-        // e.stopPropagation();
-        DragDropService.getInstance().handleDrop(e, this);
-    }
+    // (REMOVIDO - Etapa 1) Métodos initDNDListeners e handlers (onDrag...)
 
     /**
      * (MODIFICADO) Usa a referência bindada
@@ -118,6 +99,22 @@ export class Container {
         });
     }
 
+    // (INÍCIO DA CORREÇÃO - Bug 2)
+    /**
+     * (NOVO) Força todas as linhas filhas a recalcularem
+     * seus handles de redimensionamento de *coluna*.
+     * @private
+     */
+    _updateAllColumnResizeBars() {
+        this.getRows().forEach(row => {
+            // Chama o método de Row.js que atualiza os handles de coluna
+            if (typeof row.updateAllResizeBars === 'function') {
+                row.updateAllResizeBars();
+            }
+        });
+    }
+    // (FIM DA CORREÇÃO)
+
     /**
      * (NOVO) Cria e insere uma nova Linha (Row).
      * @param {number|null} [height=null]
@@ -142,7 +139,13 @@ export class Container {
 
         // (MODIFICADO) Delega ao LayoutService
         this.requestLayoutUpdate();
-        this.updateAllResizeBars(); // (NOVO) Contexto 12
+        this.updateAllResizeBars(); // (Mantido) Atualiza os handles de LINHA (vertical)
+
+        // (INÍCIO DA CORREÇÃO - Bug 2)
+        // Força TODAS as linhas a atualizarem seus handles de COLUNA (horizontal)
+        this._updateAllColumnResizeBars();
+        // (FIM DA CORREÇÃO)
+
         return row;
     }
 
@@ -167,7 +170,12 @@ export class Container {
 
         // (MODIFICADO) Delega ao LayoutService
         this.requestLayoutUpdate();
-        this.updateAllResizeBars(); // (NOVO) Contexto 12
+        this.updateAllResizeBars(); // (Mantido) Atualiza os handles de LINHA (vertical)
+
+        // (INÍCIO DA CORREÇÃO - Bug 2)
+        // Força TODAS as linhas a atualizarem seus handles de COLUNA (horizontal)
+        this._updateAllColumnResizeBars();
+        // (FIM DA CORREÇÃO)
     }
 
     /**
@@ -241,6 +249,11 @@ export class Container {
 
         // (MODIFICADO) Delega ao LayoutService
         this.requestLayoutUpdate();
-        this.updateAllResizeBars(); // (NOVO) Contexto 12
+        this.updateAllResizeBars(); // (Mantido) Atualiza os handles de LINHA (vertical)
+
+        // (INÍCIO DA CORREÇÃO - Bug 2)
+        // Garante que o estado inicial dos handles de coluna esteja correto
+        this._updateAllColumnResizeBars();
+        // (FIM DA CORREÇÃO)
     }
 }
