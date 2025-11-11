@@ -131,7 +131,12 @@ export class RowDropStrategy {
      * @returns {void}
      */
     handleDragLeave(e, dropZone, draggedData, dds) {
-        if (e.relatedTarget && dropZone.element.contains(e.relatedTarget)) {
+        if (
+            e.relatedTarget &&
+            ((dropZone.element.contains(e.relatedTarget) &&
+                e.relatedTarget.classList.contains('container__placeholder')) ||
+                e.relatedTarget.classList.contains('row'))
+        ) {
             return;
         }
         dds.hidePlaceholder();
