@@ -1,6 +1,7 @@
 import { PanelGroup } from '../../components/Panel/PanelGroup.js';
 import { Panel } from '../../components/Panel/Panel.js';
 import { DragDropService } from './DragDropService.js';
+import { FloatingPanelManagerService } from './FloatingPanelManagerService.js';
 
 /**
  * Description:
@@ -102,6 +103,13 @@ export class ColumnDropStrategy {
      * @returns {void}
      */
     handleDragOver(e, dropZone, draggedData, dds) {
+        const placeholder = dds.getPlaceholder();
+        if (e.target !== dropZone.element && e.target !== placeholder) {
+            dds.hidePlaceholder();
+            this._dropIndex = null;
+            return;
+        }
+
         if (
             !draggedData.item ||
             (draggedData.type !== 'PanelGroup' && draggedData.type !== 'Panel')
@@ -124,7 +132,6 @@ export class ColumnDropStrategy {
         }
 
         dds.showPlaceholder('horizontal', draggedItem.element.offsetHeight);
-        const placeholder = dds.getPlaceholder();
 
         const oldColumn = draggedItem.getColumn();
         const originalIndex = oldColumn ? oldColumn.getPanelGroupIndex(draggedItem) : -1;
@@ -194,6 +201,19 @@ export class ColumnDropStrategy {
             (draggedData.type !== 'PanelGroup' && draggedData.type !== 'Panel')
         ) {
             return;
+        }
+
+        let sourceGroup = null;
+        if (draggedData.type === 'PanelGroup') {
+            sourceGroup = draggedData.item;
+        } else if (draggedData.type === 'Panel') {
+            sourceGroup = draggedData.item._state.parentGroup;
+        }
+
+        if (sourceGroup && sourceGroup._state.isFloating) {
+            if (draggedData.type === 'PanelGroup') {
+                FloatingPanelManagerService.getInstance().removeFloatingPanel(sourceGroup);
+            }
         }
 
         if (panelIndex === null) {

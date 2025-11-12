@@ -1,4 +1,5 @@
 import { appBus } from '../../utils/EventBus.js';
+import { FloatingPanelManagerService } from './FloatingPanelManagerService.js';
 
 /**
  * Description:
@@ -360,20 +361,26 @@ export class DragDropService {
         const me = this;
         if (!me.isDragging()) return;
 
+        e.preventDefault();
+        e.stopPropagation();
+
         const dropZoneElement = e.target.closest('[data-dropzone]');
-        if (!dropZoneElement || !dropZoneElement.dropZoneInstance) {
-            me.hidePlaceholder();
-            return;
-        }
+        const placeholderVisible = !!me._placeholder.parentElement;
+        const isTabContainerDrop =
+            dropZoneElement && dropZoneElement.dropZoneInstance?.dropZoneType === 'TabContainer';
 
-        const dropZoneInstance = dropZoneElement.dropZoneInstance;
-        const strategy = me._strategyRegistry.get(dropZoneInstance.dropZoneType);
+        if ((placeholderVisible || isTabContainerDrop) && dropZoneElement) {
+            const dropZoneInstance = dropZoneElement.dropZoneInstance;
+            const strategy = me._strategyRegistry.get(dropZoneInstance.dropZoneType);
 
-        if (strategy && typeof strategy.handleDrop === 'function') {
-            e.preventDefault();
-            e.stopPropagation();
-            strategy.handleDrop(e, dropZoneInstance, me.getDraggedData(), me);
+            if (strategy && typeof strategy.handleDrop === 'function') {
+                strategy.handleDrop(e, dropZoneInstance, me.getDraggedData(), me);
+            } else {
+                me.hidePlaceholder();
+            }
         } else {
+            const fpms = FloatingPanelManagerService.getInstance();
+            fpms.handleUndockDrop(me.getDraggedData(), e);
             me.hidePlaceholder();
         }
     }

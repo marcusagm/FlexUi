@@ -1,5 +1,6 @@
 import { PanelGroup } from '../../components/Panel/PanelGroup.js';
 import { Panel } from '../../components/Panel/Panel.js';
+import { FloatingPanelManagerService } from './FloatingPanelManagerService.js';
 
 /**
  * Description:
@@ -94,6 +95,13 @@ export class TabContainerDropStrategy {
      * @returns {void}
      */
     handleDragOver(e, dropZone, draggedData, dds) {
+        const placeholder = dds.getPlaceholder();
+        if (e.target !== dropZone.element && e.target !== placeholder) {
+            dds.hidePlaceholder();
+            this._dropIndex = null;
+            return;
+        }
+
         const groups = this._getGroups(draggedData, dropZone);
         if (!groups || groups.sourceGroup === groups.targetGroup) {
             return;
@@ -142,6 +150,12 @@ export class TabContainerDropStrategy {
         }
 
         const { draggedPanel, sourceGroup, targetGroup } = groups;
+
+        if (sourceGroup._state.isFloating) {
+            if (draggedData.type === 'PanelGroup') {
+                FloatingPanelManagerService.getInstance().removeFloatingPanel(sourceGroup);
+            }
+        }
 
         sourceGroup.removePanel(draggedPanel);
         targetGroup.addPanel(draggedPanel, true); // Add and make active

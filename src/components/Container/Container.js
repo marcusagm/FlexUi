@@ -1,5 +1,6 @@
 import { Row } from '../Row/Row.js';
 import { appBus } from '../../utils/EventBus.js';
+import { FloatingPanelManagerService } from '../../services/DND/FloatingPanelManagerService.js';
 
 /**
  * Description:
@@ -238,9 +239,14 @@ export class Container {
      * @returns {object}
      */
     toJSON() {
-        return {
-            rows: this.getRows().map(row => row.toJSON())
+        const me = this;
+        const fpms = FloatingPanelManagerService.getInstance();
+
+        const layout = {
+            rows: me.getRows().map(row => row.toJSON()),
+            floatingPanels: fpms.toJSON()
         };
+        return layout;
     }
 
     /**
@@ -254,16 +260,19 @@ export class Container {
         const rowsData = data.rows || [];
 
         if (rowsData.length === 0 && data.columns) {
-            // Fallback for legacy layouts (without 'rows')
             console.warn("Container: Loading legacy layout (no 'rows'). Wrapping in a Row.");
             const row = me.createRow();
             row.fromJSON(data);
         } else {
-            // Load rows
             rowsData.forEach(rowData => {
                 const row = me.createRow(rowData.height);
                 row.fromJSON(rowData);
             });
+        }
+
+        if (data.floatingPanels && Array.isArray(data.floatingPanels)) {
+            const fpms = FloatingPanelManagerService.getInstance();
+            fpms.fromJSON(data.floatingPanels);
         }
 
         if (me.getRows().length === 0) {

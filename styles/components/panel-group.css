@@ -328,3 +328,14 @@
 .dnd-active .panel-group__resize-handle {
     pointer-events: none;
 }
+
+.panel-group--floating {
+    position: absolute;
+    z-index: 50;
+    box-shadow: var(--panel-floating-shadow);
+    flex: 0 1 auto;
+}
+
+.panel-group--floating > .panel-group__resize-handle {
+    display: none;
+}

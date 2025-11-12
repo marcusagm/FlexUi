@@ -10,6 +10,7 @@
     overflow: auto;
     width: var(--container-width);
     height: var(--container-height-calc);
+    position: relative;
 }
 .dnd-active .container {
     gap: var(--dnd-active-container-gap);

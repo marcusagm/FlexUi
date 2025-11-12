@@ -220,6 +220,7 @@
     --panel-simple-header-title-padding: 0 5px;
     --panel-content-flex-grow: 1;
     --panel-content-min-height: 20px; /* (Esta duplicata foi de panel-group, não panel.css) */
+    --panel-floating-shadow: 0 5px 5px rgba(0, 0, 0, 0.2);
 
     /* Component: Panel (Content) */
     --panel-content-padding: 8px;

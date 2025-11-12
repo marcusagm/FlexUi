@@ -4,6 +4,7 @@ import { Panel } from './Panel.js';
 import { appBus } from '../../utils/EventBus.js';
 import { throttleRAF } from '../../utils/ThrottleRAF.js';
 import { generateId } from '../../utils/generateId.js';
+import { FloatingPanelManagerService } from '../../services/DND/FloatingPanelManagerService.js';
 
 /**
  * Description:
@@ -62,7 +63,10 @@ export class PanelGroup {
      * closable: boolean,
      * collapsible: boolean,
      * movable: boolean,
-     * title: string | null
+     * title: string | null,
+     * isFloating: boolean,
+     * x: number | null,
+     * y: number | null
      * }}
      * @private
      */
@@ -79,7 +83,10 @@ export class PanelGroup {
         collapsible: true,
         movable: true,
         hasTitle: true,
-        title: null
+        title: null,
+        isFloating: false,
+        x: null,
+        y: null
     };
 
     /**
@@ -137,15 +144,16 @@ export class PanelGroup {
         me._state.contentContainer = document.createElement('div');
         me._state.contentContainer.classList.add('panel-group__content');
 
-        me._state.contentContainer.addEventListener('dragenter', e => e.stopPropagation());
-        me._state.contentContainer.addEventListener('dragover', e => e.stopPropagation());
-        me._state.contentContainer.addEventListener('dragleave', e => e.stopPropagation());
-        me._state.contentContainer.addEventListener('drop', e => e.stopPropagation());
-
         me._state.collapsed = collapsed;
         me.element = document.createElement('div');
         me.element.classList.add('panel-group');
         me.element.classList.add('panel');
+
+        me.element.addEventListener('mousedown', () => {
+            if (me._state.isFloating) {
+                FloatingPanelManagerService.getInstance().bringToFront(me);
+            }
+        });
 
         me._state.header = new PanelGroupHeader(me);
 
@@ -158,6 +166,7 @@ export class PanelGroup {
         me._boundOnToggleCollapseRequest = me.onToggleCollapseRequest.bind(me);
 
         me.build();
+        me.setFloatingState(me._state.isFloating, me._state.x, me._state.y);
 
         if (initialPanel) {
             me.addPanel(initialPanel, true);
@@ -226,6 +235,30 @@ export class PanelGroup {
      */
     getColumn() {
         return this._state.column;
+    }
+
+    /**
+     * Sets the floating state and updates the DOM.
+     * @param {boolean} isFloating - Whether the panel should be floating.
+     * @param {number|null} x - The X coordinate.
+     * @param {number|null} y - The Y coordinate.
+     * @returns {void}
+     */
+    setFloatingState(isFloating, x, y) {
+        const me = this;
+        me._state.isFloating = isFloating;
+        me._state.x = x;
+        me._state.y = y;
+
+        if (isFloating) {
+            me.element.classList.add('panel-group--floating');
+            me.element.style.left = `${x}px`;
+            me.element.style.top = `${y}px`;
+        } else {
+            me.element.classList.remove('panel-group--floating');
+            me.element.style.left = '';
+            me.element.style.top = '';
+        }
     }
 
     /**
@@ -322,6 +355,9 @@ export class PanelGroup {
      */
     canCollapse() {
         const me = this;
+        if (me._state.isFloating) {
+            return me._state.collapsible;
+        }
         if (!me._state.column) return false;
         if (!me._state.collapsible) return false;
 
@@ -421,10 +457,10 @@ export class PanelGroup {
         const minPanelHeight = me.getMinPanelHeight();
         me.element.style.minHeight = `${minPanelHeight}px`;
 
-        if (me._state.height !== null) {
+        if (me._state.height !== null && !me._state.isFloating) {
             me.element.style.height = `${me._state.height}px`;
             me.element.style.flex = '0 0 auto';
-        } else {
+        } else if (!me._state.isFloating) {
             me.element.style.height = 'auto';
             me.element.style.flex = '0 0 auto';
         }
@@ -617,7 +653,7 @@ export class PanelGroup {
      */
     requestLayoutUpdate() {
         const column = this.getColumn();
-        if (column) {
+        if (column && !this._state.isFloating) {
             appBus.emit('layout:panel-groups-changed', column);
         }
     }
@@ -634,6 +670,9 @@ export class PanelGroup {
             height: me._state.height,
             collapsed: me._state.collapsed,
             activePanelId: me._state.activePanel ? me._state.activePanel.id : null,
+            isFloating: me._state.isFloating,
+            x: me._state.x,
+            y: me._state.y,
             config: {
                 closable: me._state.closable,
                 collapsible: me._state.collapsible,
@@ -660,6 +699,15 @@ export class PanelGroup {
         }
         if (data.collapsed !== undefined) {
             me._state.collapsed = data.collapsed;
+        }
+        if (data.isFloating !== undefined) {
+            me._state.isFloating = data.isFloating;
+        }
+        if (data.x !== undefined) {
+            me._state.x = data.x;
+        }
+        if (data.y !== undefined) {
+            me._state.y = data.y;
         }
         if (data.config) {
             Object.assign(me._state, data.config);

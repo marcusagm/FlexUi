@@ -18,6 +18,7 @@ import { TabContainerDropStrategy } from './services/DND/TabContainerDropStrateg
 import { LayoutService } from './services/LayoutService.js';
 import { appBus } from './utils/EventBus.js';
 import { debounce } from './utils/Debounce.js';
+import { FloatingPanelManagerService } from './services/DND/FloatingPanelManagerService.js';
 
 /**
  * Description:
@@ -149,9 +150,11 @@ export class App {
 
         LayoutService.getInstance();
 
+        const fpms = FloatingPanelManagerService.getInstance();
+        fpms.registerContainer(me.container.element);
+
         document.body.append(me.menu.element, me.container.element, me.statusBar.element);
 
-        // Armazena referências bindadas para preservar o 'this'
         me._boundAddNewPanel = me.addNewPanel.bind(me);
         me._boundResetLayoutSilent = me.resetLayout.bind(me, true);
         me._boundSaveLayout = me.saveLayout.bind(me);
@@ -173,6 +176,13 @@ export class App {
         const me = this;
         await me.menu.load();
         await me.loadInitialLayout();
+
+        const fpms = FloatingPanelManagerService.getInstance();
+        fpms.addFloatingPanel(
+            new PanelGroup(new TextPanel('Float', 'Painel flutuante', 170), 170),
+            10,
+            10
+        );
 
         appBus.emit('app:set-permanent-status', 'Pronto');
     }
