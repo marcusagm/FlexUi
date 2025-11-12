@@ -215,13 +215,13 @@ export class FloatingPanelManagerService {
      * @param {DragEvent} event - The native drop event.
      * @returns {void}
      */
-    handleUndockDrop(draggedData, event) {
+    handleUndockDrop(draggedData, positionX, positionY) {
         const me = this;
         if (!me.container) return;
 
         const containerRect = me.container.getBoundingClientRect();
-        const x = event.clientX - containerRect.left;
-        const y = event.clientY - containerRect.top;
+        const x = positionX - containerRect.left;
+        const y = positionY - containerRect.top;
 
         let panelGroup = null;
 

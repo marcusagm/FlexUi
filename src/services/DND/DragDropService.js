@@ -53,10 +53,16 @@ export class DragDropService {
 
     /**
      * Stores the item, type, and element being dragged.
-     * @type {{item: object | null, type: string | null, element: HTMLElement | null}}
+     * @type {{
+     * item: object | null,
+     * type: string | null,
+     * element: HTMLElement | null,
+     * offsetX: number,
+     * offsetY: number
+     * }}
      * @private
      */
-    _dragState = { item: null, type: null, element: null };
+    _dragState = { item: null, type: null, element: null, offsetX: 0, offsetY: 0 };
 
     /**
      * The single shared DOM element for drop feedback.
@@ -105,6 +111,20 @@ export class DragDropService {
      * @private
      */
     _boundOnDragEnd = null;
+
+    /**
+     * Caches the last valid X coordinate from dragOver.
+     * @type {number}
+     * @private
+     */
+    _lastDragX = 0;
+
+    /**
+     * Caches the last valid Y coordinate from dragOver.
+     * @type {number}
+     * @private
+     */
+    _lastDragY = 0;
 
     /**
      * @private
@@ -214,7 +234,13 @@ export class DragDropService {
 
     /**
      * <DraggedData> getter.
-     * @returns {{item: object | null, type: string | null, element: HTMLElement | null}}
+     * @returns {{
+     * item: object | null,
+     * type: string | null,
+     * element: HTMLElement | null,
+     * offsetX: number,
+     * offsetY: number
+     * }}
      */
     getDraggedData() {
         return this._dragState;
@@ -308,6 +334,21 @@ export class DragDropService {
         const me = this;
         if (!me.isDragging()) return;
 
+        if (e.clientX !== 0 || e.clientY !== 0) {
+            me._lastDragX = e.clientX;
+            me._lastDragY = e.clientY;
+        }
+
+        if (me._dragState.type === 'PanelGroup' && me._dragState.item._state.isFloating === true) {
+            const fpms = FloatingPanelManagerService.getInstance();
+            const containerRect = fpms.getContainerBounds();
+            if (containerRect) {
+                const newX = me._lastDragX - containerRect.left - me._dragState.offsetX;
+                const newY = me._lastDragY - containerRect.top - me._dragState.offsetY;
+                fpms.updatePanelPosition(me._dragState.item, newX, newY);
+            }
+        }
+
         const dropZoneElement = e.target.closest('[data-dropzone]');
         if (!dropZoneElement || !dropZoneElement.dropZoneInstance) {
             me.hidePlaceholder();
@@ -380,7 +421,7 @@ export class DragDropService {
             }
         } else {
             const fpms = FloatingPanelManagerService.getInstance();
-            fpms.handleUndockDrop(me.getDraggedData(), e);
+            fpms.handleUndockDrop(me.getDraggedData(), me._lastDragX, me._lastDragY);
             me.hidePlaceholder();
         }
     }
@@ -402,7 +443,7 @@ export class DragDropService {
 
     /**
      * Handles the 'dragstart' event from the appBus.
-     * @param {object} payload - { item, type, element, event }.
+     * @param {object} payload - { item, type, element, event, offsetX, offsetY }.
      * @private
      * @returns {void}
      */
@@ -413,21 +454,29 @@ export class DragDropService {
         document.body.classList.add('dnd-active');
         me._clearStrategyCaches();
 
-        const { item, type, element, event: e } = payload;
+        const { item, type, element, event, offsetX, offsetY } = payload;
 
         me._dragState.item = item;
         me._dragState.type = type || null;
         me._dragState.element = element;
+        me._dragState.offsetX = offsetX || 0;
+        me._dragState.offsetY = offsetY || 0;
         me._isDragging = true;
 
-        e.dataTransfer.setData('text/plain', '');
-        e.dataTransfer.dropEffect = 'move';
         element.classList.add('dragging');
+        event.dataTransfer.dropEffect = 'move';
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', '');
+        if (me._dragState.item._state.isFloating === true) {
+            const transparentPixelBase64 =
+                'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
 
-        const rect = element.getBoundingClientRect();
-        const offsetX = e.clientX - rect.left;
-        const offsetY = e.clientY - rect.top;
-        e.dataTransfer.setDragImage(element, offsetX, offsetY);
+            const dragImage = new Image(1, 1);
+            dragImage.src = transparentPixelBase64;
+            event.dataTransfer.setDragImage(dragImage, offsetX, offsetY);
+        } else {
+            event.dataTransfer.setDragImage(element, offsetX, offsetY);
+        }
     }
 
     /**
@@ -449,6 +498,10 @@ export class DragDropService {
         me._dragState.item = null;
         me._dragState.type = null;
         me._dragState.element = null;
+        me._dragState.offsetX = 0;
+        me._dragState.offsetY = 0;
         me._isDragging = false;
+        me._lastDragX = 0;
+        me._lastDragY = 0;
     }
 }
