@@ -1,4 +1,5 @@
 import { ModalInstance } from './ModalInstance.js';
+import { throttleRAF } from '../../utils/ThrottleRAF.js';
 
 /**
  * Description:
@@ -155,7 +156,7 @@ export class ModalService {
         document.addEventListener('keydown', me._onGlobalKeydown.bind(me));
 
         // [FEATURE] Attach throttled resize listener
-        me._throttledResizeHandler = me._throttle(me._onWindowResize.bind(me), 150);
+        me._throttledResizeHandler = throttleRAF(me._onWindowResize.bind(me));
         window.addEventListener('resize', me._throttledResizeHandler);
     }
 
@@ -648,26 +649,6 @@ export class ModalService {
     }
 
     // --- Utility Helpers ---
-
-    /**
-     * [FEATURE] Utility to throttle function execution.
-     * @param {Function} func The function to throttle.
-     * @param {number} limit The delay in milliseconds.
-     * @returns {Function} The throttled function.
-     * @private
-     */
-    _throttle(func, limit) {
-        let inThrottle;
-        return function () {
-            const args = arguments;
-            const context = this;
-            if (!inThrottle) {
-                func.apply(context, args);
-                inThrottle = true;
-                setTimeout(() => (inThrottle = false), limit);
-            }
-        };
-    }
 
     /**
      * Gets the width of the browser's scrollbar.
