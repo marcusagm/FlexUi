@@ -423,7 +423,11 @@ export class DragDropService {
         e.dataTransfer.setData('text/plain', '');
         e.dataTransfer.dropEffect = 'move';
         element.classList.add('dragging');
-        e.dataTransfer.setDragImage(element, 20, 20);
+
+        const rect = element.getBoundingClientRect();
+        const offsetX = e.clientX - rect.left;
+        const offsetY = e.clientY - rect.top;
+        e.dataTransfer.setDragImage(element, offsetX, offsetY);
     }
 
     /**

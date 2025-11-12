@@ -59,7 +59,9 @@ export class PanelGroup {
      * activePanel: Panel | null,
      * collapsed: boolean,
      * height: number | null,
+     * width: number | null,
      * minHeight: number,
+     * minWidth: number,
      * closable: boolean,
      * collapsible: boolean,
      * movable: boolean,
@@ -78,7 +80,9 @@ export class PanelGroup {
         activePanel: null,
         collapsed: false,
         height: null,
+        width: null,
         minHeight: 100,
+        minWidth: 150,
         closable: true,
         collapsible: true,
         movable: true,
@@ -130,6 +134,55 @@ export class PanelGroup {
     _boundOnToggleCollapseRequest = null;
 
     /**
+     * @type {HTMLElement}
+     * @private
+     */
+    _resizeHandleSE = null;
+
+    /**
+     * @type {HTMLElement}
+     * @private
+     */
+    _resizeHandleS = null;
+
+    /**
+     * @type {HTMLElement}
+     * @private
+     */
+    _resizeHandleE = null;
+
+    /**
+     * @type {Function | null}
+     * @private
+     */
+    _boundOnFloatingResizeStart = null;
+
+    /**
+     * @type {Function | null}
+     * @private
+     */
+    _boundOnFloatingResizeMove = null;
+
+    /**
+     * @type {Function | null}
+     * @private
+     */
+    _boundOnFloatingResizeUp = null;
+
+    /**
+     * Tracks coordinates during floating resize.
+     * @type {object}
+     * @private
+     */
+    _resizeState = {
+        startX: 0,
+        startY: 0,
+        startWidth: 0,
+        startHeight: 0,
+        direction: null
+    };
+
+    /**
      * @param {Panel | null} [initialPanel=null] - The optional first panel.
      * @param {number|null} [height=null] - The initial height of the group.
      * @param {boolean} [collapsed=false] - The initial collapsed state.
@@ -164,6 +217,12 @@ export class PanelGroup {
         me._boundOnChildCloseRequest = me.onChildCloseRequest.bind(me);
         me._boundOnCloseRequest = me.onCloseRequest.bind(me);
         me._boundOnToggleCollapseRequest = me.onToggleCollapseRequest.bind(me);
+
+        me._createFloatingResizeHandles();
+        me._boundOnFloatingResizeStart = me._onFloatingResizeStart.bind(me);
+        me._boundOnFloatingResizeMove = me._onFloatingResizeMove.bind(me);
+        me._boundOnFloatingResizeUp = me._onFloatingResizeUp.bind(me);
+        me._initFloatingResizeListeners();
 
         me.build();
         me.setFloatingState(me._state.isFloating, me._state.x, me._state.y);
@@ -221,6 +280,14 @@ export class PanelGroup {
     }
 
     /**
+     * <MinPanelWidth> getter.
+     * @returns {number} The calculated minimum panel width.
+     */
+    getMinPanelWidth() {
+        return this._state.minWidth;
+    }
+
+    /**
      * <ParentColumn> setter.
      * @param {import('../Column/Column.js').Column} column - The parent column instance.
      * @returns {void}
@@ -254,10 +321,18 @@ export class PanelGroup {
             me.element.classList.add('panel-group--floating');
             me.element.style.left = `${x}px`;
             me.element.style.top = `${y}px`;
+            if (me._state.width !== null) {
+                me.element.style.width = `${me._state.width}px`;
+            }
+            if (me._state.height !== null) {
+                me.element.style.height = `${me._state.height}px`;
+            }
         } else {
             me.element.classList.remove('panel-group--floating');
             me.element.style.left = '';
             me.element.style.top = '';
+            me.element.style.width = '';
+            me.element.style.height = '';
         }
     }
 
@@ -320,6 +395,12 @@ export class PanelGroup {
         me._state.header?.destroy();
         me._state.panels.forEach(panel => panel.destroy());
         me.getThrottledUpdate()?.cancel();
+
+        me._resizeHandleSE?.removeEventListener('mousedown', me._boundOnFloatingResizeStart);
+        me._resizeHandleS?.removeEventListener('mousedown', me._boundOnFloatingResizeStart);
+        me._resizeHandleE?.removeEventListener('mousedown', me._boundOnFloatingResizeStart);
+        window.removeEventListener('mousemove', me._boundOnFloatingResizeMove);
+        window.removeEventListener('mouseup', me._boundOnFloatingResizeUp);
     }
 
     /**
@@ -332,7 +413,14 @@ export class PanelGroup {
         me.resizeHandle.classList.add('panel-group__resize-handle');
         me.resizeHandle.addEventListener('mousedown', me.startResize.bind(me));
 
-        me.element.append(me._state.header.element, me._state.contentContainer, me.resizeHandle);
+        me.element.append(
+            me._state.header.element,
+            me._state.contentContainer,
+            me.resizeHandle,
+            me._resizeHandleSE,
+            me._resizeHandleS,
+            me._resizeHandleE
+        );
 
         if (!me._state.movable) {
             me.element.classList.add('panel--not-movable');
@@ -659,6 +747,124 @@ export class PanelGroup {
     }
 
     /**
+     * Creates the DOM elements for floating resize handles.
+     * @private
+     * @returns {void}
+     */
+    _createFloatingResizeHandles() {
+        const me = this;
+        me._resizeHandleSE = document.createElement('div');
+        me._resizeHandleS = document.createElement('div');
+        me._resizeHandleE = document.createElement('div');
+
+        me._resizeHandleSE.className =
+            'panel-group__resize-handle--floating panel-group__resize-handle--se';
+        me._resizeHandleS.className =
+            'panel-group__resize-handle--floating panel-group__resize-handle--s';
+        me._resizeHandleE.className =
+            'panel-group__resize-handle--floating panel-group__resize-handle--e';
+
+        me._resizeHandleSE.dataset.direction = 'se';
+        me._resizeHandleS.dataset.direction = 's';
+        me._resizeHandleE.dataset.direction = 'e';
+    }
+
+    /**
+     * Attaches mousedown listeners to floating resize handles.
+     * @private
+     * @returns {void}
+     */
+    _initFloatingResizeListeners() {
+        const me = this;
+        me._resizeHandleSE.addEventListener('mousedown', me._boundOnFloatingResizeStart);
+        me._resizeHandleS.addEventListener('mousedown', me._boundOnFloatingResizeStart);
+        me._resizeHandleE.addEventListener('mousedown', me._boundOnFloatingResizeStart);
+    }
+
+    /**
+     * Handles the start of a floating resize drag.
+     * @param {MouseEvent} e
+     * @private
+     * @returns {void}
+     */
+    _onFloatingResizeStart(e) {
+        const me = this;
+        if (!me._state.isFloating) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        me._resizeState.startX = e.clientX;
+        me._resizeState.startY = e.clientY;
+        const rect = me.element.getBoundingClientRect();
+        me._resizeState.startWidth = rect.width;
+        me._resizeState.startHeight = rect.height;
+        me._resizeState.direction = e.target.dataset.direction;
+
+        window.addEventListener('mousemove', me._boundOnFloatingResizeMove);
+        window.addEventListener('mouseup', me._boundOnFloatingResizeUp);
+    }
+
+    /**
+     * Handles mouse movement during floating resize.
+     * @param {MouseEvent} e
+     * @private
+     * @returns {void}
+     */
+    _onFloatingResizeMove(e) {
+        const me = this;
+        const deltaX = e.clientX - me._resizeState.startX;
+        const deltaY = e.clientY - me._resizeState.startY;
+
+        const fpms = FloatingPanelManagerService.getInstance();
+        const bounds = fpms.getContainerBounds();
+        if (!bounds) return;
+
+        let newWidth = me._resizeState.startWidth;
+        let newHeight = me._resizeState.startHeight;
+
+        const direction = me._resizeState.direction;
+
+        if (direction.includes('e')) {
+            newWidth = me._resizeState.startWidth + deltaX;
+        }
+        if (direction.includes('s')) {
+            newHeight = me._resizeState.startHeight + deltaY;
+        }
+
+        const minWidth = me.getMinPanelWidth();
+        const minHeight = me.getMinPanelHeight();
+
+        const maxWidth = bounds.width - me._state.x;
+        const maxHeight = bounds.height - me._state.y;
+
+        newWidth = Math.max(minWidth, Math.min(newWidth, maxWidth));
+        newHeight = Math.max(minHeight, Math.min(newHeight, maxHeight));
+
+        if (direction.includes('e')) {
+            me.element.style.width = `${newWidth}px`;
+        }
+        if (direction.includes('s')) {
+            me.element.style.height = `${newHeight}px`;
+        }
+    }
+
+    /**
+     * Handles mouse up after floating resize.
+     * @param {MouseEvent} e
+     * @private
+     * @returns {void}
+     */
+    _onFloatingResizeUp(e) {
+        const me = this;
+        window.removeEventListener('mousemove', me._boundOnFloatingResizeMove);
+        window.removeEventListener('mouseup', me._boundOnFloatingResizeUp);
+
+        me._state.width = me.element.offsetWidth;
+        me._state.height = me.element.offsetHeight;
+    }
+
+    /**
      * Serializes the PanelGroup state (and its child Panels) to JSON.
      * @returns {object}
      */
@@ -668,6 +874,7 @@ export class PanelGroup {
             id: me.id,
             type: me.getPanelType(),
             height: me._state.height,
+            width: me._state.width,
             collapsed: me._state.collapsed,
             activePanelId: me._state.activePanel ? me._state.activePanel.id : null,
             isFloating: me._state.isFloating,
@@ -696,6 +903,9 @@ export class PanelGroup {
         }
         if (data.height !== undefined) {
             me._state.height = data.height;
+        }
+        if (data.width !== undefined) {
+            me._state.width = data.width;
         }
         if (data.collapsed !== undefined) {
             me._state.collapsed = data.collapsed;

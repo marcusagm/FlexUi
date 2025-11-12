@@ -40,8 +40,8 @@
 - [x] Possibilitar proibir paineis de serem fechados
 - [x] Possibilitar proibir paineis de serem colapsados
 - [x] Permitir Paineis sem título
-- [ ] Paineis flutuantes
-- [ ] Permitir transformar paineis flutuantes em fixos
+- [x] Paineis flutuantes
+- [x] Permitir transformar paineis flutuantes em fixos
 - [ ] Permitir agrupamento de paineis flutuantes
 - [ ] Paineis flutuantes colapsados em icones
 
