@@ -433,6 +433,7 @@ export class ModalInstance {
             pos4 = event.clientY;
             document.onmouseup = closeDragElement;
             document.onmousemove = elementDrag;
+            document.onmouseleave = closeDragElement;
         }
 
         function elementDrag(event) {
@@ -448,6 +449,7 @@ export class ModalInstance {
         function closeDragElement() {
             document.onmouseup = null;
             document.onmousemove = null;
+            document.onmouseleave = null;
         }
 
         header.onmousedown = dragMouseDown;
