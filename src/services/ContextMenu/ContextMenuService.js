@@ -7,7 +7,8 @@ import { throttleRAF } from '../../utils/ThrottleRAF.js';
  * of dynamic context menus (right-click menus).
  *
  * It attaches a main menu DOM element to the body and dynamically
- * populates it. Submenus are created as separate, independent menu
+ * populates it based on the configuration provided by the caller.
+ * Submenus are created as separate, independent menu
  * structures (also attached to the body) to escape the main menu's
  * scroll viewport ('overflow: auto').
  *
@@ -25,6 +26,9 @@ import { throttleRAF } from '../../utils/ThrottleRAF.js';
  * - SCROLL_BTN_HEIGHT {number} : The pixel height of one scroll button (CSS).
  * - VIEWPORT_V_PADDING {number} : The total vertical padding of the viewport (CSS).
  * - SUBMENU_HIDE_DELAY {number} : Delay in ms before closing a submenu on mouseleave.
+ *
+ * Events:
+ * - Emits (appBus): 'contextmenu:opened'
  *
  * Dependencies:
  * - ../../utils/EventBus.js
@@ -636,6 +640,8 @@ export class ContextMenuService {
         me._buildMenuRecursive(items, me._listElement, contextData);
 
         me._positionAndFitMenu(me._menuElement, event.clientX, event.clientY, false, null);
+
+        appBus.emit('contextmenu:opened');
     }
 
     /**

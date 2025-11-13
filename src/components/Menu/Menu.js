@@ -22,7 +22,7 @@ import { appBus } from '../../utils/EventBus.js';
  *
  * Events:
  * - Listens to (native): 'click' (on document)
- * - Listens to (appBus): 'menu:item-selected', 'menu:close-siblings'
+ * - Listens to (appBus): 'menu:item-selected', 'menu:close-siblings', 'contextmenu:opened'
  *
  * Dependencies:
  * - components/Menu/MenuItem.js
@@ -91,6 +91,7 @@ export class Menu {
      * @private
      */
     _processMenuData(items, i18n) {
+        const me = this;
         if (!items || !Array.isArray(items)) {
             return [];
         }
@@ -103,7 +104,7 @@ export class Menu {
             }
 
             if (item.children && item.children.length > 0) {
-                processedItem.children = this._processMenuData(item.children, i18n);
+                processedItem.children = me._processMenuData(item.children, i18n);
             }
 
             return processedItem;
@@ -168,6 +169,7 @@ export class Menu {
         document.addEventListener('click', me._boundOnGlobalClick);
         appBus.on('menu:item-selected', me._boundCloseAllMenus, options);
         appBus.on('menu:close-siblings', me._boundCloseSiblings, options);
+        appBus.on('contextmenu:opened', me._boundCloseAllMenus, options);
     }
 
     /**
