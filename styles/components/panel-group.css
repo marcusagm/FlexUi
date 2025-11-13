@@ -287,6 +287,9 @@
 .panel-group__header--simple .panel-group__tab-container {
     flex-grow: var(--panel-simple-header-tab-container-flex-grow);
 }
+.panel-group__header--simple .panel-group__tab-container > div {
+    flex-grow: 1;
+}
 .panel-group__header--simple .panel-group__tab {
     background: transparent;
     border: none;

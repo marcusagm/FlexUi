@@ -760,12 +760,17 @@ export class PanelGroup {
      */
     setActive(panel) {
         const me = this;
-        if (!panel || panel === me._state.activePanel) return;
+        const isSimpleMode = me._state.panels.length === 1;
+
+        if (!panel) {
+            return;
+        }
+        if (panel === me._state.activePanel && !isSimpleMode) {
+            return;
+        }
 
         const oldActivePanel = me._state.activePanel;
         oldActivePanel?.unmount();
-
-        const isSimpleMode = me._state.panels.length === 1;
 
         me._state.panels.forEach(p => {
             p._state.header.element.classList.remove('panel-group__tab--active');
