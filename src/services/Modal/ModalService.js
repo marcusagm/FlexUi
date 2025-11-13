@@ -4,6 +4,7 @@ import { AlertView } from './presets/AlertView.js';
 import { ConfirmView } from './presets/ConfirmView.js';
 import { PromptView } from './presets/PromptView.js';
 import { globalState } from '../GlobalStateService.js';
+import { appShortcuts } from '../Shortcuts/Shortcuts.js';
 
 /**
  * Description:
@@ -13,6 +14,7 @@ import { globalState } from '../GlobalStateService.js';
  * UI positioning (like drawers/side-modals).
  *
  * It also manages the 'modal-open' scope for the ShortcutService via GlobalStateService.
+ * All keyboard interactions (Escape, Tab) are registered via the ShortcutService.
  *
  * Properties summary:
  * - _container {HTMLElement} : The main DOM element holding all modals.
@@ -22,6 +24,8 @@ import { globalState } from '../GlobalStateService.js';
  * - _animationDuration {number} : Duration of modal animations in ms.
  * - _globalDefaultOptions {object} : Stores default options for all modals.
  * - _throttledResizeHandler {Function} : The throttled resize event handler.
+ * - _boundHandleEscapeKey {Function} : Bound handler for the 'Escape' shortcut.
+ * - _boundHandleFocusTrap {Function} : Bound handler for the 'Tab' shortcuts.
  *
  * Typical usage:
  * import ModalService from './ModalService.js';
@@ -47,6 +51,7 @@ import { globalState } from '../GlobalStateService.js';
  * - ./presets/ConfirmView.js
  * - ./presets/PromptView.js
  * - ../GlobalStateService.js
+ * - ../Shortcuts/Shortcuts.js
  *
  * Notes / Additional:
  * - This class is a Singleton. Use ModalService.getInstance() to access it.
@@ -126,6 +131,20 @@ export class ModalService {
     static _instance = null;
 
     /**
+     * Bound handler for the 'Escape' shortcut.
+     * @type {Function | null}
+     * @private
+     */
+    _boundHandleEscapeKey = null;
+
+    /**
+     * Bound handler for the 'Tab' shortcuts.
+     * @type {Function | null}
+     * @private
+     */
+    _boundHandleFocusTrap = null;
+
+    /**
      * Private constructor for Singleton pattern.
      * @private
      */
@@ -134,6 +153,10 @@ export class ModalService {
         if (ModalService._instance) {
             throw new Error('ModalService is a Singleton. Use ModalService.getInstance().');
         }
+
+        me._boundHandleEscapeKey = me._handleEscapeKey.bind(me);
+        me._boundHandleFocusTrap = me._handleFocusTrap.bind(me);
+
         me._initialize();
     }
 
@@ -166,10 +189,31 @@ export class ModalService {
         document.body.appendChild(me.getContainer());
 
         me._backdrop.addEventListener('click', me._onBackdropClick.bind(me));
-        document.addEventListener('keydown', me._onGlobalKeydown.bind(me));
 
         me._throttledResizeHandler = throttleRAF(me._onWindowResize.bind(me));
         window.addEventListener('resize', me._throttledResizeHandler);
+
+        appShortcuts.register({
+            keys: 'Escape',
+            handler: me._boundHandleEscapeKey,
+            scopes: ['modal-open'],
+            priority: 100,
+            preventDefault: true
+        });
+        appShortcuts.register({
+            keys: 'Tab',
+            handler: me._boundHandleFocusTrap,
+            scopes: ['modal-open'],
+            priority: 100,
+            preventDefault: false // Handled inside _handleFocusTrap
+        });
+        appShortcuts.register({
+            keys: 'Shift+Tab',
+            handler: me._boundHandleFocusTrap,
+            scopes: ['modal-open'],
+            priority: 100,
+            preventDefault: false // Handled inside _handleFocusTrap
+        });
     }
 
     /**
@@ -432,8 +476,6 @@ export class ModalService {
         }
     }
 
-    // --- Presets ---
-
     /**
      * Description:
      * Shows a simple alert modal.
@@ -486,8 +528,6 @@ export class ModalService {
         });
     }
 
-    // --- Private Helpers ---
-
     /**
      * Description:
      * Manages stack and UI after a modal is closed.
@@ -538,34 +578,24 @@ export class ModalService {
         return Array.from(parentElement.querySelectorAll(me._focusableSelectors));
     }
 
-    // --- Global Event Handlers ---
-
     /**
      * Description:
-     * Handles 'Escape' key press and 'Tab' focus trapping.
+     * Handles the 'Escape' key shortcut.
      *
-     * @param {KeyboardEvent} event
+     * @param {Event} event - The native DOM event (from shortcut).
+     * @param {object} payload - The shortcut payload.
      * @private
      * @returns {void}
      */
-    _onGlobalKeydown(event) {
+    _handleEscapeKey(event, payload) {
         const me = this;
-        if (event.key !== 'Escape' && event.key !== 'Tab') {
-            return;
-        }
-
         const activeModal = me.getActiveModal();
         if (!activeModal || activeModal.isClosing) {
             return;
         }
 
-        if (event.key === 'Escape') {
-            if (activeModal.options.closeOnEscape) {
-                me.dismiss('escape');
-            }
-        }
-        if (event.key === 'Tab') {
-            me._handleFocusTrap(event);
+        if (activeModal.options.closeOnEscape) {
+            me.dismiss('escape');
         }
     }
 
@@ -609,11 +639,12 @@ export class ModalService {
      * Description:
      * Traps Tab focus within the active modal.
      *
-     * @param {KeyboardEvent} event
+     * @param {KeyboardEvent} event - The native DOM event (from shortcut).
+     * @param {object} payload - The shortcut payload.
      * @private
      * @returns {void}
      */
-    _handleFocusTrap(event) {
+    _handleFocusTrap(event, payload) {
         const me = this;
         const activeModal = me.getActiveModal();
         if (!activeModal) {
