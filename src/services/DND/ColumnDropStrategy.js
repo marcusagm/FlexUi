@@ -248,7 +248,7 @@ export class ColumnDropStrategy {
             dropZone.addPanelGroup(newPanelGroup, panelIndex);
 
             if (sourceGroup) {
-                sourceGroup.removePanel(draggedPanel);
+                sourceGroup.removePanel(draggedPanel, true);
             }
             newPanelGroup.addPanel(draggedPanel, true);
         }

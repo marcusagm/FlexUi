@@ -264,7 +264,7 @@ export class RowDropStrategy {
             newColumn.addPanelGroup(newPanelGroup);
 
             if (sourceGroup) {
-                sourceGroup.removePanel(draggedPanel);
+                sourceGroup.removePanel(draggedPanel, true);
             }
             newPanelGroup.addPanel(draggedPanel, true);
         }

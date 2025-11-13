@@ -17,8 +17,9 @@ import { ContainerDropStrategy } from './services/DND/ContainerDropStrategy.js';
 import { TabContainerDropStrategy } from './services/DND/TabContainerDropStrategy.js';
 import { LayoutService } from './services/LayoutService.js';
 import { appBus } from './utils/EventBus.js';
-import { debounce } from './utils/Debounce.js';
 import { FloatingPanelManagerService } from './services/DND/FloatingPanelManagerService.js';
+import { globalState } from './services/GlobalStateService.js';
+import { CounterPanel } from './components/Panel/CounterPanel.js';
 
 /**
  * Description:
@@ -146,9 +147,14 @@ export class App {
         dds.registerStrategy('container', new ContainerDropStrategy());
 
         const factory = PanelFactory.getInstance();
-        factory.registerPanelClasses([Panel, TextPanel, ToolbarPanel]);
+        factory.registerPanelClasses([Panel, TextPanel, ToolbarPanel, CounterPanel]);
 
         LayoutService.getInstance();
+
+        // Initialize global state keys for the application
+        globalState.set('counterValue', 0);
+        globalState.set('activeTool', 'pointer');
+        globalState.set('activeColor', '#FFFFFF');
 
         const fpms = FloatingPanelManagerService.getInstance();
         fpms.registerContainer(me.container.element);

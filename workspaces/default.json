@@ -16,6 +16,17 @@
                                 "config": {},
                                 "panels": [
                                     {
+                                        "type": "CounterPanel",
+                                        "title": "Contador 1",
+                                        "height": null,
+                                        "config": {
+                                            "closable": true,
+                                            "collapsible": true,
+                                            "movable": true,
+                                            "minHeight": 100
+                                        }
+                                    },
+                                    {
                                         "type": "TextPanel",
                                         "title": "Painel de Texto 1",
                                         "height": null,
@@ -165,10 +176,9 @@
                                 },
                                 "panels": [
                                     {
-                                        "type": "ToolbarPanel",
-                                        "title": "",
+                                        "type": "CounterPanel",
+                                        "title": "Contador 2",
                                         "height": null,
-                                        "content": null,
                                         "config": {
                                             "closable": true,
                                             "collapsible": false,
@@ -179,6 +189,37 @@
                                 ]
                             }
                         ]
+                    }
+                ]
+            }
+        ],
+        "floatingPanels": [
+            {
+                "type": "PanelGroup",
+                "height": 150,
+                "width": 250,
+                "collapsed": false,
+                "activePanelId": null,
+                "isFloating": true,
+                "x": 20,
+                "y": 20,
+                "config": {
+                    "closable": true,
+                    "collapsible": true,
+                    "movable": true,
+                    "minHeight": 100
+                },
+                "panels": [
+                    {
+                        "type": "CounterPanel",
+                        "title": "Contador Flutuante",
+                        "height": null,
+                        "config": {
+                            "closable": true,
+                            "collapsible": true,
+                            "movable": true,
+                            "minHeight": 100
+                        }
                     }
                 ]
             }

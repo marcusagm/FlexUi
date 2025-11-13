@@ -358,7 +358,7 @@ export class PanelGroup {
      */
     onChildCloseRequest({ panel, group }) {
         if (group === this && this._state.panels.includes(panel)) {
-            this.removePanel(panel);
+            this.removePanel(panel, false);
         }
     }
 
@@ -665,16 +665,41 @@ export class PanelGroup {
     }
 
     /**
-     * Removes a child Panel (tab) from this group.
-     * @param {Panel} panel - The panel instance to remove.
+     * Adds multiple child Panels (tabs) at once, optimized for state loading.
+     * @param {Array<Panel>} panels - The panel instances to add.
      * @returns {void}
      */
-    removePanel(panel) {
+    addPanelsBulk(panels) {
+        const me = this;
+        if (!panels || panels.length === 0) return;
+
+        panels.forEach(panel => {
+            panel._state.header.setMode(false);
+            panel.setParentGroup(me);
+
+            me._state.header.tabContainer.appendChild(panel._state.header.element);
+            me._state.contentContainer.appendChild(panel.contentElement);
+
+            panel.contentElement.style.display = 'none';
+        });
+
+        me._state.panels.push(...panels);
+    }
+
+    /**
+     * Removes a child Panel (tab) from this group.
+     * @param {Panel} panel - The panel instance to remove.
+     * @param {boolean} [isMoving=false] - If true, panel is not destroyed (DND).
+     * @returns {void}
+     */
+    removePanel(panel, isMoving = false) {
         const me = this;
         const index = me._state.panels.indexOf(panel);
         if (index === -1) return;
 
-        panel.destroy();
+        if (!isMoving) {
+            panel.destroy();
+        }
 
         panel._state.header.element.classList.remove('panel-group__tab--active');
         panel._state.header.element.remove();
@@ -932,15 +957,15 @@ export class PanelGroup {
 
         const activePanelId = data.activePanelId;
         let activePanelInstance = null;
+        const panelInstances = [];
 
         if (data.panels && Array.isArray(data.panels)) {
             const factory = PanelFactory.getInstance();
 
             data.panels.forEach(panelData => {
                 const panel = factory.createPanel(panelData);
-
                 if (panel) {
-                    me.addPanel(panel, false);
+                    panelInstances.push(panel);
                     if (panel.id === activePanelId) {
                         activePanelInstance = panel;
                     }
@@ -948,12 +973,17 @@ export class PanelGroup {
             });
         }
 
-        if (!activePanelInstance && me._state.panels.length > 0) {
-            activePanelInstance = me._state.panels[0];
-        }
+        if (panelInstances.length === 1) {
+            me.addPanel(panelInstances[0], true);
+        } else if (panelInstances.length > 1) {
+            me.addPanelsBulk(panelInstances);
 
-        if (activePanelInstance) {
-            me.setActive(activePanelInstance);
+            if (!activePanelInstance) {
+                activePanelInstance = panelInstances[0];
+            }
+            if (activePanelInstance) {
+                me.setActive(activePanelInstance);
+            }
         }
 
         me.updateHeight();

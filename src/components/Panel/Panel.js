@@ -1,5 +1,3 @@
-// src/components/Panel/Panel.js (Modificado)
-
 import { PanelHeader } from './PanelHeader.js';
 import { appBus } from '../../utils/EventBus.js';
 import { generateId } from '../../utils/generateId.js';
@@ -29,10 +27,17 @@ import { globalState } from '../../services/GlobalStateService.js';
  * // This is an abstract class; typically you would extend it.
  * class MyPanel extends Panel {
  *
+ * constructor(...) {
+ * super(...);
+ * // Bind listeners FIRST
+ * this._myCallback = this._myCallback.bind(this);
+ * // Call render LAST
+ * this.render();
+ * }
+ *
  * render() {
  * // Called once on init
  * this.contentElement.innerHTML = 'Hello World';
- * this._myCallback = this._myCallback.bind(this);
  * }
  *
  * getObservedStateKeys() {
@@ -93,12 +98,11 @@ export class Panel {
     _contentElement = null;
 
     /**
-     * Stores the bound reference to the onStateUpdate function
-     * for automatic unsubscribing.
-     * @type {Function | null}
+     * Stores the actual listener functions for automatic unsubscribing.
+     * @type {Map<string, Function>}
      * @private
      */
-    _boundOnStateUpdate = null;
+    _boundStateListeners = null;
 
     /**
      * Unique ID for the Panel, used by PanelGroup to manage tabs.
@@ -118,6 +122,7 @@ export class Panel {
 
         me._contentElement = document.createElement('div');
         me._contentElement.classList.add('panel__content');
+        me._boundStateListeners = new Map();
 
         const panelTitle = title !== undefined && title !== null ? String(title) : '';
         me._state.hasTitle = panelTitle.length > 0;
@@ -130,7 +135,6 @@ export class Panel {
         }
 
         me.build();
-        me.render();
     }
 
     /**
@@ -310,12 +314,14 @@ export class Panel {
      */
     mount() {
         const me = this;
-        me._boundOnStateUpdate = me.onStateUpdate.bind(me);
+        const boundOnStateUpdate = me.onStateUpdate.bind(me);
 
         me.getObservedStateKeys().forEach(key => {
-            globalState.subscribe(key, value => {
-                me._boundOnStateUpdate(key, value);
-            });
+            const listener = value => {
+                boundOnStateUpdate(key, value);
+            };
+            me._boundStateListeners.set(key, listener);
+            globalState.subscribe(key, listener);
         });
     }
 
@@ -327,11 +333,11 @@ export class Panel {
      */
     unmount() {
         const me = this;
-        if (me._boundOnStateUpdate) {
-            me.getObservedStateKeys().forEach(key => {
-                globalState.unsubscribe(key, me._boundOnStateUpdate);
+        if (me._boundStateListeners) {
+            me._boundStateListeners.forEach((listener, key) => {
+                globalState.unsubscribe(key, listener);
             });
-            me._boundOnStateUpdate = null;
+            me._boundStateListeners.clear();
         }
     }
 

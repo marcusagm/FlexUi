@@ -157,7 +157,7 @@ export class TabContainerDropStrategy {
             }
         }
 
-        sourceGroup.removePanel(draggedPanel);
+        sourceGroup.removePanel(draggedPanel, true);
         targetGroup.addPanel(draggedPanel, true); // Add and make active
     }
 

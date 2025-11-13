@@ -286,7 +286,7 @@ export class ContainerDropStrategy {
             newColumn.addPanelGroup(newPanelGroup);
 
             if (sourceGroup) {
-                sourceGroup.removePanel(draggedPanel);
+                sourceGroup.removePanel(draggedPanel, true);
             }
             draggedPanel._state.height = null;
             newPanelGroup.addPanel(draggedPanel, true);

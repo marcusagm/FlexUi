@@ -234,7 +234,7 @@ export class FloatingPanelManagerService {
             if (sourceGroup._state.panels.length === 1) {
                 panelGroup = sourceGroup;
             } else {
-                sourceGroup.removePanel(panel);
+                sourceGroup.removePanel(panel, true);
                 panelGroup = new PanelGroup(panel);
             }
         }

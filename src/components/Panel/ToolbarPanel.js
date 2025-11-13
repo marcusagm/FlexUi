@@ -37,6 +37,8 @@ export class ToolbarPanel extends Panel {
             movable: false,
             minHeight: 50
         });
+
+        this.render();
     }
 
     /**
