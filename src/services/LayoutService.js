@@ -31,6 +31,7 @@ import { appBus } from '../utils/EventBus.js';
  * - Applies 'fills-space' logic to the last Column in a Row.
  * - Applies 'fills-space' logic to the last *visible* PanelGroup in a Column.
  * - Enforces that at least one PanelGroup in a Column is visible.
+ * - Manages the 'disabled' state of PanelGroup collapse buttons.
  *
  * Dependencies:
  * - ../components/Column/Column.js
@@ -154,8 +155,6 @@ export class LayoutService {
 
         const columns = row.getColumns();
         columns.forEach((column, idx) => {
-            // (CORREÇÃO vDND-Bug-Resize)
-            // This service is now the source of truth for both width AND resize bars.
             const isLast = idx === columns.length - 1;
             column.updateWidth(isLast);
             column.addResizeBars(isLast);
@@ -175,39 +174,33 @@ export class LayoutService {
             );
             return;
         }
-
-        this._checkPanelsGroupsCollapsed(column);
         this._updatePanelGroupsSizes(column);
     }
 
     /**
-     * Ensures at least one PanelGroup is visible in a column.
-     * @param {Column} column - The column to check.
-     * @private
-     * @returns {void}
-     */
-    _checkPanelsGroupsCollapsed(column) {
-        const panelGroups = column.getPanelGroups();
-        const uncollapsedGroups = panelGroups.filter(p => !p._state.collapsed);
-        const totalGroups = panelGroups.length;
-
-        if (uncollapsedGroups.length === 0 && totalGroups > 0) {
-            panelGroups[totalGroups - 1].unCollapse();
-        }
-    }
-
-    /**
-     * Recalculates sizes and applies 'panel-group--fills-space'
-     * to the correct PanelGroup in a column.
+     * Recalculates sizes, applies 'panel-group--fills-space',
+     * and manages the collapse button state for all PanelGroups in a column.
      * @param {Column} column - The column to update.
      * @private
      * @returns {void}
      */
     _updatePanelGroupsSizes(column) {
+        const me = this;
         const panelGroups = column.getPanelGroups();
+        if (panelGroups.length === 0) {
+            return;
+        }
 
-        const uncollapsedPanelGroups = panelGroups.filter(p => !p._state.collapsed);
+        let uncollapsedPanelGroups = panelGroups.filter(p => !p._state.collapsed);
+
+        if (uncollapsedPanelGroups.length === 0) {
+            const lastGroup = panelGroups[panelGroups.length - 1];
+            lastGroup.unCollapse();
+            uncollapsedPanelGroups = [lastGroup];
+        }
+
         const lastUncollapsedGroup = uncollapsedPanelGroups[uncollapsedPanelGroups.length - 1];
+        const isOnlyOneUncollapsed = uncollapsedPanelGroups.length === 1;
 
         panelGroups.forEach(panel => {
             const shouldFillSpace = panel === lastUncollapsedGroup;
@@ -218,6 +211,18 @@ export class LayoutService {
             } else {
                 panel.element.classList.remove('panel-group--fills-space');
             }
+
+            const collapseButton = panel._state.header?.collapseBtn;
+            if (collapseButton) {
+                const isThisPanelTheOnlyUncollapsed = isOnlyOneUncollapsed && shouldFillSpace;
+
+                if (!panel._state.collapsible || isThisPanelTheOnlyUncollapsed) {
+                    collapseButton.disabled = true;
+                } else {
+                    collapseButton.disabled = false;
+                }
+            }
+
             panel.updateHeight();
         });
     }

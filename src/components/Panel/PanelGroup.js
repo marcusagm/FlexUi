@@ -39,7 +39,6 @@ import { FloatingPanelManagerService } from '../../services/DND/FloatingPanelMan
  * - Manages active tab state ('setActive').
  * - Renders in "simple mode" (no tabs) if only one child Panel exists.
  * - Manages its own vertical resize ('startResize') using PointerEvents.
- * - Enforces 'canCollapse' rule (must not be the last visible group).
  * - If last Panel is removed, destroys itself ('removePanel' -> 'close').
  *
  * Dependencies:
@@ -460,22 +459,6 @@ export class PanelGroup {
     }
 
     /**
-     * Checks if this panel group is allowed to collapse.
-     * @returns {boolean}
-     */
-    canCollapse() {
-        const me = this;
-        if (me._state.isFloating) {
-            return me._state.collapsible;
-        }
-        if (!me._state.column) return false;
-        if (!me._state.collapsible) return false;
-
-        const uncollapsedGroups = me._state.column.getPanelGroupsUncollapsed();
-        return uncollapsedGroups.length > 1 || me._state.collapsed;
-    }
-
-    /**
      * Toggles the collapse state and requests a layout update.
      * @returns {void}
      */
@@ -484,9 +467,6 @@ export class PanelGroup {
         if (me._state.collapsed) {
             me.unCollapse();
         } else {
-            if (!me.canCollapse()) {
-                return;
-            }
             me.collapse();
         }
 
