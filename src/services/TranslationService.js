@@ -256,7 +256,6 @@ export class TranslationService {
 
             const translationData = await response.json();
             me.registerLanguage(sanitizedCode, translationData);
-            console.log(`TranslationService: Successfully loaded language "${sanitizedCode}".`);
             return true;
         } catch (error) {
             console.error(

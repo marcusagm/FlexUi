@@ -67,10 +67,6 @@ export class StateService {
         }
 
         try {
-            console.info(
-                `StateService: No saved state found (key: ${key}). Loading 'workspaces/default.json'.`
-            );
-
             const response = await fetch('workspaces/default.json');
 
             if (!response.ok) {
