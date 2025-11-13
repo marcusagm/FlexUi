@@ -12,7 +12,7 @@ import { globalState } from '../GlobalStateService.js';
  * async data resolution, global defaults, instance ID management, and advanced
  * UI positioning (like drawers/side-modals).
  *
- * It also manages the 'modal-open' scope for the ShortcutService.
+ * It also manages the 'modal-open' scope for the ShortcutService via GlobalStateService.
  *
  * Properties summary:
  * - _container {HTMLElement} : The main DOM element holding all modals.
@@ -306,12 +306,7 @@ export class ModalService {
             me._previousActiveElement = document.activeElement;
             me._container.classList.add('modal-container--is-open');
             me._applyScrollLock();
-
-            const scopes = globalState.get('activeScopes') || [];
-            if (!scopes.includes('modal-open')) {
-                scopes.push('modal-open');
-                globalState.set('activeScopes', scopes);
-            }
+            globalState.addScope('modal-open');
         }
 
         const currentActive = me.getActiveModal();
@@ -523,8 +518,7 @@ export class ModalService {
                 me._previousActiveElement = null;
             }
 
-            const scopes = (globalState.get('activeScopes') || []).filter(s => s !== 'modal-open');
-            globalState.set('activeScopes', scopes);
+            globalState.removeScope('modal-open');
         }
     }
 

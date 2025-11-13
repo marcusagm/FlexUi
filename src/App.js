@@ -154,10 +154,10 @@ export class App {
         LayoutService.getInstance();
 
         // Initialize global state keys for the application
+        // 'activeScopes' is now initialized by GlobalStateService itself.
         globalState.set('counterValue', 0);
         globalState.set('activeTool', 'pointer');
         globalState.set('activeColor', '#FFFFFF');
-        globalState.set('activeScopes', ['global']);
 
         const fpms = FloatingPanelManagerService.getInstance();
         fpms.registerContainer(me.container.element);
