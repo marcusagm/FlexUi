@@ -1,4 +1,5 @@
 import { appBus } from '../../utils/EventBus.js';
+import { ContextMenuService } from '../../services/ContextMenu/ContextMenuService.js';
 
 /**
  * Description:
@@ -18,12 +19,13 @@ import { appBus } from '../../utils/EventBus.js';
  * this._state.header = new PanelHeader(this, panelTitle);
  *
  * Events:
- * - Emits (DOM): 'dragstart', 'dragend'
+ * - Emits (DOM): 'dragstart', 'dragend', 'contextmenu'
  * - Emits (appBus): 'dragstart', 'dragend'
  * - Emits (appBus): 'panel:group-child-close-request'
  *
  * Dependencies:
  * - ../../utils/EventBus.js
+ * - ../../services/ContextMenu/ContextMenuService.js
  */
 export class PanelHeader {
     /**
@@ -62,6 +64,36 @@ export class PanelHeader {
     _closeBtn;
 
     /**
+     * @type {Function | null}
+     * @private
+     */
+    _boundOnDragStart = null;
+
+    /**
+     * @type {Function | null}
+     * @private
+     */
+    _boundOnDragEnd = null;
+
+    /**
+     * @type {Function | null}
+     * @private
+     */
+    _boundOnCloseClick = null;
+
+    /**
+     * @type {Function | null}
+     * @private
+     */
+    _boundOnTabClick = null;
+
+    /**
+     * @type {Function | null}
+     * @private
+     */
+    _boundOnContextMenu = null;
+
+    /**
      * @param {import('./Panel.js').Panel} panel - The parent Panel instance.
      * @param {string} title - The initial title.
      */
@@ -70,6 +102,12 @@ export class PanelHeader {
         me._state.panel = panel;
         me._state.title = title;
         me.element = document.createElement('div');
+
+        me._boundOnDragStart = me.onDragStart.bind(me);
+        me._boundOnDragEnd = me.onDragEnd.bind(me);
+        me._boundOnCloseClick = me.onCloseClick.bind(me);
+        me._boundOnTabClick = me.onTabClick.bind(me);
+        me._boundOnContextMenu = me.onContextMenu.bind(me);
 
         me.build();
         me.initEventListeners();
@@ -102,10 +140,11 @@ export class PanelHeader {
      */
     initEventListeners() {
         const me = this;
-        me.element.addEventListener('dragstart', me.onDragStart.bind(me));
-        me.element.addEventListener('dragend', me.onDragEnd.bind(me));
-        me._closeBtn.addEventListener('click', me.onCloseClick.bind(me));
-        me.element.addEventListener('click', me.onTabClick.bind(me));
+        me.element.addEventListener('dragstart', me._boundOnDragStart);
+        me.element.addEventListener('dragend', me._boundOnDragEnd);
+        me._closeBtn.addEventListener('click', me._boundOnCloseClick);
+        me.element.addEventListener('click', me._boundOnTabClick);
+        me.element.addEventListener('contextmenu', me._boundOnContextMenu);
     }
 
     /**
@@ -114,10 +153,11 @@ export class PanelHeader {
      */
     destroy() {
         const me = this;
-        me.element.removeEventListener('dragstart', me.onDragStart.bind(me));
-        me.element.removeEventListener('dragend', me.onDragEnd.bind(me));
-        me._closeBtn.removeEventListener('click', me.onCloseClick.bind(me));
-        me.element.removeEventListener('click', me.onTabClick.bind(me));
+        me.element.removeEventListener('dragstart', me._boundOnDragStart);
+        me.element.removeEventListener('dragend', me._boundOnDragEnd);
+        me._closeBtn.removeEventListener('click', me._boundOnCloseClick);
+        me.element.removeEventListener('click', me._boundOnTabClick);
+        me.element.removeEventListener('contextmenu', me._boundOnContextMenu);
     }
 
     /**
@@ -181,6 +221,40 @@ export class PanelHeader {
         if (me._state.parentGroup) {
             me._state.parentGroup.setActive(me._state.panel);
         }
+    }
+
+    /**
+     * Handles the context menu (right-click) event on the tab.
+     * @param {MouseEvent} e
+     * @returns {void}
+     */
+    onContextMenu(e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const me = this;
+        const panelState = me._state.panel._state;
+        const menuItems = [
+            {
+                title: 'Desacoplar Painel',
+                event: 'app:undock-panel-request',
+                disabled: !panelState.movable || panelState.parentGroup._state.isFloating
+            },
+            { isSeparator: true },
+            {
+                title: 'Fechar Aba',
+                event: 'app:close-panel-request',
+                disabled: !panelState.closable
+            }
+        ];
+
+        const contextData = {
+            panel: me._state.panel,
+            group: me._state.parentGroup,
+            nativeEvent: e
+        };
+
+        ContextMenuService.getInstance().show(e, menuItems, contextData);
     }
 
     /**

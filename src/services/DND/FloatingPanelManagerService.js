@@ -26,6 +26,7 @@ import { appBus } from '../../utils/EventBus.js';
  *
  * Events:
  * - Listens to: 'panelgroup:removed'
+ * - Listens to: 'app:undock-panel-request'
  *
  * Dependencies:
  * - components/Panel/PanelGroup.js
@@ -81,6 +82,12 @@ export class FloatingPanelManagerService {
     _boundOnPanelGroupRemoved = null;
 
     /**
+     * @type {Function | null}
+     * @private
+     */
+    _boundOnUndockRequest = null;
+
+    /**
      * Private constructor for Singleton.
      */
     constructor() {
@@ -92,6 +99,7 @@ export class FloatingPanelManagerService {
 
         const me = this;
         me._boundOnPanelGroupRemoved = me._onPanelGroupRemoved.bind(me);
+        me._boundOnUndockRequest = me._onUndockRequest.bind(me);
         me._initEventListeners();
     }
 
@@ -137,9 +145,9 @@ export class FloatingPanelManagerService {
      */
     _initEventListeners() {
         const me = this;
-        appBus.on('panelgroup:removed', me._boundOnPanelGroupRemoved, {
-            namespace: me._namespace
-        });
+        const options = { namespace: me._namespace };
+        appBus.on('panelgroup:removed', me._boundOnPanelGroupRemoved, options);
+        appBus.on('app:undock-panel-request', me._boundOnUndockRequest, options);
     }
 
     /**
@@ -212,7 +220,8 @@ export class FloatingPanelManagerService {
     /**
      * Handles the drop event for an item being "undocked" (dropped outside a dropzone).
      * @param {object} draggedData - The data from DragDropService.
-     * @param {DragEvent} event - The native drop event.
+     * @param {number} positionX - The final clientX of the drop.
+     * @param {number} positionY - The final clientY of the drop.
      * @returns {void}
      */
     handleUndockDrop(draggedData, positionX, positionY) {
@@ -245,6 +254,46 @@ export class FloatingPanelManagerService {
 
         panelGroup.getColumn()?.removePanelGroup(panelGroup);
         me.addFloatingPanel(panelGroup, x, y);
+    }
+
+    /**
+     * Event handler for 'app:undock-panel-request' from ContextMenu.
+     * @param {object} contextData - The data from the context menu action.
+     * @param {import('../../components/Panel/Panel.js').Panel} contextData.panel - The panel to undock.
+     * @param {import('../../components/Panel/PanelGroup.js').PanelGroup} contextData.group - The source group.
+     * @param {MouseEvent} contextData.nativeEvent - The original contextmenu event.
+     * @private
+     * @returns {void}
+     */
+    _onUndockRequest(contextData) {
+        const me = this;
+        const { panel, group, nativeEvent } = contextData;
+        if (!panel || !group) return;
+
+        const containerRect = me.getContainerBounds();
+        if (!containerRect) {
+            console.warn('FPMS: Container not found for undock request.');
+            return;
+        }
+
+        const isLastPanel = group._state.panels.length === 1;
+        let panelGroupToFloat;
+
+        if (isLastPanel) {
+            panelGroupToFloat = group;
+            const sourceColumn = panelGroupToFloat.getColumn();
+            if (sourceColumn) {
+                sourceColumn.removePanelGroup(panelGroupToFloat, true);
+            }
+        } else {
+            group.removePanel(panel, true);
+            panelGroupToFloat = new PanelGroup(panel);
+        }
+
+        const x = nativeEvent.clientX - containerRect.left - 10;
+        const y = nativeEvent.clientY - containerRect.top - 10;
+
+        me.addFloatingPanel(panelGroupToFloat, x, y);
     }
 
     /**

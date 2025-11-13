@@ -30,6 +30,7 @@ import { FloatingPanelManagerService } from '../../services/DND/FloatingPanelMan
  * - Listens to: 'panel:group-child-close-request' (from PanelHeader via Panel)
  * - Listens to: 'panel:close-request' (from PanelGroupHeader)
  * - Listens to: 'panel:toggle-collapse-request' (from PanelGroupHeader)
+ * - Listens to: 'app:close-panel-request' (from ContextMenu)
  * - Emits: 'panelgroup:removed' (when closed or empty)
  * - Emits: 'layout:panel-groups-changed' (to notify LayoutService)
  *
@@ -125,6 +126,12 @@ export class PanelGroup {
      * @type {Function | null}
      * @private
      */
+    _boundOnChildCloseRequestFromContext = null;
+
+    /**
+     * @type {Function | null}
+     * @private
+     */
     _boundOnCloseRequest = null;
 
     /**
@@ -215,6 +222,7 @@ export class PanelGroup {
         }
 
         me._boundOnChildCloseRequest = me.onChildCloseRequest.bind(me);
+        me._boundOnChildCloseRequestFromContext = me.onChildCloseRequestFromContext.bind(me);
         me._boundOnCloseRequest = me.onCloseRequest.bind(me);
         me._boundOnToggleCollapseRequest = me.onToggleCollapseRequest.bind(me);
 
@@ -345,6 +353,7 @@ export class PanelGroup {
         const options = { namespace: me._namespace };
 
         appBus.on('panel:group-child-close-request', me._boundOnChildCloseRequest, options);
+        appBus.on('app:close-panel-request', me._boundOnChildCloseRequestFromContext, options);
         appBus.on('panel:close-request', me._boundOnCloseRequest, options);
         appBus.on('panel:toggle-collapse-request', me._boundOnToggleCollapseRequest, options);
     }
@@ -360,6 +369,17 @@ export class PanelGroup {
         if (group === this && this._state.panels.includes(panel)) {
             this.removePanel(panel, false);
         }
+    }
+
+    /**
+     * Event handler for 'app:close-panel-request' from ContextMenu.
+     * @param {object} contextData
+     * @param {Panel} contextData.panel - The child Panel.
+     * @param {PanelGroup} contextData.group - The parent PanelGroup.
+     * @returns {void}
+     */
+    onChildCloseRequestFromContext(contextData) {
+        this.onChildCloseRequest(contextData);
     }
 
     /**
