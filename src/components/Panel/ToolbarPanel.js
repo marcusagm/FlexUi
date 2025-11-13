@@ -16,7 +16,7 @@ import { Modal } from '../../services/Modal/Modal.js';
  * Business rules implemented:
  * - Identifies itself as 'ToolbarPanel' to the factory.
  * - Overrides default config to be non-collapsible and non-movable.
- * - Content is static and rebuilt in 'populateContent'.
+ * - Content is static and rebuilt in 'render'.
  * - Does not save/load 'content' in toJSON/fromJSON.
  *
  * Dependencies:
@@ -51,8 +51,8 @@ export class ToolbarPanel extends Panel {
      * (Overrides Panel) Populates the content element with demo buttons.
      * @returns {void}
      */
-    populateContent() {
-        const contentEl = this.getContentElement();
+    render() {
+        const contentEl = this.contentElement;
         contentEl.classList.add('panel__content--toolbar');
 
         const btn1 = document.createElement('button');
@@ -132,7 +132,7 @@ export class ToolbarPanel extends Panel {
      * @returns {void}
      */
     setContent(htmlString) {
-        // Does nothing. Content is populated by populateContent().
+        // Does nothing. Content is populated by render().
     }
 
     /**

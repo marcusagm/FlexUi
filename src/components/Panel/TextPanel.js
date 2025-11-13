@@ -27,7 +27,7 @@ export class TextPanel extends Panel {
      */
     constructor(title, initialText, height = null, config = {}) {
         super(title, height, config);
-        this.getContentElement().textContent = initialText;
+        this.contentElement.textContent = initialText;
     }
 
     /**
@@ -36,15 +36,6 @@ export class TextPanel extends Panel {
      */
     static get panelType() {
         return 'TextPanel';
-    }
-
-    /**
-     * (Overrides Panel) Populates the content element.
-     * @returns {void}
-     */
-    populateContent() {
-        // This is intentionally left empty because the content
-        // is set in the constructor.
     }
 
     /**
@@ -64,7 +55,7 @@ export class TextPanel extends Panel {
         const panelData = super.toJSON();
         const newData = {
             ...panelData,
-            content: me.getContentElement().textContent
+            content: me.contentElement.textContent
         };
         return newData;
     }
@@ -77,6 +68,6 @@ export class TextPanel extends Panel {
     fromJSON(data) {
         const me = this;
         super.fromJSON(data); // Restore base properties first
-        me.getContentElement().textContent = data.content;
+        me.contentElement.textContent = data.content;
     }
 }

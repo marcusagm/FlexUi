@@ -651,7 +651,7 @@ export class PanelGroup {
         panel.setParentGroup(me);
 
         me._state.header.tabContainer.appendChild(panel._state.header.element);
-        me._state.contentContainer.appendChild(panel.getContentElement());
+        me._state.contentContainer.appendChild(panel.contentElement);
 
         me._updateHeaderMode();
         me._state.header.updateScrollButtons();
@@ -659,7 +659,7 @@ export class PanelGroup {
         if (makeActive || me._state.panels.length === 1) {
             me.setActive(panel);
         } else {
-            panel.getContentElement().style.display = 'none';
+            panel.contentElement.style.display = 'none';
             me.requestLayoutUpdate();
         }
     }
@@ -674,9 +674,11 @@ export class PanelGroup {
         const index = me._state.panels.indexOf(panel);
         if (index === -1) return;
 
+        panel.destroy();
+
         panel._state.header.element.classList.remove('panel-group__tab--active');
         panel._state.header.element.remove();
-        panel.getContentElement().remove();
+        panel.contentElement.remove();
 
         me._state.panels.splice(index, 1);
         panel.setParentGroup(null);
@@ -713,24 +715,29 @@ export class PanelGroup {
      */
     setActive(panel) {
         const me = this;
-        if (!panel) return;
+        if (!panel || panel === me._state.activePanel) return;
+
+        const oldActivePanel = me._state.activePanel;
+        oldActivePanel?.unmount();
 
         const isSimpleMode = me._state.panels.length === 1;
 
         me._state.panels.forEach(p => {
             p._state.header.element.classList.remove('panel-group__tab--active');
-            p.getContentElement().style.display = 'none';
+            p.contentElement.style.display = 'none';
         });
 
         if (!isSimpleMode) {
             panel._state.header.element.classList.add('panel-group__tab--active');
         }
 
-        panel.getContentElement().style.display = '';
+        panel.contentElement.style.display = '';
 
         me._state.activePanel = panel;
         me._state.title = panel._state.title;
         me._state.header.updateAriaLabels();
+
+        panel.mount();
 
         me.requestLayoutUpdate();
     }
