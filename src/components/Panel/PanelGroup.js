@@ -38,7 +38,7 @@ import { FloatingPanelManagerService } from '../../services/DND/FloatingPanelMan
  * - Orchestrates Panel DOM (header vs. content).
  * - Manages active tab state ('setActive').
  * - Renders in "simple mode" (no tabs) if only one child Panel exists.
- * - Manages its own vertical resize ('startResize').
+ * - Manages its own vertical resize ('startResize') using PointerEvents.
  * - Enforces 'canCollapse' rule (must not be the last visible group).
  * - If last Panel is removed, destroys itself ('removePanel' -> 'close').
  *
@@ -186,7 +186,9 @@ export class PanelGroup {
         startY: 0,
         startWidth: 0,
         startHeight: 0,
-        direction: null
+        direction: null,
+        pointerId: null,
+        target: null
     };
 
     /**
@@ -209,7 +211,7 @@ export class PanelGroup {
         me.element.classList.add('panel-group');
         me.element.classList.add('panel');
 
-        me.element.addEventListener('mousedown', () => {
+        me.element.addEventListener('pointerdown', () => {
             if (me._state.isFloating) {
                 FloatingPanelManagerService.getInstance().bringToFront(me);
             }
@@ -416,11 +418,11 @@ export class PanelGroup {
         me._state.panels.forEach(panel => panel.destroy());
         me.getThrottledUpdate()?.cancel();
 
-        me._resizeHandleSE?.removeEventListener('mousedown', me._boundOnFloatingResizeStart);
-        me._resizeHandleS?.removeEventListener('mousedown', me._boundOnFloatingResizeStart);
-        me._resizeHandleE?.removeEventListener('mousedown', me._boundOnFloatingResizeStart);
-        window.removeEventListener('mousemove', me._boundOnFloatingResizeMove);
-        window.removeEventListener('mouseup', me._boundOnFloatingResizeUp);
+        me._resizeHandleSE?.removeEventListener('pointerdown', me._boundOnFloatingResizeStart);
+        me._resizeHandleS?.removeEventListener('pointerdown', me._boundOnFloatingResizeStart);
+        me._resizeHandleE?.removeEventListener('pointerdown', me._boundOnFloatingResizeStart);
+        window.removeEventListener('pointermove', me._boundOnFloatingResizeMove);
+        window.removeEventListener('pointerup', me._boundOnFloatingResizeUp);
     }
 
     /**
@@ -431,7 +433,7 @@ export class PanelGroup {
         const me = this;
         me.resizeHandle = document.createElement('div');
         me.resizeHandle.classList.add('panel-group__resize-handle');
-        me.resizeHandle.addEventListener('mousedown', me.startResize.bind(me));
+        me.resizeHandle.addEventListener('pointerdown', me.startResize.bind(me));
 
         me.element.append(
             me._state.header.element,
@@ -580,35 +582,46 @@ export class PanelGroup {
 
     /**
      * Handles the start of a vertical resize drag for this PanelGroup.
-     * @param {MouseEvent} e - The mousedown event.
+     * @param {PointerEvent} e - The pointerdown event.
      * @returns {void}
      */
     startResize(e) {
         e.preventDefault();
         const me = this;
+        const target = e.target;
+        const pointerId = e.pointerId;
+        target.setPointerCapture(pointerId);
+
         const startY = e.clientY;
         const startH = me.element.offsetHeight;
 
         const minPanelHeight = me.getMinPanelHeight();
 
         const onMove = ev => {
+            if (ev.pointerId !== pointerId) {
+                return;
+            }
             const delta = ev.clientY - startY;
             me._state.height = Math.max(minPanelHeight, startH + delta);
             me.getThrottledUpdate()();
         };
 
-        const onUp = () => {
-            window.removeEventListener('mousemove', onMove);
-            window.removeEventListener('mouseup', onUp);
-            window.removeEventListener('mouseleave', onUp);
+        const onUp = ev => {
+            if (ev.pointerId !== pointerId) {
+                return;
+            }
+            target.releasePointerCapture(pointerId);
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', onUp);
+            window.removeEventListener('pointerleave', onUp);
 
             me.getThrottledUpdate()?.cancel();
             me.requestLayoutUpdate();
         };
 
-        window.addEventListener('mousemove', onMove);
-        window.addEventListener('mouseup', onUp);
-        window.addEventListener('mouseleave', onUp);
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onUp);
+        window.addEventListener('pointerleave', onUp);
     }
 
     /**
@@ -890,14 +903,14 @@ export class PanelGroup {
      */
     _initFloatingResizeListeners() {
         const me = this;
-        me._resizeHandleSE.addEventListener('mousedown', me._boundOnFloatingResizeStart);
-        me._resizeHandleS.addEventListener('mousedown', me._boundOnFloatingResizeStart);
-        me._resizeHandleE.addEventListener('mousedown', me._boundOnFloatingResizeStart);
+        me._resizeHandleSE.addEventListener('pointerdown', me._boundOnFloatingResizeStart);
+        me._resizeHandleS.addEventListener('pointerdown', me._boundOnFloatingResizeStart);
+        me._resizeHandleE.addEventListener('pointerdown', me._boundOnFloatingResizeStart);
     }
 
     /**
      * Handles the start of a floating resize drag.
-     * @param {MouseEvent} e
+     * @param {PointerEvent} e
      * @private
      * @returns {void}
      */
@@ -908,25 +921,35 @@ export class PanelGroup {
         e.preventDefault();
         e.stopPropagation();
 
+        const target = e.target;
+        const pointerId = e.pointerId;
+        target.setPointerCapture(pointerId);
+
         me._resizeState.startX = e.clientX;
         me._resizeState.startY = e.clientY;
         const rect = me.element.getBoundingClientRect();
         me._resizeState.startWidth = rect.width;
         me._resizeState.startHeight = rect.height;
-        me._resizeState.direction = e.target.dataset.direction;
+        me._resizeState.direction = target.dataset.direction;
+        me._resizeState.pointerId = pointerId;
+        me._resizeState.target = target;
 
-        window.addEventListener('mousemove', me._boundOnFloatingResizeMove);
-        window.addEventListener('mouseup', me._boundOnFloatingResizeUp);
+        window.addEventListener('pointermove', me._boundOnFloatingResizeMove);
+        window.addEventListener('pointerup', me._boundOnFloatingResizeUp);
     }
 
     /**
      * Handles mouse movement during floating resize.
-     * @param {MouseEvent} e
+     * @param {PointerEvent} e
      * @private
      * @returns {void}
      */
     _onFloatingResizeMove(e) {
         const me = this;
+        if (e.pointerId !== me._resizeState.pointerId) {
+            return;
+        }
+
         const deltaX = e.clientX - me._resizeState.startX;
         const deltaY = e.clientY - me._resizeState.startY;
 
@@ -949,8 +972,8 @@ export class PanelGroup {
         const minWidth = me.getMinPanelWidth();
         const minHeight = me.getMinPanelHeight();
 
-        const maxWidth = bounds.width - me._state.x;
-        const maxHeight = bounds.height - me._state.y;
+        const maxWidth = bounds.width - (me._state.x || 0);
+        const maxHeight = bounds.height - (me._state.y || 0);
 
         newWidth = Math.max(minWidth, Math.min(newWidth, maxWidth));
         newHeight = Math.max(minHeight, Math.min(newHeight, maxHeight));
@@ -965,17 +988,26 @@ export class PanelGroup {
 
     /**
      * Handles mouse up after floating resize.
-     * @param {MouseEvent} e
+     * @param {PointerEvent} e
      * @private
      * @returns {void}
      */
     _onFloatingResizeUp(e) {
         const me = this;
-        window.removeEventListener('mousemove', me._boundOnFloatingResizeMove);
-        window.removeEventListener('mouseup', me._boundOnFloatingResizeUp);
+        if (e.pointerId !== me._resizeState.pointerId) {
+            return;
+        }
+
+        me._resizeState.target.releasePointerCapture(me._resizeState.pointerId);
+
+        window.removeEventListener('pointermove', me._boundOnFloatingResizeMove);
+        window.removeEventListener('pointerup', me._boundOnFloatingResizeUp);
 
         me._state.width = me.element.offsetWidth;
         me._state.height = me.element.offsetHeight;
+
+        me._resizeState.pointerId = null;
+        me._resizeState.target = null;
     }
 
     /**

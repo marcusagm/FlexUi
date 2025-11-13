@@ -224,51 +224,68 @@ export class Row {
      * @returns {void}
      */
     addResizeBars(isLast) {
-        this.element.querySelectorAll('.row__resize-handle').forEach(b => b.remove());
-        this.element.classList.remove('row--resize-bottom');
+        const me = this;
+        me.element.querySelectorAll('.row__resize-handle').forEach(b => b.remove());
+        me.element.classList.remove('row--resize-bottom');
 
-        if (isLast) return;
+        if (isLast) {
+            return;
+        }
 
-        this.element.classList.add('row--resize-bottom');
+        me.element.classList.add('row--resize-bottom');
         const bar = document.createElement('div');
         bar.classList.add('row__resize-handle');
-        this.element.appendChild(bar);
-        bar.addEventListener('mousedown', e => this.startResize(e));
+        me.element.appendChild(bar);
+        bar.addEventListener('pointerdown', e => me.startResize(e));
     }
 
     /**
      * Handles the start of a vertical resize drag for this Row.
-     * @param {MouseEvent} e - The mousedown event.
+     * @param {PointerEvent} e - The pointerdown event.
      * @returns {void}
      */
     startResize(e) {
         const me = this;
         const container = me._state.parentContainer;
-        if (!container) return;
+        if (!container) {
+            return;
+        }
 
         const rows = container.getRows();
         const idx = rows.indexOf(me);
-        if (rows.length === 1 || idx === rows.length - 1) return;
+        if (rows.length === 1 || idx === rows.length - 1) {
+            return;
+        }
 
         e.preventDefault();
+        const target = e.target;
+        const pointerId = e.pointerId;
+        target.setPointerCapture(pointerId);
+
         const startY = e.clientY;
         const startH = me.element.offsetHeight;
 
         const onMove = ev => {
+            if (ev.pointerId !== pointerId) {
+                return;
+            }
             const delta = ev.clientY - startY;
             me._state.height = Math.max(me.getMinHeight(), startH + delta);
-            me.getThrottledUpdate()(); // Updates style O(1)
+            me.getThrottledUpdate()();
         };
 
-        const onUp = () => {
-            window.removeEventListener('mousemove', onMove);
-            window.removeEventListener('mouseup', onUp);
+        const onUp = ev => {
+            if (ev.pointerId !== pointerId) {
+                return;
+            }
+            target.releasePointerCapture(pointerId);
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', onUp);
             me.getThrottledUpdate()?.cancel();
-            // Delegate layout sync to Container -> LayoutService
             container.requestLayoutUpdate();
         };
-        window.addEventListener('mousemove', onMove);
-        window.addEventListener('mouseup', onUp);
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onUp);
     }
 
     /**
@@ -312,8 +329,12 @@ export class Row {
     deleteColumn(column) {
         const me = this;
         const index = me._state.children.indexOf(column);
-        if (index === -1) return;
-        if (!(me._state.children[index] instanceof Column)) return;
+        if (index === -1) {
+            return;
+        }
+        if (!(me._state.children[index] instanceof Column)) {
+            return;
+        }
 
         column.destroy();
         const columnEl = me._state.children[index].element;

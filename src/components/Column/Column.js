@@ -209,51 +209,68 @@ export class Column {
      * @returns {void}
      */
     addResizeBars(isLast) {
-        this.element.querySelectorAll('.column__resize-handle').forEach(b => b.remove());
-        this.element.classList.remove('column--resize-right');
+        const me = this;
+        me.element.querySelectorAll('.column__resize-handle').forEach(b => b.remove());
+        me.element.classList.remove('column--resize-right');
 
-        if (isLast) return;
+        if (isLast) {
+            return;
+        }
 
-        this.element.classList.add('column--resize-right');
+        me.element.classList.add('column--resize-right');
         const bar = document.createElement('div');
         bar.classList.add('column__resize-handle');
-        this.element.appendChild(bar);
-        bar.addEventListener('mousedown', e => this.startResize(e));
+        me.element.appendChild(bar);
+        bar.addEventListener('pointerdown', e => me.startResize(e));
     }
 
     /**
      * Handles the start of a horizontal resize drag.
-     * @param {MouseEvent} e - The mousedown event.
+     * @param {PointerEvent} e - The pointerdown event.
      * @returns {void}
      */
     startResize(e) {
         const me = this;
-        const container = me._state.container; // This is the parent Row instance
+        const container = me._state.container;
 
         const columns = container.getColumns();
         const cols = columns.map(c => c.element);
 
         const idx = cols.indexOf(me.element);
-        if (cols.length === 1 || idx === cols.length - 1) return;
+        if (cols.length === 1 || idx === cols.length - 1) {
+            return;
+        }
 
         e.preventDefault();
+        const target = e.target;
+        const pointerId = e.pointerId;
+        target.setPointerCapture(pointerId);
+
         const startX = e.clientX;
         const startW = me.element.offsetWidth;
 
         const onMove = ev => {
+            if (ev.pointerId !== pointerId) {
+                return;
+            }
             const delta = ev.clientX - startX;
             me._state.width = Math.max(me.getMinWidth(), startW + delta);
             me.getThrottledUpdate()();
         };
 
-        const onUp = () => {
-            window.removeEventListener('mousemove', onMove);
-            window.removeEventListener('mouseup', onUp);
+        const onUp = ev => {
+            if (ev.pointerId !== pointerId) {
+                return;
+            }
+            target.releasePointerCapture(pointerId);
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', onUp);
             me.getThrottledUpdate()?.cancel();
             container.requestLayoutUpdate();
         };
-        window.addEventListener('mousemove', onMove);
-        window.addEventListener('mouseup', onUp);
+
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onUp);
     }
 
     /**
@@ -347,7 +364,9 @@ export class Column {
     removePanelGroup(panelGroup, emitEmpty = true) {
         const me = this;
         const index = me.getPanelGroupIndex(panelGroup);
-        if (index === -1) return;
+        if (index === -1) {
+            return;
+        }
 
         me._state.panelGroups.splice(index, 1);
         panelGroup.setParentColumn(null);
