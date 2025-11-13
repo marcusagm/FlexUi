@@ -22,8 +22,7 @@
                                         "config": {
                                             "closable": true,
                                             "collapsible": true,
-                                            "movable": true,
-                                            "minHeight": 100
+                                            "movable": true
                                         }
                                     },
                                     {
@@ -34,8 +33,7 @@
                                         "config": {
                                             "closable": true,
                                             "collapsible": true,
-                                            "movable": true,
-                                            "minHeight": 100
+                                            "movable": true
                                         }
                                     },
                                     {
@@ -46,8 +44,7 @@
                                         "config": {
                                             "closable": true,
                                             "collapsible": true,
-                                            "movable": true,
-                                            "minHeight": 100
+                                            "movable": true
                                         }
                                     },
                                     {
@@ -58,8 +55,7 @@
                                         "config": {
                                             "closable": true,
                                             "collapsible": true,
-                                            "movable": true,
-                                            "minHeight": 100
+                                            "movable": true
                                         }
                                     }
                                 ]
@@ -79,8 +75,7 @@
                                         "config": {
                                             "closable": true,
                                             "collapsible": true,
-                                            "movable": true,
-                                            "minHeight": 100
+                                            "movable": true
                                         }
                                     }
                                 ]
@@ -98,8 +93,7 @@
                                 "config": {
                                     "closable": true,
                                     "collapsible": false,
-                                    "movable": false,
-                                    "minHeight": 50
+                                    "movable": false
                                 },
                                 "panels": [
                                     {
@@ -110,8 +104,7 @@
                                         "config": {
                                             "closable": true,
                                             "collapsible": false,
-                                            "movable": false,
-                                            "minHeight": 50
+                                            "movable": false
                                         }
                                     }
                                 ]
@@ -131,8 +124,7 @@
                                         "config": {
                                             "closable": true,
                                             "collapsible": true,
-                                            "movable": true,
-                                            "minHeight": 100
+                                            "movable": true
                                         }
                                     }
                                 ]
@@ -157,8 +149,7 @@
                                         "config": {
                                             "closable": true,
                                             "collapsible": true,
-                                            "movable": true,
-                                            "minHeight": 100
+                                            "movable": true
                                         }
                                     }
                                 ]
@@ -171,8 +162,7 @@
                                 "config": {
                                     "closable": true,
                                     "collapsible": false,
-                                    "movable": false,
-                                    "minHeight": 50
+                                    "movable": false
                                 },
                                 "panels": [
                                     {
@@ -182,8 +172,7 @@
                                         "config": {
                                             "closable": true,
                                             "collapsible": false,
-                                            "movable": false,
-                                            "minHeight": 50
+                                            "movable": false
                                         }
                                     }
                                 ]
@@ -196,8 +185,8 @@
         "floatingPanels": [
             {
                 "type": "PanelGroup",
-                "height": 150,
-                "width": 250,
+                "height": 160,
+                "width": 260,
                 "collapsed": false,
                 "activePanelId": null,
                 "isFloating": true,
@@ -206,8 +195,7 @@
                 "config": {
                     "closable": true,
                     "collapsible": true,
-                    "movable": true,
-                    "minHeight": 100
+                    "movable": true
                 },
                 "panels": [
                     {
@@ -217,8 +205,7 @@
                         "config": {
                             "closable": true,
                             "collapsible": true,
-                            "movable": true,
-                            "minHeight": 100
+                            "movable": true
                         }
                     }
                 ]

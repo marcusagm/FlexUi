@@ -32,6 +32,7 @@ import { appBus } from '../utils/EventBus.js';
  * - Applies 'fills-space' logic to the last *visible* PanelGroup in a Column.
  * - Enforces that at least one PanelGroup in a Column is visible.
  * - Manages the 'disabled' state of PanelGroup collapse buttons.
+ * - Applies dynamic CSS 'min-width' to Columns based on their children.
  *
  * Dependencies:
  * - ../components/Column/Column.js
@@ -158,6 +159,8 @@ export class LayoutService {
             const isLast = idx === columns.length - 1;
             column.updateWidth(isLast);
             column.addResizeBars(isLast);
+
+            column.element.style.minWidth = `${column.getEffectiveMinWidth()}px`;
         });
     }
 
@@ -188,6 +191,7 @@ export class LayoutService {
         const me = this;
         const panelGroups = column.getPanelGroups();
         if (panelGroups.length === 0) {
+            column.element.style.minWidth = `${column.getEffectiveMinWidth()}px`;
             return;
         }
 
@@ -225,5 +229,7 @@ export class LayoutService {
 
             panel.updateHeight();
         });
+
+        column.element.style.minWidth = `${column.getEffectiveMinWidth()}px`;
     }
 }

@@ -10,7 +10,7 @@ import { FloatingPanelManagerService } from '../../services/DND/FloatingPanelMan
  * Description:
  * Manages a group of Panel (tabs) within a Column. This class acts as an
  * "Orchestrator" for its child Panel components. It does not render tabs
- * itself; instead, it retrieves the header element (the tab) and the content
+ * itself; instead, it retrieves the header element (the "tab") and the content
  * element from each child Panel and appends them to its own internal
  * containers (TabContainer and ContentContainer).
  *
@@ -39,6 +39,7 @@ import { FloatingPanelManagerService } from '../../services/DND/FloatingPanelMan
  * - Manages active tab state ('setActive').
  * - Renders in "simple mode" (no tabs) if only one child Panel exists.
  * - Manages its own vertical resize ('startResize') using PointerEvents.
+ * - (Logic removed) 'canCollapse' rule now managed by LayoutService.
  * - If last Panel is removed, destroys itself ('removePanel' -> 'close').
  *
  * Dependencies:
@@ -293,7 +294,12 @@ export class PanelGroup {
      * @returns {number} The calculated minimum panel width.
      */
     getMinPanelWidth() {
-        return this._state.minWidth;
+        const me = this;
+        const activePanelMinWidth = me._state.activePanel
+            ? me._state.activePanel.getMinPanelWidth()
+            : 0;
+
+        return Math.max(me._state.minWidth, activePanelMinWidth);
     }
 
     /**
@@ -951,6 +957,7 @@ export class PanelGroup {
 
         const minWidth = me.getMinPanelWidth();
         const minHeight = me.getMinPanelHeight();
+        console.log(minHeight);
 
         const maxWidth = bounds.width - (me._state.x || 0);
         const maxHeight = bounds.height - (me._state.y || 0);
@@ -1010,7 +1017,8 @@ export class PanelGroup {
                 closable: me._state.closable,
                 collapsible: me._state.collapsible,
                 movable: me._state.movable,
-                minHeight: me._state.minHeight
+                minHeight: me._state.minHeight,
+                minWidth: me._state.minWidth
             },
             panels: me._state.panels.map(panel => panel.toJSON())
         };

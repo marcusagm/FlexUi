@@ -70,6 +70,7 @@ export class Panel {
      * header: PanelHeader | null,
      * height: number | null,
      * minHeight: number,
+     * minWidth: number,
      * closable: boolean,
      * collapsible: boolean,
      * movable: boolean,
@@ -83,6 +84,7 @@ export class Panel {
         header: null,
         height: null,
         minHeight: 100,
+        minWidth: 150,
         closable: true,
         collapsible: true,
         movable: true,
@@ -160,6 +162,14 @@ export class Panel {
      */
     getMinPanelHeight() {
         return Math.max(0, this._state.minHeight);
+    }
+
+    /**
+     * <MinPanelWidth> getter.
+     * @returns {number} The minimum width for the panel's content area.
+     */
+    getMinPanelWidth() {
+        return Math.max(0, this._state.minWidth);
     }
 
     /**
@@ -265,7 +275,8 @@ export class Panel {
                 closable: me._state.closable,
                 collapsible: me._state.collapsible,
                 movable: me._state.movable,
-                minHeight: me._state.minHeight
+                minHeight: me._state.minHeight,
+                minWidth: me._state.minWidth
             }
         };
     }

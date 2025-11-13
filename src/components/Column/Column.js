@@ -31,6 +31,7 @@ import { generateId } from '../../utils/generateId.js';
  * - Listens for 'panelgroup:removed' and removes the child.
  * - If it becomes empty (last PanelGroup removed), emits 'column:empty'.
  * - Manages its own horizontal resize handle (via 'addResizeBars').
+ * - Resize logic respects the minWidth of its child PanelGroups.
  *
  * Dependencies:
  * - components/Panel/PanelGroup.js
@@ -169,6 +170,20 @@ export class Column {
     }
 
     /**
+     * Calculates the effective minimum width by checking its own minWidth
+     * and the minWidth of all child PanelGroups.
+     * @returns {number} The calculated effective minWidth.
+     */
+    getEffectiveMinWidth() {
+        const me = this;
+        let effectiveMinWidth = me.getMinWidth();
+        me.getPanelGroups().forEach(group => {
+            effectiveMinWidth = Math.max(effectiveMinWidth, group.getMinPanelWidth());
+        });
+        return effectiveMinWidth;
+    }
+
+    /**
      * Initializes appBus event listeners for this component.
      * @returns {void}
      */
@@ -226,6 +241,8 @@ export class Column {
 
     /**
      * Handles the start of a horizontal resize drag.
+     * Calculates the effective minimum width based on its own minWidth
+     * and the minWidth of its child PanelGroups.
      * @param {PointerEvent} e - The pointerdown event.
      * @returns {void}
      */
@@ -249,12 +266,14 @@ export class Column {
         const startX = e.clientX;
         const startW = me.element.offsetWidth;
 
+        const effectiveMinWidth = me.getEffectiveMinWidth();
+
         const onMove = ev => {
             if (ev.pointerId !== pointerId) {
                 return;
             }
             const delta = ev.clientX - startX;
-            me._state.width = Math.max(me.getMinWidth(), startW + delta);
+            me._state.width = Math.max(effectiveMinWidth, startW + delta);
             me.getThrottledUpdate()();
         };
 

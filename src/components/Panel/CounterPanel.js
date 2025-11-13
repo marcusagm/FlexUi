@@ -58,6 +58,9 @@ export class CounterPanel extends Panel {
         me._boundOnDecrease = me._onDecrease.bind(me);
         me._boundOnReset = me._onReset.bind(me);
 
+        me._state.minWidth = 260;
+        me._state.minHeight = 130;
+
         me.render();
     }
 
