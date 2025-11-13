@@ -236,7 +236,7 @@ export class PanelGroup {
         me.setFloatingState(me._state.isFloating, me._state.x, me._state.y);
 
         if (initialPanel) {
-            me.addPanel(initialPanel, true);
+            me.addPanel(initialPanel, null, true);
         }
 
         me.initEventListeners();
@@ -640,12 +640,13 @@ export class PanelGroup {
     }
 
     /**
-     * Adds a child Panel (tab) to this group.
+     * Adds a child Panel (tab) to this group at a specific index.
      * @param {Panel} panel - The panel instance to add.
+     * @param {number|null} [index=null] - The index to insert at. Appends if null.
      * @param {boolean} [makeActive=false] - Whether to make this panel active.
      * @returns {void}
      */
-    addPanel(panel, makeActive = false) {
+    addPanel(panel, index = null, makeActive = false) {
         const me = this;
         if (!panel || !(panel instanceof Panel)) {
             console.warn('PanelGroup.addPanel: item is not an instance of Panel.', panel);
@@ -667,11 +668,24 @@ export class PanelGroup {
             panel._state.header.setMode(false);
         }
 
-        me._state.panels.push(panel);
         panel.setParentGroup(me);
-
-        me._state.header.tabContainer.appendChild(panel._state.header.element);
         me._state.contentContainer.appendChild(panel.contentElement);
+
+        const tabContainer = me._state.header.tabContainer;
+        const tabElement = panel._state.header.element;
+        const safeIndex = index === null ? me._state.panels.length : index;
+
+        if (safeIndex >= me._state.panels.length) {
+            me._state.panels.push(panel);
+            tabContainer.appendChild(tabElement);
+        } else {
+            me._state.panels.splice(safeIndex, 0, panel);
+            const nextSiblingPanel = me._state.panels[safeIndex + 1];
+            const nextSiblingTabElement = nextSiblingPanel
+                ? nextSiblingPanel._state.header.element
+                : null;
+            tabContainer.insertBefore(tabElement, nextSiblingTabElement);
+        }
 
         me._updateHeaderMode();
         me._state.header.updateScrollButtons();
@@ -751,6 +765,49 @@ export class PanelGroup {
                 me.requestLayoutUpdate();
             }
         }
+    }
+
+    /**
+     * Description:
+     * Moves an existing Panel (tab) to a new index within this group.
+     * Used for drag-and-drop reordering.
+     *
+     * @param {Panel} panel - The Panel instance to move.
+     * @param {number} newIndex - The target index.
+     * @returns {void}
+     */
+    movePanel(panel, newIndex) {
+        const me = this;
+        if (!panel || newIndex < 0) {
+            return;
+        }
+
+        const oldIndex = me._state.panels.indexOf(panel);
+        if (oldIndex === -1) {
+            console.warn('PanelGroup.movePanel: Panel not found in this group.');
+            return;
+        }
+
+        if (oldIndex === newIndex) {
+            return;
+        }
+
+        me._state.panels.splice(oldIndex, 1);
+
+        const adjustedNewIndex = oldIndex < newIndex ? newIndex - 1 : newIndex;
+        me._state.panels.splice(adjustedNewIndex, 0, panel);
+
+        const tabContainer = me._state.header.tabContainer;
+        const tabElement = panel._state.header.element;
+
+        const nextSiblingPanel = me._state.panels[adjustedNewIndex + 1];
+        const nextSiblingTabElement = nextSiblingPanel
+            ? nextSiblingPanel._state.header.element
+            : null;
+
+        tabContainer.insertBefore(tabElement, nextSiblingTabElement);
+
+        me._state.header.updateScrollButtons();
     }
 
     /**
@@ -999,7 +1056,7 @@ export class PanelGroup {
         }
 
         if (panelInstances.length === 1) {
-            me.addPanel(panelInstances[0], true);
+            me.addPanel(panelInstances[0], null, true);
         } else if (panelInstances.length > 1) {
             me.addPanelsBulk(panelInstances);
 

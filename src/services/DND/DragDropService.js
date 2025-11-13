@@ -1,5 +1,7 @@
 import { appBus } from '../../utils/EventBus.js';
 import { FloatingPanelManagerService } from './FloatingPanelManagerService.js';
+import { Panel } from '../../components/Panel/Panel.js';
+import { PanelGroup } from '../../components/Panel/PanelGroup.js';
 
 /**
  * Description:
@@ -23,6 +25,8 @@ import { FloatingPanelManagerService } from './FloatingPanelManagerService.js';
  * - _placeholderMode {string | null} : Caches the current placeholder mode ('horizontal'/'vertical').
  * - _strategyRegistry {Map} : Maps dropZoneType (string) to Strategy instances.
  * - _namespace {string} : Unique namespace for appBus listeners.
+ * - _draggedSourceElement {HTMLElement|null} : The dropzone element being dragged.
+ * - _draggedSourceDropzone {string|null} : The original 'data-dropzone' value.
  *
  * Typical usage:
  * // In App.js
@@ -42,6 +46,8 @@ import { FloatingPanelManagerService } from './FloatingPanelManagerService.js';
  *
  * Dependencies:
  * - utils/EventBus.js
+ * - components/Panel/Panel.js
+ * - components/Panel/PanelGroup.js
  * - (Strategies are injected by App.js)
  */
 export class DragDropService {
@@ -125,6 +131,20 @@ export class DragDropService {
      * @private
      */
     _lastDragY = 0;
+
+    /**
+     * Stores the dropzone element being dragged to temporarily disable it.
+     * @type {HTMLElement | null}
+     * @private
+     */
+    _draggedSourceElement = null;
+
+    /**
+     * Stores the original 'data-dropzone' value of the element being dragged.
+     * @type {string | null}
+     * @private
+     */
+    _draggedSourceDropzone = null;
 
     /**
      * @private
@@ -309,7 +329,9 @@ export class DragDropService {
         const me = this;
         if (!me.isDragging()) return;
 
-        const dropZoneElement = e.target.closest('[data-dropzone]');
+        const dropZoneElement = e.target.closest(
+            "[data-dropzone='column'], [data-dropzone='row'], [data-dropzone='container'], [data-dropzone='TabContainer']"
+        );
         if (!dropZoneElement || !dropZoneElement.dropZoneInstance) {
             return;
         }
@@ -349,7 +371,9 @@ export class DragDropService {
             }
         }
 
-        const dropZoneElement = e.target.closest('[data-dropzone]');
+        const dropZoneElement = e.target.closest(
+            "[data-dropzone='column'], [data-dropzone='row'], [data-dropzone='container'], [data-dropzone='TabContainer']"
+        );
         if (!dropZoneElement || !dropZoneElement.dropZoneInstance) {
             me.hidePlaceholder();
             return;
@@ -377,7 +401,9 @@ export class DragDropService {
         const me = this;
         if (!me.isDragging()) return;
 
-        const dropZoneElement = e.target.closest('[data-dropzone]');
+        const dropZoneElement = e.target.closest(
+            "[data-dropzone='column'], [data-dropzone='row'], [data-dropzone='container'], [data-dropzone='TabContainer']"
+        );
         if (!dropZoneElement || !dropZoneElement.dropZoneInstance) {
             return;
         }
@@ -405,7 +431,9 @@ export class DragDropService {
         e.preventDefault();
         e.stopPropagation();
 
-        const dropZoneElement = e.target.closest('[data-dropzone]');
+        const dropZoneElement = e.target.closest(
+            "[data-dropzone='column'], [data-dropzone='row'], [data-dropzone='container'], [data-dropzone='TabContainer']"
+        );
         const placeholderVisible = !!me._placeholder.parentElement;
         const isTabContainerDrop =
             dropZoneElement && dropZoneElement.dropZoneInstance?.dropZoneType === 'TabContainer';
@@ -464,6 +492,21 @@ export class DragDropService {
         me._isDragging = true;
 
         element.classList.add('dragging');
+
+        let relevantGroup = null;
+        if (type === 'PanelGroup' && item instanceof PanelGroup) {
+            relevantGroup = item;
+        }
+
+        if (relevantGroup && relevantGroup._state.header) {
+            const sourceDropZone = relevantGroup._state.header.element;
+            if (sourceDropZone && sourceDropZone.dataset.dropzone) {
+                me._draggedSourceElement = sourceDropZone;
+                me._draggedSourceDropzone = sourceDropZone.dataset.dropzone;
+                sourceDropZone.dataset.dropzone = 'false';
+            }
+        }
+
         event.dataTransfer.dropEffect = 'move';
         event.dataTransfer.effectAllowed = 'move';
         event.dataTransfer.setData('text/plain', '');
@@ -490,6 +533,12 @@ export class DragDropService {
         document.body.classList.remove('dnd-active');
         me.hidePlaceholder();
         me._clearStrategyCaches();
+
+        if (me._draggedSourceElement) {
+            me._draggedSourceElement.dataset.dropzone = me._draggedSourceDropzone;
+            me._draggedSourceElement = null;
+            me._draggedSourceDropzone = null;
+        }
 
         if (me._dragState.element) {
             me._dragState.element.classList.remove('dragging');

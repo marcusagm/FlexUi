@@ -290,6 +290,9 @@
 .panel-group__header--simple .panel-group__tab-container > div {
     flex-grow: 1;
 }
+.dnd-active .panel-group__header--simple .panel-group__tab-container > div {
+    flex-grow: 0;
+}
 .panel-group__header--simple .panel-group__tab {
     background: transparent;
     border: none;
