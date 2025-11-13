@@ -177,13 +177,6 @@ export class App {
         await me.menu.load();
         await me.loadInitialLayout();
 
-        const fpms = FloatingPanelManagerService.getInstance();
-        fpms.addFloatingPanel(
-            new PanelGroup(new TextPanel('Float', 'Painel flutuante', 170), 170),
-            10,
-            10
-        );
-
         appBus.emit('app:set-permanent-status', 'Pronto');
     }
 
