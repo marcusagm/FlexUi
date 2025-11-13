@@ -6,7 +6,7 @@ import { ToolbarPanel } from './components/Panel/ToolbarPanel.js';
 import { PanelGroup } from './components/Panel/PanelGroup.js';
 import { PanelFactory } from './components/Panel/PanelFactory.js';
 import { StatusBar } from './components/StatusBar/StatusBar.js';
-import { StateService } from './services/StateService.js';
+import { ApplicationStateService } from './services/ApplicationStateService.js';
 import { appNotifications } from './services/Notification/Notification.js';
 import { NotificationUIListener } from './services/Notification/NotificationUIListener.js';
 import { TranslationService } from './services/TranslationService.js';
@@ -37,7 +37,7 @@ import { appShortcuts } from './services/Shortcuts/Shortcuts.js';
  * - menu {Menu} : The instance of the main application menu.
  * - container {Container} : The instance of the root layout container component.
  * - statusBar {StatusBar} : The instance of the application status bar.
- * - stateService {StateService} : The singleton instance of the StateService.
+ * - stateService {ApplicationStateService} : The singleton instance of the ApplicationStateService.
  * - _bound... {Function | null} : Bound event handlers for robust cleanup.
  * - debouncedResize {Function | null} : The debounced window resize handler.
  *
@@ -55,13 +55,13 @@ import { appShortcuts } from './services/Shortcuts/Shortcuts.js';
  * - Centralizes service registration (DND strategies, Panel types, Shortcuts).
  * - Manages the top-level application lifecycle (init, destroy).
  * - Orchestrates layout persistence (save, restore, reset) by coordinating
- * StateService and the root Container.
+ * ApplicationStateService and the root Container.
  *
  * Dependencies:
  * - components/Menu/Menu.js
  * - components/Container/Container.js
  * - components/StatusBar/StatusBar.js
- * - services/StateService.js
+ * - services/ApplicationStateService.js
  * - services/LayoutService.js
  * - services/DND/DragDropService.js (and all strategies)
  * - components/Panel/PanelFactory.js (and all Panel types)
@@ -140,7 +140,7 @@ export class App {
         me.container = new Container();
         me.statusBar = new StatusBar();
 
-        me.stateService = StateService.getInstance();
+        me.stateService = ApplicationStateService.getInstance();
 
         const dds = DragDropService.getInstance();
         dds.registerStrategy('column', new ColumnDropStrategy());
@@ -257,7 +257,7 @@ export class App {
     }
 
     /**
-     * Loads the initial layout from StateService (localStorage or default JSON).
+     * Loads the initial layout from ApplicationStateService (localStorage or default JSON).
      * @returns {Promise<void>}
      */
     async loadInitialLayout() {

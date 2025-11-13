@@ -6,20 +6,24 @@
  * state is found or if the saved data is corrupt.
  *
  * Properties summary:
- * - _instance {StateService | null} : The private static instance for the Singleton.
+ * - _instance {ApplicationStateService | null} : The private static instance for the Singleton.
  *
  * Typical usage:
  * // In App.js
- * const stateService = StateService.getInstance();
+ * const stateService = ApplicationStateService.getInstance();
  * const layout = await stateService.loadState('my_key');
  * stateService.saveState('my_key', { layout: ... });
+ *
+ * Business rules implemented:
+ * - Loads state from localStorage, falling back to 'workspaces/default.json'.
+ * - Saves state asynchronously (using setTimeout) to prevent UI blocking.
  *
  * Dependencies:
  * - None (loads 'workspaces/default.json' via native fetch)
  */
-export class StateService {
+export class ApplicationStateService {
     /**
-     * @type {StateService | null}
+     * @type {ApplicationStateService | null}
      * @private
      */
     static _instance = null;
@@ -28,22 +32,22 @@ export class StateService {
      * @private
      */
     constructor() {
-        if (StateService._instance) {
-            console.warn('StateService instance already exists. Use getInstance().');
-            return StateService._instance;
+        if (ApplicationStateService._instance) {
+            console.warn('ApplicationStateService instance already exists. Use getInstance().');
+            return ApplicationStateService._instance;
         }
-        StateService._instance = this;
+        ApplicationStateService._instance = this;
     }
 
     /**
-     * Gets the single instance of the StateService.
-     * @returns {StateService}
+     * Gets the single instance of the ApplicationStateService.
+     * @returns {ApplicationStateService}
      */
     static getInstance() {
-        if (!StateService._instance) {
-            StateService._instance = new StateService();
+        if (!ApplicationStateService._instance) {
+            ApplicationStateService._instance = new ApplicationStateService();
         }
-        return StateService._instance;
+        return ApplicationStateService._instance;
     }
 
     /**
@@ -81,17 +85,19 @@ export class StateService {
     }
 
     /**
-     * Saves data to localStorage.
+     * Saves data to localStorage asynchronously.
      * @param {string} key - The key to save under.
      * @param {object} data - The state object to be stringified and saved.
      * @returns {void}
      */
     saveState(key, data) {
-        try {
-            localStorage.setItem(key, JSON.stringify(data));
-        } catch (e) {
-            console.error('Failed to save state to localStorage.', e);
-        }
+        setTimeout(() => {
+            try {
+                localStorage.setItem(key, JSON.stringify(data));
+            } catch (e) {
+                console.error('Failed to save state to localStorage.', e);
+            }
+        }, 0);
     }
 
     /**
