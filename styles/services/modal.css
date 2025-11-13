@@ -1,15 +1,3 @@
-/* ========================================================================
- * FILE: modal.css (REFATORADO v8)
- * * DESCRIÇÃO:
- * Bloco :root removido. Este arquivo agora consome 100%
- * dos tokens de styles/theme.css.
- * ======================================================================== */
-
-/* ========================================================================
- * SECTION: MODAL CONTAINER (SERVICE)
- * ======================================================================== */
-
-/* --- Block: modal-container --- */
 .modal-container {
     position: fixed;
     top: 0;
@@ -20,13 +8,10 @@
     display: none;
     pointer-events: none;
 }
-/* Modifier: modal-container--is-open */
 .modal-container--is-open {
     display: block;
     pointer-events: all;
 }
-
-/* --- Element: modal__backdrop --- */
 .modal__backdrop {
     position: fixed;
     top: 0;
@@ -38,13 +23,11 @@
     transition: opacity var(--transition-speed) ease-out;
     pointer-events: all;
 }
-/* Modifier: modal__backdrop--blur */
 .modal__backdrop--blur {
     background-color: var(--modal-backdrop-blur-bg);
     backdrop-filter: blur(5px);
     -webkit-backdrop-filter: blur(5px);
 }
-/* Modifier: modal__backdrop--none */
 .modal__backdrop--none {
     background-color: transparent;
 }
@@ -52,11 +35,6 @@
     opacity: 1;
 }
 
-/* ========================================================================
- * SECTION: MODAL WINDOW (INSTANCE)
- * ======================================================================== */
-
-/* --- Block: modal --- */
 .modal {
     position: absolute;
     background-color: var(--color-bg-modal);
@@ -72,7 +50,6 @@
         transform var(--transition-speed) ease-out;
 }
 
-/* --- Modifiers: modal (State) --- */
 .modal--is-visible {
     opacity: 1;
 }
@@ -85,9 +62,6 @@
     opacity: 0;
 }
 
-/* --- Modifiers: modal (Position) --- */
-
-/* Position: center (default) */
 .modal--position-center {
     top: 50%;
     left: 50%;
@@ -101,7 +75,6 @@
     transform: translate(-50%, -50%) scale(0.95);
 }
 
-/* Position: right (drawer) */
 .modal--position-right {
     top: 0;
     right: 0;
@@ -116,7 +89,6 @@
     transform: translateX(100%);
 }
 
-/* Position: left (drawer) */
 .modal--position-left {
     top: 0;
     left: 0;
@@ -131,7 +103,6 @@
     transform: translateX(-100%);
 }
 
-/* Position: top */
 .modal--position-top {
     top: 0;
     left: 0;
@@ -146,7 +117,6 @@
     transform: translateY(-100%);
 }
 
-/* Position: bottom */
 .modal--position-bottom {
     bottom: 0;
     left: 0;
@@ -162,9 +132,6 @@
     transform: translateY(100%);
 }
 
-/* --- Modifiers: modal (Sizing) --- */
-
-/* Size rules for 'center' */
 .modal--position-center.modal--size-auto {
     width: var(--modal-center-size-auto-width);
     max-width: var(--modal-center-size-auto-max-width);
@@ -182,7 +149,6 @@
     max-width: var(--modal-center-size-auto-max-width);
 }
 
-/* Size rules for 'right' / 'left' drawers (controls width) */
 .modal--position-right.modal--size-auto,
 .modal--position-left.modal--size-auto {
     width: var(--modal-drawer-size-auto-width);
@@ -204,7 +170,6 @@
     max-width: var(--modal-drawer-size-auto-max-width);
 }
 
-/* Size rules for 'top' / 'bottom' (controls height) */
 .modal--position-top.modal--size-auto,
 .modal--position-bottom.modal--size-auto {
     height: var(--modal-sheet-size-auto-height);
@@ -225,7 +190,6 @@
     max-height: var(--modal-sheet-size-large-height);
 }
 
-/* Fullscreen (applies to all positions) */
 .modal--size-fullscreen {
     width: var(--modal-fullscreen-width);
     height: var(--modal-fullscreen-height);
@@ -238,11 +202,6 @@
     border-radius: var(--modal-fullscreen-border-radius);
 }
 
-/* ========================================================================
- * SECTION: MODAL ELEMENTS (Header, Content, Footer)
- * ======================================================================== */
-
-/* --- Element: modal__header --- */
 .modal__header {
     display: flex;
     justify-content: space-between;
@@ -251,18 +210,15 @@
     border-bottom: var(--modal-header-border-bottom-width) solid var(--color-border-default);
     flex-shrink: var(--modal-header-flex-shrink);
 }
-/* Modifier: modal__header--draggable */
 .modal__header--draggable {
     cursor: move;
 }
 
-/* --- Element: modal__nav --- */
 .modal__nav {
     display: flex;
     align-items: center;
 }
 
-/* --- Element: modal__title --- */
 .modal__title {
     font-size: var(--modal-title-font-size);
     font-weight: var(--modal-title-font-weight);
@@ -272,7 +228,6 @@
     color: var(--color-text-bright);
 }
 
-/* --- Element: modal__back-button --- */
 .modal__back-button {
     background: transparent;
     border: none;
@@ -288,7 +243,6 @@
     color: var(--color-text-primary);
 }
 
-/* --- Element: modal__close-button --- */
 .modal__close-button {
     background: transparent;
     border: none;
@@ -304,7 +258,6 @@
     color: var(--color-text-primary);
 }
 
-/* --- Element: modal__content --- */
 .modal__content {
     padding: var(--modal-content-padding);
     flex-grow: var(--modal-content-flex-grow);
@@ -314,7 +267,6 @@
     background-color: var(--color-bg-modal-content);
 }
 
-/* --- Element: modal__footer --- */
 .modal__footer {
     display: flex;
     justify-content: space-between;
@@ -325,24 +277,17 @@
     flex-shrink: var(--modal-footer-flex-shrink);
 }
 
-/* --- Element: modal__footer-text --- */
 .modal__footer-text {
     font-size: var(--modal-footer-text-font-size);
     color: var(--color-text-primary);
     opacity: var(--modal-footer-text-opacity);
 }
 
-/* --- Element: modal__footer-buttons --- */
 .modal__footer-buttons {
     display: flex;
     gap: var(--modal-footer-buttons-gap);
 }
 
-/* ========================================================================
- * SECTION: MODAL COMPONENTS (Buttons, Prompts, Spinner)
- * ======================================================================== */
-
-/* --- Element: modal__button (Base) --- */
 .modal__button {
     border: none;
     padding: var(--modal-button-padding);
@@ -359,7 +304,6 @@
     background-color: var(--surface-level-4);
 }
 
-/* Modifier: modal__button--primary */
 .modal__button--primary {
     background-color: var(--color-accent-primary);
     color: var(--color-text-on-accent);
@@ -367,7 +311,7 @@
 .modal__button--primary:hover {
     background-color: var(--color-accent-hover);
 }
-/* Modifier: modal__button--secondary (explicit) */
+
 .modal__button--secondary {
     background-color: var(--color-bg-hover);
     color: var(--color-text-primary);
@@ -376,7 +320,6 @@
     background-color: var(--surface-level-4);
 }
 
-/* --- Elements for Presets --- */
 .modal__prompt {
     display: flex;
     flex-direction: column;
@@ -398,10 +341,9 @@
     border-color: transparent;
 }
 
-/* --- Element: modal__spinner --- */
 .modal__spinner {
     border: var(--modal-spinner-border-width) solid var(--color-bg-hover);
-    border-top-color: var(--color-accent-primary); /* (border-top -> border-top-color) */
+    border-top-color: var(--color-accent-primary);
     border-radius: 50%;
     width: var(--modal-spinner-size);
     height: var(--modal-spinner-size);
@@ -417,19 +359,11 @@
     }
 }
 
-/* ========================================================================
- * SECTION: GLOBAL STATE & RESPONSIVENESS
- * ======================================================================== */
-
-/* --- Global State Class --- */
-/* Applied to <body> when any modal is open */
 .modal-scroll-lock {
     overflow: hidden;
 }
 
-/* --- Responsiveness --- */
 @media (max-width: 640px) {
-    /* Make drawers wider on mobile */
     .modal--position-right.modal--size-small,
     .modal--position-left.modal--size-small,
     .modal--position-right.modal--size-medium,
@@ -437,14 +371,12 @@
         width: var(--modal-responsive-drawer-width);
     }
 
-    /* Make centered modals simpler */
     .modal--position-center.modal--size-small,
     .modal--position-center.modal--size-medium {
         width: var(--modal-responsive-center-width);
         max-width: var(--modal-responsive-center-width);
     }
 
-    /* Reduce padding on mobile */
     .modal__content {
         padding: var(--modal-padding-small);
     }

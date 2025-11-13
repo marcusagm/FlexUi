@@ -155,6 +155,7 @@
     --menu-submenu-min-width: 180px;
     --menu-submenu-nested-top: 5px;
     --menu-submenu-nested-border-radius: 0;
+    --menu-z-index: 300;
 
     /* Component: StatusBar */
     --statusbar-flex-shrink: 0;

@@ -1,5 +1,3 @@
-/* === 1. Containers === */
-/* Posiciona os containers em locais fixos */
 .notification-container {
     position: fixed;
     z-index: var(--notification-container-z-index);
@@ -7,13 +5,10 @@
     flex-direction: column;
     max-width: var(--notification-container-max-width);
 }
-
-/* Espaçamento entre notificações */
 .notification-container .notification {
     margin-bottom: var(--notification-margin-bottom);
 }
 
-/* Posições */
 .notification-container--top-right {
     top: var(--notification-container-offset);
     right: var(--notification-container-offset);
@@ -41,10 +36,9 @@
     transform: translateX(-50%);
 }
 
-/* === 2. Notificação Base (Toast/Snackbar) === */
 .notification {
     display: flex;
-    align-items: flex-start; /* Alinha ícone e conteúdo */
+    align-items: flex-start;
     background: var(--color-bg-panel);
     color: var(--color-text-primary);
     padding: var(--notification-padding);
@@ -53,18 +47,13 @@
     min-width: var(--notification-min-width);
 }
 
-/* === 3. Variantes (Toast vs Snackbar) === */
-/* Apenas um exemplo; podem ser iguais ou diferentes */
-.notification--toast {
-    /* Estilo padrão (acima) */
-}
+/* .notification--toast {
+} */
 .notification--snackbar {
-    /* Snackbars geralmente ficam embaixo e são mais largos */
     min-width: var(--notification-snackbar-min-width);
     background: var(--color-bg-app);
 }
 
-/* === 4. Tipos (Cores) - Mapeado para tokens de feedback */
 .notification--info {
     background: var(--color-feedback-info);
     color: var(--color-text-on-info);
@@ -82,7 +71,6 @@
     color: var(--color-text-on-danger);
 }
 
-/* === 5. Elementos Internos === */
 .notification__icon-wrapper {
     margin-right: var(--notification-icon-wrapper-margin-right);
     font-size: var(--notification-icon-wrapper-font-size);
@@ -90,7 +78,7 @@
 }
 
 .notification__content {
-    flex-grow: 1; /* Ocupa o espaço restante */
+    flex-grow: 1;
 }
 
 .notification__message {
@@ -101,14 +89,14 @@
 
 .notification__buttons {
     display: flex;
-    justify-content: flex-end; /* Alinha botões à direita */
+    justify-content: flex-end;
     margin-top: var(--notification-buttons-margin-top);
 }
 
 .notification__button {
     background: transparent;
     border: none;
-    color: inherit; /* Herda a cor do tipo (ex: branco no 'danger') */
+    color: inherit;
     font-weight: var(--notification-button-font-weight);
     text-transform: uppercase;
     padding: var(--notification-button-padding);
@@ -117,7 +105,6 @@
     opacity: var(--notification-button-opacity);
 }
 
-/* Destaque para botões OK/Cancel */
 .notification__button--ok,
 .notification__button--cancel {
     opacity: var(--notification-button-hover-opacity);
@@ -129,7 +116,7 @@
 }
 
 .notification--warning .notification__button {
-    color: var(--color-text-on-warning); /* Garante legibilidade no fundo amarelo */
+    color: var(--color-text-on-warning);
 }
 .notification--warning .notification__button:hover {
     background: var(--notification-warning-button-hover-bg);
@@ -150,7 +137,6 @@
     opacity: var(--notification-close-button-hover-opacity);
 }
 
-/* === 6. Animações === */
 .notification {
     transition:
         opacity 0.3s ease,
@@ -165,16 +151,12 @@
     transform: translateY(calc(-1 * var(--notification-animation-transform-y)));
 }
 
-/* Estado de entrada */
 .notification.is-entering {
     opacity: 1;
     transform: translateY(0);
 }
 
-/* Estado de saída */
 .notification.is-exiting {
     opacity: 0;
-    transform: translateY(
-        var(--notification-animation-transform-y)
-    ); /* Ou de volta para cima, dependendo da posição */
+    transform: translateY(var(--notification-animation-transform-y));
 }

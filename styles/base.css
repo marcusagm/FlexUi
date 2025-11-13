@@ -1,9 +1,4 @@
-/* styles/base.css (Substituindo o antigo core.css) */
-@import 'theme.css'; /* Importa todos os tokens (Cores, Fontes, Spacing) */
-
-/*
- * Variáveis de UI foram movidas para theme.css
- */
+@import 'theme.css';
 
 html,
 body {
@@ -13,17 +8,15 @@ body {
 }
 
 body {
-    /* Mapeamento para os novos tokens do theme.css */
     font-family: var(--font-family-base);
     background-color: var(--color-bg-app);
     color: var(--color-text-primary);
     display: flex;
     flex-direction: column;
     font-size: var(--font-size-app);
-    /* user-select: none; (REMOVIDO na Etapa 1/v5) - Esta linha quebrou o D&D */
+    text-rendering: optimizeLegibility;
 }
 
-/* Scrollbar agora usa os tokens de Acento */
 ::-webkit-scrollbar {
     width: 8px;
     height: 8px;

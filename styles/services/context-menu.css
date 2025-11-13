@@ -71,16 +71,16 @@
 .context-menu__viewport {
     flex-grow: 1;
     flex-shrink: 1;
-    padding: var(--menu-submenu-padding); /* 4px 0 */
+    padding: var(--menu-submenu-padding);
 
     overflow-y: auto;
     overflow-x: hidden;
 
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* IE e Edge */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
 }
 .context-menu__viewport::-webkit-scrollbar {
-    display: none; /* Chrome, Safari e Opera */
+    display: none;
 }
 
 .context-menu__list {
@@ -94,7 +94,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: var(--menu-submenu-item-padding); /* 4px 12px */
+    padding: var(--menu-submenu-item-padding);
     font-size: var(--menu-item-font-size);
     line-height: var(--menu-item-line-height);
     cursor: pointer;
@@ -131,8 +131,8 @@
 
 .context-menu__submenu {
     display: none;
-    position: fixed; /* Alterado de 'absolute' para 'fixed' */
-    z-index: 501; /* Z-index maior que o menu principal */
+    position: fixed;
+    z-index: 501;
     min-width: 180px;
     padding: var(--menu-submenu-padding);
     background-color: var(--color-bg-panel);
@@ -143,9 +143,3 @@
 .context-menu__submenu--visible {
     display: block;
 }
-
-/* Removido:
-.context-menu__item:hover > .context-menu__submenu {
-    display: block;
-}
-*/

@@ -83,7 +83,8 @@
 - [x] Sistema de tradução
 - [x] Bloqueio da tela abaixo
 - [x] Telas de confirmação
-- [ ] Sistema de atalhos de teclado
+- [x] Sistema de atalhos de teclado
+- [x] Menu de contexto
 
 # Melhorar o CONTRIBUTING.md
 

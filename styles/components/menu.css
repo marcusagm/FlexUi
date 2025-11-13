@@ -2,9 +2,8 @@
     display: flex;
     height: var(--menu-height);
     background-color: var(--color-bg-header);
-    /* border-bottom: 1px solid #111; */
     box-shadow: 0 0 5px 0 #00000099;
-    z-index: 100;
+    z-index: var(--menu-z-index);
 }
 
 .menu__item {

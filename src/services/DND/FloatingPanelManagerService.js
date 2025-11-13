@@ -138,6 +138,30 @@ export class FloatingPanelManagerService {
         return this._container;
     }
 
+    /* ----------------------
+     Public Methods
+    ---------------------- */
+
+    /**
+     * Description:
+     * Destroys all currently active floating panels and clears the manager.
+     * This is used when restoring or resetting the workspace to prevent duplicates.
+     *
+     * @returns {void}
+     */
+    clearAll() {
+        const me = this;
+        const panelsToClose = [...me._floatingPanels];
+        panelsToClose.forEach(panelGroup => {
+            if (panelGroup && typeof panelGroup.close === 'function') {
+                panelGroup.close();
+            }
+        });
+
+        me._floatingPanels = [];
+        me._zIndexCounter = 100;
+    }
+
     /**
      * Initializes appBus event listeners for this component.
      * @private
@@ -205,7 +229,9 @@ export class FloatingPanelManagerService {
      */
     removeFloatingPanel(panelGroup) {
         const me = this;
-        if (!panelGroup) return;
+        if (!panelGroup) {
+            return;
+        }
 
         const index = me._floatingPanels.indexOf(panelGroup);
         if (index > -1) {
@@ -226,7 +252,9 @@ export class FloatingPanelManagerService {
      */
     handleUndockDrop(draggedData, positionX, positionY) {
         const me = this;
-        if (!me.container) return;
+        if (!me.container) {
+            return;
+        }
 
         const containerRect = me.container.getBoundingClientRect();
         const x = positionX - containerRect.left;
@@ -268,7 +296,9 @@ export class FloatingPanelManagerService {
     _onUndockRequest(contextData) {
         const me = this;
         const { panel, group, nativeEvent } = contextData;
-        if (!panel || !group) return;
+        if (!panel || !group) {
+            return;
+        }
 
         const containerRect = me.getContainerBounds();
         if (!containerRect) {

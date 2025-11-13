@@ -20,6 +20,7 @@ import { appBus } from './utils/EventBus.js';
 import { FloatingPanelManagerService } from './services/DND/FloatingPanelManagerService.js';
 import { globalState } from './services/GlobalStateService.js';
 import { CounterPanel } from './components/Panel/CounterPanel.js';
+import { appShortcuts } from './services/Shortcuts/Shortcuts.js';
 
 /**
  * Description:
@@ -51,7 +52,7 @@ import { CounterPanel } from './components/Panel/CounterPanel.js';
  *
  * Business rules implemented:
  * - Implements the Singleton pattern to ensure only one App instance.
- * - Centralizes service registration (DND strategies, Panel types).
+ * - Centralizes service registration (DND strategies, Panel types, Shortcuts).
  * - Manages the top-level application lifecycle (init, destroy).
  * - Orchestrates layout persistence (save, restore, reset) by coordinating
  * StateService and the root Container.
@@ -65,6 +66,7 @@ import { CounterPanel } from './components/Panel/CounterPanel.js';
  * - services/DND/DragDropService.js (and all strategies)
  * - components/Panel/PanelFactory.js (and all Panel types)
  * - services/Notification/NotificationUIListener.js
+ * - services/Shortcuts/Shortcuts.js
  * - utils/EventBus.js
  * - utils/Debounce.js
  */
@@ -155,6 +157,7 @@ export class App {
         globalState.set('counterValue', 0);
         globalState.set('activeTool', 'pointer');
         globalState.set('activeColor', '#FFFFFF');
+        globalState.set('activeScopes', ['global']);
 
         const fpms = FloatingPanelManagerService.getInstance();
         fpms.registerContainer(me.container.element);
@@ -168,6 +171,7 @@ export class App {
         me._boundResetLayout = me.resetLayout.bind(me, false);
 
         me.initEventListeners();
+        me._registerGlobalShortcuts();
 
         const uiListener = new NotificationUIListener(document.body);
         uiListener.listen(appNotifications);
@@ -203,8 +207,42 @@ export class App {
     }
 
     /**
+     * Registers all global application shortcuts.
+     * @private
+     * @returns {void}
+     */
+    _registerGlobalShortcuts() {
+        appShortcuts.register({
+            keys: 'Ctrl+S',
+            command: 'app:save-state',
+            scopes: ['global'],
+            preventDefault: true
+        });
+
+        appShortcuts.register({
+            keys: 'Ctrl+R',
+            command: 'app:restore-state',
+            scopes: ['global'],
+            preventDefault: true
+        });
+
+        appShortcuts.register({
+            keys: 'Ctrl+Shift+R',
+            command: 'app:reset-state',
+            scopes: ['global'],
+            preventDefault: true
+        });
+
+        appShortcuts.register({
+            keys: 'Ctrl+N',
+            command: 'app:add-new-panel',
+            scopes: ['global'],
+            preventDefault: true
+        });
+    }
+
+    /**
      * Cleans up all event listeners and child components.
-     * (MODIFICADO) Usa offByNamespace para limpar todos os listeners do appBus.
      * @returns {void}
      */
     destroy() {
@@ -271,6 +309,7 @@ export class App {
      */
     async restoreLayout() {
         const me = this;
+        FloatingPanelManagerService.getInstance().clearAll();
         me.container.clear();
         await me.loadInitialLayout();
 
@@ -286,6 +325,7 @@ export class App {
      */
     async resetLayout(silent = false) {
         const me = this;
+        FloatingPanelManagerService.getInstance().clearAll();
         me.stateService.clearState(me.STORAGE_KEY);
         me.container.clear();
 

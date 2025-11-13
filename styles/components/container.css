@@ -1,10 +1,10 @@
 @import '../theme.css';
-/* (NOVO) Classe para o Container principal (gestor de linhas) */
+
 .container {
     flex: 1;
     display: flex;
-    flex-direction: column; /* Gere linhas verticalmente */
-    gap: var(--container-gap); /* Gap entre as linhas */
+    flex-direction: column;
+    gap: var(--container-gap);
     padding: var(--container-padding);
     background: var(--color-bg-app);
     overflow: auto;

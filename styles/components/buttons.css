@@ -1,7 +1,4 @@
-/* --- 2.4 Botões (btn) --- */
 .btn {
-    /* Variáveis locais --btn-* REMOVIDAS */
-
     display: var(--button-display);
     padding: var(--button-padding-y) var(--button-padding-x);
     font-family: var(--font-family-base);
@@ -15,7 +12,7 @@
     user-select: var(--button-user-select);
     border: var(--button-border-width) solid var(--color-border-default);
     border-radius: var(--button-border-radius);
-    background-color: var(--color-bg-panel); /* (Fundo padrão) */
+    background-color: var(--color-bg-panel);
     color: var(--color-text-primary);
     transition:
         color var(--transition-speed),
@@ -42,7 +39,7 @@
     background-color: var(--color-bg-hover);
 }
 .btn--secondary:hover {
-    background-color: var(--surface-level-4); /* (Exceção para hover mais escuro) */
+    background-color: var(--surface-level-4);
 }
 .btn--danger {
     background-color: var(--color-feedback-danger);
@@ -50,7 +47,7 @@
     border-color: var(--color-feedback-danger);
 }
 .btn--danger:hover {
-    background-color: var(--danger-60); /* (Token direto da paleta) */
+    background-color: var(--danger-60);
     color: var(--color-text-on-danger);
     border-color: var(--danger-60);
 }

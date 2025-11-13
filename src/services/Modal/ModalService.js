@@ -3,6 +3,7 @@ import { throttleRAF } from '../../utils/ThrottleRAF.js';
 import { AlertView } from './presets/AlertView.js';
 import { ConfirmView } from './presets/ConfirmView.js';
 import { PromptView } from './presets/PromptView.js';
+import { globalState } from '../GlobalStateService.js';
 
 /**
  * Description:
@@ -10,6 +11,8 @@ import { PromptView } from './presets/PromptView.js';
  * It handles stacking, accessibility (focus trap, ARIA), scroll locking,
  * async data resolution, global defaults, instance ID management, and advanced
  * UI positioning (like drawers/side-modals).
+ *
+ * It also manages the 'modal-open' scope for the ShortcutService.
  *
  * Properties summary:
  * - _container {HTMLElement} : The main DOM element holding all modals.
@@ -36,6 +39,14 @@ import { PromptView } from './presets/PromptView.js';
  * title: 'Hello',
  * content: 'This is a modal.'
  * });
+ *
+ * Dependencies:
+ * - ./ModalInstance.js
+ * - ../../utils/ThrottleRAF.js
+ * - ./presets/AlertView.js
+ * - ./presets/ConfirmView.js
+ * - ./presets/PromptView.js
+ * - ../GlobalStateService.js
  *
  * Notes / Additional:
  * - This class is a Singleton. Use ModalService.getInstance() to access it.
@@ -154,69 +165,74 @@ export class ModalService {
         me.getContainer().appendChild(me.getBackdrop());
         document.body.appendChild(me.getContainer());
 
-        // Attach global listeners
         me._backdrop.addEventListener('click', me._onBackdropClick.bind(me));
         document.addEventListener('keydown', me._onGlobalKeydown.bind(me));
 
-        // [FEATURE] Attach throttled resize listener
         me._throttledResizeHandler = throttleRAF(me._onWindowResize.bind(me));
         window.addEventListener('resize', me._throttledResizeHandler);
     }
 
-    // --- Getters / Setters ---
-
-    /** * @param {HTMLElement} element
-     * @description Sets the container element.
+    /**
+     * <Container> setter.
+     * @param {HTMLElement} element - The main container element.
+     * @returns {void}
      */
     setContainer(element) {
         const me = this;
         me._container = element;
     }
-    /** * @returns {HTMLElement}
-     * @description Gets the container element.
+    /**
+     * <Container> getter.
+     * @returns {HTMLElement} The container element.
      */
     getContainer() {
         const me = this;
         return me._container;
     }
 
-    /** * @param {HTMLElement} element
-     * @description Sets the backdrop element.
+    /**
+     * <Backdrop> setter.
+     * @param {HTMLElement} element - The backdrop element.
+     * @returns {void}
      */
     setBackdrop(element) {
         const me = this;
         me._backdrop = element;
     }
-    /** * @returns {HTMLElement}
-     * @description Gets the backdrop element.
+    /**
+     * <Backdrop> getter.
+     * @returns {HTMLElement} The backdrop element.
      */
     getBackdrop() {
         const me = this;
         return me._backdrop;
     }
 
-    /** * @returns {number}
-     * @description Gets the animation duration in ms.
+    /**
+     * <AnimationDuration> getter.
+     * @returns {number} The animation duration in ms.
      */
     getAnimationDuration() {
         const me = this;
         return me._animationDuration;
     }
 
-    /** * @returns {ModalInstance | null}
-     * @description Gets the currently active (top-most) modal instance.
+    /**
+     * <ActiveModal> getter.
+     * @returns {ModalInstance | null} The currently active (top-most) modal instance.
      */
     getActiveModal() {
         const me = this;
         return me._modalStack.length > 0 ? me._modalStack[me._modalStack.length - 1] : null;
     }
 
-    // --- Public API Methods ---
-
     /**
-     * [FEATURE] Sets default options for all subsequent modal 'open' calls.
+     * Description:
+     * Sets default options for all subsequent modal 'open' calls.
      * Options are merged with system defaults.
+     *
      * @param {object} options - An options object (see `open()` for details).
+     * @returns {void}
      */
     setDefaultOptions(options = {}) {
         const me = this;
@@ -224,14 +240,13 @@ export class ModalService {
     }
 
     /**
+     * Description:
      * Opens a new modal window.
+     *
      * @param {object} options - The modal configuration object.
      * @param {string} [options.id] - A unique ID for this modal instance.
      * @param {string} [options.title] - The text for the modal header.
      * @param {string|HTMLElement|object} options.content - The modal content.
-     * Can be an HTML string, a DOM element, or an object:
-     * { viewUrl: '/path.html', controller: (api, el, data) => {} }
-     * { controller: (api, el, data) => {} } (if using 'resolve' only)
      * @param {string} [options.size='medium'] - 'auto', 'small', 'medium', 'large', 'fullscreen'.
      * @param {string} [options.position='center'] - 'center', 'right', 'left', 'top', 'bottom'.
      * @param {boolean} [options.closeButton=true] - Show the 'X' close button.
@@ -239,13 +254,11 @@ export class ModalService {
      * @param {boolean} [options.closeOnEscape=true] - Close when Escape key is pressed.
      * @param {string} [options.backdrop='visible'] - 'visible', 'blur', 'none'.
      * @param {Array<object>} [options.buttons] - Array of button config objects.
-     * Example: { text: 'OK', class: 'modal__button', action: 'resolve', value: true }
      * @param {string} [options.footerText] - Text for the bottom-left of the footer.
      * @param {boolean} [options.draggable=false] - If the modal header is draggable.
      * @param {string} [options.className] - A custom CSS class to add to the modal window.
      * @param {string} [options.initialFocus] - CSS selector for the element to focus on open.
      * @param {object<Promise>} [options.resolve] - An object of promises to resolve before loading content.
-     * Example: { user: fetchUser(1) }
      * @param {Function} [options.onBeforeOpen] - Hook: before modal is created. Receives (api).
      * @param {Function} [options.onOpen] - Hook: after modal is visible. Receives (api, resolvedData).
      * @param {Function} [options.onBeforeClose] - Hook: before modal closes. Return false to cancel. Receives (reason, value, api).
@@ -255,7 +268,6 @@ export class ModalService {
     open(options = {}) {
         const me = this;
 
-        // [FEATURE] Merge options: Hardcoded < Global < Instance
         const hardcodedDefaults = {
             id: null,
             title: null,
@@ -284,27 +296,29 @@ export class ModalService {
             ...options
         };
 
-        // [FEATURE] Check for duplicate ID
         if (modalOptions.id && me.isIdOpen(modalOptions.id)) {
             const errorMsg = `[ModalService] Modal with ID "${modalOptions.id}" is already open.`;
             console.warn(errorMsg);
             return Promise.reject(errorMsg);
         }
 
-        // Handle first modal opening
         if (me._modalStack.length === 0) {
             me._previousActiveElement = document.activeElement;
             me._container.classList.add('modal-container--is-open');
             me._applyScrollLock();
+
+            const scopes = globalState.get('activeScopes') || [];
+            if (!scopes.includes('modal-open')) {
+                scopes.push('modal-open');
+                globalState.set('activeScopes', scopes);
+            }
         }
 
-        // Hide current active modal (if navigating)
         const currentActive = me.getActiveModal();
         if (currentActive) {
             currentActive.hide();
         }
 
-        // Update backdrop style
         me._backdrop.className = 'modal__backdrop';
         if (modalOptions.backdrop === 'blur') {
             me._backdrop.classList.add('modal__backdrop--blur');
@@ -312,11 +326,9 @@ export class ModalService {
             me._backdrop.classList.add('modal__backdrop--none');
         }
 
-        // Create and stack new instance
         const modalInstance = new ModalInstance(modalOptions, me);
         me._modalStack.push(modalInstance);
 
-        // Add to DOM and show
         me._container.appendChild(modalInstance.element);
         modalInstance.show();
 
@@ -324,8 +336,11 @@ export class ModalService {
     }
 
     /**
+     * Description:
      * Closes the *active* modal and resolves its promise.
+     *
      * @param {*} [value] - The value to resolve the promise with.
+     * @returns {void}
      */
     close(value) {
         const me = this;
@@ -341,8 +356,11 @@ export class ModalService {
     }
 
     /**
+     * Description:
      * Closes the *active* modal and rejects (dismisses) its promise.
+     *
      * @param {*} [reason] - The reason for dismissal (e.g., 'backdrop', 'escape').
+     * @returns {void}
      */
     dismiss(reason) {
         const me = this;
@@ -358,8 +376,11 @@ export class ModalService {
     }
 
     /**
+     * Description:
      * Navigates back one step in the modal stack.
      * This is an alias for dismissing the current modal.
+     *
+     * @returns {void}
      */
     back() {
         const me = this;
@@ -367,8 +388,10 @@ export class ModalService {
     }
 
     /**
-     * [FEATURE] Gets a modal instance by its unique ID.
-     * @param {string} id The modal ID.
+     * Description:
+     * Gets a modal instance by its unique ID.
+     *
+     * @param {string} id - The modal ID.
      * @returns {ModalInstance | null} The instance or null if not found.
      */
     getById(id) {
@@ -377,8 +400,10 @@ export class ModalService {
     }
 
     /**
-     * [FEATURE] Checks if a modal with a given ID is currently open.
-     * @param {string} id The modal ID.
+     * Description:
+     * Checks if a modal with a given ID is currently open.
+     *
+     * @param {string} id - The modal ID.
      * @returns {boolean}
      */
     isIdOpen(id) {
@@ -387,10 +412,13 @@ export class ModalService {
     }
 
     /**
-     * [FEATURE] Closes a modal by its ID, regardless of its position in the stack.
-     * @param {string} id The modal ID.
-     * @param {*} [value] The value to resolve/reject the promise with.
-     * @param {string} [reason='resolve'] 'resolve' or 'dismiss'.
+     * Description:
+     * Closes a modal by its ID, regardless of its position in the stack.
+     *
+     * @param {string} id - The modal ID.
+     * @param {*} [value] - The value to resolve/reject the promise with.
+     * @param {string} [reason='resolve'] - 'resolve' or 'dismiss'.
+     * @returns {void}
      */
     closeById(id, value, reason = 'resolve') {
         const me = this;
@@ -402,9 +430,7 @@ export class ModalService {
         const isActive = modalToClose === me.getActiveModal();
 
         if (modalToClose.destroy(reason, value)) {
-            // Remove from stack
             me._modalStack = me._modalStack.filter(modal => modal.options.id !== id);
-            // Only update UI if the *active* modal was the one closed
             if (isActive) {
                 me._updateAfterClose();
             }
@@ -414,7 +440,9 @@ export class ModalService {
     // --- Presets ---
 
     /**
+     * Description:
      * Shows a simple alert modal.
+     *
      * @param {string} message - The alert message.
      * @param {string} [title='Alert'] - The modal title.
      * @returns {Promise} Resolves with `true` when 'OK' is clicked.
@@ -429,7 +457,9 @@ export class ModalService {
     }
 
     /**
+     * Description:
      * Shows a confirmation modal.
+     *
      * @param {string} message - The confirmation message.
      * @param {string} [title='Confirm'] - The modal title.
      * @returns {Promise<boolean>} Resolves with true (OK) or false (Cancel).
@@ -444,7 +474,9 @@ export class ModalService {
     }
 
     /**
+     * Description:
      * Shows a prompt modal with a text input.
+     *
      * @param {string} message - The prompt message.
      * @param {string} [title='Prompt'] - The modal title.
      * @param {string} [defaultValue=''] - The default value for the input.
@@ -462,21 +494,20 @@ export class ModalService {
     // --- Private Helpers ---
 
     /**
+     * Description:
      * Manages stack and UI after a modal is closed.
-     * If a modal was closed from the middle of the stack,
-     * this only runs if it was the *active* modal.
+     *
      * @private
+     * @returns {void}
      */
     _updateAfterClose() {
         const me = this;
         const newActiveModal = me.getActiveModal();
 
         if (newActiveModal) {
-            // Show the previous modal in the stack
             newActiveModal.show();
             newActiveModal.focus();
 
-            // Update backdrop to match the new active modal
             me._backdrop.className = 'modal__backdrop';
             if (newActiveModal.options.backdrop === 'blur') {
                 me._backdrop.classList.add('modal__backdrop--blur');
@@ -484,36 +515,44 @@ export class ModalService {
                 me._backdrop.classList.add('modal__backdrop--none');
             }
         } else {
-            // No modals left, close the service
             me._container.classList.remove('modal-container--is-open');
             me._applyScrollUnlock();
 
-            // Restore focus (A11y)
             if (me._previousActiveElement) {
                 me._previousActiveElement.focus();
                 me._previousActiveElement = null;
             }
+
+            const scopes = (globalState.get('activeScopes') || []).filter(s => s !== 'modal-open');
+            globalState.set('activeScopes', scopes);
         }
     }
 
     /**
+     * Description:
      * Gets a list of focusable elements within a parent.
+     *
      * @param {HTMLElement} parentElement - The element to search within.
      * @returns {Array<HTMLElement>}
-     * @public (Used by ModalInstance)
+     * @public
      */
     getFocusableElements(parentElement) {
         const me = this;
-        if (!parentElement) return [];
+        if (!parentElement) {
+            return [];
+        }
         return Array.from(parentElement.querySelectorAll(me._focusableSelectors));
     }
 
     // --- Global Event Handlers ---
 
     /**
+     * Description:
      * Handles 'Escape' key press and 'Tab' focus trapping.
+     *
      * @param {KeyboardEvent} event
      * @private
+     * @returns {void}
      */
     _onGlobalKeydown(event) {
         const me = this;
@@ -522,7 +561,9 @@ export class ModalService {
         }
 
         const activeModal = me.getActiveModal();
-        if (!activeModal || activeModal.isClosing) return;
+        if (!activeModal || activeModal.isClosing) {
+            return;
+        }
 
         if (event.key === 'Escape') {
             if (activeModal.options.closeOnEscape) {
@@ -535,8 +576,11 @@ export class ModalService {
     }
 
     /**
+     * Description:
      * Handles clicks on the backdrop.
+     *
      * @private
+     * @returns {void}
      */
     _onBackdropClick() {
         const me = this;
@@ -551,30 +595,36 @@ export class ModalService {
     }
 
     /**
-     * [FEATURE] Handles the throttled window resize event.
-     * Iterates over all open modals and calls their updatePosition method.
+     * Description:
+     * Handles the throttled window resize event.
+     *
      * @private
+     * @returns {void}
      */
     _onWindowResize() {
         const me = this;
         if (me._modalStack.length === 0) {
             return;
         }
-        // Update position for all open modals (needed for stack)
         me._modalStack.forEach(modalInstance => {
             modalInstance.updatePosition();
         });
     }
 
     /**
+     * Description:
      * Traps Tab focus within the active modal.
+     *
      * @param {KeyboardEvent} event
      * @private
+     * @returns {void}
      */
     _handleFocusTrap(event) {
         const me = this;
         const activeModal = me.getActiveModal();
-        if (!activeModal) return;
+        if (!activeModal) {
+            return;
+        }
 
         const focusableElements = me.getFocusableElements(activeModal.element);
         if (focusableElements.length === 0) {
@@ -586,13 +636,11 @@ export class ModalService {
         const lastElement = focusableElements[focusableElements.length - 1];
 
         if (event.shiftKey) {
-            // Shift + Tab
             if (document.activeElement === firstElement) {
                 lastElement.focus();
                 event.preventDefault();
             }
         } else {
-            // Tab
             if (document.activeElement === lastElement) {
                 firstElement.focus();
                 event.preventDefault();
@@ -600,10 +648,10 @@ export class ModalService {
         }
     }
 
-    // --- Utility Helpers ---
-
     /**
+     * Description:
      * Gets the width of the browser's scrollbar.
+     *
      * @returns {number} Scrollbar width in pixels.
      * @private
      */
@@ -612,8 +660,11 @@ export class ModalService {
     }
 
     /**
+     * Description:
      * Applies scroll lock to the body.
+     *
      * @private
+     * @returns {void}
      */
     _applyScrollLock() {
         const me = this;
@@ -623,8 +674,11 @@ export class ModalService {
     }
 
     /**
+     * Description:
      * Removes scroll lock from the body.
+     *
      * @private
+     * @returns {void}
      */
     _applyScrollUnlock() {
         document.body.style.paddingRight = '';

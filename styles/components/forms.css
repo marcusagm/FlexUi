@@ -1,20 +1,3 @@
-/*
- * =================================================================
- * ARQUIVO CSS DE FORMULÁRIOS (REFATORADO v8)
- *
- * Bloco :root removido. Este arquivo agora consome 100%
- * dos tokens de styles/theme.css.
- * =================================================================
- */
-
-/**
- * =================================================================
- * PARTE 2: FORM SYSTEM (v4.0)
- * =================================================================
- */
-
-/* --- 2.1 Estrutura do Formulário --- */
-
 .form-group {
     margin-bottom: var(--form-group-margin-bottom);
 }
@@ -65,7 +48,6 @@
     user-select: auto;
 }
 
-/* Rótulo Flutuante (v2) */
 .form-group--floating {
     position: relative;
 }
@@ -94,7 +76,6 @@
     font-weight: var(--form-floating-label-focus-font-weight);
 }
 
-/* Contador de Caracteres (v4.0) */
 .form-group__counter {
     display: block;
     font-size: var(--form-counter-font-size);
@@ -102,8 +83,6 @@
     text-align: right;
     margin-top: var(--form-counter-margin-top);
 }
-
-/* --- 2.2 Controles Padrão --- */
 
 .form-control,
 .form-select {
@@ -149,7 +128,6 @@ textarea.form-control {
     resize: vertical;
 }
 
-/* Select customizado */
 .form-select {
     appearance: none;
     background-image: var(--form-select-arrow);
@@ -158,7 +136,6 @@ textarea.form-control {
     padding-right: var(--form-select-padding-right);
 }
 
-/* Correção para Select Múltiplo (v4.0) */
 .form-select[multiple] {
     appearance: auto;
     background-image: none;
@@ -171,7 +148,6 @@ textarea.form-control {
     box-shadow: 0 0 0 3px var(--color-placeholder-bg);
 }
 
-/* Input de Arquivo Customizado (Corrigido v4.0) */
 .form-file {
     display: flex;
     align-items: center;
@@ -217,9 +193,8 @@ textarea.form-control {
     user-select: auto;
 }
 
-/* --- 2.3 Controles Customizados --- */
 .form-check {
-    --form-check-size: var(--form-check-size, 1.25em); /* (Variável local mantida) */
+    --form-check-size: var(--form-check-size, 1.25em);
     display: block;
     position: relative;
     padding-left: var(--form-check-padding-left-calc);
@@ -276,7 +251,6 @@ textarea.form-control {
     background-color: var(--color-bg-hover);
 }
 
-/* Checkbox */
 .form-check__label::after {
     left: var(--form-checkbox-after-left-calc);
     top: var(--form-checkbox-after-top-calc);
@@ -286,7 +260,7 @@ textarea.form-control {
     border-width: var(--form-checkbox-after-border-width);
     transform: rotate(45deg);
 }
-/* Radio */
+
 .form-check--radio .form-check__label::before {
     border-radius: 50%;
 }
@@ -298,9 +272,9 @@ textarea.form-control {
     border-radius: 50%;
     background: var(--color-bg-app);
 }
-/* Switch */
+
 .form-check--switch {
-    --form-switch-width: var(--form-switch-width-calc); /* (Variável local mantida) */
+    --form-switch-width: var(--form-switch-width-calc);
     padding-left: var(--form-switch-padding-left-calc);
 }
 .form-check--switch .form-check__label::before {
@@ -327,9 +301,6 @@ textarea.form-control {
     transform: var(--form-switch-checked-transform-calc);
 }
 
-/* --- 2.5 Elementos Compostos --- */
-
-/* Input Group (Corrigido/Melhorado v4.0) */
 .input-group {
     position: relative;
     display: flex;
@@ -343,7 +314,7 @@ textarea.form-control {
     width: 1%;
     min-width: 0;
 }
-/* Logica de arredondamento */
+
 .input-group > .form-control:not(:first-child),
 .input-group > .btn:not(:first-child) {
     border-top-left-radius: 0;
@@ -354,7 +325,7 @@ textarea.form-control {
     border-top-right-radius: 0;
     border-bottom-right-radius: 0;
 }
-/* Colapso de borda */
+
 .input-group > :not(:first-child) {
     margin-left: var(--input-group-item-margin-left);
 }
@@ -380,7 +351,6 @@ textarea.form-control {
     outline-offset: var(--input-group-btn-focus-outline-offset);
 }
 
-/* Input Group com Ícone (Corrigido v4.0) */
 .input-group--icon {
     position: relative;
 }
@@ -416,7 +386,6 @@ textarea.form-control {
     color: var(--color-text-primary);
 }
 
-/* Range Slider */
 .form-range {
     width: 100%;
     height: var(--form-range-height);
@@ -463,9 +432,6 @@ textarea.form-control {
     box-shadow: 0 0 0 3px var(--color-placeholder-bg);
 }
 
-/* --- 2.6 Feedback (Validação e Progresso) --- */
-
-/* Componente .progress-group (v4.0) */
 .progress-group {
     display: flex;
     align-items: center;
@@ -495,7 +461,6 @@ textarea.form-control {
     flex-grow: 1;
 }
 
-/* Barra de Progresso (Padrão) */
 .progress {
     display: flex;
     height: var(--progress-height);
@@ -516,7 +481,6 @@ textarea.form-control {
     transition: var(--progress-bar-transition);
 }
 
-/* Validação (Feedback) */
 .form-feedback {
     display: none;
     width: 100%;
@@ -530,7 +494,6 @@ textarea.form-control {
     color: var(--color-feedback-success);
 }
 
-/* Validação com Ícones ARIA (Melhorado v4.0) */
 .form-control[aria-invalid='true'],
 .form-select[aria-invalid='true'] {
     border-color: var(--color-feedback-danger);
@@ -545,7 +508,7 @@ textarea.form-control {
     background-image: var(--form-icon-valid);
     padding-right: var(--form-valid-icon-padding-right-calc);
 }
-/* Lógica de múltiplos backgrounds para .form-select */
+
 .form-select[aria-invalid='true'] {
     background-image: var(--form-icon-invalid), var(--form-select-arrow);
     background-position: var(--form-valid-select-bg-pos);
@@ -557,14 +520,13 @@ textarea.form-control {
     padding-right: var(--form-valid-select-padding-right);
 }
 
-/* Mostra a mensagem de feedback */
 .form-control[aria-invalid='true'] ~ .form-feedback--invalid,
 .form-control[aria-invalid='false'] ~ .form-feedback--valid,
 .form-select[aria-invalid='true'] ~ .form-feedback--invalid,
 .form-select[aria-invalid='false'] ~ .form-feedback--valid {
     display: block;
 }
-/* Validação para .form-check */
+
 .form-check__input[aria-invalid='true'] ~ .form-check__label {
     color: var(--color-feedback-danger);
 }
@@ -575,7 +537,6 @@ textarea.form-control {
     display: block;
 }
 
-/* Sumário de Erros (v4.0) */
 .form-error-summary {
     display: none;
     padding: var(--form-error-summary-padding);
@@ -606,9 +567,6 @@ textarea.form-control {
     text-decoration: underline;
 }
 
-/* --- 2.8 Modificadores Globais --- */
-
-/* Modificador de Densidade (v3.0) */
 .form--compact {
     --form-control-padding-y: var(--form-compact-control-padding-y);
     --form-control-padding-x: var(--form-compact-control-padding-x);
