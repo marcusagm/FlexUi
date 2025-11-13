@@ -91,16 +91,31 @@ export class ToolbarPanel extends Panel {
         };
 
         const btn5 = document.createElement('button');
-        btn5.textContent = 'Preferencias';
+        btn5.textContent = 'Modal';
         btn5.onclick = () => {
             Modal.open({
-                title: 'Preferências',
-                content: 'Teste de janela modal mostrando uma tela para editar preferências.',
+                title: 'Modal',
+                content: 'Teste de janela modal comum.',
                 footerText: 'Texto de rodapé'
             });
         };
+        const btn6 = document.createElement('button');
+        btn6.textContent = 'Alert';
+        btn6.onclick = () => {
+            Modal.alert('Exemplo de alerta', 'Alerta');
+        };
+        const btn7 = document.createElement('button');
+        btn7.textContent = 'Confirm';
+        btn7.onclick = () => {
+            Modal.confirm('Are you sure you want to continue?', 'Confirmation');
+        };
+        const btn8 = document.createElement('button');
+        btn8.textContent = 'Pompt';
+        btn8.onclick = () => {
+            Modal.prompt('What is your name?', 'Prompt', 'Anonymous');
+        };
 
-        contentEl.append(btn1, btn2, btn3, btn4, btn5);
+        contentEl.append(btn1, btn2, btn3, btn4, btn5, btn6, btn7, btn8);
     }
 
     /**

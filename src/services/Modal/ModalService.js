@@ -1,5 +1,8 @@
 import { ModalInstance } from './ModalInstance.js';
 import { throttleRAF } from '../../utils/ThrottleRAF.js';
+import { AlertView } from './presets/AlertView.js';
+import { ConfirmView } from './presets/ConfirmView.js';
+import { PromptView } from './presets/PromptView.js';
 
 /**
  * Description:
@@ -418,19 +421,10 @@ export class ModalService {
      */
     alert(message, title = 'Alert') {
         const me = this;
+        const viewConfig = AlertView(message);
         return me.open({
             title: title,
-            content: `<p>${message}</p>`,
-            size: 'small',
-            closeOnBackdropClick: false,
-            buttons: [
-                {
-                    text: 'OK',
-                    class: 'modal__button modal__button--primary',
-                    action: 'resolve',
-                    value: true
-                }
-            ]
+            ...viewConfig
         });
     }
 
@@ -442,26 +436,10 @@ export class ModalService {
      */
     confirm(message, title = 'Confirm') {
         const me = this;
+        const viewConfig = ConfirmView(message);
         return me.open({
             title: title,
-            content: `<p>${message}</p>`,
-            size: 'small',
-            closeOnBackdropClick: false,
-            closeOnEscape: false,
-            buttons: [
-                {
-                    text: 'Cancel',
-                    class: 'modal__button modal__button--secondary',
-                    action: 'resolve',
-                    value: false
-                },
-                {
-                    text: 'OK',
-                    class: 'modal__button modal__button--primary',
-                    action: 'resolve',
-                    value: true
-                }
-            ]
+            ...viewConfig
         });
     }
 
@@ -474,36 +452,10 @@ export class ModalService {
      */
     prompt(message, title = 'Prompt', defaultValue = '') {
         const me = this;
-        const inputId = `modal-prompt-input-${Date.now()}`;
-        const content = `
-      <div class="modal__prompt">
-        <label for="${inputId}" class="modal__prompt-label">${message}</label>
-        <input type="text" id="${inputId}" class="modal__prompt-input" value="${defaultValue}">
-      </div>
-    `;
+        const viewConfig = PromptView(message, defaultValue);
         return me.open({
             title: title,
-            content: content,
-            size: 'small',
-            closeOnBackdropClick: false,
-            closeOnEscape: false,
-            initialFocus: `#${inputId}`, // Focus the input
-            buttons: [
-                {
-                    text: 'Cancel',
-                    class: 'modal__button modal__button--secondary',
-                    action: 'resolve',
-                    value: null
-                },
-                {
-                    text: 'OK',
-                    class: 'modal__button modal__button--primary',
-                    action: api => {
-                        const value = api.contentElement.querySelector('input').value;
-                        api.close(value);
-                    }
-                }
-            ]
+            ...viewConfig
         });
     }
 
