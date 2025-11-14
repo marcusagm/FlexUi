@@ -2,6 +2,7 @@ import { appBus } from '../../utils/EventBus.js';
 import { FloatingPanelManagerService } from './FloatingPanelManagerService.js';
 import { Panel } from '../../components/Panel/Panel.js';
 import { PanelGroup } from '../../components/Panel/PanelGroup.js';
+import { throttleRAF } from '../../utils/ThrottleRAF.js';
 
 /**
  * Description:
@@ -48,6 +49,7 @@ import { PanelGroup } from '../../components/Panel/PanelGroup.js';
  * - utils/EventBus.js
  * - components/Panel/Panel.js
  * - components/Panel/PanelGroup.js
+ * - utils/ThrottleRAF.js
  * - (Strategies are injected by App.js)
  */
 export class DragDropService {
@@ -119,6 +121,20 @@ export class DragDropService {
     _boundOnDragEnd = null;
 
     /**
+     * A 1x1 transparent Image object, pre-cached for use as a drag ghost.
+     * @type {Image | null}
+     * @private
+     */
+    _transparentDragImage = null;
+
+    /**
+     * Throttled function to update floating panel position during drag.
+     * @type {Function | null}
+     * @private
+     */
+    _throttledMoveFloatingPanel = null;
+
+    /**
      * Caches the last valid X coordinate from dragOver.
      * @type {number}
      * @private
@@ -158,9 +174,11 @@ export class DragDropService {
 
         const me = this;
         me._createPlaceholder();
+        me._createTransparentDragImage();
 
         me._boundOnDragStart = me._onDragStart.bind(me);
         me._boundOnDragEnd = me._onDragEnd.bind(me);
+        me._throttledMoveFloatingPanel = throttleRAF(me._moveFloatingPanel.bind(me));
 
         me._initEventListeners();
     }
@@ -289,6 +307,9 @@ export class DragDropService {
     destroy() {
         const me = this;
         appBus.offByNamespace(me._namespace);
+        me._throttledMoveFloatingPanel?.cancel();
+        me._throttledMoveFloatingPanel = null;
+        me._transparentDragImage = null;
     }
 
     /**
@@ -299,6 +320,20 @@ export class DragDropService {
     _createPlaceholder() {
         this._placeholder = document.createElement('div');
         this._placeholder.classList.add('container__placeholder');
+    }
+
+    /**
+     * Creates and caches the 1x1 transparent drag image to prevent race conditions.
+     * @private
+     * @returns {void}
+     */
+    _createTransparentDragImage() {
+        const me = this;
+        const transparentPixelBase64 =
+            'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+
+        me._transparentDragImage = new Image(1, 1);
+        me._transparentDragImage.src = transparentPixelBase64;
     }
 
     /**
@@ -362,13 +397,7 @@ export class DragDropService {
         }
 
         if (me._dragState.type === 'PanelGroup' && me._dragState.item._state.isFloating === true) {
-            const fpms = FloatingPanelManagerService.getInstance();
-            const containerRect = fpms.getContainerBounds();
-            if (containerRect) {
-                const newX = me._lastDragX - containerRect.left - me._dragState.offsetX;
-                const newY = me._lastDragY - containerRect.top - me._dragState.offsetY;
-                fpms.updatePanelPosition(me._dragState.item, newX, newY);
-            }
+            me._throttledMoveFloatingPanel();
         }
 
         const dropZoneElement = e.target.closest(
@@ -455,6 +484,31 @@ export class DragDropService {
     }
 
     /**
+     * Helper method (called via throttle) to update the visual position
+     * of a floating panel during a drag.
+     * @private
+     * @returns {void}
+     */
+    _moveFloatingPanel() {
+        const me = this;
+        if (
+            !me.isDragging() ||
+            me._dragState.type !== 'PanelGroup' ||
+            !me._dragState.item._state.isFloating
+        ) {
+            return;
+        }
+
+        const fpms = FloatingPanelManagerService.getInstance();
+        const containerRect = fpms.getContainerBounds();
+        if (containerRect) {
+            const newX = me._lastDragX - containerRect.left - me._dragState.offsetX;
+            const newY = me._lastDragY - containerRect.top - me._dragState.offsetY;
+            fpms.updatePanelPosition(me._dragState.item, newX, newY);
+        }
+    }
+
+    /**
      * Clears the cache of all registered strategies.
      * @private
      * @returns {void}
@@ -511,11 +565,7 @@ export class DragDropService {
         event.dataTransfer.effectAllowed = 'move';
         event.dataTransfer.setData('text/plain', '');
         if (me._dragState.item._state.isFloating === true) {
-            const transparentPixelBase64 =
-                'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
-
-            const dragImage = new Image(1, 1);
-            dragImage.src = transparentPixelBase64;
+            const dragImage = me._transparentDragImage;
             event.dataTransfer.setDragImage(dragImage, offsetX, offsetY);
         } else {
             event.dataTransfer.setDragImage(element, offsetX, offsetY);
@@ -530,6 +580,7 @@ export class DragDropService {
     _onDragEnd() {
         const me = this;
 
+        me._throttledMoveFloatingPanel?.cancel();
         document.body.classList.remove('dnd-active');
         me.hidePlaceholder();
         me._clearStrategyCaches();
