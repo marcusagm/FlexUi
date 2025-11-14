@@ -8,7 +8,7 @@
                 "collapsible": true,
                 "columns": [
                     {
-                        "width": null,
+                        "width": 260,
                         "panelGroups": [
                             {
                                 "type": "PanelGroup",
