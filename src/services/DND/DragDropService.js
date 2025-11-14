@@ -45,6 +45,10 @@ import { throttleRAF } from '../../utils/ThrottleRAF.js';
  * Events:
  * - Listens to (appBus): 'dragstart', 'dragend'
  *
+ * Business rules implemented:
+ * - Uses a "clean clone" method for non-floating drag ghosts
+ * to prevent visual artifacts from overlapping UI elements.
+ *
  * Dependencies:
  * - utils/EventBus.js
  * - components/Panel/Panel.js
@@ -133,6 +137,13 @@ export class DragDropService {
      * @private
      */
     _throttledMoveFloatingPanel = null;
+
+    /**
+     * Stores the temporary cloned element used for a clean drag ghost image.
+     * @type {HTMLElement | null}
+     * @private
+     */
+    _dragGhostClone = null;
 
     /**
      * Caches the last valid X coordinate from dragOver.
@@ -310,6 +321,11 @@ export class DragDropService {
         me._throttledMoveFloatingPanel?.cancel();
         me._throttledMoveFloatingPanel = null;
         me._transparentDragImage = null;
+
+        if (me._dragGhostClone) {
+            me._dragGhostClone.remove();
+            me._dragGhostClone = null;
+        }
     }
 
     /**
@@ -564,11 +580,20 @@ export class DragDropService {
         event.dataTransfer.dropEffect = 'move';
         event.dataTransfer.effectAllowed = 'move';
         event.dataTransfer.setData('text/plain', '');
+
         if (me._dragState.item._state.isFloating === true) {
             const dragImage = me._transparentDragImage;
             event.dataTransfer.setDragImage(dragImage, offsetX, offsetY);
         } else {
-            event.dataTransfer.setDragImage(element, offsetX, offsetY);
+            const clone = element.cloneNode(true);
+            clone.style.position = 'absolute';
+            clone.style.left = '-9999px';
+            clone.style.top = '0';
+            clone.style.width = `${element.offsetWidth}px`;
+            document.body.appendChild(clone);
+            me._dragGhostClone = clone;
+
+            event.dataTransfer.setDragImage(clone, offsetX, offsetY);
         }
     }
 
@@ -579,6 +604,11 @@ export class DragDropService {
      */
     _onDragEnd() {
         const me = this;
+
+        if (me._dragGhostClone) {
+            me._dragGhostClone.remove();
+            me._dragGhostClone = null;
+        }
 
         me._throttledMoveFloatingPanel?.cancel();
         document.body.classList.remove('dnd-active');
