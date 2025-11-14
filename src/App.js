@@ -49,6 +49,7 @@ import { appShortcuts } from './services/Shortcuts/Shortcuts.js';
  * Events:
  * - Listens to: 'app:add-new-panel', 'app:save-state', 'app:restore-state', 'app:reset-state'
  * - Emits: 'app:set-permanent-status' (on init)
+ * - Emits: 'app:layout-initialized' (on init, after load)
  *
  * Business rules implemented:
  * - Implements the Singleton pattern to ensure only one App instance.
@@ -186,6 +187,8 @@ export class App {
         const me = this;
         await me.menu.load();
         await me.loadInitialLayout();
+
+        appBus.emit('app:layout-initialized', me.container);
 
         appBus.emit('app:set-permanent-status', 'Pronto');
     }

@@ -28,6 +28,7 @@ import { FloatingPanelManagerService } from '../../services/DND/FloatingPanelMan
  * - Registers as a 'container' type drop zone.
  * - Listens for 'row:empty' and automatically removes any Row that
  * reports its last Column has been removed.
+ * - Manages the vertical resize handles/collapse buttons for its child Rows.
  * - Forces recalculation of *column* resize handles on all child Rows
  * whenever a row is added or deleted.
  *
@@ -114,6 +115,18 @@ export class Container {
     }
 
     /**
+     * Updates the vertical resize bars for all child Rows.
+     * The last Row is instructed not to show its bar.
+     * @returns {void}
+     */
+    updateAllResizeBars() {
+        const rows = this.getRows();
+        rows.forEach((row, idx) => {
+            row.addResizeBars(idx === rows.length - 1);
+        });
+    }
+
+    /**
      * Forces all child Rows to recalculate their *column* resize handles.
      * (Required to fix DND bugs where the "last" row changes).
      * @private
@@ -151,6 +164,7 @@ export class Container {
         }
 
         me.requestLayoutUpdate();
+        me.updateAllResizeBars();
         me._updateAllColumnResizeBars();
 
         return row;
@@ -176,6 +190,7 @@ export class Container {
         me._state.children.splice(index, 1);
 
         me.requestLayoutUpdate();
+        me.updateAllResizeBars();
         me._updateAllColumnResizeBars();
     }
 
@@ -264,6 +279,7 @@ export class Container {
         }
 
         me.requestLayoutUpdate();
+        me.updateAllResizeBars();
         me._updateAllColumnResizeBars();
     }
 }

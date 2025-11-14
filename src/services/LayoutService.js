@@ -22,6 +22,7 @@ import { appBus } from '../utils/EventBus.js';
  * appBus.emit('layout:columns-changed', this);
  *
  * Events:
+ * - Listens to: 'app:layout-initialized' (to run full check after load)
  * - Listens to: 'layout:panel-groups-changed'
  * - Listens to: 'layout:rows-changed'
  * - Listens to: 'layout:columns-changed'
@@ -35,6 +36,8 @@ import { appBus } from '../utils/EventBus.js';
  * - Enforces that at least one Row in a Container is visible.
  * - Enforces that at least one PanelGroup in a Column is visible.
  * - Manages the 'disabled' state of PanelGroup collapse buttons.
+ * - Manages 'disabled' *and* 'visibility' state of Row collapse buttons
+ * (assumes Container/Row created the button elements).
  * - Applies dynamic CSS 'min-width' to Columns based on their children.
  *
  * Dependencies:
@@ -76,6 +79,12 @@ export class LayoutService {
     _boundOnColumnsChanged = null;
 
     /**
+     * @type {Function | null}
+     * @private
+     */
+    _boundOnLayoutInitialized = null;
+
+    /**
      * @private
      */
     constructor() {
@@ -89,6 +98,7 @@ export class LayoutService {
         me._boundOnPanelGroupsChanged = me._onPanelGroupsChanged.bind(me);
         me._boundOnRowsChanged = me._onRowsChanged.bind(me);
         me._boundOnColumnsChanged = me._onColumnsChanged.bind(me);
+        me._boundOnLayoutInitialized = me._onLayoutInitialized.bind(me);
 
         me._initEventListeners();
     }
@@ -113,6 +123,7 @@ export class LayoutService {
         const me = this;
         const options = { namespace: me._namespace };
 
+        appBus.on('app:layout-initialized', me._boundOnLayoutInitialized, options);
         appBus.on('layout:panel-groups-changed', me._boundOnPanelGroupsChanged, options);
         appBus.on('layout:rows-changed', me._boundOnRowsChanged, options);
         appBus.on('layout:columns-changed', me._boundOnColumnsChanged, options);
@@ -125,6 +136,31 @@ export class LayoutService {
     destroy() {
         const me = this;
         appBus.offByNamespace(me._namespace);
+    }
+
+    /**
+     * Handles the 'app:layout-initialized' event.
+     * Runs a full, cascading layout check on the entire container
+     * to ensure all UI (buttons, sizes, min-widths) is correct on load.
+     * @param {Container} container - The root Container instance.
+     * @private
+     * @returns {void}
+     */
+    _onLayoutInitialized(container) {
+        if (!container || !(container instanceof Container)) {
+            console.warn('LayoutService: "_onLayoutInitialized" received invalid container.');
+            return;
+        }
+
+        this._onRowsChanged(container);
+
+        container.getRows().forEach(row => {
+            this._onColumnsChanged(row);
+
+            row.getColumns().forEach(column => {
+                this._updatePanelGroupsSizes(column);
+            });
+        });
     }
 
     /**
@@ -157,11 +193,8 @@ export class LayoutService {
         const lastUncollapsedRow = uncollapsedRows[uncollapsedRows.length - 1];
         const isOnlyOneUncollapsed = uncollapsedRows.length === 1;
 
-        rows.forEach((row, idx) => {
-            const isLast = idx === rows.length - 1;
+        rows.forEach(row => {
             const isLastVisible = row === lastUncollapsedRow;
-
-            row.addResizeBars(isLast);
             row.updateHeight(isLastVisible);
 
             if (row.collapseBtn) {
