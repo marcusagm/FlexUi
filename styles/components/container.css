@@ -69,3 +69,79 @@
 .dnd-active .row__resize-handle {
     pointer-events: none;
 }
+
+/* --- Row Collapse --- */
+
+.row--collapsed {
+    /* Define a altura da linha colapsada para acomodar o botão */
+    height: 8px !important;
+    min-height: 8px !important;
+    flex-basis: 8px !important;
+    flex-grow: 0 !important;
+    flex-shrink: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+}
+
+.row--collapsed .column {
+    display: none;
+}
+
+.row--collapsed .row__resize-handle {
+    /* O handle de resize não é visível quando a linha está colapsada */
+    display: none;
+}
+
+.row__collapse-btn {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 8px; /* Altura solicitada */
+    z-index: 6; /* Acima do z-index: 5 do resize-handle */
+
+    /* Estilização do botão */
+    background: transparent;
+    border: none;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition:
+        background-color 0.2s ease-in-out,
+        color 0.2s ease-in-out;
+}
+
+.row__collapse-btn:hover {
+    background-color: var(--color-accent-hover);
+    color: var(--color-text-bright);
+}
+
+.row__collapse-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    background-color: transparent;
+    color: var(--color-text-secondary);
+}
+
+/* Ícone da seta (pseudo-elemento) */
+.row__collapse-btn::before {
+    content: '▲';
+    display: block;
+    font-size: 8px; /* Pequeno para caber na altura de 8px */
+    line-height: 8px;
+    transform: scale(0.8);
+    transition: transform 0.2s ease-in-out;
+}
+
+.row__collapse-btn--collapsed::before {
+    transform: scale(0.8) rotate(180deg);
+}
+
+/* .row--resize-bottom .row__collapse-btn {
+    /* Quando houver um handle de resize (3px), o botão (8px) deve
+       ficar posicionado acima dele para não haver sobreposição.
+    bottom: 3px;
+} */

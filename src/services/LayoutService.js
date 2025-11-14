@@ -27,9 +27,12 @@ import { appBus } from '../utils/EventBus.js';
  * - Listens to: 'layout:columns-changed'
  *
  * Business rules implemented:
- * - Applies 'fills-space' logic to the last Row in a Container.
+ * - Manages 'disabled' *and* 'visibility' state of Row collapse buttons,
+ * and orchestrates their creation via 'row.addResizeBars()'.
+ * - Applies 'fills-space' logic to the last *visible* Row in a Container.
  * - Applies 'fills-space' logic to the last Column in a Row.
  * - Applies 'fills-space' logic to the last *visible* PanelGroup in a Column.
+ * - Enforces that at least one Row in a Container is visible.
  * - Enforces that at least one PanelGroup in a Column is visible.
  * - Manages the 'disabled' state of PanelGroup collapse buttons.
  * - Applies dynamic CSS 'min-width' to Columns based on their children.
@@ -126,6 +129,7 @@ export class LayoutService {
 
     /**
      * Handles the 'layout:rows-changed' event (Vertical).
+     * Applies space-filling logic and collapse button rules.
      * @param {Container} container - The Container needing an update.
      * @private
      * @returns {void}
@@ -137,8 +141,43 @@ export class LayoutService {
         }
 
         const rows = container.getRows();
+        if (rows.length === 0) {
+            return;
+        }
+
+        const totalRows = rows.length;
+        let uncollapsedRows = rows.filter(r => !r._state.collapsed);
+
+        if (uncollapsedRows.length === 0) {
+            const lastRow = rows[rows.length - 1];
+            lastRow.unCollapse();
+            uncollapsedRows = [lastRow];
+        }
+
+        const lastUncollapsedRow = uncollapsedRows[uncollapsedRows.length - 1];
+        const isOnlyOneUncollapsed = uncollapsedRows.length === 1;
+
         rows.forEach((row, idx) => {
-            row.updateHeight(idx === rows.length - 1);
+            const isLast = idx === rows.length - 1;
+            const isLastVisible = row === lastUncollapsedRow;
+
+            row.addResizeBars(isLast);
+            row.updateHeight(isLastVisible);
+
+            if (row.collapseBtn) {
+                if (totalRows === 1) {
+                    row.collapseBtn.style.display = 'none';
+                } else {
+                    row.collapseBtn.style.display = '';
+                    const isThisRowTheOnlyUncollapsed = isOnlyOneUncollapsed && isLastVisible;
+
+                    if (!row._state.collapsible || isThisRowTheOnlyUncollapsed) {
+                        row.collapseBtn.disabled = true;
+                    } else {
+                        row.collapseBtn.disabled = false;
+                    }
+                }
+            }
         });
     }
 
@@ -177,6 +216,7 @@ export class LayoutService {
             );
             return;
         }
+
         this._updatePanelGroupsSizes(column);
     }
 
