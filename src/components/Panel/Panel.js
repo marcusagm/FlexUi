@@ -68,7 +68,6 @@ export class Panel {
      * @type {{
      * parentGroup: import('./PanelGroup.js').PanelGroup | null,
      * header: PanelHeader | null,
-     * height: number | null,
      * minHeight: number,
      * minWidth: number,
      * closable: boolean,
@@ -82,7 +81,6 @@ export class Panel {
     _state = {
         parentGroup: null,
         header: null,
-        height: null,
         minHeight: 100,
         minWidth: 150,
         closable: true,
@@ -115,7 +113,7 @@ export class Panel {
 
     /**
      * @param {string} title - The initial title for the panel header/tab.
-     * @param {number|null} [height=null] - The preferred height.
+     * @param {number|null} [height=null] - (Ignored) Kept for API compatibility.
      * @param {object} [config={}] - Configuration overrides (closable, movable, etc.).
      */
     constructor(title, height = null, config = {}) {
@@ -131,10 +129,6 @@ export class Panel {
         me._state.title = panelTitle;
 
         me._state.header = new PanelHeader(me, panelTitle);
-
-        if (height !== null) {
-            me._state.height = height;
-        }
 
         me.build();
     }
@@ -269,15 +263,7 @@ export class Panel {
         return {
             id: me.id,
             type: me.getPanelType(),
-            title: me._state.title,
-            height: me._state.height,
-            config: {
-                closable: me._state.closable,
-                collapsible: me._state.collapsible,
-                movable: me._state.movable,
-                minHeight: me._state.minHeight,
-                minWidth: me._state.minWidth
-            }
+            title: me._state.title
         };
     }
 
@@ -291,20 +277,10 @@ export class Panel {
         if (data.id) {
             me.id = data.id;
         }
-        if (data.height !== undefined) {
-            me._state.height = data.height;
-        }
         if (data.title !== undefined) {
             me._state.title = data.title;
             if (me._state.header) {
                 me._state.header.setTitle(data.title);
-            }
-        }
-
-        if (data.config) {
-            Object.assign(me._state, data.config);
-            if (me._state.header) {
-                me._state.header.updateConfig(data.config);
             }
         }
     }

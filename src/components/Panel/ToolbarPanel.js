@@ -35,7 +35,7 @@ export class ToolbarPanel extends Panel {
             ...config,
             collapsible: false,
             movable: false,
-            minHeight: 50
+            minHeight: 75
         });
 
         this.render();

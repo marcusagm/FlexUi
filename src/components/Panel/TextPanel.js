@@ -22,7 +22,7 @@ export class TextPanel extends Panel {
     /**
      * @param {string} title - The panel title.
      * @param {string} initialText - The text to display.
-     * @param {number|null} [height=null] - The initial height.
+     * @param {number|null} [height=null] - (Ignored) Kept for API compatibility.
      * @param {object} [config={}] - Configuration overrides.
      */
     constructor(title, initialText, height = null, config = {}) {

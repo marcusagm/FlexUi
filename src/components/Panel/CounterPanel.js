@@ -51,15 +51,17 @@ export class CounterPanel extends Panel {
      * @param {object} [config={}] - Configurações de override.
      */
     constructor(title, height = null, config = {}) {
-        super(title, height, config);
+        super(title, height, {
+            ...config,
+            collapsible: false,
+            minHeight: 130,
+            minWidth: 260
+        });
         const me = this;
 
         me._boundOnIncrease = me._onIncrease.bind(me);
         me._boundOnDecrease = me._onDecrease.bind(me);
         me._boundOnReset = me._onReset.bind(me);
-
-        me._state.minWidth = 260;
-        me._state.minHeight = 130;
 
         me.render();
     }

@@ -82,7 +82,7 @@ export class PanelGroup {
         collapsed: false,
         height: null,
         width: null,
-        minHeight: 100,
+        minHeight: 10,
         minWidth: 150,
         closable: true,
         collapsible: true,

@@ -4,6 +4,8 @@
         "rows": [
             {
                 "height": null,
+                "collapsed": false,
+                "collapsible": true,
                 "columns": [
                     {
                         "width": null,
@@ -17,46 +19,28 @@
                                 "panels": [
                                     {
                                         "type": "CounterPanel",
-                                        "title": "Contador 1",
-                                        "height": null,
-                                        "config": {
-                                            "closable": true,
-                                            "collapsible": true,
-                                            "movable": true
-                                        }
+                                        "title": "Counter 1"
                                     },
                                     {
                                         "type": "TextPanel",
-                                        "title": "Painel de Texto 1",
-                                        "height": null,
-                                        "content": "Este é um painel customizado.",
-                                        "config": {
-                                            "closable": true,
-                                            "collapsible": true,
-                                            "movable": true
-                                        }
-                                    },
+                                        "title": "Text panel 1",
+                                        "content": "Este é o painel de texto 1."
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "PanelGroup",
+                                "height": 105,
+                                "collapsed": false,
+                                "activePanelId": null,
+                                "config": {
+                                    "collapsible": false,
+                                    "movable": false
+                                },
+                                "panels": [
                                     {
-                                        "type": "TextPanel",
-                                        "title": "Aba um",
-                                        "height": null,
-                                        "content": "este é o conteudo da aba",
-                                        "config": {
-                                            "closable": true,
-                                            "collapsible": true,
-                                            "movable": true
-                                        }
-                                    },
-                                    {
-                                        "type": "TextPanel",
-                                        "title": "Aba Um título muito grande para teste",
-                                        "height": null,
-                                        "content": "abs 2 este é o conteudo da aba",
-                                        "config": {
-                                            "closable": true,
-                                            "collapsible": true,
-                                            "movable": true
-                                        }
+                                        "type": "ToolbarPanel",
+                                        "title": "ToolBar 1"
                                     }
                                 ]
                             },
@@ -69,14 +53,8 @@
                                 "panels": [
                                     {
                                         "type": "TextPanel",
-                                        "title": "Painel de Texto 2",
-                                        "height": 200,
-                                        "content": "O conteúdo é gerenciado pela subclasse.",
-                                        "config": {
-                                            "closable": true,
-                                            "collapsible": true,
-                                            "movable": true
-                                        }
+                                        "title": "Text panel 2",
+                                        "content": "Este é o painel de texto 2."
                                     }
                                 ]
                             }
@@ -90,42 +68,26 @@
                                 "height": null,
                                 "collapsed": false,
                                 "activePanelId": null,
-                                "config": {
-                                    "closable": true,
-                                    "collapsible": false,
-                                    "movable": false
-                                },
+                                "config": {},
                                 "panels": [
                                     {
-                                        "type": "ToolbarPanel",
-                                        "title": "Barra de Ferramentas",
-                                        "height": null,
-                                        "content": null,
-                                        "config": {
-                                            "closable": true,
-                                            "collapsible": false,
-                                            "movable": false
-                                        }
+                                        "type": "TextPanel",
+                                        "title": "Text panel 3",
+                                        "content": "Este é o painel de texto 3."
                                     }
                                 ]
                             },
                             {
                                 "type": "PanelGroup",
-                                "height": null,
+                                "height": 200,
                                 "collapsed": true,
                                 "activePanelId": null,
                                 "config": {},
                                 "panels": [
                                     {
                                         "type": "TextPanel",
-                                        "title": "Painel 3",
-                                        "height": null,
-                                        "content": "Mais um painel de texto.",
-                                        "config": {
-                                            "closable": true,
-                                            "collapsible": true,
-                                            "movable": true
-                                        }
+                                        "title": "Text panel 2",
+                                        "content": "Painel de texto 2 (Colapsado)."
                                     }
                                 ]
                             }
@@ -143,14 +105,8 @@
                                 "panels": [
                                     {
                                         "type": "TextPanel",
-                                        "title": "Painel 4",
-                                        "height": null,
-                                        "content": "Conteúdo do painel 4.",
-                                        "config": {
-                                            "closable": true,
-                                            "collapsible": true,
-                                            "movable": true
-                                        }
+                                        "title": "Text panel 2",
+                                        "content": "Painel de texto 2 (Coluna 3)."
                                     }
                                 ]
                             },
@@ -159,21 +115,11 @@
                                 "height": null,
                                 "collapsed": false,
                                 "activePanelId": null,
-                                "config": {
-                                    "closable": true,
-                                    "collapsible": false,
-                                    "movable": false
-                                },
+                                "config": {},
                                 "panels": [
                                     {
                                         "type": "CounterPanel",
-                                        "title": "Contador 2",
-                                        "height": null,
-                                        "config": {
-                                            "closable": true,
-                                            "collapsible": false,
-                                            "movable": false
-                                        }
+                                        "title": "Counter 2"
                                     }
                                 ]
                             }
@@ -186,27 +132,17 @@
             {
                 "type": "PanelGroup",
                 "height": 160,
-                "width": 260,
+                "width": 250,
                 "collapsed": false,
                 "activePanelId": null,
                 "isFloating": true,
                 "x": 20,
                 "y": 20,
-                "config": {
-                    "closable": true,
-                    "collapsible": true,
-                    "movable": true
-                },
+                "config": {},
                 "panels": [
                     {
                         "type": "CounterPanel",
-                        "title": "Contador Flutuante",
-                        "height": null,
-                        "config": {
-                            "closable": true,
-                            "collapsible": true,
-                            "movable": true
-                        }
+                        "title": "Counter 3"
                     }
                 ]
             }
