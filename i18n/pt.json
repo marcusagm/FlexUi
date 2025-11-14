@@ -10,7 +10,11 @@
         "apply": "Aplicar",
         "cancel": "Cancelar",
         "save": "Salvar",
-        "close": "Fechar"
+        "close": "Fechar",
+        "initializing": "Inicializando Aplicação...",
+        "saving": "Salvando...",
+        "restoring": "Restaurando...",
+        "reseting": "Redefinindo..."
     },
     "appstate": {
         "save": "Área de trabalho salva!",

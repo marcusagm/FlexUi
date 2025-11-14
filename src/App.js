@@ -21,6 +21,7 @@ import { FloatingPanelManagerService } from './services/DND/FloatingPanelManager
 import { globalState } from './services/GlobalStateService.js';
 import { CounterPanel } from './components/Panel/CounterPanel.js';
 import { appShortcuts } from './services/Shortcuts/Shortcuts.js';
+import { Loader } from './services/Loader/Loader.js';
 
 /**
  * Description:
@@ -38,6 +39,8 @@ import { appShortcuts } from './services/Shortcuts/Shortcuts.js';
  * - container {Container} : The instance of the root layout container component.
  * - statusBar {StatusBar} : The instance of the application status bar.
  * - stateService {ApplicationStateService} : The singleton instance of the ApplicationStateService.
+ * - _workspaceLoader {Loader} : The loader instance for the main container.
+ * - _mainWrapper {HTMLElement} : The DOM wrapper for Menu and Container.
  * - _bound... {Function | null} : Bound event handlers for robust cleanup.
  * - debouncedResize {Function | null} : The debounced window resize handler.
  *
@@ -70,6 +73,7 @@ import { appShortcuts } from './services/Shortcuts/Shortcuts.js';
  * - services/Shortcuts/Shortcuts.js
  * - utils/EventBus.js
  * - utils/Debounce.js
+ * - services/Loader/Loader.js
  */
 export class App {
     /**
@@ -129,6 +133,20 @@ export class App {
      */
     debouncedResize = null;
 
+    /**
+     * Loader instance for the workspace (inset).
+     * @type {import('./services/Loader/Loader.js').Loader | null}
+     * @private
+     */
+    _workspaceLoader = null;
+
+    /**
+     * Main DOM wrapper for Menu and Container.
+     * @type {HTMLElement | null}
+     * @private
+     */
+    _mainWrapper = null;
+
     constructor() {
         if (App.instance) {
             return App.instance;
@@ -163,7 +181,13 @@ export class App {
         const fpms = FloatingPanelManagerService.getInstance();
         fpms.registerContainer(me.container.element);
 
-        document.body.append(me.menu.element, me.container.element, me.statusBar.element);
+        me._mainWrapper = document.createElement('div');
+        me._mainWrapper.className = 'app-wrapper';
+
+        me._workspaceLoader = new Loader(me._mainWrapper, { type: 'inset' });
+
+        me._mainWrapper.append(me.menu.element, me.container.element);
+        document.body.append(me._mainWrapper, me.statusBar.element);
 
         me._boundAddNewPanel = me.addNewPanel.bind(me);
         me._boundResetLayoutSilent = me.resetLayout.bind(me, true);
@@ -282,28 +306,36 @@ export class App {
 
     /**
      * Serializes the current layout from the container and saves it to localStorage.
-     * @returns {void}
+     * @returns {Promise<void>}
      */
-    saveLayout() {
+    async saveLayout() {
         const me = this;
-        const layoutData = me.container.toJSON();
-
-        if (me.currentWorkspace) {
-            me.currentWorkspace.layout = layoutData;
-        } else {
-            console.warn(
-                'App.saveLayout: currentWorkspace é nulo. Criando novo objeto de workspace.'
-            );
-            me.currentWorkspace = {
-                name: 'Workspace Salvo (Fallback)',
-                layout: layoutData
-            };
-        }
-
-        me.stateService.saveState(me.STORAGE_KEY, me.currentWorkspace);
-
         const i18n = TranslationService.getInstance();
-        appNotifications.success(i18n.translate('appstate.save'));
+        me._workspaceLoader.show(i18n.translate('actions.saving'));
+
+        try {
+            const layoutData = me.container.toJSON();
+            if (me.currentWorkspace) {
+                me.currentWorkspace.layout = layoutData;
+            } else {
+                console.warn(
+                    'App.saveLayout: currentWorkspace é nulo. Criando novo objeto de workspace.'
+                );
+                me.currentWorkspace = {
+                    name: 'Workspace Salvo (Fallback)',
+                    layout: layoutData
+                };
+            }
+
+            await me.stateService.saveState(me.STORAGE_KEY, me.currentWorkspace);
+
+            appNotifications.success(i18n.translate('appstate.save'));
+        } catch (err) {
+            console.error('App.saveLayout: Falha ao salvar o estado.', err);
+            appNotifications.danger('Falha ao salvar o workspace.');
+        } finally {
+            me._workspaceLoader.hide();
+        }
     }
 
     /**
@@ -312,12 +344,21 @@ export class App {
      */
     async restoreLayout() {
         const me = this;
-        FloatingPanelManagerService.getInstance().clearAll();
-        me.container.clear();
-        await me.loadInitialLayout();
-
         const i18n = TranslationService.getInstance();
-        appNotifications.success(i18n.translate('appstate.restore'));
+        me._workspaceLoader.show(i18n.translate('actions.restoring'));
+
+        try {
+            FloatingPanelManagerService.getInstance().clearAll();
+            me.container.clear();
+            await me.loadInitialLayout();
+
+            appNotifications.success(i18n.translate('appstate.restore'));
+        } catch (err) {
+            console.error('App.restoreLayout: Falha ao restaurar.', err);
+            appNotifications.danger('Falha ao restaurar o workspace.');
+        } finally {
+            me._workspaceLoader.hide();
+        }
     }
 
     /**
@@ -328,15 +369,24 @@ export class App {
      */
     async resetLayout(silent = false) {
         const me = this;
-        FloatingPanelManagerService.getInstance().clearAll();
-        me.stateService.clearState(me.STORAGE_KEY);
-        me.container.clear();
+        const i18n = TranslationService.getInstance();
+        me._workspaceLoader.show(i18n.translate('actions.reseting'));
 
-        await me.loadInitialLayout();
+        try {
+            FloatingPanelManagerService.getInstance().clearAll();
+            me.stateService.clearState(me.STORAGE_KEY);
+            me.container.clear();
 
-        if (!silent) {
-            const i18n = TranslationService.getInstance();
-            appBus.emit('app:set-status-message', i18n.translate('appstate.reset'));
+            await me.loadInitialLayout();
+
+            if (!silent) {
+                appBus.emit('app:set-status-message', i18n.translate('appstate.reset'));
+            }
+        } catch (err) {
+            console.error('App.resetLayout: Falha ao redefinir.', err);
+            appNotifications.danger('Falha ao redefinir o workspace.');
+        } finally {
+            me._workspaceLoader.hide();
         }
     }
 

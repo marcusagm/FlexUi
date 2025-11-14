@@ -12,11 +12,11 @@
  * // In App.js
  * const stateService = ApplicationStateService.getInstance();
  * const layout = await stateService.loadState('my_key');
- * stateService.saveState('my_key', { layout: ... });
+ * await stateService.saveState('my_key', { layout: ... });
  *
  * Business rules implemented:
  * - Loads state from localStorage, falling back to 'workspaces/default.json'.
- * - Saves state asynchronously (using setTimeout) to prevent UI blocking.
+ * - Saves state asynchronously (using setTimeout + Promise) to prevent UI blocking.
  *
  * Dependencies:
  * - None (loads 'workspaces/default.json' via native fetch)
@@ -85,19 +85,23 @@ export class ApplicationStateService {
     }
 
     /**
-     * Saves data to localStorage asynchronously.
+     * Saves data to localStorage asynchronously and returns a Promise.
      * @param {string} key - The key to save under.
      * @param {object} data - The state object to be stringified and saved.
-     * @returns {void}
+     * @returns {Promise<void>} A promise that resolves when saving is complete or rejects on error.
      */
     saveState(key, data) {
-        setTimeout(() => {
-            try {
-                localStorage.setItem(key, JSON.stringify(data));
-            } catch (e) {
-                console.error('Failed to save state to localStorage.', e);
-            }
-        }, 0);
+        return new Promise((resolve, reject) => {
+            setTimeout(() => {
+                try {
+                    localStorage.setItem(key, JSON.stringify(data));
+                    resolve();
+                } catch (e) {
+                    console.error('Failed to save state to localStorage.', e);
+                    reject(e);
+                }
+            }, 0);
+        });
     }
 
     /**
