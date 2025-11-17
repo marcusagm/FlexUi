@@ -408,20 +408,34 @@ export class Row {
 
         if (index === null) {
             me._state.children.push(column);
+            // Append before the row resize handle if it exists
             const resizeHandle = me.element.querySelector('.row__resize-handle');
-            me.element.insertBefore(column.element, resizeHandle);
+            if (resizeHandle) {
+                me.element.insertBefore(column.element, resizeHandle);
+            } else {
+                me.element.appendChild(column.element);
+            }
         } else {
+            // Fix: Use _state.children to find the correct sibling element for insertion
+            // instead of relying on DOM index which might include buttons/handles.
             me._state.children.splice(index, 0, column);
-            const nextSiblingColumn = me._state.children[index + 1];
-            let nextSiblingElement = nextSiblingColumn ? nextSiblingColumn.element : null;
 
-            if (!nextSiblingElement) {
+            const nextSiblingColumn = me._state.children[index + 1]; // The column that was at 'index'
+            let nextDomNode = nextSiblingColumn ? nextSiblingColumn.element : null;
+
+            if (!nextDomNode) {
+                // If no next column, try to find the resize handle
                 const resizeHandle = me.element.querySelector('.row__resize-handle');
                 if (resizeHandle) {
-                    nextSiblingElement = resizeHandle;
+                    nextDomNode = resizeHandle;
                 }
             }
-            me.element.insertBefore(column.element, nextSiblingElement);
+
+            if (nextDomNode) {
+                me.element.insertBefore(column.element, nextDomNode);
+            } else {
+                me.element.appendChild(column.element);
+            }
         }
 
         if (me._state.collapsed) {
@@ -444,12 +458,11 @@ export class Row {
         if (index === -1) {
             return;
         }
-        if (!(me._state.children[index] instanceof Column)) {
-            return;
-        }
+        // Remove check for instanceof to ensure we can remove any object in children array
+        // if (!(me._state.children[index] instanceof Column)) { return; }
 
         column.destroy();
-        const columnEl = me._state.children[index].element;
+        const columnEl = column.element;
         if (columnEl && me.element.contains(columnEl)) {
             me.element.removeChild(columnEl);
         }
@@ -526,6 +539,7 @@ export class Row {
      */
     clear() {
         const me = this;
+        // Create a copy to avoid modification during iteration issues if delete modifies array
         [...me.getColumns()].forEach(column => {
             me.deleteColumn(column);
         });

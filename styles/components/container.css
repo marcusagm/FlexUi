@@ -1,19 +1,15 @@
 @import '../theme.css';
 
 .container {
-    /* flex: 1; (REMOVIDO - Agora é um item de grid) */
     display: flex;
     flex-direction: column;
     gap: var(--container-gap);
     padding: var(--container-padding);
     background: var(--color-bg-app);
     overflow: auto;
-    /* width: var(--container-width); (REMOVIDO - Grid controla) */
-    /* height: var(--container-height-calc); (REMOVIDO - Grid controla) */
-    position: relative; /* Mantido para DND e loader */
+    position: relative;
 }
-.dnd-active.dnd-type-panelgroup .container,
-.dnd-active.dnd-type-panel .container {
+.dnd-active .container {
     gap: var(--dnd-active-container-gap);
     padding: var(--dnd-active-container-padding);
 }
@@ -26,8 +22,7 @@
     position: relative;
     min-height: 50px;
 }
-.dnd-active.dnd-type-panelgroup .row,
-.dnd-active.dnd-type-panel .row {
+.dnd-active .row {
     gap: var(--dnd-active-container-gap);
     padding: var(--dnd-active-row-padding);
 }
@@ -37,6 +32,8 @@
     border: var(--color-placeholder-border-active);
     border-radius: var(--border-radius-base);
     margin: 0;
+    /* CORREÇÃO CRÍTICA: Ignorar eventos de mouse para não atrapalhar elementFromPoint */
+    pointer-events: none !important;
 }
 
 .container__placeholder--horizontal {
@@ -75,7 +72,6 @@
 /* --- Row Collapse --- */
 
 .row--collapsed {
-    /* Define a altura da linha colapsada para acomodar o botão */
     height: 8px !important;
     min-height: 8px !important;
     flex-basis: 8px !important;
@@ -90,7 +86,6 @@
 }
 
 .row--collapsed .row__resize-handle {
-    /* O handle de resize não é visível quando a linha está colapsada */
     display: none;
 }
 
@@ -99,10 +94,8 @@
     top: 0;
     left: 0;
     width: 100%;
-    height: 8px; /* Altura solicitada */
-    z-index: 6; /* Acima do z-index: 5 do resize-handle */
-
-    /* Estilização do botão */
+    height: 8px;
+    z-index: 6;
     background: transparent;
     border: none;
     color: var(--color-text-secondary);
@@ -128,11 +121,10 @@
     color: var(--color-text-secondary);
 }
 
-/* Ícone da seta (pseudo-elemento) */
 .row__collapse-btn::before {
     content: '▲';
     display: block;
-    font-size: 8px; /* Pequeno para caber na altura de 8px */
+    font-size: 8px;
     line-height: 8px;
     transform: scale(0.8);
     transition: transform 0.2s ease-in-out;
@@ -141,9 +133,3 @@
 .row__collapse-btn--collapsed::before {
     transform: scale(0.8) rotate(180deg);
 }
-
-/* .row--resize-bottom .row__collapse-btn {
-    /* Quando houver um handle de resize (3px), o botão (8px) deve
-       ficar posicionado acima dele para não haver sobreposição.
-    bottom: 3px;
-} */

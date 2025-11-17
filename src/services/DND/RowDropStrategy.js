@@ -10,17 +10,19 @@ import { FloatingPanelManagerService } from './FloatingPanelManagerService.js';
  * creating a new Column for the dropped item.
  *
  * Properties summary:
- * - _columnCache {Array<object>} : Caches the geometry of child Columns.
  * - _dropIndex {number | null} : The calculated drop index (column index).
- * - _originalColumnIndex {number | null} : The starting column index (for "ghost" logic).
- * - _originColumnHadOnePanel {boolean} : Flag for "ghost" logic.
  *
  * Business rules implemented:
- * - Caches child Column geometry on 'handleDragEnter'.
- * - Calculates drop index based on 'midX' (horizontal midpoint).
+ * - Uses "Live Geometry" in handleDragOver to handle layout shifts caused by the placeholder.
+ * - Calculates drop index based on 'midX' (horizontal midpoint) of current columns.
  * - Shows a 'vertical' placeholder in the calculated gap.
+ * - Implements "ghost" logic in real-time within handleDragOver to prevent
+ * redundant drops (e.g., dropping the sole content of a column next to itself).
+ * - Validates drop zone strictly: The target MUST be the row element itself
+ * or the placeholder.
  * - On drop: Creates a new Column, creates a new PanelGroup inside it,
  * and moves the dropped Panel or PanelGroup into the new group.
+ * - Returns boolean indicating if the drop was handled.
  *
  * Dependencies:
  * - ../../components/Panel/PanelGroup.js
@@ -29,53 +31,76 @@ import { FloatingPanelManagerService } from './FloatingPanelManagerService.js';
  */
 export class RowDropStrategy {
     /**
-     * Caches the geometry (midX) and index of child Columns.
-     * @type {Array<{element: HTMLElement, midX: number, index: number}>}
-     * @private
-     */
-    _columnCache = [];
-
-    /**
      * The calculated drop index (state).
+     *
      * @type {number | null}
      * @private
      */
     _dropIndex = null;
 
     /**
-     * The starting column index (for "ghost" logic).
-     * @type {number | null}
-     * @private
-     */
-    _originalColumnIndex = null;
-
-    /**
-     * Flag for "ghost" logic.
-     * @type {boolean}
-     * @private
-     */
-    _originColumnHadOnePanel = false;
-
-    /**
-     * Clears the internal geometry cache and drop index.
+     * Clears the internal state and drop index.
+     *
      * @returns {void}
      */
     clearCache() {
-        this._columnCache = [];
         this._dropIndex = null;
-        this._originalColumnIndex = null;
-        this._originColumnHadOnePanel = false;
     }
 
     /**
-     * Caches the geometry of child columns on drag enter.
-     * @param {DragEvent} e - The native drag event.
+     * Setup initial state on drag enter.
+     * Currently mostly a pass-through as logic is handled live in DragOver.
+     *
+     * @param {{x: number, y: number, target: HTMLElement}} point - The coordinates and target.
      * @param {import('../../components/Row/Row.js').Row} dropZone - The Row instance.
      * @param {{item: object, type: string}} draggedData - The item being dragged.
      * @param {DragDropService} dds - The DND service instance.
      * @returns {void}
      */
-    handleDragEnter(e, dropZone, draggedData, dds) {
+    handleDragEnter(point, dropZone, draggedData, dds) {
+        this.clearCache();
+    }
+
+    /**
+     * Hides the placeholder on drag leave.
+     *
+     * @param {{x: number, y: number, target: HTMLElement}} point - The coordinates and target.
+     * @param {import('../../components/Row/Row.js').Row} dropZone - The Row instance.
+     * @param {{item: object, type: string}} draggedData - The item being dragged.
+     * @param {DragDropService} dds - The DND service instance.
+     * @returns {void}
+     */
+    handleDragLeave(point, dropZone, draggedData, dds) {
+        dds.hidePlaceholder();
+        this.clearCache();
+    }
+
+    /**
+     * Calculates the drop position and shows the placeholder on drag over using Live Geometry.
+     * Contains logic to identify and block redundant moves (Ghost Logic).
+     *
+     * @param {{x: number, y: number, target: HTMLElement}} point - The coordinates and target.
+     * @param {import('../../components/Row/Row.js').Row} dropZone - The Row instance.
+     * @param {{item: object, type: string}} draggedData - The item being dragged.
+     * @param {DragDropService} dds - The DND service instance.
+     * @returns {void}
+     */
+    handleDragOver(point, dropZone, draggedData, dds) {
+        const me = this;
+        const placeholder = dds.getPlaceholder();
+
+        // Strict Target Check:
+        // We only accept the drag if the pointer is directly over the Row element
+        // or the Placeholder. If it is over a child (like a Column), we assume
+        // that specific child's strategy should handle it.
+        // We use 'contains' check but ensure we are not deep inside a child.
+        // Actually, simply checking if target is dropZone or placeholder is safest for "gaps".
+        if (point.target !== dropZone.element && point.target !== placeholder) {
+            dds.hidePlaceholder();
+            me._dropIndex = null;
+            return;
+        }
+
         if (
             !draggedData.item ||
             (draggedData.type !== 'PanelGroup' && draggedData.type !== 'Panel')
@@ -83,6 +108,7 @@ export class RowDropStrategy {
             return;
         }
 
+        // 1. Identify effective item (PanelGroup)
         let effectiveItem;
         if (draggedData.type === 'PanelGroup') {
             effectiveItem = draggedData.item;
@@ -91,140 +117,102 @@ export class RowDropStrategy {
             if (!effectiveItem) return;
         }
 
-        this.clearCache();
-        const columns = dropZone.getColumns();
-
-        this._columnCache = columns.map((col, index) => {
-            const rect = col.element.getBoundingClientRect();
-            return {
-                midX: rect.left + rect.width / 2,
-                element: col.element,
-                index: index
-            };
-        });
+        // 2. Calculate Source State (Live)
+        // This determines if the item being dragged is the ONLY content of its current column.
+        let originalColumnIndex = -1;
+        let isOriginSingle = false;
 
         const oldColumn = effectiveItem.getColumn();
-        if (oldColumn) {
-            const oldColCacheItem = this._columnCache.find(
-                item => item.element === oldColumn.element
-            );
+        const columns = dropZone.getColumns();
 
-            if (oldColCacheItem) {
-                this._originalColumnIndex = oldColCacheItem.index;
+        if (oldColumn && oldColumn._state.parentContainer === dropZone) {
+            originalColumnIndex = columns.indexOf(oldColumn);
+
+            if (originalColumnIndex !== -1) {
                 if (draggedData.type === 'PanelGroup' && oldColumn.getTotalPanelGroups() === 1) {
-                    this._originColumnHadOnePanel = true;
+                    // Dragging the only group of the column
+                    isOriginSingle = true;
                 } else if (
                     draggedData.type === 'Panel' &&
-                    effectiveItem._state.panels.length === 1
+                    effectiveItem._state.panels.length === 1 && // Group has 1 panel
+                    oldColumn.getTotalPanelGroups() === 1 // Column has 1 group
                 ) {
-                    this._originColumnHadOnePanel = true;
+                    // Dragging the only panel of the only group of the column
+                    isOriginSingle = true;
                 }
             }
         }
-    }
 
-    /**
-     * Hides the placeholder on drag leave.
-     * @param {DragEvent} e - The native drag event.
-     * @param {import('../../components/Row/Row.js').Row} dropZone - The Row instance.
-     * @param {{item: object, type: string}} draggedData - The item being dragged.
-     * @param {DragDropService} dds - The DND service instance.
-     * @returns {void}
-     */
-    handleDragLeave(e, dropZone, draggedData, dds) {
-        if (
-            e.relatedTarget &&
-            ((dropZone.element.contains(e.relatedTarget) &&
-                e.relatedTarget.classList.contains('container__placeholder')) ||
-                e.relatedTarget.classList.contains('row'))
-        ) {
-            return;
-        }
-        dds.hidePlaceholder();
-        this.clearCache();
-    }
+        // 3. Live Geometry Calculation for Drop Index
+        const mouseX = point.x;
+        let targetElement = null;
+        let placed = false;
+        me._dropIndex = columns.length;
 
-    /**
-     * Calculates the drop position and shows the placeholder on drag over.
-     * @param {DragEvent} e - The native drag event.
-     * @param {import('../../components/Row/Row.js').Row} dropZone - The Row instance.
-     * @param {{item: object, type: string}} draggedData - The item being dragged.
-     * @param {DragDropService} dds - The DND service instance.
-     * @returns {void}
-     */
-    handleDragOver(e, dropZone, draggedData, dds) {
-        const placeholder = dds.getPlaceholder();
-        if (e.target !== dropZone.element && e.target !== placeholder) {
-            dds.hidePlaceholder();
-            this._dropIndex = null;
-            return;
-        }
+        for (let i = 0; i < columns.length; i++) {
+            const col = columns[i];
+            const rect = col.element.getBoundingClientRect();
+            const midX = rect.left + rect.width / 2;
 
-        if (
-            !draggedData.item ||
-            (draggedData.type !== 'PanelGroup' && draggedData.type !== 'Panel')
-        ) {
-            return;
-        }
-
-        const mouseX = e.clientX;
-        let gapFound = false;
-
-        this._dropIndex = this._columnCache.length;
-        for (const col of this._columnCache) {
-            if (mouseX < col.midX) {
-                this._dropIndex = col.index;
-                gapFound = true;
+            if (mouseX < midX) {
+                me._dropIndex = i;
+                targetElement = col.element;
+                placed = true;
                 break;
             }
         }
 
-        const isLeftGap = this._dropIndex === this._originalColumnIndex;
-        const isRightGap = this._dropIndex === this._originalColumnIndex + 1;
+        // 4. Ghost Logic (Block redundant drops)
+        const isLeftGap = me._dropIndex === originalColumnIndex;
+        const isRightGap = me._dropIndex === originalColumnIndex + 1;
 
-        if (
-            this._originalColumnIndex !== null &&
-            this._originColumnHadOnePanel &&
-            (isLeftGap || isRightGap)
-        ) {
+        if (isOriginSingle && (isLeftGap || isRightGap)) {
             dds.hidePlaceholder();
-            this._dropIndex = null;
+            me._dropIndex = null;
             return;
         }
 
+        // 5. Render Placeholder
         dds.showPlaceholder('vertical');
 
-        if (gapFound) {
-            const targetElement = this._columnCache.find(
-                item => item.index === this._dropIndex
-            )?.element;
-
-            if (targetElement && dropZone.element.contains(targetElement)) {
+        if (placed && targetElement) {
+            // Live insert before the target element (column)
+            if (dropZone.element.contains(targetElement)) {
                 dropZone.element.insertBefore(placeholder, targetElement);
             }
         } else {
+            // Append to end if no split point found
             dropZone.element.appendChild(placeholder);
         }
     }
 
     /**
      * Handles the drop logic for the Row (creates a new Column).
-     * @param {DragEvent} e - The native drag event.
+     *
+     * @param {{x: number, y: number, target: HTMLElement}} point - The coordinates and target.
      * @param {import('../../components/Row/Row.js').Row} dropZone - The Row instance.
      * @param {{item: object, type: string}} draggedData - The item being dragged.
      * @param {DragDropService} dds - The DND service instance.
-     * @returns {void}
+     * @returns {boolean} True if drop was handled; false if it should fall through.
      */
-    handleDrop(e, dropZone, draggedData, dds) {
-        const panelIndex = this._dropIndex;
+    handleDrop(point, dropZone, draggedData, dds) {
+        const me = this;
+
+        // Gatekeeper: If placeholder is not visible, drop is invalid.
+        if (!dds.getPlaceholder().parentElement) {
+            me.clearCache();
+            return false;
+        }
+
+        const panelIndex = me._dropIndex;
         dds.hidePlaceholder();
-        this.clearCache();
+        me.clearCache();
 
         if (
             !draggedData.item ||
             (draggedData.type !== 'PanelGroup' && draggedData.type !== 'Panel')
         ) {
-            return;
+            return false;
         }
 
         let sourceGroup = null;
@@ -241,7 +229,7 @@ export class RowDropStrategy {
         }
 
         if (panelIndex === null) {
-            return;
+            return false;
         }
 
         if (draggedData.type === 'PanelGroup') {
@@ -268,5 +256,7 @@ export class RowDropStrategy {
             }
             newPanelGroup.addPanel(draggedPanel, true);
         }
+
+        return true;
     }
 }

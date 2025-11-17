@@ -20,8 +20,11 @@ import { FloatingPanelManagerService } from './FloatingPanelManagerService.js';
  * and shows a 'vertical' placeholder between them for both modes.
  * - Implements "ghost" logic (only for reordering) to prevent dropping a tab
  * in its original position.
+ * - Prevents dropping a PanelGroup onto itself.
+ * - Prevents dropping a single Panel back into its own group if it's the only child.
  * - On Drop (Merge): Moves the panel into the target group at the specific `_dropIndex`.
  * - On Drop (Reorder): Calls `panelGroup.movePanel()` to update the tab order.
+ * - Returns boolean indicating if the drop was handled.
  *
  * Dependencies:
  * - ../../components/Panel/PanelGroup.js
@@ -43,6 +46,7 @@ export class TabContainerDropStrategy {
 
     /**
      * Caches geometry of sibling tabs for reordering.
+     *
      * @type {Array<{element: HTMLElement, midX: number, stateIndex: number}>}
      * @private
      */
@@ -50,6 +54,7 @@ export class TabContainerDropStrategy {
 
     /**
      * Helper to get the source/target groups and the specific panel being moved.
+     *
      * @param {{item: object, type: string}} draggedData - The item being dragged.
      * @param {PanelGroup} dropZone - The target PanelGroup instance.
      * @returns {{draggedPanel: Panel, sourceGroup: PanelGroup, targetGroup: PanelGroup} | null}
@@ -91,6 +96,7 @@ export class TabContainerDropStrategy {
 
     /**
      * Caches the geometry of all tabs in the group for reordering.
+     *
      * @param {PanelGroup} dropZone
      * @private
      */
@@ -112,19 +118,31 @@ export class TabContainerDropStrategy {
 
     /**
      * Applies visual feedback on drag enter.
-     * @param {DragEvent} e - The native drag event.
+     *
+     * @param {{x: number, y: number, target: HTMLElement}} point - The coordinates and target.
      * @param {PanelGroup} dropZone - The target PanelGroup instance.
      * @param {{item: object, type: string}} draggedData - The item being dragged.
      * @param {import('./DragDropService.js').DragDropService} dds - The DND service instance.
      * @returns {void}
      */
-    handleDragEnter(e, dropZone, draggedData, dds) {
+    handleDragEnter(point, dropZone, draggedData, dds) {
         const me = this;
         me.clearCache(true); // Clear visual feedback only
         if (!draggedData.item) return;
 
+        if (draggedData.item === dropZone) {
+            return;
+        }
+
         const groups = me._getGroups(draggedData, dropZone);
         if (!groups) {
+            return;
+        }
+
+        if (
+            groups.sourceGroup === groups.targetGroup &&
+            groups.targetGroup._state.panels.length === 1
+        ) {
             return;
         }
 
@@ -135,19 +153,30 @@ export class TabContainerDropStrategy {
 
     /**
      * Maintains visual feedback on drag over.
-     * @param {DragEvent} e - The native drag event.
+     *
+     * @param {{x: number, y: number, target: HTMLElement}} point - The coordinates and target.
      * @param {PanelGroup} dropZone - The target PanelGroup instance.
      * @param {{item: object, type: string}} draggedData - The item being dragged.
      * @param {import('./DragDropService.js').DragDropService} dds - The DND service instance.
      * @returns {void}
      */
-    handleDragOver(e, dropZone, draggedData, dds) {
+    handleDragOver(point, dropZone, draggedData, dds) {
         const me = this;
         const placeholder = dds.getPlaceholder();
         const tabContainerElement = dropZone._state.header.tabContainer;
 
-        if (!tabContainerElement.contains(e.target) && e.target !== tabContainerElement) {
-            me.handleDragLeave(e, dropZone, draggedData, dds);
+        if (draggedData.item === dropZone) {
+            me.handleDragLeave(point, dropZone, draggedData, dds);
+            return;
+        }
+
+        if (
+            point.target &&
+            !tabContainerElement.contains(point.target) &&
+            point.target !== tabContainerElement &&
+            point.target !== placeholder
+        ) {
+            me.handleDragLeave(point, dropZone, draggedData, dds);
             return;
         }
 
@@ -156,17 +185,36 @@ export class TabContainerDropStrategy {
             return;
         }
 
+        if (
+            groups.sourceGroup === groups.targetGroup &&
+            groups.targetGroup._state.panels.length === 1
+        ) {
+            me.handleDragLeave(point, dropZone, draggedData, dds);
+            return;
+        }
+
+        // Robustness: Ensure _isReordering is set even if DragEnter was skipped
+        me._isReordering = groups.sourceGroup === groups.targetGroup;
+
         const { draggedPanel } = groups;
         const originalIndex = dropZone._state.panels.indexOf(draggedPanel);
 
+        // --- Live Geometry Calculation ---
+        const panels = dropZone._state.panels;
         let targetElement = null;
         let placed = false;
-        me._dropIndex = dropZone._state.panels.length;
+        me._dropIndex = panels.length;
 
-        for (const tab of me._tabCache) {
-            if (e.clientX < tab.midX) {
-                targetElement = tab.element;
-                me._dropIndex = tab.stateIndex;
+        for (let i = 0; i < panels.length; i++) {
+            const panel = panels[i];
+            const tabElement = panel._state.header.element;
+
+            const rect = tabElement.getBoundingClientRect();
+            const midX = rect.left + rect.width / 2;
+
+            if (point.x < midX) {
+                targetElement = tabElement;
+                me._dropIndex = i;
                 placed = true;
                 break;
             }
@@ -192,46 +240,46 @@ export class TabContainerDropStrategy {
 
     /**
      * Removes visual feedback on drag leave.
-     * @param {DragEvent} e - The native drag event.
+     *
+     * @param {{x: number, y: number, target: HTMLElement}} point - The coordinates and target.
      * @param {PanelGroup} dropZone - The target PanelGroup instance.
      * @param {{item: object, type: string}} draggedData - The item being dragged.
      * @param {import('./DragDropService.js').DragDropService} dds - The DND service instance.
      * @returns {void}
      */
-    handleDragLeave(e, dropZone, draggedData, dds) {
-        const me = this;
-        const tabContainerElement = dropZone._state.header.tabContainer;
-        if (!tabContainerElement) return;
-
-        if (
-            e.relatedTarget &&
-            (tabContainerElement.contains(e.relatedTarget) ||
-                e.relatedTarget.classList.contains('container__placeholder'))
-        ) {
-            return;
-        }
-
+    handleDragLeave(point, dropZone, draggedData, dds) {
         dds.hidePlaceholder();
-        me.clearCache();
+        this.clearCache();
     }
 
     /**
      * Handles the drop logic for merging tabs/panels.
-     * @param {DragEvent} e - The native drag event.
+     *
+     * @param {{x: number, y: number, target: HTMLElement}} point - The coordinates and target.
      * @param {PanelGroup} dropZone - The target PanelGroup instance.
      * @param {{item: object, type: string}} draggedData - The item being dragged.
      * @param {import('./DragDropService.js').DragDropService} dds - The DND service instance.
-     * @returns {void}
+     * @returns {boolean} True if drop was handled; false otherwise.
      */
-    handleDrop(e, dropZone, draggedData, dds) {
+    handleDrop(point, dropZone, draggedData, dds) {
         const me = this;
+
+        // Gatekeeper: If placeholder is not visible, drop is invalid.
+        if (!dds.getPlaceholder().parentElement) {
+            me.clearCache();
+            return false;
+        }
+
         dds.hidePlaceholder();
 
         const groups = me._getGroups(draggedData, dropZone);
         if (!groups) {
             me.clearCache();
-            return;
+            return false;
         }
+
+        // Recalculate isReordering just to be safe
+        me._isReordering = groups.sourceGroup === groups.targetGroup;
 
         const { draggedPanel, sourceGroup, targetGroup } = groups;
 
@@ -247,14 +295,16 @@ export class TabContainerDropStrategy {
             }
 
             sourceGroup.removePanel(draggedPanel, true);
-            targetGroup.addPanel(draggedPanel, me._dropIndex, true); // Add and make active
+            targetGroup.addPanel(draggedPanel, me._dropIndex, true);
         }
 
         me.clearCache();
+        return true;
     }
 
     /**
      * Clears any stray visual feedback from all tab containers.
+     *
      * @param {boolean} [visualOnly=false] - If true, only clears visual state.
      * @returns {void}
      */

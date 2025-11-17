@@ -125,7 +125,7 @@ class EventBus {
         if (!me._listeners.has(eventName)) {
             return;
         }
-        // console.info(eventName, args);
+        console.info(eventName, args);
 
         const listeners = [...me._listeners.get(eventName)];
         for (const listener of listeners) {

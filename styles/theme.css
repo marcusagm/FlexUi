@@ -147,8 +147,8 @@
     /* Layout App */
     --menu-height: 26px;
     --statusbar-height: 24px;
-    --toolbar-height-horizontal: 5px; /* Altura da T/B Toolbar */
-    --toolbar-width-vertical: 5px; /* Largura da L/R Toolbar */
+    --toolbar-height-horizontal: 30px; /* Altura da T/B Toolbar */
+    --toolbar-width-vertical: 30px; /* Largura da L/R Toolbar */
     --toolbar-padding: 0;
     --toolbar-background: var(--surface-level-1);
     --toolbar-border-color: var(--color-border-default);

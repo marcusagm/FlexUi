@@ -18,17 +18,17 @@ body {
 }
 
 .app-wrapper {
-    flex: 1; /* O wrapper preenche o espaço do body */
+    flex: 1;
     display: grid;
-    grid-template-rows: auto auto 1fr auto auto; /* Menu, T-Toolbar, Main, B-Toolbar, StatusBar */
-    grid-template-columns: auto 1fr auto; /* L-Toolbar, Main, R-Toolbar */
+    grid-template-rows: auto auto 1fr auto auto;
+    grid-template-columns: auto 1fr auto;
     grid-template-areas:
         'menu menu menu'
         'toolbar-top toolbar-top toolbar-top'
         'toolbar-left main toolbar-right'
         'toolbar-bottom toolbar-bottom toolbar-bottom'
         'statusbar statusbar statusbar';
-    overflow: hidden; /* O .container (main) fará o scroll interno */
+    overflow: hidden;
 }
 
 /* Atribui os componentes de App.js às áreas de grid */
@@ -43,7 +43,6 @@ body {
 }
 .container {
     grid-area: main;
-    /* height e width são controlados pelo grid agora */
     height: 100%;
     width: 100%;
     overflow: auto;
@@ -62,29 +61,24 @@ body {
     width: 8px;
     height: 8px;
 }
-
 ::-webkit-scrollbar-thumb {
     background: var(--color-accent-inactive);
     border-radius: var(--border-radius-sm);
 }
-
 ::-webkit-scrollbar-thumb:hover {
     background: var(--color-accent-hover);
 }
 ::-webkit-scrollbar-thumb:active {
     background: var(--color-accent-active);
 }
-
 ::-webkit-scrollbar-track {
     background: var(--color-bg-app);
 }
 
 .dragging {
-    cursor: grabbing !important;
-    user-select: none !important;
+    opacity: 0.5; /* Feedback visual no elemento original */
 }
 
-/* --- Utilitários de Acessibilidade --- */
 .sr-only {
     position: absolute;
     width: 1px;
@@ -105,4 +99,24 @@ body {
     overflow: visible;
     clip: auto;
     white-space: normal;
+}
+
+/* --- Drag and Drop Sintético (Ghost Element) --- */
+.dnd-ghost {
+    position: fixed !important; /* Força fixed para ser relativo ao viewport */
+    pointer-events: none !important;
+    z-index: 99999; /* Acima de tudo, inclusive Modais */
+    left: 0;
+    top: 0;
+    margin: 0;
+    padding: 0;
+    opacity: 0.9;
+    transform-origin: top left;
+    will-change: transform, left, top;
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4); /* Sombra mais pronunciada para efeito de "levante" */
+    background-color: var(--color-bg-panel);
+    border-radius: var(--border-radius-base);
+    overflow: hidden;
+    /* Garantir que o box-sizing não quebre as dimensões copiadas */
+    box-sizing: border-box;
 }

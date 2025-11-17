@@ -18,8 +18,12 @@ import { FloatingPanelManagerService } from './FloatingPanelManagerService.js';
  * - Caches child Row geometry on 'handleDragEnter'.
  * - Calculates drop index based on 'midY' (vertical midpoint).
  * - Shows a 'horizontal' placeholder in the calculated gap.
+ * - Validates drop zone strictly: The target MUST be the container element itself
+ * or the placeholder. Hovering over children (Rows) is considered an invalid
+ * drop for the Container (allowing specific Row strategies or Undock to take over).
  * - On drop: Creates a new Row, creates a new Column inside it,
  * and moves the dropped Panel or PanelGroup into the new Column.
+ * - Returns true only if the drop was successfully handled.
  *
  * Dependencies:
  * - ../../components/Panel/PanelGroup.js
@@ -30,6 +34,7 @@ import { FloatingPanelManagerService } from './FloatingPanelManagerService.js';
 export class ContainerDropStrategy {
     /**
      * Caches the geometry (midY) and index of child Rows.
+     *
      * @type {Array<{element: HTMLElement, midY: number, index: number}>}
      * @private
      */
@@ -37,6 +42,7 @@ export class ContainerDropStrategy {
 
     /**
      * The calculated drop index (state).
+     *
      * @type {number | null}
      * @private
      */
@@ -44,6 +50,7 @@ export class ContainerDropStrategy {
 
     /**
      * The starting row index (for "ghost" logic).
+     *
      * @type {number | null}
      * @private
      */
@@ -51,6 +58,7 @@ export class ContainerDropStrategy {
 
     /**
      * Flag for "ghost" logic.
+     *
      * @type {boolean}
      * @private
      */
@@ -58,6 +66,7 @@ export class ContainerDropStrategy {
 
     /**
      * Clears the internal geometry cache and drop index.
+     *
      * @returns {void}
      */
     clearCache() {
@@ -69,13 +78,14 @@ export class ContainerDropStrategy {
 
     /**
      * Caches the geometry of child rows on drag enter.
-     * @param {DragEvent} e - The native drag event.
+     *
+     * @param {{x: number, y: number, target: HTMLElement}} point - The coordinates and target.
      * @param {import('../../components/Container/Container.js').Container} dropZone - The Container instance.
      * @param {{item: object, type: string}} draggedData - The item being dragged.
-     * @param {DragDropService} dds - The DND service instance.
+     * @param {import('./DragDropService.js').DragDropService} dds - The DND service instance.
      * @returns {void}
      */
-    handleDragEnter(e, dropZone, draggedData, dds) {
+    handleDragEnter(point, dropZone, draggedData, dds) {
         if (
             !draggedData.item ||
             (draggedData.type !== 'PanelGroup' && draggedData.type !== 'Panel')
@@ -133,36 +143,38 @@ export class ContainerDropStrategy {
 
     /**
      * Hides the placeholder on drag leave.
-     * @param {DragEvent} e - The native drag event.
+     *
+     * @param {{x: number, y: number, target: HTMLElement}} point - The coordinates and target.
      * @param {import('../../components/Container/Container.js').Container} dropZone - The Container instance.
      * @param {{item: object, type: string}} draggedData - The item being dragged.
-     * @param {DragDropService} dds - The DND service instance.
+     * @param {import('./DragDropService.js').DragDropService} dds - The DND service instance.
      * @returns {void}
      */
-    handleDragLeave(e, dropZone, draggedData, dds) {
-        if (
-            e.relatedTarget &&
-            ((dropZone.element.contains(e.relatedTarget) &&
-                e.relatedTarget.classList.contains('container__placeholder')) ||
-                e.relatedTarget.classList.contains('container'))
-        ) {
-            return;
-        }
+    handleDragLeave(point, dropZone, draggedData, dds) {
+        // In synthetic drag, handleDragLeave is called when the dropZone changes.
+        // We simply clean up here.
         dds.hidePlaceholder();
         this.clearCache();
     }
 
     /**
      * Calculates the drop position and shows the placeholder on drag over.
-     * @param {DragEvent} e - The native drag event.
+     * Applies strict target validation to allow fall-through (Undock).
+     *
+     * @param {{x: number, y: number, target: HTMLElement}} point - The coordinates and target.
      * @param {import('../../components/Container/Container.js').Container} dropZone - The Container instance.
      * @param {{item: object, type: string}} draggedData - The item being dragged.
-     * @param {DragDropService} dds - The DND service instance.
+     * @param {import('./DragDropService.js').DragDropService} dds - The DND service instance.
      * @returns {void}
      */
-    handleDragOver(e, dropZone, draggedData, dds) {
+    handleDragOver(point, dropZone, draggedData, dds) {
         const placeholder = dds.getPlaceholder();
-        if (e.target !== dropZone.element && e.target !== placeholder) {
+
+        // Strict Target Check:
+        // We only accept the drag if the pointer is directly over the Container element
+        // or the Placeholder. If it is over a child (like a Row or Panel), we assume
+        // that specific child's strategy (or Undock logic) should handle it.
+        if (point.target !== dropZone.element && point.target !== placeholder) {
             dds.hidePlaceholder();
             this._dropIndex = null;
             return;
@@ -183,11 +195,12 @@ export class ContainerDropStrategy {
             if (!effectiveItem) return;
         }
 
+        // Populate cache if empty (e.g. fast entry skipping DragEnter)
         if (this._rowCache.length === 0 && dropZone.getRows().length > 0) {
-            this.handleDragEnter(e, dropZone, draggedData, dds);
+            this.handleDragEnter(point, dropZone, draggedData, dds);
         }
 
-        const mouseY = e.clientY;
+        const mouseY = point.y;
         let gapFound = false;
 
         this._dropIndex = this._rowCache.length;
@@ -199,6 +212,7 @@ export class ContainerDropStrategy {
             }
         }
 
+        // Ghost logic: prevent drop on same position
         const isTopGap = this._dropIndex === this._originalRowIndex;
         const isBottomGap = this._dropIndex === this._originalRowIndex + 1;
 
@@ -229,13 +243,20 @@ export class ContainerDropStrategy {
 
     /**
      * Handles the drop logic for the Container (creates a new Row).
-     * @param {DragEvent} e - The native drag event.
+     *
+     * @param {{x: number, y: number, target: HTMLElement}} point - The coordinates and target.
      * @param {import('../../components/Container/Container.js').Container} dropZone - The Container instance.
      * @param {{item: object, type: string}} draggedData - The item being dragged.
-     * @param {DragDropService} dds - The DND service instance.
-     * @returns {void}
+     * @param {import('./DragDropService.js').DragDropService} dds - The DND service instance.
+     * @returns {boolean} True if drop was handled; false if it should fall through.
      */
-    handleDrop(e, dropZone, draggedData, dds) {
+    handleDrop(point, dropZone, draggedData, dds) {
+        // Gatekeeper: If placeholder is not visible, drag over logic decided this was invalid.
+        if (!dds.getPlaceholder().parentElement) {
+            this.clearCache();
+            return false;
+        }
+
         const rowIndex = this._dropIndex;
         dds.hidePlaceholder();
         this.clearCache();
@@ -244,7 +265,7 @@ export class ContainerDropStrategy {
             !draggedData.item ||
             (draggedData.type !== 'PanelGroup' && draggedData.type !== 'Panel')
         ) {
-            return;
+            return false;
         }
 
         let sourceGroup = null;
@@ -261,7 +282,7 @@ export class ContainerDropStrategy {
         }
 
         if (rowIndex === null) {
-            return;
+            return false;
         }
 
         if (draggedData.type === 'PanelGroup') {
@@ -291,5 +312,7 @@ export class ContainerDropStrategy {
             draggedPanel._state.height = null;
             newPanelGroup.addPanel(draggedPanel, true);
         }
+
+        return true;
     }
 }

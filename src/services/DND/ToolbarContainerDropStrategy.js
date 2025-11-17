@@ -9,7 +9,7 @@ import { ToolbarContainer } from '../../components/Toolbar/ToolbarContainer.js';
  * between different ToolbarContainers (e.g., from 'top' to 'left').
  *
  * Properties summary:
- * - _groupCache {Array<object>} : Caches geometry of child ToolbarGroups.
+ * - _dropZoneCache {Array<object>} : Caches geometry of child ToolbarGroups.
  * - _dropIndex {number | null} : The calculated drop index.
  * - _originalIndex {number | null} : The starting index (for "ghost" logic).
  * - _sourceContainer {ToolbarContainer | null} : The container where the drag originated.
@@ -20,7 +20,7 @@ import { ToolbarContainer } from '../../components/Toolbar/ToolbarContainer.js';
  * - Calculates drop index based on 'midX' (horizontal) or 'midY' (vertical).
  * - Shows a 'vertical' (if H) or 'horizontal' (if V) placeholder.
  * - Implements "ghost" logic to prevent dropping adjacent to the start position.
- * - On drop: Calls 'removeGroup' on the source and 'addGroup' on the target.
+ * - Returns false on drop if the placeholder is not active (enables undock fallback).
  *
  * Dependencies:
  * - ../../components/Toolbar/ToolbarGroup.js
@@ -30,10 +30,11 @@ import { ToolbarContainer } from '../../components/Toolbar/ToolbarContainer.js';
 export class ToolbarContainerDropStrategy {
     /**
      * Caches the geometry (midX/midY) and index of child ToolbarGroups.
+     * Renamed from _groupCache to _dropZoneCache to align with DragDropService protocol.
      * @type {Array<{element: HTMLElement, mid: number, index: number}>}
      * @private
      */
-    _groupCache = [];
+    _dropZoneCache = [];
 
     /**
      * The calculated drop index (state).
@@ -69,7 +70,7 @@ export class ToolbarContainerDropStrategy {
      */
     clearCache() {
         const me = this;
-        me._groupCache = [];
+        me._dropZoneCache = [];
         me._dropIndex = null;
         me._originalIndex = null;
         me._sourceContainer = null;
@@ -78,13 +79,13 @@ export class ToolbarContainerDropStrategy {
 
     /**
      * Caches the geometry of child groups on drag enter.
-     * @param {DragEvent} e - The native drag event.
+     * @param {{x: number, y: number, target: HTMLElement}} point - The coordinates and target.
      * @param {ToolbarContainer} dropZone - The ToolbarContainer instance.
      * @param {{item: object, type: string}} draggedData - The item being dragged.
      * @param {DragDropService} dds - The DND service instance.
      * @returns {void}
      */
-    handleDragEnter(e, dropZone, draggedData, dds) {
+    handleDragEnter(point, dropZone, draggedData, dds) {
         const me = this;
         if (!draggedData.item || draggedData.type !== 'ToolbarGroup') {
             return;
@@ -106,7 +107,7 @@ export class ToolbarContainerDropStrategy {
                 mid = rect.top + rect.height / 2;
             }
 
-            me._groupCache.push({
+            me._dropZoneCache.push({
                 element: group.element,
                 mid: mid,
                 index: index
@@ -120,59 +121,52 @@ export class ToolbarContainerDropStrategy {
 
     /**
      * Hides the placeholder on drag leave.
-     * @param {DragEvent} e - The native drag event.
+     * @param {{x: number, y: number, target: HTMLElement}} point - The coordinates and target.
      * @param {ToolbarContainer} dropZone - The ToolbarContainer instance.
      * @param {{item: object, type: string}} draggedData - The item being dragged.
      * @param {DragDropService} dds - The DND service instance.
      * @returns {void}
      */
-    handleDragLeave(e, dropZone, draggedData, dds) {
-        const me = this;
-        if (
-            e.relatedTarget &&
-            ((dropZone.element.contains(e.relatedTarget) &&
-                e.relatedTarget.classList.contains('container__placeholder')) ||
-                e.relatedTarget.classList.contains('toolbar__scroll-container') ||
-                e.relatedTarget.classList.contains('toolbar-container'))
-        ) {
-            return;
-        }
+    handleDragLeave(point, dropZone, draggedData, dds) {
         dds.hidePlaceholder();
-        me.clearCache();
+        this.clearCache();
     }
 
     /**
      * Calculates the drop position and shows the placeholder on drag over.
-     * @param {DragEvent} e - The native drag event.
+     * @param {{x: number, y: number, target: HTMLElement}} point - The coordinates and target.
      * @param {ToolbarContainer} dropZone - The ToolbarContainer instance.
      * @param {{item: object, type: string}} draggedData - The item being dragged.
      * @param {DragDropService} dds - The DND service instance.
      * @returns {void}
      */
-    handleDragOver(e, dropZone, draggedData, dds) {
+    handleDragOver(point, dropZone, draggedData, dds) {
         const me = this;
-        const placeholder = dds.getPlaceholder();
+
+        // Validation: Only handle ToolbarGroups
+        if (draggedData.type !== 'ToolbarGroup') {
+            dds.hidePlaceholder();
+            return;
+        }
+
+        // Recalculate cache if empty (e.g., rapid entry or empty toolbar)
+        if (me._dropZoneCache.length === 0 && dropZone._state.groups.length > 0) {
+            me.handleDragEnter(point, dropZone, draggedData, dds);
+        }
+
         const scrollContainer = dropZone._scrollContainer;
 
-        const isOverContainer = e.target === dropZone.element;
-        const isOverScroll = e.target === scrollContainer || scrollContainer.contains(e.target);
-        const isOverPlaceholder = e.target === placeholder;
-
-        if (!isOverContainer && !isOverScroll && !isOverPlaceholder) {
+        // Containment Check
+        if (!dropZone.element.contains(point.target)) {
             dds.hidePlaceholder();
-            me._dropIndex = null;
             return;
         }
 
-        if (draggedData.type !== 'ToolbarGroup') {
-            return;
-        }
-
-        const clientPos = me._orientation === 'horizontal' ? e.clientX : e.clientY;
+        const clientPos = me._orientation === 'horizontal' ? point.x : point.y;
         let gapFound = false;
 
-        me._dropIndex = me._groupCache.length;
-        for (const group of me._groupCache) {
+        me._dropIndex = me._dropZoneCache.length;
+        for (const group of me._dropZoneCache) {
             if (clientPos < group.mid) {
                 me._dropIndex = group.index;
                 gapFound = true;
@@ -180,6 +174,7 @@ export class ToolbarContainerDropStrategy {
             }
         }
 
+        // Ghost Logic: Prevent drop on self or immediate neighbor (no-op)
         const isSameContainer = me._sourceContainer === dropZone;
         const isLeftGap = me._dropIndex === me._originalIndex;
         const isRightGap = me._dropIndex === me._originalIndex + 1;
@@ -191,15 +186,19 @@ export class ToolbarContainerDropStrategy {
         }
 
         const placeholderMode = me._orientation === 'horizontal' ? 'vertical' : 'horizontal';
+        const placeholder = dds.getPlaceholder();
         dds.showPlaceholder(placeholderMode);
 
+        // Place placeholder in DOM
         if (gapFound) {
-            const targetElement = me._groupCache.find(
+            const targetElement = me._dropZoneCache.find(
                 item => item.index === me._dropIndex
             )?.element;
 
             if (targetElement && scrollContainer.contains(targetElement)) {
                 scrollContainer.insertBefore(placeholder, targetElement);
+            } else {
+                scrollContainer.appendChild(placeholder);
             }
         } else {
             scrollContainer.appendChild(placeholder);
@@ -208,26 +207,34 @@ export class ToolbarContainerDropStrategy {
 
     /**
      * Handles the drop logic for the ToolbarContainer.
-     * @param {DragEvent} e - The native drag event.
+     * @param {{x: number, y: number, target: HTMLElement}} point - The coordinates and target.
      * @param {ToolbarContainer} dropZone - The ToolbarContainer instance.
      * @param {{item: object, type: string}} draggedData - The item being dragged.
      * @param {DragDropService} dds - The DND service instance.
-     * @returns {void}
+     * @returns {boolean} True if handled.
      */
-    handleDrop(e, dropZone, draggedData, dds) {
+    handleDrop(point, dropZone, draggedData, dds) {
         const me = this;
+
+        // Gatekeeper: If placeholder is not visible, drop is invalid.
+        if (!dds.getPlaceholder().parentElement) {
+            me.clearCache();
+            return false;
+        }
+
         const dropIndex = me._dropIndex;
-        const sourceContainer = me._sourceContainer;
         const targetContainer = dropZone;
+        const draggedItem = draggedData.item;
+
+        // Fallback: Try to get source from item if handleDragEnter didn't run correctly
+        const sourceContainer = me._sourceContainer || draggedItem._state.parentContainer;
 
         dds.hidePlaceholder();
         me.clearCache();
 
         if (draggedData.type !== 'ToolbarGroup' || dropIndex === null) {
-            return;
+            return false;
         }
-
-        const draggedItem = draggedData.item;
 
         if (sourceContainer === targetContainer) {
             targetContainer.moveGroup(draggedItem, dropIndex);
@@ -235,5 +242,7 @@ export class ToolbarContainerDropStrategy {
             sourceContainer.removeGroup(draggedItem);
             targetContainer.addGroup(draggedItem, dropIndex);
         }
+
+        return true;
     }
 }

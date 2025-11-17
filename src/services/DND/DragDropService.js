@@ -117,67 +117,63 @@ export class DragDropService {
     _namespace = 'dnd-service';
 
     /**
+     * The visual clone element following the cursor.
+     * @type {HTMLElement | null}
+     * @private
+     */
+    _dragGhost = null;
+
+    /**
+     * The ID of the pointer initiating the drag.
+     * @type {number | null}
+     * @private
+     */
+    _activePointerId = null;
+
+    /**
+     * The current DropZone instance being hovered.
+     * @type {object | null}
+     * @private
+     */
+    _activeDropZone = null;
+
+    /**
+     * Bound handler for bus 'dragstart'.
      * @type {Function | null}
      * @private
      */
     _boundOnDragStart = null;
 
     /**
+     * Bound handler for window 'pointermove'.
      * @type {Function | null}
      * @private
      */
-    _boundOnDragEnd = null;
+    _boundOnPointerMove = null;
 
     /**
-     * A 1x1 transparent Image object, pre-cached for use as a drag ghost.
-     * @type {Image | null}
-     * @private
-     */
-    _transparentDragImage = null;
-
-    /**
-     * Throttled function to update floating panel position during drag.
+     * Bound handler for window 'pointerup'.
      * @type {Function | null}
      * @private
      */
-    _throttledMoveFloatingPanel = null;
+    _boundOnPointerUp = null;
 
     /**
-     * Stores the temporary cloned element used for a clean drag ghost image.
-     * @type {HTMLElement | null}
+     * Throttled logic for visual updates and hit-testing.
+     * @type {Function | null}
      * @private
      */
-    _dragGhostClone = null;
+    _throttledMoveHandler = null;
 
     /**
-     * Caches the last valid X coordinate from dragOver.
-     * @type {number}
+     * Caches the last known pointer coordinates.
+     * @type {{x: number, y: number}}
      * @private
      */
-    _lastDragX = 0;
+    _lastCoordinates = { x: 0, y: 0 };
 
     /**
-     * Caches the last valid Y coordinate from dragOver.
-     * @type {number}
-     * @private
-     */
-    _lastDragY = 0;
-
-    /**
-     * Stores the dropzone element being dragged to temporarily disable it.
-     * @type {HTMLElement | null}
-     * @private
-     */
-    _draggedSourceElement = null;
-
-    /**
-     * Stores the original 'data-dropzone' value of the element being dragged.
-     * @type {string | null}
-     * @private
-     */
-    _draggedSourceDropzone = null;
-
-    /**
+     * Private constructor. Use getInstance().
      * @private
      */
     constructor() {
@@ -189,17 +185,18 @@ export class DragDropService {
 
         const me = this;
         me._createPlaceholder();
-        me._createTransparentDragImage();
 
         me._boundOnDragStart = me._onDragStart.bind(me);
-        me._boundOnDragEnd = me._onDragEnd.bind(me);
-        me._throttledMoveFloatingPanel = throttleRAF(me._moveFloatingPanel.bind(me));
+        me._boundOnPointerMove = me._onSyntheticPointerMove.bind(me);
+        me._boundOnPointerUp = me._onSyntheticPointerUp.bind(me);
+
+        me._throttledMoveHandler = throttleRAF(me._processMove.bind(me));
 
         me._initEventListeners();
     }
 
     /**
-     * Gets the single instance of the service.
+     * Gets the single instance of the DragDropService.
      * @returns {DragDropService}
      */
     static getInstance() {
@@ -210,9 +207,48 @@ export class DragDropService {
     }
 
     /**
-     * Hides the placeholder by removing it from the DOM
-     * and resetting its state.
-     * @returns {void}
+     * Registers a DND strategy for a specific drop zone type.
+     * @param {string} dropZoneType
+     * @param {object} strategyInstance
+     */
+    registerStrategy(dropZoneType, strategyInstance) {
+        if (
+            !strategyInstance ||
+            typeof strategyInstance.handleDragOver !== 'function' ||
+            typeof strategyInstance.handleDrop !== 'function'
+        ) {
+            console.warn(`DragDropService: Invalid strategy for "${dropZoneType}".`);
+            return;
+        }
+        this._strategyRegistry.set(dropZoneType, strategyInstance);
+    }
+
+    /**
+     * Getter for the current drag state data.
+     * @returns {object}
+     */
+    getDraggedData() {
+        return this._dragState;
+    }
+
+    /**
+     * Getter for the visual placeholder element.
+     * @returns {HTMLElement}
+     */
+    getPlaceholder() {
+        return this._placeholder;
+    }
+
+    /**
+     * Checks if a drag operation is currently active.
+     * @returns {boolean}
+     */
+    isDragging() {
+        return this._isDragging;
+    }
+
+    /**
+     * Hides the visual placeholder from the DOM.
      */
     hidePlaceholder() {
         const me = this;
@@ -221,21 +257,18 @@ export class DragDropService {
         }
         me._placeholder.className = 'container__placeholder';
         me._placeholder.style.height = '';
+        me._placeholder.style.width = '';
         me._placeholderMode = null;
     }
 
     /**
-     * Shows the placeholder in a specific mode ('horizontal' or 'vertical').
-     * @param {'horizontal' | 'vertical'} mode - The display mode.
-     * @param {number | null} [height=null] - The height (for horizontal mode).
-     * @returns {void}
+     * Shows the visual placeholder in the specified mode.
+     * @param {'horizontal' | 'vertical'} mode
+     * @param {number|null} [dimension=null]
      */
-    showPlaceholder(mode, height = null) {
+    showPlaceholder(mode, dimension = null) {
         const me = this;
         if (mode === me._placeholderMode) {
-            if (mode === 'horizontal' && height && me._placeholder.style.height !== `${height}px`) {
-                // me._placeholder.style.height = `${height}px`;
-            }
             return;
         }
 
@@ -243,9 +276,6 @@ export class DragDropService {
 
         if (mode === 'horizontal') {
             me._placeholder.classList.add('container__placeholder--horizontal');
-            if (height) {
-                // me._placeholder.style.height = `${height}px`;
-            }
         } else if (mode === 'vertical') {
             me._placeholder.classList.add('container__placeholder--vertical');
         }
@@ -254,88 +284,25 @@ export class DragDropService {
     }
 
     /**
-     * Registers a DND strategy for a specific drop zone type.
-     * @param {string} dropZoneType - The identifier (e.g., 'column').
-     * @param {object} strategyInstance - The instance of the strategy class.
-     * @returns {void}
-     */
-    registerStrategy(dropZoneType, strategyInstance) {
-        const me = this;
-        if (!dropZoneType) {
-            console.warn('DragDropService: Attempted to register strategy without dropZoneType.');
-            return;
-        }
-        if (
-            !strategyInstance ||
-            (typeof strategyInstance.handleDrop !== 'function' &&
-                typeof strategyInstance.handleDragOver !== 'function')
-        ) {
-            console.warn(`DragDropService: Invalid strategy for "${dropZoneType}".`);
-            return;
-        }
-        me._strategyRegistry.set(dropZoneType, strategyInstance);
-    }
-
-    /**
-     * Removes a strategy from the registry.
-     * @param {string} dropZoneType - The identifier (e.g., 'column').
-     * @returns {void}
-     */
-    unregisterStrategy(dropZoneType) {
-        this._strategyRegistry.delete(dropZoneType);
-    }
-
-    /**
-     * <DraggedData> getter.
-     * @returns {{
-     * item: object | null,
-     * type: string | null,
-     * element: HTMLElement | null,
-     * offsetX: number,
-     * offsetY: number
-     * }}
-     */
-    getDraggedData() {
-        return this._dragState;
-    }
-
-    /**
-     * <Placeholder> getter.
-     * @returns {HTMLElement} The shared placeholder DOM element.
-     */
-    getPlaceholder() {
-        return this._placeholder;
-    }
-
-    /**
-     * Checks if a drag operation is currently in progress.
-     * @returns {boolean}
-     */
-    isDragging() {
-        return this._isDragging;
-    }
-
-    /**
-     * Cleans up all appBus listeners.
-     * @returns {void}
+     * Cleans up the service.
      */
     destroy() {
         const me = this;
         appBus.offByNamespace(me._namespace);
-        me._throttledMoveFloatingPanel?.cancel();
-        me._throttledMoveFloatingPanel = null;
-        me._transparentDragImage = null;
+        me._throttledMoveHandler?.cancel();
 
-        if (me._dragGhostClone) {
-            me._dragGhostClone.remove();
-            me._dragGhostClone = null;
+        if (me._dragGhost) {
+            me._dragGhost.remove();
         }
+        if (me._activePointerId !== null) {
+            me._removeGlobalListeners();
+        }
+        me._placeholder?.remove();
     }
 
     /**
-     * Creates the shared placeholder element.
+     * Creates the shared placeholder DOM element.
      * @private
-     * @returns {void}
      */
     _createPlaceholder() {
         this._placeholder = document.createElement('div');
@@ -343,296 +310,261 @@ export class DragDropService {
     }
 
     /**
-     * Creates and caches the 1x1 transparent drag image to prevent race conditions.
+     * Initializes the 'dragstart' listener on the event bus.
      * @private
-     * @returns {void}
-     */
-    _createTransparentDragImage() {
-        const me = this;
-        const transparentPixelBase64 =
-            'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
-
-        me._transparentDragImage = new Image(1, 1);
-        me._transparentDragImage.src = transparentPixelBase64;
-    }
-
-    /**
-     * Attaches listeners to the appBus and native DND events on the body.
-     * @private
-     * @returns {void}
      */
     _initEventListeners() {
         const me = this;
         const options = { namespace: me._namespace };
         appBus.on('dragstart', me._boundOnDragStart, options);
-        appBus.on('dragend', me._boundOnDragEnd, options);
-
-        const rootElement = document.body;
-        rootElement.addEventListener('dragenter', me._onNativeDragEnter.bind(me));
-        rootElement.addEventListener('dragover', me._onNativeDragOver.bind(me));
-        rootElement.addEventListener('dragleave', me._onNativeDragLeave.bind(me));
-        rootElement.addEventListener('drop', me._onNativeDrop.bind(me));
     }
 
     /**
-     * Unified native 'dragenter' handler (DOM Bridge).
-     * @param {DragEvent} e
+     * Clears the internal cache of all registered strategies.
      * @private
-     * @returns {void}
-     */
-    _onNativeDragEnter(e) {
-        const me = this;
-        if (!me.isDragging()) return;
-
-        const dropZoneElement = e.target.closest(
-            "[data-dropzone='column'], [data-dropzone='row'], [data-dropzone='container'], [data-dropzone='TabContainer'], [data-dropzone='toolbar-container']"
-        );
-        if (!dropZoneElement || !dropZoneElement.dropZoneInstance) {
-            return;
-        }
-
-        const dropZoneInstance = dropZoneElement.dropZoneInstance;
-        const strategy = me._strategyRegistry.get(dropZoneInstance.dropZoneType);
-
-        if (strategy && typeof strategy.handleDragEnter === 'function') {
-            e.preventDefault();
-            e.stopPropagation();
-            strategy.handleDragEnter(e, dropZoneInstance, me.getDraggedData(), me);
-        }
-    }
-
-    /**
-     * Unified native 'dragover' handler (DOM Bridge).
-     * @param {DragEvent} e
-     * @private
-     * @returns {void}
-     */
-    _onNativeDragOver(e) {
-        const me = this;
-        if (!me.isDragging()) return;
-
-        // CORREÇÃO: Chamada universal de preventDefault para permitir
-        // o arraste sobre áreas não-dropzone (ex: menu, painel flutuante).
-        e.preventDefault();
-        e.stopPropagation();
-
-        if (e.clientX !== 0 || e.clientY !== 0) {
-            me._lastDragX = e.clientX;
-            me._lastDragY = e.clientY;
-        }
-
-        if (me._dragState.type === 'PanelGroup' && me._dragState.item._state.isFloating === true) {
-            me._throttledMoveFloatingPanel();
-        }
-
-        const dropZoneElement = e.target.closest(
-            "[data-dropzone='column'], [data-dropzone='row'], [data-dropzone='container'], [data-dropzone='TabContainer'], [data-dropzone='toolbar-container']"
-        );
-        if (!dropZoneElement || !dropZoneElement.dropZoneInstance) {
-            me.hidePlaceholder();
-            return;
-        }
-
-        const dropZoneInstance = dropZoneElement.dropZoneInstance;
-        const strategy = me._strategyRegistry.get(dropZoneInstance.dropZoneType);
-
-        if (strategy && typeof strategy.handleDragOver === 'function') {
-            strategy.handleDragOver(e, dropZoneInstance, me.getDraggedData(), me);
-        } else {
-            me.hidePlaceholder();
-        }
-    }
-
-    /**
-     * Unified native 'dragleave' handler (DOM Bridge).
-     * @param {DragEvent} e
-     * @private
-     * @returns {void}
-     */
-    _onNativeDragLeave(e) {
-        const me = this;
-        if (!me.isDragging()) return;
-
-        const dropZoneElement = e.target.closest(
-            "[data-dropzone='column'], [data-dropzone='row'], [data-dropzone='container'], [data-dropzone='TabContainer'], [data-dropzone='toolbar-container']"
-        );
-        if (!dropZoneElement || !dropZoneElement.dropZoneInstance) {
-            return;
-        }
-
-        const dropZoneInstance = dropZoneElement.dropZoneInstance;
-        const strategy = me._strategyRegistry.get(dropZoneInstance.dropZoneType);
-
-        if (strategy && typeof strategy.handleDragLeave === 'function') {
-            e.preventDefault();
-            e.stopPropagation();
-            strategy.handleDragLeave(e, dropZoneInstance, me.getDraggedData(), me);
-        }
-    }
-
-    /**
-     * Unified native 'drop' handler (DOM Bridge).
-     * @param {DragEvent} e
-     * @private
-     * @returns {void}
-     */
-    _onNativeDrop(e) {
-        const me = this;
-        if (!me.isDragging()) return;
-
-        e.preventDefault();
-        e.stopPropagation();
-
-        const dropZoneElement = e.target.closest(
-            "[data-dropzone='column'], [data-dropzone='row'], [data-dropzone='container'], [data-dropzone='TabContainer'], [data-dropzone='toolbar-container']"
-        );
-        const placeholderVisible = !!me._placeholder.parentElement;
-
-        const dropZoneInstance = dropZoneElement ? dropZoneElement.dropZoneInstance : null;
-        const isTabContainerDrop =
-            dropZoneInstance && dropZoneInstance.dropZoneType === 'TabContainer';
-        const isToolbarContainerDrop =
-            dropZoneInstance && dropZoneInstance.dropZoneType === 'toolbar-container';
-
-        if (
-            (placeholderVisible || isTabContainerDrop || isToolbarContainerDrop) &&
-            dropZoneElement
-        ) {
-            const dropZoneInstance = dropZoneElement.dropZoneInstance;
-            const strategy = me._strategyRegistry.get(dropZoneInstance.dropZoneType);
-
-            if (strategy && typeof strategy.handleDrop === 'function') {
-                strategy.handleDrop(e, dropZoneInstance, me.getDraggedData(), me);
-            } else {
-                me.hidePlaceholder();
-            }
-        } else {
-            const fpms = FloatingPanelManagerService.getInstance();
-            fpms.handleUndockDrop(me.getDraggedData(), me._lastDragX, me._lastDragY);
-            me.hidePlaceholder();
-        }
-    }
-
-    /**
-     * Helper method (called via throttle) to update the visual position
-     * of a floating panel during a drag.
-     * @private
-     * @returns {void}
-     */
-    _moveFloatingPanel() {
-        const me = this;
-        if (
-            !me.isDragging() ||
-            me._dragState.type !== 'PanelGroup' ||
-            !me._dragState.item._state.isFloating
-        ) {
-            return;
-        }
-
-        const fpms = FloatingPanelManagerService.getInstance();
-        const containerRect = fpms.getContainerBounds();
-        if (containerRect) {
-            const newX = me._lastDragX - containerRect.left - me._dragState.offsetX;
-            const newY = me._lastDragY - containerRect.top - me._dragState.offsetY;
-            fpms.updatePanelPosition(me._dragState.item, newX, newY);
-        }
-    }
-
-    /**
-     * Clears the cache of all registered strategies.
-     * @private
-     * @returns {void}
      */
     _clearStrategyCaches() {
-        const me = this;
-        if (!me._strategyRegistry) return;
-        for (const strategy of me._strategyRegistry.values()) {
-            if (strategy && typeof strategy.clearCache === 'function') {
+        this._strategyRegistry.forEach(strategy => {
+            if (typeof strategy.clearCache === 'function') {
                 strategy.clearCache();
             }
-        }
+        });
     }
 
     /**
-     * Handles the 'dragstart' event from the appBus.
-     * @param {object} payload - { item, type, element, event, offsetX, offsetY }.
+     * Handles the start of a drag operation.
+     * @param {object} payload
      * @private
-     * @returns {void}
      */
     _onDragStart(payload) {
         const me = this;
-        if (!payload || !payload.item || !payload.element) return;
-
-        document.body.classList.add('dnd-active');
-
-        if (payload.type && typeof payload.type === 'string') {
-            const typeClass = `dnd-type-${payload.type.toLowerCase()}`;
-            document.body.classList.add(typeClass);
+        if (me._isDragging) {
+            return;
         }
 
-        me._clearStrategyCaches();
-
         const { item, type, element, event, offsetX, offsetY } = payload;
+        if (!event || !element) {
+            return;
+        }
 
+        me._isDragging = true;
         me._dragState.item = item;
-        me._dragState.type = type || null;
+        me._dragState.type = type;
         me._dragState.element = element;
         me._dragState.offsetX = offsetX || 0;
         me._dragState.offsetY = offsetY || 0;
-        me._isDragging = true;
+        me._dragState.initialX = event.clientX;
+        me._dragState.initialY = event.clientY;
+        me._activePointerId = event.pointerId;
 
+        me._lastCoordinates.x = event.clientX;
+        me._lastCoordinates.y = event.clientY;
+
+        document.body.classList.add('dnd-active');
+        if (type) {
+            document.body.classList.add(`dnd-type-${type.toLowerCase()}`);
+        }
         element.classList.add('dragging');
 
-        let relevantGroup = null;
-        if (type === 'PanelGroup' && item instanceof PanelGroup) {
-            relevantGroup = item;
+        // Important: Disable pointer events on the source element.
+        // This ensures that 'elementFromPoint' sees through the source
+        // and detects the drop zone underneath it.
+        element.style.pointerEvents = 'none';
+
+        // If dragging a floating panel, hide the original element.
+        // The Ghost will provide the visual feedback.
+        if (
+            me._dragState.item &&
+            me._dragState.item._state &&
+            me._dragState.item._state.isFloating
+        ) {
+            element.style.opacity = '0';
         }
 
-        if (relevantGroup && relevantGroup._state.header) {
-            const sourceDropZone = relevantGroup._state.header.element;
-            if (sourceDropZone && sourceDropZone.dataset.dropzone) {
-                me._draggedSourceElement = sourceDropZone;
-                me._draggedSourceDropzone = sourceDropZone.dataset.dropzone;
-                sourceDropZone.dataset.dropzone = 'false';
-            }
-        }
+        me._createDragGhost(
+            element,
+            event.clientX,
+            event.clientY,
+            me._dragState.offsetX,
+            me._dragState.offsetY
+        );
 
-        event.dataTransfer.dropEffect = 'move';
-        event.dataTransfer.effectAllowed = 'move';
-        event.dataTransfer.setData('text/plain', '');
+        me._clearStrategyCaches();
 
-        if (me._dragState.item._state.isFloating === true) {
-            const dragImage = me._transparentDragImage;
-            event.dataTransfer.setDragImage(dragImage, offsetX, offsetY);
-        } else {
-            const clone = element.cloneNode(true);
-            clone.style.position = 'absolute';
-            clone.style.left = '-9999px';
-            clone.style.top = '0';
-            clone.style.width = `${element.offsetWidth}px`;
-            document.body.appendChild(clone);
-            me._dragGhostClone = clone;
-
-            event.dataTransfer.setDragImage(clone, offsetX, offsetY);
-        }
+        window.addEventListener('pointermove', me._boundOnPointerMove, { passive: false });
+        window.addEventListener('pointerup', me._boundOnPointerUp);
+        window.addEventListener('pointercancel', me._boundOnPointerUp);
     }
 
     /**
-     * Handles the 'dragend' event from the appBus.
+     * Creates the visual "ghost" element.
+     * Forces top/left/margin to 0 to prevent layout issues.
      * @private
-     * @returns {void}
      */
-    _onDragEnd() {
+    _createDragGhost(sourceElement, clientX, clientY, offsetX, offsetY) {
         const me = this;
+        const clone = sourceElement.cloneNode(true);
 
-        if (me._dragGhostClone) {
-            me._dragGhostClone.remove();
-            me._dragGhostClone = null;
+        clone.classList.add('dnd-ghost');
+
+        clone.style.margin = '0';
+        clone.style.top = '0';
+        clone.style.left = '0';
+        clone.style.bottom = 'auto';
+        clone.style.right = 'auto';
+
+        // Ensure the ghost is visible even if the source is hidden
+        clone.style.opacity = '';
+        clone.style.pointerEvents = 'none';
+
+        clone.style.width = `${sourceElement.offsetWidth}px`;
+        clone.style.height = `${sourceElement.offsetHeight}px`;
+
+        const top = clientY - offsetY;
+        const left = clientX - offsetX;
+        clone.style.transform = `translate3d(${left}px, ${top}px, 0)`;
+
+        document.body.appendChild(clone);
+        me._dragGhost = clone;
+    }
+
+    /**
+     * Handles global pointermove event.
+     * @private
+     */
+    _onSyntheticPointerMove(event) {
+        const me = this;
+        if (event.pointerId !== me._activePointerId) {
+            return;
         }
 
-        me._throttledMoveFloatingPanel?.cancel();
-        document.body.classList.remove('dnd-active');
+        event.preventDefault();
 
+        me._lastCoordinates.x = event.clientX;
+        me._lastCoordinates.y = event.clientY;
+
+        me._throttledMoveHandler(event.clientX, event.clientY);
+    }
+
+    /**
+     * Throttled move handler.
+     * Updates ghost and delegates to strategies.
+     * @private
+     */
+    _processMove(clientX, clientY) {
+        const me = this;
+        if (!me._isDragging) {
+            return;
+        }
+
+        // 1. Move Ghost
+        if (me._dragGhost) {
+            const top = clientY - me._dragState.offsetY;
+            const left = clientX - me._dragState.offsetX;
+            me._dragGhost.style.transform = `translate3d(${left}px, ${top}px, 0)`;
+        }
+
+        // 2. Hit Test
+        const targetBelow = document.elementFromPoint(clientX, clientY);
+        const dropZoneElement = targetBelow ? targetBelow.closest('[data-dropzone]') : null;
+        const newDropZoneInstance = dropZoneElement ? dropZoneElement.dropZoneInstance : null;
+
+        // 3. Handle Zone Transitions (Leave/Enter)
+        if (newDropZoneInstance !== me._activeDropZone) {
+            if (me._activeDropZone) {
+                const oldStrategy = me._strategyRegistry.get(me._activeDropZone.dropZoneType);
+                if (oldStrategy && typeof oldStrategy.handleDragLeave === 'function') {
+                    const point = { x: clientX, y: clientY, target: targetBelow };
+                    oldStrategy.handleDragLeave(point, me._activeDropZone, me._dragState, me);
+                }
+            }
+            me._activeDropZone = newDropZoneInstance;
+        }
+
+        // 4. Handle Zone Over
+        if (me._activeDropZone) {
+            const strategy = me._strategyRegistry.get(me._activeDropZone.dropZoneType);
+            if (strategy) {
+                const point = { x: clientX, y: clientY, target: targetBelow };
+
+                // Implicit Enter logic if cache is empty
+                if (strategy._dropZoneCache && strategy._dropZoneCache.length === 0) {
+                    if (typeof strategy.handleDragEnter === 'function') {
+                        strategy.handleDragEnter(point, me._activeDropZone, me._dragState, me);
+                    }
+                }
+
+                strategy.handleDragOver(point, me._activeDropZone, me._dragState, me);
+                return;
+            }
+        }
+
+        // 5. No zone active
+        me.hidePlaceholder();
+    }
+
+    /**
+     * Handles global pointerup event.
+     * @private
+     */
+    _onSyntheticPointerUp(event) {
+        const me = this;
+        if (event.pointerId !== me._activePointerId) {
+            return;
+        }
+
+        me._removeGlobalListeners();
+
+        const clientX = event.clientX;
+        const clientY = event.clientY;
+        const targetBelow = document.elementFromPoint(clientX, clientY);
+
+        let dropHandled = false;
+
+        // Attempt drop on active zone
+        if (me._activeDropZone && targetBelow) {
+            const dropZoneElement = targetBelow.closest('[data-dropzone]');
+            const dropZoneInstance = dropZoneElement ? dropZoneElement.dropZoneInstance : null;
+
+            if (dropZoneInstance === me._activeDropZone) {
+                const strategy = me._strategyRegistry.get(dropZoneInstance.dropZoneType);
+                if (strategy) {
+                    const point = { x: clientX, y: clientY, target: targetBelow };
+                    dropHandled = strategy.handleDrop(point, dropZoneInstance, me._dragState, me);
+                }
+            }
+        }
+
+        // Fallback to Undock if not handled
+        if (!dropHandled) {
+            const floatingManager = FloatingPanelManagerService.getInstance();
+            floatingManager.handleUndockDrop(me._dragState, clientX, clientY);
+        }
+
+        me._cleanupDrag();
+        appBus.emit('dragend', { ...me._dragState });
+    }
+
+    /**
+     * Resets state.
+     * @private
+     */
+    _cleanupDrag() {
+        const me = this;
+
+        me._isDragging = false;
+        me._activePointerId = null;
+        me._activeDropZone = null;
+        me._throttledMoveHandler.cancel();
+
+        if (me._dragGhost) {
+            me._dragGhost.remove();
+            me._dragGhost = null;
+        }
+
+        me.hidePlaceholder();
+
+        document.body.classList.remove('dnd-active');
         const classesToRemove = [];
         document.body.classList.forEach(cls => {
             if (cls.startsWith('dnd-type-')) {
@@ -641,26 +573,27 @@ export class DragDropService {
         });
         classesToRemove.forEach(cls => document.body.classList.remove(cls));
 
-        me.hidePlaceholder();
-        me._clearStrategyCaches();
-
-        if (me._draggedSourceElement) {
-            me._draggedSourceElement.dataset.dropzone = me._draggedSourceDropzone;
-            me._draggedSourceElement = null;
-            me._draggedSourceDropzone = null;
-        }
-
         if (me._dragState.element) {
             me._dragState.element.classList.remove('dragging');
+            // Restore styles modified in _onDragStart
+            me._dragState.element.style.pointerEvents = '';
+            me._dragState.element.style.opacity = '';
         }
 
+        me._clearStrategyCaches();
+
         me._dragState.item = null;
-        me._dragState.type = null;
         me._dragState.element = null;
-        me._dragState.offsetX = 0;
-        me._dragState.offsetY = 0;
-        me._isDragging = false;
-        me._lastDragX = 0;
-        me._lastDragY = 0;
+    }
+
+    /**
+     * Removes listeners.
+     * @private
+     */
+    _removeGlobalListeners() {
+        const me = this;
+        window.removeEventListener('pointermove', me._boundOnPointerMove);
+        window.removeEventListener('pointerup', me._boundOnPointerUp);
+        window.removeEventListener('pointercancel', me._boundOnPointerUp);
     }
 }

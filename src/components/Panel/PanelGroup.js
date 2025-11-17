@@ -341,6 +341,14 @@ export class PanelGroup {
 
         if (isFloating) {
             me.element.classList.add('panel-group--floating');
+
+            // Reset constraints applied by LayoutService (e.g., when it was the only child)
+            me.element.classList.remove('panel-group--fills-space');
+            if (me._state.header && me._state.header.collapseBtn) {
+                // Re-enable the button based on configuration, not layout position
+                me._state.header.collapseBtn.disabled = !me._state.collapsible;
+            }
+
             me.element.style.left = `${x}px`;
             me.element.style.top = `${y}px`;
             if (me._state.width !== null) {

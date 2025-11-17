@@ -21,7 +21,7 @@ import { appBus } from '../../utils/EventBus.js';
  * Events:
  * - Emits (appBus): 'panel:toggle-collapse-request'
  * - Emits (appBus): 'panel:close-request'
- * - Emits (appBus): 'dragstart' (for the *entire group*)
+ * - Emits (appBus): 'dragstart' (for the *entire group* via Pointer)
  *
  * Dependencies:
  * - ../../utils/EventBus.js
@@ -66,9 +66,11 @@ export class PanelGroupHeader {
         const me = this;
         me.moveHandle = document.createElement('div');
         me.moveHandle.classList.add('panel-group__move-handle', 'panel__move-handle');
-        me.moveHandle.draggable = true;
-        me.moveHandle.addEventListener('dragstart', me.onGroupDragStart.bind(me));
-        me.moveHandle.addEventListener('dragend', me.onDragEnd.bind(me));
+
+        // Pointer events for Drag
+        me.moveHandle.style.touchAction = 'none';
+        me.moveHandle.addEventListener('pointerdown', me.onGroupPointerDown.bind(me));
+
         me.moveHandle.setAttribute('role', 'button');
 
         const iconElement = document.createElement('span');
@@ -174,12 +176,20 @@ export class PanelGroupHeader {
 
     /**
      * Handles drag start for the *entire group*.
-     * @param {DragEvent} e
+     * @param {PointerEvent} e
      * @returns {void}
      */
-    onGroupDragStart(e) {
+    onGroupPointerDown(e) {
         const me = this;
+        if (e.button !== 0) return;
+
         if (!me.panelGroup._state.movable) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        const target = e.target;
+        target.setPointerCapture(e.pointerId);
 
         const dragElement = me.panelGroup.element;
         const rect = dragElement.getBoundingClientRect();
@@ -194,17 +204,5 @@ export class PanelGroupHeader {
             offsetX: offsetX,
             offsetY: offsetY
         });
-
-        me.moveHandle.style.cursor = 'grabbing';
-    }
-
-    /**
-     * Handles drag end for the group.
-     * @param {DragEvent} e
-     * @returns {void}
-     */
-    onDragEnd(e) {
-        this.moveHandle.style.cursor = 'grab';
-        appBus.emit('dragend');
     }
 }

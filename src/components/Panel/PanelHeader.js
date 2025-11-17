@@ -6,7 +6,7 @@ import { ContextMenuService } from '../../services/ContextMenu/ContextMenuServic
  * Represents the header/tab component of a single Panel.
  * This class is a self-contained DOM component owned by a Panel.
  * It renders the UI for the "tab" and acts as the drag source
- * for DND operations involving the Panel.
+ * for DND operations involving the Panel using Pointer Events.
  *
  * Properties summary:
  * - _state {object} : Manages references to its parent Panel and PanelGroup.
@@ -19,8 +19,7 @@ import { ContextMenuService } from '../../services/ContextMenu/ContextMenuServic
  * this._state.header = new PanelHeader(this, panelTitle);
  *
  * Events:
- * - Emits (DOM): 'dragstart', 'dragend', 'contextmenu'
- * - Emits (appBus): 'dragstart', 'dragend'
+ * - Emits (appBus): 'dragstart'
  * - Emits (appBus): 'panel:group-child-close-request'
  *
  * Dependencies:
@@ -67,13 +66,7 @@ export class PanelHeader {
      * @type {Function | null}
      * @private
      */
-    _boundOnDragStart = null;
-
-    /**
-     * @type {Function | null}
-     * @private
-     */
-    _boundOnDragEnd = null;
+    _boundOnPointerDown = null;
 
     /**
      * @type {Function | null}
@@ -103,8 +96,7 @@ export class PanelHeader {
         me._state.title = title;
         me.element = document.createElement('div');
 
-        me._boundOnDragStart = me.onDragStart.bind(me);
-        me._boundOnDragEnd = me.onDragEnd.bind(me);
+        me._boundOnPointerDown = me.onPointerDown.bind(me);
         me._boundOnCloseClick = me.onCloseClick.bind(me);
         me._boundOnTabClick = me.onTabClick.bind(me);
         me._boundOnContextMenu = me.onContextMenu.bind(me);
@@ -122,6 +114,12 @@ export class PanelHeader {
         const me = this;
         me.element.classList.add('panel-group__tab');
 
+        // Touch-action none is important for pointer events handling
+        me.element.style.touchAction = 'none';
+
+        // Default draggable state (can be overridden by updateConfig/setMode)
+        me.element.draggable = true;
+
         me._titleEl = document.createElement('span');
         me._titleEl.classList.add('panel__title');
         me._titleEl.textContent = me._state.title || 'Sem Título';
@@ -135,13 +133,12 @@ export class PanelHeader {
     }
 
     /**
-     * Initializes DND (drag source) and click listeners.
+     * Initializes DND (pointer) and click listeners.
      * @returns {void}
      */
     initEventListeners() {
         const me = this;
-        me.element.addEventListener('dragstart', me._boundOnDragStart);
-        me.element.addEventListener('dragend', me._boundOnDragEnd);
+        me.element.addEventListener('pointerdown', me._boundOnPointerDown);
         me._closeBtn.addEventListener('click', me._boundOnCloseClick);
         me.element.addEventListener('click', me._boundOnTabClick);
         me.element.addEventListener('contextmenu', me._boundOnContextMenu);
@@ -153,26 +150,39 @@ export class PanelHeader {
      */
     destroy() {
         const me = this;
-        me.element.removeEventListener('dragstart', me._boundOnDragStart);
-        me.element.removeEventListener('dragend', me._boundOnDragEnd);
+        me.element.removeEventListener('pointerdown', me._boundOnPointerDown);
         me._closeBtn.removeEventListener('click', me._boundOnCloseClick);
         me.element.removeEventListener('click', me._boundOnTabClick);
         me.element.removeEventListener('contextmenu', me._boundOnContextMenu);
     }
 
     /**
-     * Handles the start of a drag operation (drag source).
-     * @param {DragEvent} e
+     * Handles the start of a drag operation (pointerdown).
+     * @param {PointerEvent} e
      * @returns {void}
      */
-    onDragStart(e) {
-        e.stopPropagation();
-
+    onPointerDown(e) {
         const me = this;
-        if (!me._state.panel._state.movable) {
-            e.preventDefault();
+
+        // 1. Only left click or touch
+        if (e.button !== 0) return;
+
+        // 2. Ignore if dragging is disabled (e.g. single tab mode or locked panel)
+        // We use the DOM 'draggable' property as the state flag for this.
+        if (!me.element.draggable) {
             return;
         }
+
+        // 3. Ignore if clicking the close button
+        if (e.target.closest('.panel-group__tab-close')) {
+            return;
+        }
+
+        e.preventDefault(); // Prevent scrolling/selection
+        e.stopPropagation();
+
+        const target = e.target;
+        target.setPointerCapture(e.pointerId);
 
         const rect = me.element.getBoundingClientRect();
         const offsetX = e.clientX - rect.left;
@@ -186,16 +196,6 @@ export class PanelHeader {
             offsetX: offsetX,
             offsetY: offsetY
         });
-    }
-
-    /**
-     * Handles the end of a drag operation.
-     * @param {DragEvent} e
-     * @returns {void}
-     */
-    onDragEnd(e) {
-        e.stopPropagation();
-        appBus.emit('dragend');
     }
 
     /**
@@ -296,7 +296,7 @@ export class PanelHeader {
         }
 
         if (config.movable === false) {
-            me.element.draggable = false;
+            me.element.draggable = false; // Used as logic flag
             me.element.style.cursor = 'default';
         } else {
             me.element.draggable = true;
@@ -306,7 +306,7 @@ export class PanelHeader {
 
     /**
      * Toggles the visual appearance between 'simple' (header) and 'tab' mode.
-     * Also manages the 'draggable' state.
+     * Also manages the draggable state logic.
      * @param {boolean} isSimpleMode
      * @returns {void}
      */
@@ -315,6 +315,8 @@ export class PanelHeader {
         if (isSimpleMode) {
             me.element.classList.remove('panel-group__tab');
             me._closeBtn.style.display = 'none';
+
+            // Single panel mode: Disable tab dragging
             me.element.draggable = false;
             me.element.style.cursor = 'default';
         } else {
@@ -322,6 +324,8 @@ export class PanelHeader {
             if (me._state.panel._state.closable) {
                 me._closeBtn.style.display = '';
             }
+
+            // Multi panel mode: Restore draggable based on config
             if (me._state.panel._state.movable) {
                 me.element.draggable = true;
                 me.element.style.cursor = 'grab';
