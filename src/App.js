@@ -15,6 +15,7 @@ import { ColumnDropStrategy } from './services/DND/ColumnDropStrategy.js';
 import { RowDropStrategy } from './services/DND/RowDropStrategy.js';
 import { ContainerDropStrategy } from './services/DND/ContainerDropStrategy.js';
 import { TabContainerDropStrategy } from './services/DND/TabContainerDropStrategy.js';
+import { ToolbarContainerDropStrategy } from './services/DND/ToolbarContainerDropStrategy.js';
 import { LayoutService } from './services/LayoutService.js';
 import { appBus } from './utils/EventBus.js';
 import { FloatingPanelManagerService } from './services/DND/FloatingPanelManagerService.js';
@@ -22,6 +23,9 @@ import { globalState } from './services/GlobalStateService.js';
 import { CounterPanel } from './components/Panel/CounterPanel.js';
 import { appShortcuts } from './services/Shortcuts/Shortcuts.js';
 import { Loader } from './services/Loader/Loader.js';
+import { ToolbarContainer } from './components/Toolbar/ToolbarContainer.js';
+import { ToolbarGroupFactory } from './components/Toolbar/ToolbarGroupFactory.js';
+import { ApplicationGroup } from './components/Toolbar/ApplicationGroup.js';
 
 /**
  * Description:
@@ -38,6 +42,10 @@ import { Loader } from './services/Loader/Loader.js';
  * - menu {Menu} : The instance of the main application menu.
  * - container {Container} : The instance of the root layout container component.
  * - statusBar {StatusBar} : The instance of the application status bar.
+ * - _toolbarTop {ToolbarContainer} : Instance of the top toolbar container.
+ * - _toolbarBottom {ToolbarContainer} : Instance of the bottom toolbar container.
+ * - _toolbarLeft {ToolbarContainer} : Instance of the left toolbar container.
+ * - _toolbarRight {ToolbarContainer} : Instance of the right toolbar container.
  * - stateService {ApplicationStateService} : The singleton instance of the ApplicationStateService.
  * - _workspaceLoader {Loader} : The loader instance for the main container.
  * - _mainWrapper {HTMLElement} : The DOM wrapper for Menu and Container.
@@ -65,6 +73,9 @@ import { Loader } from './services/Loader/Loader.js';
  * - components/Menu/Menu.js
  * - components/Container/Container.js
  * - components/StatusBar/StatusBar.js
+ * - components/Toolbar/ToolbarContainer.js
+ * - components/Toolbar/ToolbarGroupFactory.js
+ * - components/Toolbar/ApplicationGroup.js
  * - services/ApplicationStateService.js
  * - services/LayoutService.js
  * - services/DND/DragDropService.js (and all strategies)
@@ -147,6 +158,30 @@ export class App {
      */
     _mainWrapper = null;
 
+    /**
+     * @type {import('./components/Toolbar/ToolbarContainer.js').ToolbarContainer | null}
+     * @private
+     */
+    _toolbarTop = null;
+
+    /**
+     * @type {import('./components/Toolbar/ToolbarContainer.js').ToolbarContainer | null}
+     * @private
+     */
+    _toolbarBottom = null;
+
+    /**
+     * @type {import('./components/Toolbar/ToolbarContainer.js').ToolbarContainer | null}
+     * @private
+     */
+    _toolbarLeft = null;
+
+    /**
+     * @type {import('./components/Toolbar/ToolbarContainer.js').ToolbarContainer | null}
+     * @private
+     */
+    _toolbarRight = null;
+
     constructor() {
         if (App.instance) {
             return App.instance;
@@ -158,6 +193,10 @@ export class App {
         me.menu = new Menu();
         me.container = new Container();
         me.statusBar = new StatusBar();
+        me._toolbarTop = new ToolbarContainer('top', 'horizontal');
+        me._toolbarBottom = new ToolbarContainer('bottom', 'horizontal');
+        me._toolbarLeft = new ToolbarContainer('left', 'vertical');
+        me._toolbarRight = new ToolbarContainer('right', 'vertical');
 
         me.stateService = ApplicationStateService.getInstance();
 
@@ -166,9 +205,13 @@ export class App {
         dds.registerStrategy('TabContainer', new TabContainerDropStrategy());
         dds.registerStrategy('row', new RowDropStrategy());
         dds.registerStrategy('container', new ContainerDropStrategy());
+        dds.registerStrategy('toolbar-container', new ToolbarContainerDropStrategy());
 
         const factory = PanelFactory.getInstance();
         factory.registerPanelClasses([Panel, TextPanel, ToolbarPanel, CounterPanel]);
+
+        const toolbarFactory = ToolbarGroupFactory.getInstance();
+        toolbarFactory.registerToolbarGroupClasses([ApplicationGroup]);
 
         LayoutService.getInstance();
 
@@ -186,8 +229,27 @@ export class App {
 
         me._workspaceLoader = new Loader(me._mainWrapper, { type: 'inset' });
 
-        me._mainWrapper.append(me.menu.element, me.container.element);
-        document.body.append(me._mainWrapper, me.statusBar.element);
+        // Assign grid-areas
+        me.menu.element.style.gridArea = 'menu';
+        me._toolbarTop.element.style.gridArea = 'toolbar-top';
+        me._toolbarLeft.element.style.gridArea = 'toolbar-left';
+        me.container.element.style.gridArea = 'main';
+        me._toolbarRight.element.style.gridArea = 'toolbar-right';
+        me._toolbarBottom.element.style.gridArea = 'toolbar-bottom';
+        me.statusBar.element.style.gridArea = 'statusbar';
+
+        // Append all 7 components to the grid wrapper
+        me._mainWrapper.append(
+            me.menu.element,
+            me._toolbarTop.element,
+            me._toolbarLeft.element,
+            me.container.element,
+            me._toolbarRight.element,
+            me._toolbarBottom.element,
+            me.statusBar.element
+        );
+        // Append only the wrapper to the body
+        document.body.append(me._mainWrapper);
 
         me._boundAddNewPanel = me.addNewPanel.bind(me);
         me._boundResetLayoutSilent = me.resetLayout.bind(me, true);
@@ -281,6 +343,11 @@ export class App {
 
         me.menu?.destroy();
         me.container?.destroy();
+        me.statusBar?.destroy();
+        me._toolbarTop?.destroy();
+        me._toolbarBottom?.destroy();
+        me._toolbarLeft?.destroy();
+        me._toolbarRight?.destroy();
     }
 
     /**
@@ -293,7 +360,17 @@ export class App {
 
         if (workspaceData && workspaceData.layout) {
             me.currentWorkspace = workspaceData;
+
+            // Restore Panels, Rows, Columns, Floating
             me.container.fromJSON(workspaceData.layout);
+
+            // Restore Toolbars
+            if (workspaceData.layout.toolbars) {
+                me._toolbarTop.fromJSON(workspaceData.layout.toolbars.top || []);
+                me._toolbarBottom.fromJSON(workspaceData.layout.toolbars.bottom || []);
+                me._toolbarLeft.fromJSON(workspaceData.layout.toolbars.left || []);
+                me._toolbarRight.fromJSON(workspaceData.layout.toolbars.right || []);
+            }
         } else {
             console.error(
                 'App: Falha crítica ao carregar o layout. Nenhum dado de workspace foi encontrado.'
@@ -314,7 +391,14 @@ export class App {
         me._workspaceLoader.show(i18n.translate('actions.saving'));
 
         try {
-            const layoutData = me.container.toJSON();
+            const layoutData = me.container.toJSON(); // { rows, floatingPanels }
+            layoutData.toolbars = {
+                top: me._toolbarTop.toJSON(),
+                bottom: me._toolbarBottom.toJSON(),
+                left: me._toolbarLeft.toJSON(),
+                right: me._toolbarRight.toJSON()
+            };
+
             if (me.currentWorkspace) {
                 me.currentWorkspace.layout = layoutData;
             } else {

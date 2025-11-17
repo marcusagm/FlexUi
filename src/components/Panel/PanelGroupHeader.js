@@ -181,11 +181,18 @@ export class PanelGroupHeader {
         const me = this;
         if (!me.panelGroup._state.movable) return;
 
+        const dragElement = me.panelGroup.element;
+        const rect = dragElement.getBoundingClientRect();
+        const offsetX = e.clientX - rect.left;
+        const offsetY = e.clientY - rect.top;
+
         appBus.emit('dragstart', {
             item: me.panelGroup,
             type: 'PanelGroup',
-            element: me.panelGroup.element,
-            event: e
+            element: dragElement,
+            event: e,
+            offsetX: offsetX,
+            offsetY: offsetY
         });
 
         me.moveHandle.style.cursor = 'grabbing';

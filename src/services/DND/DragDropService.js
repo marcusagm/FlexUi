@@ -3,6 +3,7 @@ import { FloatingPanelManagerService } from './FloatingPanelManagerService.js';
 import { Panel } from '../../components/Panel/Panel.js';
 import { PanelGroup } from '../../components/Panel/PanelGroup.js';
 import { throttleRAF } from '../../utils/ThrottleRAF.js';
+import { ToolbarContainerDropStrategy } from './ToolbarContainerDropStrategy.js';
 
 /**
  * Description:
@@ -48,12 +49,15 @@ import { throttleRAF } from '../../utils/ThrottleRAF.js';
  * Business rules implemented:
  * - Uses a "clean clone" method for non-floating drag ghosts
  * to prevent visual artifacts from overlapping UI elements.
+ * - Calls preventDefault() universally on dragOver if dragging is active
+ * to allow floating panels to move over non-dropzone areas.
  *
  * Dependencies:
  * - utils/EventBus.js
  * - components/Panel/Panel.js
  * - components/Panel/PanelGroup.js
  * - utils/ThrottleRAF.js
+ * - ./ToolbarContainerDropStrategy.js
  * - (Strategies are injected by App.js)
  */
 export class DragDropService {
@@ -381,7 +385,7 @@ export class DragDropService {
         if (!me.isDragging()) return;
 
         const dropZoneElement = e.target.closest(
-            "[data-dropzone='column'], [data-dropzone='row'], [data-dropzone='container'], [data-dropzone='TabContainer']"
+            "[data-dropzone='column'], [data-dropzone='row'], [data-dropzone='container'], [data-dropzone='TabContainer'], [data-dropzone='toolbar-container']"
         );
         if (!dropZoneElement || !dropZoneElement.dropZoneInstance) {
             return;
@@ -407,6 +411,11 @@ export class DragDropService {
         const me = this;
         if (!me.isDragging()) return;
 
+        // CORREÇÃO: Chamada universal de preventDefault para permitir
+        // o arraste sobre áreas não-dropzone (ex: menu, painel flutuante).
+        e.preventDefault();
+        e.stopPropagation();
+
         if (e.clientX !== 0 || e.clientY !== 0) {
             me._lastDragX = e.clientX;
             me._lastDragY = e.clientY;
@@ -417,7 +426,7 @@ export class DragDropService {
         }
 
         const dropZoneElement = e.target.closest(
-            "[data-dropzone='column'], [data-dropzone='row'], [data-dropzone='container'], [data-dropzone='TabContainer']"
+            "[data-dropzone='column'], [data-dropzone='row'], [data-dropzone='container'], [data-dropzone='TabContainer'], [data-dropzone='toolbar-container']"
         );
         if (!dropZoneElement || !dropZoneElement.dropZoneInstance) {
             me.hidePlaceholder();
@@ -428,8 +437,6 @@ export class DragDropService {
         const strategy = me._strategyRegistry.get(dropZoneInstance.dropZoneType);
 
         if (strategy && typeof strategy.handleDragOver === 'function') {
-            e.preventDefault();
-            e.stopPropagation();
             strategy.handleDragOver(e, dropZoneInstance, me.getDraggedData(), me);
         } else {
             me.hidePlaceholder();
@@ -447,7 +454,7 @@ export class DragDropService {
         if (!me.isDragging()) return;
 
         const dropZoneElement = e.target.closest(
-            "[data-dropzone='column'], [data-dropzone='row'], [data-dropzone='container'], [data-dropzone='TabContainer']"
+            "[data-dropzone='column'], [data-dropzone='row'], [data-dropzone='container'], [data-dropzone='TabContainer'], [data-dropzone='toolbar-container']"
         );
         if (!dropZoneElement || !dropZoneElement.dropZoneInstance) {
             return;
@@ -477,13 +484,20 @@ export class DragDropService {
         e.stopPropagation();
 
         const dropZoneElement = e.target.closest(
-            "[data-dropzone='column'], [data-dropzone='row'], [data-dropzone='container'], [data-dropzone='TabContainer']"
+            "[data-dropzone='column'], [data-dropzone='row'], [data-dropzone='container'], [data-dropzone='TabContainer'], [data-dropzone='toolbar-container']"
         );
         const placeholderVisible = !!me._placeholder.parentElement;
-        const isTabContainerDrop =
-            dropZoneElement && dropZoneElement.dropZoneInstance?.dropZoneType === 'TabContainer';
 
-        if ((placeholderVisible || isTabContainerDrop) && dropZoneElement) {
+        const dropZoneInstance = dropZoneElement ? dropZoneElement.dropZoneInstance : null;
+        const isTabContainerDrop =
+            dropZoneInstance && dropZoneInstance.dropZoneType === 'TabContainer';
+        const isToolbarContainerDrop =
+            dropZoneInstance && dropZoneInstance.dropZoneType === 'toolbar-container';
+
+        if (
+            (placeholderVisible || isTabContainerDrop || isToolbarContainerDrop) &&
+            dropZoneElement
+        ) {
             const dropZoneInstance = dropZoneElement.dropZoneInstance;
             const strategy = me._strategyRegistry.get(dropZoneInstance.dropZoneType);
 

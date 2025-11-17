@@ -1,6 +1,25 @@
 {
     "name": "Layout Padrão",
     "layout": {
+        "toolbars": {
+            "top": [
+                {
+                    "type": "ApplicationGroup",
+                    "title": "Ações 1"
+                },
+                {
+                    "type": "ApplicationGroup",
+                    "title": "Ações 2"
+                },
+                {
+                    "type": "ApplicationGroup",
+                    "title": "Ações 3"
+                }
+            ],
+            "bottom": [],
+            "left": [],
+            "right": []
+        },
         "rows": [
             {
                 "height": null,
@@ -30,7 +49,7 @@
                             },
                             {
                                 "type": "PanelGroup",
-                                "height": 105,
+                                "height": 100,
                                 "collapsed": false,
                                 "activePanelId": null,
                                 "config": {
@@ -131,7 +150,7 @@
         "floatingPanels": [
             {
                 "type": "PanelGroup",
-                "height": 160,
+                "height": 156,
                 "width": 250,
                 "collapsed": false,
                 "activePanelId": null,

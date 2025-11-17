@@ -174,11 +174,17 @@ export class PanelHeader {
             return;
         }
 
+        const rect = me.element.getBoundingClientRect();
+        const offsetX = e.clientX - rect.left;
+        const offsetY = e.clientY - rect.top;
+
         appBus.emit('dragstart', {
             item: me._state.panel,
             type: 'Panel',
             element: me.element,
-            event: e
+            event: e,
+            offsetX: offsetX,
+            offsetY: offsetY
         });
     }
 

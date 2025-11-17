@@ -1,0 +1,226 @@
+@import '../theme.css';
+
+.toolbar-container {
+    display: flex;
+    align-items: center;
+    background-color: var(--toolbar-background);
+    /* padding: var(--toolbar-padding); (REMOVIDO) */
+    gap: var(--spacing-2);
+    position: relative;
+    overflow: hidden;
+    /* Adicionada borda transparente para manter espaço */
+    border: 1px solid transparent;
+}
+
+/* Apenas toolbars NÃO vazias recebem borda e padding */
+.toolbar-container:not(.is-empty) {
+    padding: var(--toolbar-padding);
+}
+.toolbar-container--top:not(.is-empty) {
+    border-bottom: 1px solid var(--toolbar-border-color);
+}
+.toolbar-container--bottom:not(.is-empty) {
+    border-top: 1px solid var(--toolbar-border-color);
+}
+.toolbar-container--left:not(.is-empty) {
+    border-right: 1px solid var(--toolbar-border-color);
+}
+.toolbar-container--right:not(.is-empty) {
+    border-left: 1px solid var(--toolbar-border-color);
+}
+
+/* Toolbars vazias não têm altura ou largura */
+.toolbar-container.is-empty {
+    height: auto;
+    width: auto;
+}
+
+/* Toolbars vazias tornam-se Zonas de Drop visíveis DURANTE o arraste */
+body.dnd-active .toolbar-container--top.is-empty,
+body.dnd-active .toolbar-container--bottom.is-empty {
+    min-height: var(--toolbar-height-horizontal);
+    background: var(--color-placeholder-bg);
+    border-color: var(--color-placeholder-border-active);
+    padding: var(--toolbar-padding);
+}
+body.dnd-active .toolbar-container--left.is-empty,
+body.dnd-active .toolbar-container--right.is-empty {
+    min-width: var(--toolbar-width-vertical);
+    background: var(--color-placeholder-bg);
+    border-color: var(--color-placeholder-border-active);
+    padding: var(--toolbar-padding);
+}
+
+.toolbar-container--top {
+    /* height: var(--toolbar-height-horizontal); (REMOVIDO) */
+    flex-direction: row;
+}
+.toolbar-container--bottom {
+    /* height: var(--toolbar-height-horizontal); (REMOVIDO) */
+    flex-direction: row;
+}
+.toolbar-container--left {
+    /* width: var(--toolbar-width-vertical); (REMOVIDO) */
+    flex-direction: column;
+}
+.toolbar-container--right {
+    /* width: var(--toolbar-width-vertical); (REMOVIDO) */
+    flex-direction: column;
+}
+
+.toolbar__scroll-container {
+    flex: 1;
+    display: flex;
+    gap: var(--spacing-2);
+    overflow: hidden;
+    height: 100%;
+    width: 100%;
+}
+.toolbar-container--top .toolbar__scroll-container,
+.toolbar-container--bottom .toolbar__scroll-container {
+    flex-direction: row;
+}
+.toolbar-container--left .toolbar__scroll-container,
+.toolbar-container--right .toolbar__scroll-container {
+    flex-direction: column;
+}
+
+.toolbar__scroll-btn {
+    display: none; /* JS controla a visibilidade */
+    flex-shrink: 0;
+    background: var(--color-bg-hover);
+    border: 1px solid var(--color-border-default);
+    color: var(--color-text-primary);
+    cursor: pointer;
+    padding: 0;
+    width: 16px;
+    height: 100%;
+}
+.toolbar-container--left .toolbar__scroll-btn,
+.toolbar-container--right .toolbar__scroll-btn {
+    width: 100%;
+    height: 16px;
+}
+.toolbar__scroll-btn:hover {
+    background-color: var(--color-accent-hover);
+}
+.toolbar__scroll-btn--disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    background-color: var(--color-bg-hover);
+}
+
+.toolbar-group {
+    display: flex;
+    flex-shrink: 0;
+    border: 1px solid transparent; /* Placeholder */
+    border-radius: var(--border-radius-sm);
+}
+.toolbar-container--top .toolbar-group,
+.toolbar-container--bottom .toolbar-group {
+    flex-direction: row;
+    align-items: center;
+}
+.toolbar-container--left .toolbar-group,
+.toolbar-container--right .toolbar-group {
+    flex-direction: column;
+    align-items: center;
+}
+
+.toolbar-group__handle {
+    width: 10px;
+    cursor: grab;
+    opacity: 0.6;
+    color: var(--color-text-secondary);
+    flex-shrink: 0;
+}
+.toolbar-group__handle:hover {
+    opacity: 1;
+    color: var(--color-text-primary);
+}
+.toolbar-group__handle .icon {
+    width: 10px;
+    height: 10px;
+}
+/* Vertical alignment for horizontal toolbars */
+.toolbar-container--top .toolbar-group__handle,
+.toolbar-container--bottom .toolbar-group__handle {
+    height: 100%;
+    align-content: center;
+}
+/* Horizontal alignment for vertical toolbars */
+.toolbar-container--left .toolbar-group__handle,
+.toolbar-container--right .toolbar-group__handle {
+    width: 100%;
+    height: 10px;
+    text-align: center;
+}
+
+.toolbar-group__title {
+    font-size: 0.9em;
+    font-weight: 600;
+    padding: 0 var(--spacing-2);
+    white-space: nowrap;
+}
+.toolbar-container--left .toolbar-group__title,
+.toolbar-container--right .toolbar-group__title {
+    /* O título não é exibido em toolbars verticais */
+    display: none;
+}
+
+.toolbar-group__content {
+    display: flex;
+    gap: var(--spacing-1);
+    padding: 0 var(--spacing-1);
+}
+.toolbar-container--left .toolbar-group__content,
+.toolbar-container--right .toolbar-group__content {
+    flex-direction: column;
+}
+
+/* --- Estilos para Botões (ApplicationGroup) --- */
+.toolbar-button {
+    width: var(--panel-button-size);
+    height: var(--panel-button-size);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--color-text-secondary);
+    user-select: none;
+    border-radius: var(--border-radius-base);
+    background: none;
+    border: none;
+    padding: var(--panel-button-padding);
+}
+.toolbar-button .icon {
+    width: 14px;
+    height: 14px;
+}
+.toolbar-button:hover:not([disabled]) {
+    background: var(--color-bg-hover);
+    color: var(--color-text-primary);
+}
+.toolbar-button:active:not([disabled]) {
+    background: var(--color-bg-active);
+    color: var(--color-text-bright);
+}
+.toolbar-button[disabled] {
+    opacity: var(--panel-button-disabled-opacity);
+    cursor: not-allowed;
+    color: var(--color-text-disabled);
+}
+
+.toolbar-divider {
+    width: 1px;
+    height: 16px;
+    background-color: var(--color-border-default);
+    margin: 0 var(--spacing-1);
+}
+.toolbar-container--left .toolbar-divider,
+.toolbar-container--right .toolbar-divider {
+    height: 1px;
+    width: 16px;
+    margin: var(--spacing-1) 0;
+}

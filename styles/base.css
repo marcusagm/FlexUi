@@ -17,6 +17,47 @@ body {
     text-rendering: optimizeLegibility;
 }
 
+.app-wrapper {
+    flex: 1; /* O wrapper preenche o espaço do body */
+    display: grid;
+    grid-template-rows: auto auto 1fr auto auto; /* Menu, T-Toolbar, Main, B-Toolbar, StatusBar */
+    grid-template-columns: auto 1fr auto; /* L-Toolbar, Main, R-Toolbar */
+    grid-template-areas:
+        'menu menu menu'
+        'toolbar-top toolbar-top toolbar-top'
+        'toolbar-left main toolbar-right'
+        'toolbar-bottom toolbar-bottom toolbar-bottom'
+        'statusbar statusbar statusbar';
+    overflow: hidden; /* O .container (main) fará o scroll interno */
+}
+
+/* Atribui os componentes de App.js às áreas de grid */
+.menu {
+    grid-area: menu;
+}
+.toolbar-container--top {
+    grid-area: toolbar-top;
+}
+.toolbar-container--left {
+    grid-area: toolbar-left;
+}
+.container {
+    grid-area: main;
+    /* height e width são controlados pelo grid agora */
+    height: 100%;
+    width: 100%;
+    overflow: auto;
+}
+.toolbar-container--right {
+    grid-area: toolbar-right;
+}
+.toolbar-container--bottom {
+    grid-area: toolbar-bottom;
+}
+.status-bar {
+    grid-area: statusbar;
+}
+
 ::-webkit-scrollbar {
     width: 8px;
     height: 8px;

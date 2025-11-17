@@ -1,16 +1,16 @@
 @import '../theme.css';
 
 .container {
-    flex: 1;
+    /* flex: 1; (REMOVIDO - Agora é um item de grid) */
     display: flex;
     flex-direction: column;
     gap: var(--container-gap);
     padding: var(--container-padding);
     background: var(--color-bg-app);
     overflow: auto;
-    width: var(--container-width);
-    height: var(--container-height-calc);
-    position: relative;
+    /* width: var(--container-width); (REMOVIDO - Grid controla) */
+    /* height: var(--container-height-calc); (REMOVIDO - Grid controla) */
+    position: relative; /* Mantido para DND e loader */
 }
 .dnd-active .container {
     gap: var(--dnd-active-container-gap);

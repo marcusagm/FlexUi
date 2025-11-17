@@ -144,6 +144,18 @@
     --column-padding: 0;
     --dnd-active-column-padding: var(--dnd-active-container-gap) 0;
 
+    /* Layout App */
+    --menu-height: 26px;
+    --statusbar-height: 24px;
+    --toolbar-height-horizontal: 32px; /* Altura da T/B Toolbar */
+    --toolbar-width-vertical: 36px; /* Largura da L/R Toolbar */
+    --toolbar-padding: 4px;
+    --toolbar-background: var(--surface-level-1);
+    --toolbar-border-color: var(--color-border-default);
+
+    /* Animação */
+    --transition-speed: 200ms ease-in-out;
+
     /* Component: Menu */
     --menu-item-font-size: 1.1em;
     --menu-item-line-height: 1em;
