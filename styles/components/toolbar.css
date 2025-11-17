@@ -8,14 +8,20 @@
     gap: var(--spacing-2);
     position: relative;
     overflow: hidden;
-    border: 1px solid transparent;
+    /* REMOVIDO: border: 1px solid transparent; (Causa do bug dos 2px fantasmas) */
 }
 
+/* Toolbars vazias são removidas do fluxo de layout (Zero Footprint) */
+.toolbar-container.is-empty {
+    display: none;
+}
+
+/* Aplica padding e bordas APENAS se houver conteúdo */
 .toolbar-container:not(.is-empty) {
     padding: var(--toolbar-padding);
 }
 
-/* Bordas específicas por posição */
+/* Bordas Semânticas: Aplicadas apenas na direção necessária */
 .toolbar-container--top:not(.is-empty) {
     border-bottom: 1px solid var(--toolbar-border-color);
 }
@@ -29,27 +35,29 @@
     border-left: 1px solid var(--toolbar-border-color);
 }
 
-/* Toolbars vazias colapsam */
-.toolbar-container.is-empty {
-    height: auto;
-    width: auto;
-}
-
-/* --- Correção D&D (Etapa 1) --- */
-/* Expande toolbar vazia APENAS se estiver arrastando um ToolbarGroup */
+/* --- Comportamento durante Drag & Drop --- */
+/* Quando o D&D está ativo e o item é compatível (ToolbarGroup),
+   forçamos a toolbar vazia a aparecer (display: flex) e definimos
+   estilos explícitos de placeholder.
+*/
 body.dnd-active.dnd-type-toolbargroup .toolbar-container--top.is-empty,
 body.dnd-active.dnd-type-toolbargroup .toolbar-container--bottom.is-empty {
+    display: flex; /* Restaura visibilidade */
     min-height: var(--toolbar-height-horizontal);
     background: var(--color-placeholder-bg);
-    border-color: var(--color-placeholder-border-active);
-    /* padding: var(--toolbar-padding); */
+    border: 1px solid var(--color-placeholder-border-active); /* Borda explícita para dropzone */
+    outline: 5px solid var(--color-placeholder-border-active);
+    padding: 0;
 }
+
 body.dnd-active.dnd-type-toolbargroup .toolbar-container--left.is-empty,
 body.dnd-active.dnd-type-toolbargroup .toolbar-container--right.is-empty {
+    display: flex; /* Restaura visibilidade */
     min-width: var(--toolbar-width-vertical);
     background: var(--color-placeholder-bg);
-    border-color: var(--color-placeholder-border-active);
-    /* padding: var(--toolbar-padding); */
+    border: 1px solid var(--color-placeholder-border-active); /* Borda explícita para dropzone */
+    padding: 0;
+    outline: 5px solid var(--color-placeholder-border-active);
 }
 
 /* Orientação dos Containers */
@@ -84,7 +92,7 @@ body.dnd-active.dnd-type-toolbargroup .toolbar-container--right.is-empty {
     flex-direction: column;
 }
 
-/* --- Botões de Scroll (Refatorado Etapa 2) --- */
+/* --- Botões de Scroll --- */
 .toolbar__scroll-btn {
     display: none;
     flex-shrink: 0;
@@ -114,18 +122,22 @@ body.dnd-active.dnd-type-toolbargroup .toolbar-container--right.is-empty {
 .toolbar__scroll-btn:hover {
     background-color: var(--color-accent-hover);
 }
-.toolbar__scroll-btn--disabled {
-    opacity: 0.3;
-    cursor: not-allowed;
-    background-color: var(--color-bg-hover);
+.toolbar__scroll-btn:focus-visible {
+    outline: 2px solid var(--color-accent-primary);
+    outline-offset: -2px;
+    z-index: 10;
 }
 
 /* --- Grupos de Toolbar --- */
 .toolbar-group {
     display: flex;
     flex-shrink: 0;
+    /* Borda placeholder mantida no item filho para alinhamento interno, se necessário,
+       mas não afeta o layout do container pai vazio */
     border: 1px solid transparent;
     border-radius: var(--border-radius-sm);
+    background-color: var(--toolbar-background);
+    padding: 4px;
     transition:
         background-color 0.2s,
         border-color 0.2s;
@@ -156,6 +168,13 @@ body.dnd-active.dnd-type-toolbargroup .toolbar-container--right.is-empty {
     opacity: 1;
     color: var(--color-text-primary);
 }
+.toolbar-group__handle:focus-visible {
+    outline: 2px solid var(--color-accent-primary);
+    outline-offset: -2px;
+    border-radius: 2px;
+    opacity: 1;
+    color: var(--color-text-primary);
+}
 .toolbar-group__handle .icon {
     width: 10px;
     height: 10px;
@@ -168,6 +187,7 @@ body.dnd-active.dnd-type-toolbargroup .toolbar-container--right.is-empty {
 .toolbar-container--right .toolbar-group__handle {
     width: 100%;
     height: 10px;
+    margin-bottom: 5px;
 }
 
 /* Título do Grupo */
@@ -193,7 +213,7 @@ body.dnd-active.dnd-type-toolbargroup .toolbar-container--right.is-empty {
     flex-direction: column;
 }
 
-/* Botões Internos (ApplicationGroup) */
+/* Botões Internos */
 .toolbar-button {
     width: var(--panel-button-size);
     height: var(--panel-button-size);
@@ -241,24 +261,17 @@ body.dnd-active.dnd-type-toolbargroup .toolbar-container--right.is-empty {
     margin: var(--spacing-1) 0;
 }
 
-/* --- Animações de Drop (Etapa 3 - UX Improvement) --- */
-
-/* Placeholder Vertical (para Toolbars Horizontais) */
-/* Expande a largura de 0px para 5px */
+/* --- Animações de Drop --- */
 .toolbar-container .container__placeholder--vertical {
     animation: toolbarPlaceholderExpandH 0.2s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
     transform-origin: left center;
-    /* Sobrescreve padrão para permitir animação */
     width: 0;
     min-width: 0;
 }
 
-/* Placeholder Horizontal (para Toolbars Verticais) */
-/* Expande a altura de 0px para 5px */
 .toolbar-container .container__placeholder--horizontal {
     animation: toolbarPlaceholderExpandV 0.2s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
     transform-origin: top center;
-    /* Sobrescreve padrão para permitir animação */
     height: 0;
     min-height: 0;
 }
@@ -270,7 +283,7 @@ body.dnd-active.dnd-type-toolbargroup .toolbar-container--right.is-empty {
         margin: 0;
     }
     to {
-        width: 5px; /* Valor de referência: --container-placeholder-vertical-width */
+        width: 5px;
         opacity: 1;
         margin: 0;
     }
@@ -283,7 +296,7 @@ body.dnd-active.dnd-type-toolbargroup .toolbar-container--right.is-empty {
         margin: 0;
     }
     to {
-        height: 5px; /* Valor de referência: --container-placeholder-height */
+        height: 5px;
         opacity: 1;
         margin: 0;
     }
