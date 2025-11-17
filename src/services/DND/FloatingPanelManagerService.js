@@ -245,7 +245,9 @@ export class FloatingPanelManagerService {
 
     /**
      * Handles the drop event for an item being "undocked" (dropped outside a dropzone).
-     * @param {object} draggedData - The data from DragDropService.
+     * Applies constraints to ensure the panel stays within container bounds.
+     *
+     * @param {object} draggedData - The data from DragDropService { item, type, offsetX, offsetY }.
      * @param {number} positionX - The final clientX of the drop.
      * @param {number} positionY - The final clientY of the drop.
      * @returns {void}
@@ -257,8 +259,10 @@ export class FloatingPanelManagerService {
         }
 
         const containerRect = me.container.getBoundingClientRect();
-        const x = positionX - containerRect.left;
-        const y = positionY - containerRect.top;
+
+        // Calculate initial position based on drop point minus offset (grab point)
+        const initialX = positionX - containerRect.left - (draggedData.offsetX || 0);
+        const initialY = positionY - containerRect.top - (draggedData.offsetY || 0);
 
         let panelGroup = null;
 
@@ -281,7 +285,15 @@ export class FloatingPanelManagerService {
         }
 
         panelGroup.getColumn()?.removePanelGroup(panelGroup);
-        me.addFloatingPanel(panelGroup, x, y);
+
+        // 1. Add panel to DOM first (so it has dimensions)
+        me.addFloatingPanel(panelGroup, initialX, initialY);
+
+        // 2. Apply clamping logic (using actual dimensions)
+        const constrained = me.updatePanelPosition(panelGroup, initialX, initialY);
+
+        // 3. Sync state with constrained position
+        panelGroup.setFloatingState(true, constrained.x, constrained.y);
     }
 
     /**
@@ -323,7 +335,10 @@ export class FloatingPanelManagerService {
         const x = nativeEvent.clientX - containerRect.left - 10;
         const y = nativeEvent.clientY - containerRect.top - 10;
 
+        // Add panel and then constrain it immediately
         me.addFloatingPanel(panelGroupToFloat, x, y);
+        const constrained = me.updatePanelPosition(panelGroupToFloat, x, y);
+        panelGroupToFloat.setFloatingState(true, constrained.x, constrained.y);
     }
 
     /**

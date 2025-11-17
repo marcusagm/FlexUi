@@ -51,6 +51,7 @@ import { ToolbarContainerDropStrategy } from './ToolbarContainerDropStrategy.js'
  * to prevent visual artifacts from overlapping UI elements.
  * - Calls preventDefault() universally on dragOver if dragging is active
  * to allow floating panels to move over non-dropzone areas.
+ * - Constrains Ghost movement to the main container bounds to prevent layout overflow.
  *
  * Dependencies:
  * - utils/EventBus.js
@@ -366,13 +367,9 @@ export class DragDropService {
         }
         element.classList.add('dragging');
 
-        // Important: Disable pointer events on the source element.
-        // This ensures that 'elementFromPoint' sees through the source
-        // and detects the drop zone underneath it.
         element.style.pointerEvents = 'none';
 
-        // If dragging a floating panel, hide the original element.
-        // The Ghost will provide the visual feedback.
+        // Hide original if floating to simulate direct manipulation via Ghost
         if (
             me._dragState.item &&
             me._dragState.item._state &&
@@ -398,7 +395,6 @@ export class DragDropService {
 
     /**
      * Creates the visual "ghost" element.
-     * Forces top/left/margin to 0 to prevent layout issues.
      * @private
      */
     _createDragGhost(sourceElement, clientX, clientY, offsetX, offsetY) {
@@ -413,7 +409,6 @@ export class DragDropService {
         clone.style.bottom = 'auto';
         clone.style.right = 'auto';
 
-        // Ensure the ghost is visible even if the source is hidden
         clone.style.opacity = '';
         clone.style.pointerEvents = 'none';
 
@@ -448,7 +443,9 @@ export class DragDropService {
 
     /**
      * Throttled move handler.
-     * Updates ghost and delegates to strategies.
+     * Updates ghost position (constrained to container) and performs hit-testing.
+     * @param {number} clientX - Pointer X.
+     * @param {number} clientY - Pointer Y.
      * @private
      */
     _processMove(clientX, clientY) {
@@ -457,10 +454,29 @@ export class DragDropService {
             return;
         }
 
-        // 1. Move Ghost
+        // 1. Move Ghost with Constraints
         if (me._dragGhost) {
-            const top = clientY - me._dragState.offsetY;
-            const left = clientX - me._dragState.offsetX;
+            let top = clientY - me._dragState.offsetY;
+            let left = clientX - me._dragState.offsetX;
+
+            // Get container bounds to constrain the ghost
+            const fpms = FloatingPanelManagerService.getInstance();
+            const bounds = fpms.getContainerBounds();
+
+            if (bounds) {
+                // We constrain relative to the viewport, since Ghost is position: fixed
+                const ghostWidth = me._dragGhost.offsetWidth;
+                const ghostHeight = me._dragGhost.offsetHeight;
+
+                const minX = bounds.left;
+                const minY = bounds.top;
+                const maxX = bounds.right - ghostWidth;
+                const maxY = bounds.bottom - ghostHeight;
+
+                left = Math.max(minX, Math.min(left, maxX));
+                top = Math.max(minY, Math.min(top, maxY));
+            }
+
             me._dragGhost.style.transform = `translate3d(${left}px, ${top}px, 0)`;
         }
 
@@ -487,7 +503,6 @@ export class DragDropService {
             if (strategy) {
                 const point = { x: clientX, y: clientY, target: targetBelow };
 
-                // Implicit Enter logic if cache is empty
                 if (strategy._dropZoneCache && strategy._dropZoneCache.length === 0) {
                     if (typeof strategy.handleDragEnter === 'function') {
                         strategy.handleDragEnter(point, me._activeDropZone, me._dragState, me);
@@ -538,6 +553,7 @@ export class DragDropService {
         // Fallback to Undock if not handled
         if (!dropHandled) {
             const floatingManager = FloatingPanelManagerService.getInstance();
+            // We pass the original mouse coordinates; FloatingManager should constrain them
             floatingManager.handleUndockDrop(me._dragState, clientX, clientY);
         }
 
@@ -575,7 +591,6 @@ export class DragDropService {
 
         if (me._dragState.element) {
             me._dragState.element.classList.remove('dragging');
-            // Restore styles modified in _onDragStart
             me._dragState.element.style.pointerEvents = '';
             me._dragState.element.style.opacity = '';
         }
