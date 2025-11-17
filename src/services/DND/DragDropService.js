@@ -51,7 +51,8 @@ import { ToolbarContainerDropStrategy } from './ToolbarContainerDropStrategy.js'
  * to prevent visual artifacts from overlapping UI elements.
  * - Calls preventDefault() universally on dragOver if dragging is active
  * to allow floating panels to move over non-dropzone areas.
- * - Constrains Ghost movement to the main container bounds to prevent layout overflow.
+ * - Constrains Ghost movement to the main container bounds ONLY for Panels,
+ * allowing Toolbars to move freely.
  *
  * Dependencies:
  * - utils/EventBus.js
@@ -369,7 +370,6 @@ export class DragDropService {
 
         element.style.pointerEvents = 'none';
 
-        // Hide original if floating to simulate direct manipulation via Ghost
         if (
             me._dragState.item &&
             me._dragState.item._state &&
@@ -395,6 +395,7 @@ export class DragDropService {
 
     /**
      * Creates the visual "ghost" element.
+     * Forces top/left/margin to 0 to prevent layout issues.
      * @private
      */
     _createDragGhost(sourceElement, clientX, clientY, offsetX, offsetY) {
@@ -443,7 +444,7 @@ export class DragDropService {
 
     /**
      * Throttled move handler.
-     * Updates ghost position (constrained to container) and performs hit-testing.
+     * Updates ghost position (constrained to container ONLY for Panels) and performs hit-testing.
      * @param {number} clientX - Pointer X.
      * @param {number} clientY - Pointer Y.
      * @private
@@ -454,27 +455,30 @@ export class DragDropService {
             return;
         }
 
-        // 1. Move Ghost with Constraints
+        // 1. Move Ghost
         if (me._dragGhost) {
             let top = clientY - me._dragState.offsetY;
             let left = clientX - me._dragState.offsetX;
 
-            // Get container bounds to constrain the ghost
-            const fpms = FloatingPanelManagerService.getInstance();
-            const bounds = fpms.getContainerBounds();
+            // FIX: Apply constraints ONLY for Panels/PanelGroups, not ToolbarGroups
+            const isPanel = me._dragState.type === 'Panel' || me._dragState.type === 'PanelGroup';
 
-            if (bounds) {
-                // We constrain relative to the viewport, since Ghost is position: fixed
-                const ghostWidth = me._dragGhost.offsetWidth;
-                const ghostHeight = me._dragGhost.offsetHeight;
+            if (isPanel) {
+                const fpms = FloatingPanelManagerService.getInstance();
+                const bounds = fpms.getContainerBounds();
 
-                const minX = bounds.left;
-                const minY = bounds.top;
-                const maxX = bounds.right - ghostWidth;
-                const maxY = bounds.bottom - ghostHeight;
+                if (bounds) {
+                    const ghostWidth = me._dragGhost.offsetWidth;
+                    const ghostHeight = me._dragGhost.offsetHeight;
 
-                left = Math.max(minX, Math.min(left, maxX));
-                top = Math.max(minY, Math.min(top, maxY));
+                    const minX = bounds.left;
+                    const minY = bounds.top;
+                    const maxX = bounds.right - ghostWidth;
+                    const maxY = bounds.bottom - ghostHeight;
+
+                    left = Math.max(minX, Math.min(left, maxX));
+                    top = Math.max(minY, Math.min(top, maxY));
+                }
             }
 
             me._dragGhost.style.transform = `translate3d(${left}px, ${top}px, 0)`;
@@ -553,7 +557,6 @@ export class DragDropService {
         // Fallback to Undock if not handled
         if (!dropHandled) {
             const floatingManager = FloatingPanelManagerService.getInstance();
-            // We pass the original mouse coordinates; FloatingManager should constrain them
             floatingManager.handleUndockDrop(me._dragState, clientX, clientY);
         }
 
