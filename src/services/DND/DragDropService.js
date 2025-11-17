@@ -564,6 +564,12 @@ export class DragDropService {
         if (!payload || !payload.item || !payload.element) return;
 
         document.body.classList.add('dnd-active');
+
+        if (payload.type && typeof payload.type === 'string') {
+            const typeClass = `dnd-type-${payload.type.toLowerCase()}`;
+            document.body.classList.add(typeClass);
+        }
+
         me._clearStrategyCaches();
 
         const { item, type, element, event, offsetX, offsetY } = payload;
@@ -626,6 +632,15 @@ export class DragDropService {
 
         me._throttledMoveFloatingPanel?.cancel();
         document.body.classList.remove('dnd-active');
+
+        const classesToRemove = [];
+        document.body.classList.forEach(cls => {
+            if (cls.startsWith('dnd-type-')) {
+                classesToRemove.push(cls);
+            }
+        });
+        classesToRemove.forEach(cls => document.body.classList.remove(cls));
+
         me.hidePlaceholder();
         me._clearStrategyCaches();
 

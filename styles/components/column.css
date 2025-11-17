@@ -9,7 +9,8 @@
     position: relative;
     overflow: auto;
 }
-.dnd-active .column {
+.dnd-active.dnd-type-panelgroup .column,
+.dnd-active.dnd-type-panel .column {
     gap: var(--dnd-active-container-gap);
     padding: var(--dnd-active-column-padding);
 }

@@ -1,21 +1,21 @@
 @import '../theme.css';
 
+/* --- Estrutura Base do Container --- */
 .toolbar-container {
     display: flex;
     align-items: center;
     background-color: var(--toolbar-background);
-    /* padding: var(--toolbar-padding); (REMOVIDO) */
     gap: var(--spacing-2);
     position: relative;
     overflow: hidden;
-    /* Adicionada borda transparente para manter espaço */
     border: 1px solid transparent;
 }
 
-/* Apenas toolbars NÃO vazias recebem borda e padding */
 .toolbar-container:not(.is-empty) {
     padding: var(--toolbar-padding);
 }
+
+/* Bordas específicas por posição */
 .toolbar-container--top:not(.is-empty) {
     border-bottom: 1px solid var(--toolbar-border-color);
 }
@@ -29,45 +29,44 @@
     border-left: 1px solid var(--toolbar-border-color);
 }
 
-/* Toolbars vazias não têm altura ou largura */
+/* Toolbars vazias colapsam */
 .toolbar-container.is-empty {
     height: auto;
     width: auto;
 }
 
-/* Toolbars vazias tornam-se Zonas de Drop visíveis DURANTE o arraste */
-body.dnd-active .toolbar-container--top.is-empty,
-body.dnd-active .toolbar-container--bottom.is-empty {
+/* --- Correção D&D (Etapa 1) --- */
+/* Expande toolbar vazia APENAS se estiver arrastando um ToolbarGroup */
+body.dnd-active.dnd-type-toolbargroup .toolbar-container--top.is-empty,
+body.dnd-active.dnd-type-toolbargroup .toolbar-container--bottom.is-empty {
     min-height: var(--toolbar-height-horizontal);
     background: var(--color-placeholder-bg);
     border-color: var(--color-placeholder-border-active);
-    padding: var(--toolbar-padding);
+    /* padding: var(--toolbar-padding); */
 }
-body.dnd-active .toolbar-container--left.is-empty,
-body.dnd-active .toolbar-container--right.is-empty {
+body.dnd-active.dnd-type-toolbargroup .toolbar-container--left.is-empty,
+body.dnd-active.dnd-type-toolbargroup .toolbar-container--right.is-empty {
     min-width: var(--toolbar-width-vertical);
     background: var(--color-placeholder-bg);
     border-color: var(--color-placeholder-border-active);
-    padding: var(--toolbar-padding);
+    /* padding: var(--toolbar-padding); */
 }
 
+/* Orientação dos Containers */
 .toolbar-container--top {
-    /* height: var(--toolbar-height-horizontal); (REMOVIDO) */
     flex-direction: row;
 }
 .toolbar-container--bottom {
-    /* height: var(--toolbar-height-horizontal); (REMOVIDO) */
     flex-direction: row;
 }
 .toolbar-container--left {
-    /* width: var(--toolbar-width-vertical); (REMOVIDO) */
     flex-direction: column;
 }
 .toolbar-container--right {
-    /* width: var(--toolbar-width-vertical); (REMOVIDO) */
     flex-direction: column;
 }
 
+/* --- Scroll Container --- */
 .toolbar__scroll-container {
     flex: 1;
     display: flex;
@@ -85,8 +84,9 @@ body.dnd-active .toolbar-container--right.is-empty {
     flex-direction: column;
 }
 
+/* --- Botões de Scroll (Refatorado Etapa 2) --- */
 .toolbar__scroll-btn {
-    display: none; /* JS controla a visibilidade */
+    display: none;
     flex-shrink: 0;
     background: var(--color-bg-hover);
     border: 1px solid var(--color-border-default);
@@ -95,12 +95,22 @@ body.dnd-active .toolbar-container--right.is-empty {
     padding: 0;
     width: 16px;
     height: 100%;
+    align-items: center;
+    justify-content: center;
 }
 .toolbar-container--left .toolbar__scroll-btn,
 .toolbar-container--right .toolbar__scroll-btn {
     width: 100%;
     height: 16px;
 }
+
+.toolbar-container.has-scroll-prev .toolbar__scroll-btn--prev {
+    display: flex;
+}
+.toolbar-container.has-scroll-next .toolbar__scroll-btn--next {
+    display: flex;
+}
+
 .toolbar__scroll-btn:hover {
     background-color: var(--color-accent-hover);
 }
@@ -110,11 +120,15 @@ body.dnd-active .toolbar-container--right.is-empty {
     background-color: var(--color-bg-hover);
 }
 
+/* --- Grupos de Toolbar --- */
 .toolbar-group {
     display: flex;
     flex-shrink: 0;
-    border: 1px solid transparent; /* Placeholder */
+    border: 1px solid transparent;
     border-radius: var(--border-radius-sm);
+    transition:
+        background-color 0.2s,
+        border-color 0.2s;
 }
 .toolbar-container--top .toolbar-group,
 .toolbar-container--bottom .toolbar-group {
@@ -127,12 +141,16 @@ body.dnd-active .toolbar-container--right.is-empty {
     align-items: center;
 }
 
+/* Handle de Arraste */
 .toolbar-group__handle {
     width: 10px;
     cursor: grab;
     opacity: 0.6;
     color: var(--color-text-secondary);
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 .toolbar-group__handle:hover {
     opacity: 1;
@@ -142,20 +160,17 @@ body.dnd-active .toolbar-container--right.is-empty {
     width: 10px;
     height: 10px;
 }
-/* Vertical alignment for horizontal toolbars */
 .toolbar-container--top .toolbar-group__handle,
 .toolbar-container--bottom .toolbar-group__handle {
     height: 100%;
-    align-content: center;
 }
-/* Horizontal alignment for vertical toolbars */
 .toolbar-container--left .toolbar-group__handle,
 .toolbar-container--right .toolbar-group__handle {
     width: 100%;
     height: 10px;
-    text-align: center;
 }
 
+/* Título do Grupo */
 .toolbar-group__title {
     font-size: 0.9em;
     font-weight: 600;
@@ -164,10 +179,10 @@ body.dnd-active .toolbar-container--right.is-empty {
 }
 .toolbar-container--left .toolbar-group__title,
 .toolbar-container--right .toolbar-group__title {
-    /* O título não é exibido em toolbars verticais */
     display: none;
 }
 
+/* Conteúdo do Grupo */
 .toolbar-group__content {
     display: flex;
     gap: var(--spacing-1);
@@ -178,7 +193,7 @@ body.dnd-active .toolbar-container--right.is-empty {
     flex-direction: column;
 }
 
-/* --- Estilos para Botões (ApplicationGroup) --- */
+/* Botões Internos (ApplicationGroup) */
 .toolbar-button {
     width: var(--panel-button-size);
     height: var(--panel-button-size);
@@ -212,6 +227,7 @@ body.dnd-active .toolbar-container--right.is-empty {
     color: var(--color-text-disabled);
 }
 
+/* Divisor */
 .toolbar-divider {
     width: 1px;
     height: 16px;
@@ -223,4 +239,52 @@ body.dnd-active .toolbar-container--right.is-empty {
     height: 1px;
     width: 16px;
     margin: var(--spacing-1) 0;
+}
+
+/* --- Animações de Drop (Etapa 3 - UX Improvement) --- */
+
+/* Placeholder Vertical (para Toolbars Horizontais) */
+/* Expande a largura de 0px para 5px */
+.toolbar-container .container__placeholder--vertical {
+    animation: toolbarPlaceholderExpandH 0.2s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+    transform-origin: left center;
+    /* Sobrescreve padrão para permitir animação */
+    width: 0;
+    min-width: 0;
+}
+
+/* Placeholder Horizontal (para Toolbars Verticais) */
+/* Expande a altura de 0px para 5px */
+.toolbar-container .container__placeholder--horizontal {
+    animation: toolbarPlaceholderExpandV 0.2s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+    transform-origin: top center;
+    /* Sobrescreve padrão para permitir animação */
+    height: 0;
+    min-height: 0;
+}
+
+@keyframes toolbarPlaceholderExpandH {
+    from {
+        width: 0;
+        opacity: 0;
+        margin: 0;
+    }
+    to {
+        width: 5px; /* Valor de referência: --container-placeholder-vertical-width */
+        opacity: 1;
+        margin: 0;
+    }
+}
+
+@keyframes toolbarPlaceholderExpandV {
+    from {
+        height: 0;
+        opacity: 0;
+        margin: 0;
+    }
+    to {
+        height: 5px; /* Valor de referência: --container-placeholder-height */
+        opacity: 1;
+        margin: 0;
+    }
 }

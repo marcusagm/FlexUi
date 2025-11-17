@@ -12,7 +12,8 @@
     /* height: var(--container-height-calc); (REMOVIDO - Grid controla) */
     position: relative; /* Mantido para DND e loader */
 }
-.dnd-active .container {
+.dnd-active.dnd-type-panelgroup .container,
+.dnd-active.dnd-type-panel .container {
     gap: var(--dnd-active-container-gap);
     padding: var(--dnd-active-container-padding);
 }
@@ -25,7 +26,8 @@
     position: relative;
     min-height: 50px;
 }
-.dnd-active .row {
+.dnd-active.dnd-type-panelgroup .row,
+.dnd-active.dnd-type-panel .row {
     gap: var(--dnd-active-container-gap);
     padding: var(--dnd-active-row-padding);
 }

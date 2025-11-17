@@ -1,38 +1,49 @@
 import { ToolbarGroupFactory } from './ToolbarGroupFactory.js';
 import { generateId } from '../../utils/generateId.js';
+import { throttleRAF } from '../../utils/ThrottleRAF.js';
 
 /**
  * Description:
- * Manages a "dockable" toolbar area (e.g., top, bottom, left, right).
+ * Manages a "dockable" toolbar area (top, bottom, left, right).
  * It controls the orientation, scrolling for overflow, and acts as the
  * drop zone for ToolbarGroups.
  *
  * Properties summary:
- * - _state {object} : Manages orientation, position, and child groups.
- * - id {string} : A unique ID for this container instance.
- * - element {HTMLElement} : The main DOM element (.toolbar-container).
- * - _scrollContainer {HTMLElement} : The inner wrapper that scrolls.
- * - _scrollPrevBtn {HTMLElement} : The "scroll left/up" button.
- * - _scrollNextBtn {HTMLElement} : The "scroll right/down" button.
- * - _resizeObserver {ResizeObserver} : Monitors the container for overflow.
+ * - _state {object} : Internal state for orientation, position, and groups.
+ * - id {string} : Unique identifier for the container instance.
+ * - element {HTMLElement} : The main DOM element of the container.
+ * - _scrollContainer {HTMLElement} : The scrollable content wrapper.
+ * - _scrollPreviousButton {HTMLElement} : Button to scroll backward.
+ * - _scrollNextButton {HTMLElement} : Button to scroll forward.
+ * - _resizeObserver {ResizeObserver} : Observer for container resizing.
+ * - _boundUpdateScrollButtons {Function} : Throttled function to update scroll buttons.
  *
  * Typical usage:
- * // In App.js
- * const topToolbar = new ToolbarContainer('top', 'horizontal');
- * appWrapper.appendChild(topToolbar.element);
+ * const toolbar = new ToolbarContainer('top', 'horizontal');
+ * document.body.appendChild(toolbar.element);
  *
  * Events:
- * - (DND) Acts as a drop zone for 'ToolbarGroup' type.
+ * - Listens to (DOM): 'scroll' on _scrollContainer
+ * - Listens to (DOM): 'click' on scroll buttons
  *
  * Business rules implemented:
- * - Adds/removes 'is-empty' class based on child count for CSS styling.
+ * - Manages scroll visibility using CSS classes 'has-scroll-prev' and 'has-scroll-next'.
+ * - Updates 'is-empty' class based on the number of child groups.
+ * - Supports A11y with ARIA roles, labels, and dynamic tabindex management.
+ * - Uses throttling for scroll updates to optimize performance.
  *
  * Dependencies:
  * - ./ToolbarGroupFactory.js
  * - ../../utils/generateId.js
+ * - ../../utils/ThrottleRAF.js
+ *
+ * Notes / Additional:
+ * - The dropZoneType is 'toolbar-container'.
  */
 export class ToolbarContainer {
     /**
+     * Internal state for orientation, position, and groups.
+     *
      * @type {{
      * orientation: 'horizontal' | 'vertical',
      * position: 'top' | 'bottom' | 'left' | 'right',
@@ -47,54 +58,64 @@ export class ToolbarContainer {
     };
 
     /**
-     * Unique ID for this container instance.
+     * Unique identifier for the container instance.
+     *
      * @type {string}
      * @public
      */
     id = generateId();
 
     /**
-     * The main DOM element (.toolbar-container).
+     * The main DOM element of the container.
+     *
      * @type {HTMLElement | null}
      * @public
      */
     element = null;
 
     /**
-     * The inner wrapper that scrolls.
+     * The scrollable content wrapper.
+     *
      * @type {HTMLElement | null}
      * @private
      */
     _scrollContainer = null;
 
     /**
-     * The "scroll left/up" button.
+     * Button to scroll backward.
+     *
      * @type {HTMLElement | null}
      * @private
      */
-    _scrollPrevBtn = null;
+    _scrollPreviousButton = null;
 
     /**
-     * The "scroll right/down" button.
+     * Button to scroll forward.
+     *
      * @type {HTMLElement | null}
      * @private
      */
-    _scrollNextBtn = null;
+    _scrollNextButton = null;
 
     /**
-     * Monitors the container for overflow.
+     * Observer for container resizing.
+     *
      * @type {ResizeObserver | null}
      * @private
      */
     _resizeObserver = null;
 
     /**
+     * Throttled function to update scroll buttons.
+     *
      * @type {Function | null}
      * @private
      */
     _boundUpdateScrollButtons = null;
 
     /**
+     * Constructor for ToolbarContainer.
+     *
      * @param {'top' | 'bottom' | 'left' | 'right'} position - The grid area name.
      * @param {'horizontal' | 'vertical'} orientation - The flex-direction.
      */
@@ -104,17 +125,18 @@ export class ToolbarContainer {
         me._state.orientation = orientation;
         me.dropZoneType = 'toolbar-container';
 
-        me._boundUpdateScrollButtons = me._updateScrollButtons.bind(me);
+        me._boundUpdateScrollButtons = throttleRAF(me._updateScrollButtons.bind(me));
 
         me._buildDOM();
-        me._initResizeObserver();
+        me._initObservers();
         me._updateEmptyState();
     }
 
     /**
-     * Builds the component's DOM structure.
-     * @private
+     * Builds the component's DOM structure with A11y attributes.
+     *
      * @returns {void}
+     * @private
      */
     _buildDOM() {
         const me = this;
@@ -123,37 +145,55 @@ export class ToolbarContainer {
         me.element.dataset.dropzone = me.dropZoneType;
         me.element.dropZoneInstance = me;
 
-        me._scrollPrevBtn = document.createElement('button');
-        me._scrollPrevBtn.type = 'button';
-        me._scrollPrevBtn.className = 'toolbar__scroll-btn toolbar__scroll-btn--prev';
-        me._scrollPrevBtn.textContent = me._state.orientation === 'horizontal' ? '‹' : '⌃';
-        me._scrollPrevBtn.addEventListener('click', me._onScrollPrev.bind(me));
+        me.element.setAttribute('role', 'toolbar');
+        me.element.setAttribute('aria-orientation', me._state.orientation);
+        me.element.setAttribute('aria-label', `${me._state.position} toolbar`);
+
+        me._scrollPreviousButton = document.createElement('button');
+        me._scrollPreviousButton.type = 'button';
+        me._scrollPreviousButton.className = 'toolbar__scroll-btn toolbar__scroll-btn--prev';
+        me._scrollPreviousButton.innerHTML =
+            me._state.orientation === 'horizontal' ? '&#8249;' : '&#708;';
+        me._scrollPreviousButton.setAttribute('aria-label', 'Scroll Previous');
+        me._scrollPreviousButton.setAttribute('tabindex', '-1');
+        me._scrollPreviousButton.addEventListener('click', me._onScrollPrevious.bind(me));
 
         me._scrollContainer = document.createElement('div');
         me._scrollContainer.className = 'toolbar__scroll-container';
 
-        me._scrollNextBtn = document.createElement('button');
-        me._scrollNextBtn.type = 'button';
-        me._scrollNextBtn.className = 'toolbar__scroll-btn toolbar__scroll-btn--next';
-        me._scrollNextBtn.textContent = me._state.orientation === 'horizontal' ? '›' : '⌄';
-        me._scrollNextBtn.addEventListener('click', me._onScrollNext.bind(me));
+        me._scrollContainer.addEventListener('scroll', me._boundUpdateScrollButtons, {
+            passive: true
+        });
 
-        me.element.append(me._scrollPrevBtn, me._scrollContainer, me._scrollNextBtn);
+        me._scrollNextButton = document.createElement('button');
+        me._scrollNextButton.type = 'button';
+        me._scrollNextButton.className = 'toolbar__scroll-btn toolbar__scroll-btn--next';
+        me._scrollNextButton.innerHTML =
+            me._state.orientation === 'horizontal' ? '&#8250;' : '&#709;';
+        me._scrollNextButton.setAttribute('aria-label', 'Scroll Next');
+        me._scrollNextButton.setAttribute('tabindex', '-1');
+        me._scrollNextButton.addEventListener('click', me._onScrollNext.bind(me));
+
+        me.element.append(me._scrollPreviousButton, me._scrollContainer, me._scrollNextButton);
     }
 
     /**
      * Initializes the ResizeObserver for the scroll container.
-     * @private
+     *
      * @returns {void}
+     * @private
      */
-    _initResizeObserver() {
+    _initObservers() {
         const me = this;
-        me._resizeObserver = new ResizeObserver(me._boundUpdateScrollButtons);
+        me._resizeObserver = new ResizeObserver(() => {
+            me._boundUpdateScrollButtons();
+        });
         me._resizeObserver.observe(me._scrollContainer);
     }
 
     /**
      * Cleans up listeners and observers.
+     *
      * @returns {void}
      */
     destroy() {
@@ -161,82 +201,117 @@ export class ToolbarContainer {
         if (me._resizeObserver) {
             me._resizeObserver.disconnect();
         }
+        me._boundUpdateScrollButtons?.cancel();
+
         me._state.groups.forEach(group => group.destroy());
         me.element.remove();
     }
 
     /**
      * Handles the "Scroll Previous" button click.
-     * @private
+     *
      * @returns {void}
+     * @private
      */
-    _onScrollPrev() {
+    _onScrollPrevious() {
         const me = this;
+        const amount = -100;
+        const options = { behavior: 'smooth' };
+
         if (me._state.orientation === 'horizontal') {
-            me._scrollContainer.scrollBy({ left: -100, behavior: 'smooth' });
+            options.left = amount;
         } else {
-            me._scrollContainer.scrollBy({ top: -100, behavior: 'smooth' });
+            options.top = amount;
         }
+        me._scrollContainer.scrollBy(options);
     }
 
     /**
      * Handles the "Scroll Next" button click.
-     * @private
+     *
      * @returns {void}
+     * @private
      */
     _onScrollNext() {
         const me = this;
+        const amount = 100;
+        const options = { behavior: 'smooth' };
+
         if (me._state.orientation === 'horizontal') {
-            me._scrollContainer.scrollBy({ left: 100, behavior: 'smooth' });
+            options.left = amount;
         } else {
-            me._scrollContainer.scrollBy({ top: 100, behavior: 'smooth' });
+            options.top = amount;
         }
+        me._scrollContainer.scrollBy(options);
     }
 
     /**
-     * Shows or hides scroll buttons based on overflow.
-     * @private
+     * Updates scroll buttons visibility using CSS classes and manages tabindex.
+     *
      * @returns {void}
+     * @private
      */
     _updateScrollButtons() {
         const me = this;
         const target = me._scrollContainer;
-        if (!target) return;
+        if (!target) {
+            return;
+        }
+
+        const bufferPixel = 1;
+        let hasPrevious = false;
+        let hasNext = false;
 
         if (me._state.orientation === 'horizontal') {
             const { scrollLeft, scrollWidth, clientWidth } = target;
-            me._scrollPrevBtn.style.display = scrollLeft > 1 ? '' : 'none';
-            me._scrollNextBtn.style.display = scrollWidth > clientWidth + 1 ? '' : 'none';
+            hasPrevious = scrollLeft > bufferPixel;
+            hasNext = scrollWidth > clientWidth + scrollLeft + bufferPixel;
         } else {
             const { scrollTop, scrollHeight, clientHeight } = target;
-            me._scrollPrevBtn.style.display = scrollTop > 1 ? '' : 'none';
-            me._scrollNextBtn.style.display = scrollHeight > clientHeight + 1 ? '' : 'none';
+            hasPrevious = scrollTop > bufferPixel;
+            hasNext = scrollHeight > clientHeight + scrollTop + bufferPixel;
+        }
+
+        me.element.classList.toggle('has-scroll-prev', hasPrevious);
+        me.element.classList.toggle('has-scroll-next', hasNext);
+
+        if (hasPrevious) {
+            me._scrollPreviousButton.removeAttribute('tabindex');
+        } else {
+            me._scrollPreviousButton.setAttribute('tabindex', '-1');
+        }
+
+        if (hasNext) {
+            me._scrollNextButton.removeAttribute('tabindex');
+        } else {
+            me._scrollNextButton.setAttribute('tabindex', '-1');
         }
     }
 
     /**
      * Updates the 'is-empty' class on the container.
-     * @private
+     *
      * @returns {void}
+     * @private
      */
     _updateEmptyState() {
         const me = this;
-        if (me._state.groups.length === 0) {
-            me.element.classList.add('is-empty');
-        } else {
-            me.element.classList.remove('is-empty');
-        }
+        const isEmpty = me._state.groups.length === 0;
+        me.element.classList.toggle('is-empty', isEmpty);
     }
 
     /**
      * Adds a ToolbarGroup to this container.
+     *
      * @param {import('./ToolbarGroup.js').ToolbarGroup} group - The group to add.
      * @param {number|null} [index=null] - The index to insert at.
      * @returns {void}
      */
     addGroup(group, index = null) {
         const me = this;
-        if (!group) return;
+        if (!group) {
+            return;
+        }
 
         const safeIndex = index === null ? me._state.groups.length : index;
 
@@ -246,33 +321,39 @@ export class ToolbarContainer {
         } else {
             me._state.groups.splice(safeIndex, 0, group);
             const nextSiblingGroup = me._state.groups[safeIndex + 1];
-            const nextSiblingEl = nextSiblingGroup ? nextSiblingGroup.element : null;
-            me._scrollContainer.insertBefore(group.element, nextSiblingEl);
+            const nextSiblingElement = nextSiblingGroup ? nextSiblingGroup.element : null;
+            me._scrollContainer.insertBefore(group.element, nextSiblingElement);
         }
         group.setParentContainer(me);
-        me._updateScrollButtons();
+
+        requestAnimationFrame(me._boundUpdateScrollButtons);
         me._updateEmptyState();
     }
 
     /**
      * Removes a ToolbarGroup from this container.
+     *
      * @param {import('./ToolbarGroup.js').ToolbarGroup} group - The group to remove.
      * @returns {void}
      */
     removeGroup(group) {
         const me = this;
         const index = me._state.groups.indexOf(group);
-        if (index === -1) return;
+        if (index === -1) {
+            return;
+        }
 
         me._state.groups.splice(index, 1);
         group.element.remove();
         group.setParentContainer(null);
-        me._updateScrollButtons();
+
+        requestAnimationFrame(me._boundUpdateScrollButtons);
         me._updateEmptyState();
     }
 
     /**
      * Moves a ToolbarGroup to a new index within this container.
+     *
      * @param {import('./ToolbarGroup.js').ToolbarGroup} group - The group to move.
      * @param {number} newIndex - The target index.
      * @returns {void}
@@ -280,23 +361,30 @@ export class ToolbarContainer {
     moveGroup(group, newIndex) {
         const me = this;
         const oldIndex = me._state.groups.indexOf(group);
-        if (oldIndex === -1) return;
+        if (oldIndex === -1) {
+            return;
+        }
+
+        if (oldIndex === newIndex) {
+            return;
+        }
 
         me._state.groups.splice(oldIndex, 1);
         const adjustedNewIndex = oldIndex < newIndex ? newIndex - 1 : newIndex;
         me._state.groups.splice(adjustedNewIndex, 0, group);
 
         const nextSiblingGroup = me._state.groups[adjustedNewIndex + 1];
-        const nextSiblingEl = nextSiblingGroup ? nextSiblingGroup.element : null;
-        me._scrollContainer.insertBefore(group.element, nextSiblingEl);
+        const nextSiblingElement = nextSiblingGroup ? nextSiblingGroup.element : null;
+        me._scrollContainer.insertBefore(group.element, nextSiblingElement);
 
-        me._updateScrollButtons();
+        requestAnimationFrame(me._boundUpdateScrollButtons);
         me._updateEmptyState();
     }
 
     /**
      * Serializes the ToolbarContainer state (child groups).
-     * @returns {Array<object>}
+     *
+     * @returns {Array<object>} An array of serialized group data.
      */
     toJSON() {
         const me = this;
@@ -305,6 +393,7 @@ export class ToolbarContainer {
 
     /**
      * Deserializes state from JSON data.
+     *
      * @param {Array<object>} data - The array of child group data.
      * @returns {void}
      */
@@ -314,7 +403,9 @@ export class ToolbarContainer {
         me._state.groups = [];
         me._scrollContainer.innerHTML = '';
 
-        if (!Array.isArray(data)) return;
+        if (!Array.isArray(data)) {
+            return;
+        }
 
         const factory = ToolbarGroupFactory.getInstance();
         data.forEach(groupData => {
@@ -324,7 +415,7 @@ export class ToolbarContainer {
             }
         });
 
-        me._updateScrollButtons();
+        requestAnimationFrame(me._boundUpdateScrollButtons);
         me._updateEmptyState();
     }
 }
