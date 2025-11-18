@@ -1,6 +1,8 @@
+import { BaseDropStrategy } from './BaseDropStrategy.js';
 import { PanelGroup } from '../../components/Panel/PanelGroup.js';
 import { Panel } from '../../components/Panel/Panel.js';
 import { FloatingPanelManagerService } from './FloatingPanelManagerService.js';
+import { ItemType } from '../../constants/DNDTypes.js';
 
 /**
  * Description:
@@ -27,11 +29,13 @@ import { FloatingPanelManagerService } from './FloatingPanelManagerService.js';
  * - Returns boolean indicating if the drop was handled.
  *
  * Dependencies:
+ * - ./BaseDropStrategy.js
  * - ../../components/Panel/PanelGroup.js
  * - ../../components/Panel/Panel.js
  * - ./FloatingPanelManagerService.js
+ * - ../../constants/DNDTypes.js
  */
-export class TabContainerDropStrategy {
+export class TabContainerDropStrategy extends BaseDropStrategy {
     /**
      * @type {boolean}
      * @private
@@ -71,11 +75,11 @@ export class TabContainerDropStrategy {
             return null;
         }
 
-        if (draggedData.type === 'Panel') {
+        if (draggedData.type === ItemType.PANEL) {
             if (!(draggedData.item instanceof Panel)) return null;
             draggedPanel = draggedData.item;
             sourceGroup = draggedPanel._state.parentGroup;
-        } else if (draggedData.type === 'PanelGroup') {
+        } else if (draggedData.type === ItemType.PANEL_GROUP) {
             if (!(draggedData.item instanceof PanelGroup)) return null;
             if (draggedData.item._state.panels.length === 1) {
                 sourceGroup = draggedData.item;
@@ -117,57 +121,78 @@ export class TabContainerDropStrategy {
     }
 
     /**
-     * Applies visual feedback on drag enter.
+     * Clears any stray visual feedback from all tab containers.
      *
-     * @param {{x: number, y: number, target: HTMLElement}} point - The coordinates and target.
-     * @param {PanelGroup} dropZone - The target PanelGroup instance.
-     * @param {{item: object, type: string}} draggedData - The item being dragged.
-     * @param {import('./DragDropService.js').DragDropService} dds - The DND service instance.
+     * @param {boolean} [visualOnly=false] - If true, only clears visual state.
      * @returns {void}
      */
-    handleDragEnter(point, dropZone, draggedData, dds) {
+    clearCache(visualOnly = false) {
+        const me = this;
+        if (!visualOnly) {
+            me._isReordering = false;
+            me._dropIndex = null;
+            me._tabCache = [];
+        }
+
+        const zones = document.querySelectorAll('.panel-group__tab-container--droptarget');
+        zones.forEach(zone => zone.classList.remove('panel-group__tab-container--droptarget'));
+    }
+
+    /**
+     * Hook called when a drag enters the zone.
+     * Applies visual feedback and caches geometry.
+     *
+     * @param {{x: number, y: number, target: HTMLElement}} point
+     * @param {PanelGroup} dropZone
+     * @param {{item: object, type: string}} draggedData
+     * @param {import('./DragDropService.js').DragDropService} dds
+     * @returns {boolean}
+     */
+    onDragEnter(point, dropZone, draggedData, dds) {
         const me = this;
         me.clearCache(true); // Clear visual feedback only
-        if (!draggedData.item) return;
+        if (!draggedData.item) return false;
 
         if (draggedData.item === dropZone) {
-            return;
+            return false;
         }
 
         const groups = me._getGroups(draggedData, dropZone);
         if (!groups) {
-            return;
+            return false;
         }
 
         if (
             groups.sourceGroup === groups.targetGroup &&
             groups.targetGroup._state.panels.length === 1
         ) {
-            return;
+            return false;
         }
 
         me._isReordering = groups.sourceGroup === groups.targetGroup;
         me._cacheTabGeometry(dropZone);
         dds.showPlaceholder('vertical');
+        return true;
     }
 
     /**
-     * Maintains visual feedback on drag over.
+     * Hook called when a drag moves over the zone.
+     * Maintains visual feedback and calculates drop index using Live Geometry.
      *
-     * @param {{x: number, y: number, target: HTMLElement}} point - The coordinates and target.
-     * @param {PanelGroup} dropZone - The target PanelGroup instance.
-     * @param {{item: object, type: string}} draggedData - The item being dragged.
-     * @param {import('./DragDropService.js').DragDropService} dds - The DND service instance.
-     * @returns {void}
+     * @param {{x: number, y: number, target: HTMLElement}} point
+     * @param {PanelGroup} dropZone
+     * @param {{item: object, type: string}} draggedData
+     * @param {import('./DragDropService.js').DragDropService} dds
+     * @returns {boolean}
      */
-    handleDragOver(point, dropZone, draggedData, dds) {
+    onDragOver(point, dropZone, draggedData, dds) {
         const me = this;
         const placeholder = dds.getPlaceholder();
         const tabContainerElement = dropZone._state.header.tabContainer;
 
         if (draggedData.item === dropZone) {
-            me.handleDragLeave(point, dropZone, draggedData, dds);
-            return;
+            // Delegate cleanup to BaseDropStrategy via return false
+            return false;
         }
 
         if (
@@ -176,21 +201,19 @@ export class TabContainerDropStrategy {
             point.target !== tabContainerElement &&
             point.target !== placeholder
         ) {
-            me.handleDragLeave(point, dropZone, draggedData, dds);
-            return;
+            return false;
         }
 
         const groups = me._getGroups(draggedData, dropZone);
         if (!groups) {
-            return;
+            return false;
         }
 
         if (
             groups.sourceGroup === groups.targetGroup &&
             groups.targetGroup._state.panels.length === 1
         ) {
-            me.handleDragLeave(point, dropZone, draggedData, dds);
-            return;
+            return false;
         }
 
         // Robustness: Ensure _isReordering is set even if DragEnter was skipped
@@ -226,7 +249,7 @@ export class TabContainerDropStrategy {
             if (isAdjacent) {
                 dds.hidePlaceholder();
                 me._dropIndex = null;
-                return;
+                return false;
             }
         }
 
@@ -236,45 +259,25 @@ export class TabContainerDropStrategy {
         } else {
             tabContainerElement.appendChild(placeholder);
         }
+
+        return true;
     }
 
     /**
-     * Removes visual feedback on drag leave.
+     * Hook called when the item is dropped.
+     * Handles logic for merging tabs/panels or reordering.
      *
-     * @param {{x: number, y: number, target: HTMLElement}} point - The coordinates and target.
-     * @param {PanelGroup} dropZone - The target PanelGroup instance.
-     * @param {{item: object, type: string}} draggedData - The item being dragged.
-     * @param {import('./DragDropService.js').DragDropService} dds - The DND service instance.
-     * @returns {void}
+     * @param {{x: number, y: number, target: HTMLElement}} point
+     * @param {PanelGroup} dropZone
+     * @param {{item: object, type: string}} draggedData
+     * @param {import('./DragDropService.js').DragDropService} dds
+     * @returns {boolean}
      */
-    handleDragLeave(point, dropZone, draggedData, dds) {
-        dds.hidePlaceholder();
-        this.clearCache();
-    }
-
-    /**
-     * Handles the drop logic for merging tabs/panels.
-     *
-     * @param {{x: number, y: number, target: HTMLElement}} point - The coordinates and target.
-     * @param {PanelGroup} dropZone - The target PanelGroup instance.
-     * @param {{item: object, type: string}} draggedData - The item being dragged.
-     * @param {import('./DragDropService.js').DragDropService} dds - The DND service instance.
-     * @returns {boolean} True if drop was handled; false otherwise.
-     */
-    handleDrop(point, dropZone, draggedData, dds) {
+    onDrop(point, dropZone, draggedData, dds) {
         const me = this;
-
-        // Gatekeeper: If placeholder is not visible, drop is invalid.
-        if (!dds.getPlaceholder().parentElement) {
-            me.clearCache();
-            return false;
-        }
-
-        dds.hidePlaceholder();
-
         const groups = me._getGroups(draggedData, dropZone);
+
         if (!groups) {
-            me.clearCache();
             return false;
         }
 
@@ -289,7 +292,7 @@ export class TabContainerDropStrategy {
             }
         } else {
             if (sourceGroup._state.isFloating) {
-                if (draggedData.type === 'PanelGroup') {
+                if (draggedData.type === ItemType.PANEL_GROUP) {
                     FloatingPanelManagerService.getInstance().removeFloatingPanel(sourceGroup);
                 }
             }
@@ -298,25 +301,6 @@ export class TabContainerDropStrategy {
             targetGroup.addPanel(draggedPanel, me._dropIndex, true);
         }
 
-        me.clearCache();
         return true;
-    }
-
-    /**
-     * Clears any stray visual feedback from all tab containers.
-     *
-     * @param {boolean} [visualOnly=false] - If true, only clears visual state.
-     * @returns {void}
-     */
-    clearCache(visualOnly = false) {
-        const me = this;
-        if (!visualOnly) {
-            me._isReordering = false;
-            me._dropIndex = null;
-            me._tabCache = [];
-        }
-
-        const zones = document.querySelectorAll('.panel-group__tab-container--droptarget');
-        zones.forEach(zone => zone.classList.remove('panel-group__tab-container--droptarget'));
     }
 }

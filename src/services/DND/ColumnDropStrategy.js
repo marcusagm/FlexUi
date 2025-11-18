@@ -1,7 +1,8 @@
+import { BaseDropStrategy } from './BaseDropStrategy.js';
 import { PanelGroup } from '../../components/Panel/PanelGroup.js';
 import { Panel } from '../../components/Panel/Panel.js';
-import { DragDropService } from './DragDropService.js';
 import { FloatingPanelManagerService } from './FloatingPanelManagerService.js';
+import { ItemType } from '../../constants/DNDTypes.js';
 
 /**
  * Description:
@@ -14,7 +15,7 @@ import { FloatingPanelManagerService } from './FloatingPanelManagerService.js';
  * - _dropIndex {number | null} : The calculated drop index.
  *
  * Business rules implemented:
- * - Caches child PanelGroup geometry on 'handleDragEnter'.
+ * - Caches child PanelGroup geometry on 'onDragEnter'.
  * - Calculates drop index based on 'midY' (vertical midpoint).
  * - Shows a 'horizontal' placeholder in the calculated gap.
  * - Implements "ghost" logic to prevent flickering when dragging over
@@ -28,11 +29,13 @@ import { FloatingPanelManagerService } from './FloatingPanelManagerService.js';
  * - Returns boolean indicating if the drop was handled.
  *
  * Dependencies:
+ * - ./BaseDropStrategy.js
  * - ../../components/Panel/PanelGroup.js
  * - ../../components/Panel/Panel.js
- * - ./DragDropService.js
+ * - ./FloatingPanelManagerService.js
+ * - ../../constants/DNDTypes.js
  */
-export class ColumnDropStrategy {
+export class ColumnDropStrategy extends BaseDropStrategy {
     /**
      * Caches the geometry (midY) and index of child PanelGroups.
      *
@@ -55,36 +58,39 @@ export class ColumnDropStrategy {
      * @returns {void}
      */
     clearCache() {
-        this._dropZoneCache = [];
-        this._dropIndex = null;
+        const me = this;
+        me._dropZoneCache = [];
+        me._dropIndex = null;
     }
 
     /**
-     * Caches the geometry of child panel groups on drag enter.
+     * Hook called when a drag enters the zone.
+     * Caches the geometry of child panel groups.
      *
-     * @param {{x: number, y: number, target: HTMLElement}} point - The coordinates and target.
-     * @param {import('../../components/Column/Column.js').Column} dropZone - The Column instance.
-     * @param {{item: object, type: string}} draggedData - The item being dragged.
-     * @param {DragDropService} dds - The DND service instance.
-     * @returns {void}
+     * @param {{x: number, y: number, target: HTMLElement}} point
+     * @param {import('../../components/Column/Column.js').Column} dropZone
+     * @param {{item: object, type: string}} draggedData
+     * @param {import('./DragDropService.js').DragDropService} dds
+     * @returns {boolean}
      */
-    handleDragEnter(point, dropZone, draggedData, dds) {
+    onDragEnter(point, dropZone, draggedData, dds) {
+        const me = this;
         if (
             !draggedData.item ||
-            (draggedData.type !== 'PanelGroup' && draggedData.type !== 'Panel')
+            (draggedData.type !== ItemType.PANEL_GROUP && draggedData.type !== ItemType.PANEL)
         ) {
-            return;
+            return false;
         }
 
         let draggedItem;
-        if (draggedData.type === 'PanelGroup') {
+        if (draggedData.type === ItemType.PANEL_GROUP) {
             draggedItem = draggedData.item;
-        } else if (draggedData.type === 'Panel') {
+        } else if (draggedData.type === ItemType.PANEL) {
             draggedItem = draggedData.item._state.parentGroup;
-            if (!draggedItem) return;
+            if (!draggedItem) return false;
         }
 
-        this.clearCache();
+        me.clearCache();
         const panelGroups = dropZone.getPanelGroups();
 
         for (let i = 0; i < panelGroups.length; i++) {
@@ -94,52 +100,52 @@ export class ColumnDropStrategy {
             const rect = targetGroup.element.getBoundingClientRect();
             const midY = rect.top + rect.height / 2;
 
-            this._dropZoneCache.push({
+            me._dropZoneCache.push({
                 element: targetGroup.element,
                 midY: midY,
                 originalIndex: i
             });
         }
+        return true;
     }
 
     /**
-     * Calculates the drop position and shows the placeholder on drag over.
+     * Hook called when a drag moves over the zone.
+     * Calculates the drop position and shows the placeholder.
      *
-     * @param {{x: number, y: number, target: HTMLElement}} point - The coordinates and target.
-     * @param {import('../../components/Column/Column.js').Column} dropZone - The Column instance.
-     * @param {{item: object, type: string}} draggedData - The item being dragged.
-     * @param {DragDropService} dds - The DND service instance.
-     * @returns {void}
+     * @param {{x: number, y: number, target: HTMLElement}} point
+     * @param {import('../../components/Column/Column.js').Column} dropZone
+     * @param {{item: object, type: string}} draggedData
+     * @param {import('./DragDropService.js').DragDropService} dds
+     * @returns {boolean}
      */
-    handleDragOver(point, dropZone, draggedData, dds) {
+    onDragOver(point, dropZone, draggedData, dds) {
+        const me = this;
         const placeholder = dds.getPlaceholder();
 
-        // Strict Target Check:
-        // We only accept the drag if the pointer is directly over the Column element
-        // or the Placeholder. If it is over a child (like a PanelGroup), we assume
-        // that specific child's strategy should handle it.
+        // Strict Target Check
         if (point.target !== dropZone.element && point.target !== placeholder) {
             dds.hidePlaceholder();
-            this._dropIndex = null;
-            return;
+            me._dropIndex = null;
+            return false;
         }
 
         if (
             !draggedData.item ||
-            (draggedData.type !== 'PanelGroup' && draggedData.type !== 'Panel')
+            (draggedData.type !== ItemType.PANEL_GROUP && draggedData.type !== ItemType.PANEL)
         ) {
-            return;
+            return false;
         }
 
         let draggedItem;
         let isEffectiveGroupDrag = false;
 
-        if (draggedData.type === 'PanelGroup') {
+        if (draggedData.type === ItemType.PANEL_GROUP) {
             draggedItem = draggedData.item;
             isEffectiveGroupDrag = true;
-        } else if (draggedData.type === 'Panel') {
+        } else if (draggedData.type === ItemType.PANEL) {
             draggedItem = draggedData.item._state.parentGroup;
-            if (!draggedItem) return;
+            if (!draggedItem) return false;
             if (draggedItem._state.panels.length === 1) {
                 isEffectiveGroupDrag = true;
             }
@@ -151,13 +157,13 @@ export class ColumnDropStrategy {
         const originalIndex = oldColumn ? oldColumn.getPanelGroupIndex(draggedItem) : -1;
 
         let placed = false;
-        this._dropIndex = dropZone.getPanelGroups().length;
+        me._dropIndex = dropZone.getPanelGroups().length;
 
-        for (const cacheItem of this._dropZoneCache) {
+        for (const cacheItem of me._dropZoneCache) {
             if (point.y < cacheItem.midY) {
                 dropZone.element.insertBefore(placeholder, cacheItem.element);
                 placed = true;
-                this._dropIndex = cacheItem.originalIndex;
+                me._dropIndex = cacheItem.originalIndex;
                 break;
             }
         }
@@ -167,73 +173,55 @@ export class ColumnDropStrategy {
         }
 
         const isSameColumn = oldColumn === dropZone;
-        const isOriginalPosition = this._dropIndex === originalIndex;
-        const isBelowGhost = this._dropIndex === originalIndex + 1;
+        const isOriginalPosition = me._dropIndex === originalIndex;
+        const isBelowGhost = me._dropIndex === originalIndex + 1;
 
         if (isSameColumn && isEffectiveGroupDrag && (isOriginalPosition || isBelowGhost)) {
             dds.hidePlaceholder();
-            this._dropIndex = null;
-            return;
-        }
-    }
-
-    /**
-     * Hides the placeholder on drag leave.
-     *
-     * @param {{x: number, y: number, target: HTMLElement}} point - The coordinates and target.
-     * @param {import('../../components/Column/Column.js').Column} dropZone - The Column instance.
-     * @param {{item: object, type: string}} draggedData - The item being dragged.
-     * @param {DragDropService} dds - The DND service instance.
-     * @returns {void}
-     */
-    handleDragLeave(point, dropZone, draggedData, dds) {
-        dds.hidePlaceholder();
-        this.clearCache();
-    }
-
-    /**
-     * Handles the drop logic for the Column.
-     *
-     * @param {{x: number, y: number, target: HTMLElement}} point - The coordinates and target.
-     * @param {import('../../components/Column/Column.js').Column} dropZone - The Column instance.
-     * @param {{item: object, type: string}} draggedData - The item being dragged.
-     * @param {DragDropService} dds - The DND service instance.
-     * @returns {boolean} True if drop was handled, false otherwise.
-     */
-    handleDrop(point, dropZone, draggedData, dds) {
-        // Gatekeeper: If placeholder is not visible, assume invalid drop (dead zone).
-        if (!dds.getPlaceholder().parentElement) {
-            this.clearCache();
+            me._dropIndex = null;
             return false;
         }
 
-        const panelIndex = this._dropIndex;
-        dds.hidePlaceholder();
-        this.clearCache();
+        return true;
+    }
+
+    /**
+     * Hook called when the item is dropped.
+     * Moves the PanelGroup or creates a new wrapper for a Panel.
+     *
+     * @param {{x: number, y: number, target: HTMLElement}} point
+     * @param {import('../../components/Column/Column.js').Column} dropZone
+     * @param {{item: object, type: string}} draggedData
+     * @param {import('./DragDropService.js').DragDropService} dds
+     * @returns {boolean}
+     */
+    onDrop(point, dropZone, draggedData, dds) {
+        const me = this;
+        const panelIndex = me._dropIndex;
 
         if (
             !draggedData.item ||
-            (draggedData.type !== 'PanelGroup' && draggedData.type !== 'Panel')
+            (draggedData.type !== ItemType.PANEL_GROUP && draggedData.type !== ItemType.PANEL)
         ) {
             return false;
         }
 
         let sourceGroup = null;
-        if (draggedData.type === 'PanelGroup') {
+        if (draggedData.type === ItemType.PANEL_GROUP) {
             sourceGroup = draggedData.item;
-        } else if (draggedData.type === 'Panel') {
+        } else if (draggedData.type === ItemType.PANEL) {
             sourceGroup = draggedData.item._state.parentGroup;
         }
 
         if (sourceGroup && sourceGroup._state.isFloating) {
-            if (draggedData.type === 'PanelGroup') {
+            if (draggedData.type === ItemType.PANEL_GROUP) {
                 FloatingPanelManagerService.getInstance().removeFloatingPanel(sourceGroup);
             }
         }
 
         if (panelIndex === null) {
             const itemToUpdate =
-                draggedData.type === 'PanelGroup'
+                draggedData.type === ItemType.PANEL_GROUP
                     ? draggedData.item
                     : draggedData.item._state.parentGroup;
 
@@ -246,7 +234,7 @@ export class ColumnDropStrategy {
             return false;
         }
 
-        if (draggedData.type === 'PanelGroup') {
+        if (draggedData.type === ItemType.PANEL_GROUP) {
             const draggedItem = draggedData.item;
             const oldColumn = draggedItem.getColumn();
 
@@ -255,15 +243,15 @@ export class ColumnDropStrategy {
                 oldColumn.removePanelGroup(draggedItem, true);
             }
             dropZone.addPanelGroup(draggedItem, panelIndex);
-        } else if (draggedData.type === 'Panel') {
+        } else if (draggedData.type === ItemType.PANEL) {
             const draggedPanel = draggedData.item;
-            const sourceGroup = draggedPanel._state.parentGroup;
+            const sourceParentGroup = draggedPanel._state.parentGroup;
 
             const newPanelGroup = new PanelGroup();
             dropZone.addPanelGroup(newPanelGroup, panelIndex);
 
-            if (sourceGroup) {
-                sourceGroup.removePanel(draggedPanel, true);
+            if (sourceParentGroup) {
+                sourceParentGroup.removePanel(draggedPanel, true);
             }
             newPanelGroup.addPanel(draggedPanel, true);
         }

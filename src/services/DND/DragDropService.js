@@ -4,36 +4,37 @@ import { Panel } from '../../components/Panel/Panel.js';
 import { PanelGroup } from '../../components/Panel/PanelGroup.js';
 import { throttleRAF } from '../../utils/ThrottleRAF.js';
 import { ToolbarContainerDropStrategy } from './ToolbarContainerDropStrategy.js';
+import { DropZoneType, ItemType } from '../../constants/DNDTypes.js';
+import { GhostManager } from './GhostManager.js';
 
 /**
  * Description:
  * A Singleton service that manages the global state and logic for
  * Drag-and-Drop (D&D) operations. It implements the Strategy pattern,
- * delegating behavior to registered strategy classes (ColumnDropStrategy,
- * RowDropStrategy, etc.) based on the 'dropZoneType' of the target.
+ * delegating behavior to registered strategy classes based on the
+ * 'dropZoneType' of the target.
  *
- * It also implements the "DOM Bridge" pattern for DND, attaching only 4
- * native listeners to the document body and using event delegation
- * to find the correct drop zone instance.
- *
- * Adds a 'dnd-active' class to the document body during drag operations so CSS
- * can disable pointer-events on resize handles, preventing event flickering.
+ * It acts as the central coordinator for the drag lifecycle, handling:
+ * - Event listeners (Drag Start, Pointer Move, Pointer Up).
+ * - Drop Zone detection (Hit Testing).
+ * - Strategy delegation for Drop Over and Drop events.
+ * - Visual feedback management (delegated to GhostManager).
  *
  * Properties summary:
  * - _instance {DragDropService | null} : The private static instance.
  * - _dragState {object} : Stores the item, type, and element being dragged.
  * - _placeholder {HTMLElement} : The single shared DOM element used for drop feedback.
  * - _isDragging {boolean} : Flag indicating if a drag operation is active.
- * - _placeholderMode {string | null} : Caches the current placeholder mode ('horizontal'/'vertical').
+ * - _placeholderMode {string | null} : Caches the current placeholder mode.
  * - _strategyRegistry {Map} : Maps dropZoneType (string) to Strategy instances.
  * - _namespace {string} : Unique namespace for appBus listeners.
- * - _draggedSourceElement {HTMLElement|null} : The dropzone element being dragged.
- * - _draggedSourceDropzone {string|null} : The original 'data-dropzone' value.
+ * - _activePointerId {number | null} : The ID of the pointer initiating the drag.
+ * - _activeDropZone {object | null} : The current DropZone instance being hovered.
+ * - _ghostManager {GhostManager} : Manages the visual drag proxy.
  *
  * Typical usage:
- * // In App.js
  * const dds = DragDropService.getInstance();
- * dds.registerStrategy('column', new ColumnDropStrategy());
+ * dds.registerStrategy(DropZoneType.COLUMN, new ColumnDropStrategy());
  *
  * // In PanelHeader.js (Drag Source)
  * appBus.emit('dragstart', { item: panel, type: 'Panel', ... });
@@ -44,23 +45,23 @@ import { ToolbarContainerDropStrategy } from './ToolbarContainerDropStrategy.js'
  * this.element.dropZoneInstance = this;
  *
  * Events:
- * - Listens to (appBus): 'dragstart', 'dragend'
+ * - Listens to (appBus): 'dragstart'
+ * - Emits (appBus): 'dragend'
  *
  * Business rules implemented:
- * - Uses a "clean clone" method for non-floating drag ghosts
- * to prevent visual artifacts from overlapping UI elements.
- * - Calls preventDefault() universally on dragOver if dragging is active
- * to allow floating panels to move over non-dropzone areas.
- * - Constrains Ghost movement to the main container bounds ONLY for Panels,
- * allowing Toolbars to move freely.
+ * - Uses the "DOM Bridge" pattern with synthetic pointer events.
+ * - Delegates visual "ghost" management to GhostManager.
+ * - Applies constraints to panel movement via GhostManager updates.
+ * - Centralizes magic strings using DNDTypes constants.
  *
  * Dependencies:
- * - utils/EventBus.js
- * - components/Panel/Panel.js
- * - components/Panel/PanelGroup.js
- * - utils/ThrottleRAF.js
+ * - ../../utils/EventBus.js
+ * - ../../components/Panel/Panel.js
+ * - ../../components/Panel/PanelGroup.js
+ * - ../../utils/ThrottleRAF.js
  * - ./ToolbarContainerDropStrategy.js
- * - (Strategies are injected by App.js)
+ * - ../../constants/DNDTypes.js
+ * - ./GhostManager.js
  */
 export class DragDropService {
     /**
@@ -76,11 +77,21 @@ export class DragDropService {
      * type: string | null,
      * element: HTMLElement | null,
      * offsetX: number,
-     * offsetY: number
+     * offsetY: number,
+     * initialX: number,
+     * initialY: number
      * }}
      * @private
      */
-    _dragState = { item: null, type: null, element: null, offsetX: 0, offsetY: 0 };
+    _dragState = {
+        item: null,
+        type: null,
+        element: null,
+        offsetX: 0,
+        offsetY: 0,
+        initialX: 0,
+        initialY: 0
+    };
 
     /**
      * The single shared DOM element for drop feedback.
@@ -119,13 +130,6 @@ export class DragDropService {
     _namespace = 'dnd-service';
 
     /**
-     * The visual clone element following the cursor.
-     * @type {HTMLElement | null}
-     * @private
-     */
-    _dragGhost = null;
-
-    /**
      * The ID of the pointer initiating the drag.
      * @type {number | null}
      * @private
@@ -138,6 +142,13 @@ export class DragDropService {
      * @private
      */
     _activeDropZone = null;
+
+    /**
+     * Manages the visual drag proxy (ghost).
+     * @type {GhostManager}
+     * @private
+     */
+    _ghostManager = null;
 
     /**
      * Bound handler for bus 'dragstart'.
@@ -186,6 +197,7 @@ export class DragDropService {
         DragDropService._instance = this;
 
         const me = this;
+        me._ghostManager = new GhostManager();
         me._createPlaceholder();
 
         me._boundOnDragStart = me._onDragStart.bind(me);
@@ -293,9 +305,8 @@ export class DragDropService {
         appBus.offByNamespace(me._namespace);
         me._throttledMoveHandler?.cancel();
 
-        if (me._dragGhost) {
-            me._dragGhost.remove();
-        }
+        me._ghostManager.destroy();
+
         if (me._activePointerId !== null) {
             me._removeGlobalListeners();
         }
@@ -378,7 +389,7 @@ export class DragDropService {
             element.style.opacity = '0';
         }
 
-        me._createDragGhost(
+        me._ghostManager.create(
             element,
             event.clientX,
             event.clientY,
@@ -391,37 +402,6 @@ export class DragDropService {
         window.addEventListener('pointermove', me._boundOnPointerMove, { passive: false });
         window.addEventListener('pointerup', me._boundOnPointerUp);
         window.addEventListener('pointercancel', me._boundOnPointerUp);
-    }
-
-    /**
-     * Creates the visual "ghost" element.
-     * Forces top/left/margin to 0 to prevent layout issues.
-     * @private
-     */
-    _createDragGhost(sourceElement, clientX, clientY, offsetX, offsetY) {
-        const me = this;
-        const clone = sourceElement.cloneNode(true);
-
-        clone.classList.add('dnd-ghost');
-
-        clone.style.margin = '0';
-        clone.style.top = '0';
-        clone.style.left = '0';
-        clone.style.bottom = 'auto';
-        clone.style.right = 'auto';
-
-        clone.style.opacity = '';
-        clone.style.pointerEvents = 'none';
-
-        clone.style.width = `${sourceElement.offsetWidth}px`;
-        clone.style.height = `${sourceElement.offsetHeight}px`;
-
-        const top = clientY - offsetY;
-        const left = clientX - offsetX;
-        clone.style.transform = `translate3d(${left}px, ${top}px, 0)`;
-
-        document.body.appendChild(clone);
-        me._dragGhost = clone;
     }
 
     /**
@@ -444,7 +424,7 @@ export class DragDropService {
 
     /**
      * Throttled move handler.
-     * Updates ghost position (constrained to container ONLY for Panels) and performs hit-testing.
+     * Updates ghost position via GhostManager and performs hit-testing.
      * @param {number} clientX - Pointer X.
      * @param {number} clientY - Pointer Y.
      * @private
@@ -455,41 +435,25 @@ export class DragDropService {
             return;
         }
 
-        // 1. Move Ghost
-        if (me._dragGhost) {
-            let top = clientY - me._dragState.offsetY;
-            let left = clientX - me._dragState.offsetX;
+        // 1. Calculate constraints (Bounds)
+        let bounds = null;
+        const isPanel =
+            me._dragState.type === ItemType.PANEL || me._dragState.type === ItemType.PANEL_GROUP;
 
-            // FIX: Apply constraints ONLY for Panels/PanelGroups, not ToolbarGroups
-            const isPanel = me._dragState.type === 'Panel' || me._dragState.type === 'PanelGroup';
-
-            if (isPanel) {
-                const fpms = FloatingPanelManagerService.getInstance();
-                const bounds = fpms.getContainerBounds();
-
-                if (bounds) {
-                    const ghostWidth = me._dragGhost.offsetWidth;
-                    const ghostHeight = me._dragGhost.offsetHeight;
-
-                    const minX = bounds.left;
-                    const minY = bounds.top;
-                    const maxX = bounds.right - ghostWidth;
-                    const maxY = bounds.bottom - ghostHeight;
-
-                    left = Math.max(minX, Math.min(left, maxX));
-                    top = Math.max(minY, Math.min(top, maxY));
-                }
-            }
-
-            me._dragGhost.style.transform = `translate3d(${left}px, ${top}px, 0)`;
+        if (isPanel) {
+            const fpms = FloatingPanelManagerService.getInstance();
+            bounds = fpms.getContainerBounds();
         }
 
-        // 2. Hit Test
+        // 2. Update Ghost
+        me._ghostManager.update(clientX, clientY, bounds);
+
+        // 3. Hit Test
         const targetBelow = document.elementFromPoint(clientX, clientY);
         const dropZoneElement = targetBelow ? targetBelow.closest('[data-dropzone]') : null;
         const newDropZoneInstance = dropZoneElement ? dropZoneElement.dropZoneInstance : null;
 
-        // 3. Handle Zone Transitions (Leave/Enter)
+        // 4. Handle Zone Transitions (Leave/Enter)
         if (newDropZoneInstance !== me._activeDropZone) {
             if (me._activeDropZone) {
                 const oldStrategy = me._strategyRegistry.get(me._activeDropZone.dropZoneType);
@@ -501,7 +465,7 @@ export class DragDropService {
             me._activeDropZone = newDropZoneInstance;
         }
 
-        // 4. Handle Zone Over
+        // 5. Handle Zone Over
         if (me._activeDropZone) {
             const strategy = me._strategyRegistry.get(me._activeDropZone.dropZoneType);
             if (strategy) {
@@ -518,7 +482,7 @@ export class DragDropService {
             }
         }
 
-        // 5. No zone active
+        // 6. No zone active
         me.hidePlaceholder();
     }
 
@@ -576,11 +540,7 @@ export class DragDropService {
         me._activeDropZone = null;
         me._throttledMoveHandler.cancel();
 
-        if (me._dragGhost) {
-            me._dragGhost.remove();
-            me._dragGhost = null;
-        }
-
+        me._ghostManager.destroy();
         me.hidePlaceholder();
 
         document.body.classList.remove('dnd-active');
