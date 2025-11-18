@@ -139,10 +139,6 @@ export class FloatingPanelManagerService {
         return this._container;
     }
 
-    /* ----------------------
-     Public Methods
-    ---------------------- */
-
     /**
      * Description:
      * Destroys all currently active floating panels and clears the manager.
@@ -260,7 +256,10 @@ export class FloatingPanelManagerService {
             return;
         }
 
-        const containerRect = me.container.getBoundingClientRect();
+        const containerRect = me.getContainerBounds();
+        if (!containerRect) {
+            return;
+        }
 
         const initialX = positionX - containerRect.left - (draggedData.offsetX || 0);
         const initialY = positionY - containerRect.top - (draggedData.offsetY || 0);
@@ -289,7 +288,7 @@ export class FloatingPanelManagerService {
 
         me.addFloatingPanel(panelGroup, initialX, initialY);
 
-        const constrained = me.updatePanelPosition(panelGroup, initialX, initialY);
+        const constrained = me.updatePanelPosition(panelGroup, initialX, initialY, containerRect);
 
         panelGroup.setFloatingState(true, constrained.x, constrained.y);
     }
@@ -334,7 +333,7 @@ export class FloatingPanelManagerService {
         const y = nativeEvent.clientY - containerRect.top - 10;
 
         me.addFloatingPanel(panelGroupToFloat, x, y);
-        const constrained = me.updatePanelPosition(panelGroupToFloat, x, y);
+        const constrained = me.updatePanelPosition(panelGroupToFloat, x, y, containerRect);
         panelGroupToFloat.setFloatingState(true, constrained.x, constrained.y);
     }
 
@@ -401,15 +400,17 @@ export class FloatingPanelManagerService {
 
     /**
      * Updates a floating panel's position, applying container constraints.
+     * Explicitly requires bounds to be passed in, making the method pure
+     * regarding DOM reads.
+     *
      * @param {import('../../components/Panel/PanelGroup.js').PanelGroup} panelGroup - The panel to move.
      * @param {number} newX - The desired new X coordinate.
      * @param {number} newY - The desired new Y coordinate.
+     * @param {DOMRect} containerBounds - The boundaries of the container.
      * @returns {{x: number, y: number}} The constrained (applied) coordinates.
      */
-    updatePanelPosition(panelGroup, newX, newY) {
-        const me = this;
-        const bounds = me.getContainerBounds();
-        if (!bounds) {
+    updatePanelPosition(panelGroup, newX, newY, containerBounds) {
+        if (!containerBounds) {
             return { x: newX, y: newY };
         }
 
@@ -417,8 +418,8 @@ export class FloatingPanelManagerService {
         const panelWidth = panelElement.offsetWidth;
         const panelHeight = panelElement.offsetHeight;
 
-        const constrainedX = Math.max(0, Math.min(newX, bounds.width - panelWidth));
-        const constrainedY = Math.max(0, Math.min(newY, bounds.height - panelHeight));
+        const constrainedX = Math.max(0, Math.min(newX, containerBounds.width - panelWidth));
+        const constrainedY = Math.max(0, Math.min(newY, containerBounds.height - panelHeight));
 
         panelElement.style.left = `${constrainedX}px`;
         panelElement.style.top = `${constrainedY}px`;
