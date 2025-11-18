@@ -1,5 +1,6 @@
 import { appBus } from '../../utils/EventBus.js';
 import { ContextMenuService } from '../../services/ContextMenu/ContextMenuService.js';
+import { DragTrigger } from '../../utils/DragTrigger.js';
 
 /**
  * Description:
@@ -8,7 +9,7 @@ import { ContextMenuService } from '../../services/ContextMenu/ContextMenuServic
  * It renders the UI for the "tab" and acts as the drag source
  * for DND operations involving the Panel using Pointer Events.
  *
- * It implements a "Drag Threshold" to distinguish between a click (to activate)
+ * It utilizes DragTrigger to distinguish between a click (to activate)
  * and a drag (to move/undock).
  *
  * Properties summary:
@@ -16,8 +17,7 @@ import { ContextMenuService } from '../../services/ContextMenu/ContextMenuServic
  * - element {HTMLElement} : The main DOM element (<div class="panel-group__tab">).
  * - _titleEl {HTMLElement} : The <span> element for the title.
  * - _closeBtn {HTMLElement} : The <button> element for the close button.
- * - _dragThreshold {number} : Pixels mouse must move to trigger drag start.
- * - _dragStartData {object|null} : Temporary storage for pointerdown data.
+ * - _dragTrigger {DragTrigger} : Utility to handle drag/click detection.
  *
  * Typical usage:
  * // Instantiated by Panel.js
@@ -30,6 +30,7 @@ import { ContextMenuService } from '../../services/ContextMenu/ContextMenuServic
  * Dependencies:
  * - ../../utils/EventBus.js
  * - ../../services/ContextMenu/ContextMenuService.js
+ * - ../../utils/DragTrigger.js
  */
 export class PanelHeader {
     /**
@@ -68,48 +69,17 @@ export class PanelHeader {
     _closeBtn;
 
     /**
-     * Minimum pixels to move before drag starts.
-     * @type {number}
+     * Utility to handle drag/click detection.
+     * @type {DragTrigger}
      * @private
      */
-    _dragThreshold = 5;
-
-    /**
-     * Temporary data stored during the "pending drag" state.
-     * @type {object|null}
-     * @private
-     */
-    _dragStartData = null;
-
-    /**
-     * @type {Function | null}
-     * @private
-     */
-    _boundOnPointerDown = null;
-
-    /**
-     * @type {Function | null}
-     * @private
-     */
-    _boundCheckDragMove = null;
-
-    /**
-     * @type {Function | null}
-     * @private
-     */
-    _boundCheckDragUp = null;
+    _dragTrigger;
 
     /**
      * @type {Function | null}
      * @private
      */
     _boundOnCloseClick = null;
-
-    /**
-     * @type {Function | null}
-     * @private
-     */
-    _boundOnTabClick = null;
 
     /**
      * @type {Function | null}
@@ -127,17 +97,19 @@ export class PanelHeader {
         me._state.title = title;
         me.element = document.createElement('div');
 
-        me._boundOnPointerDown = me.onPointerDown.bind(me);
-        me._boundCheckDragMove = me._onCheckDragMove.bind(me);
-        me._boundCheckDragUp = me._onCheckDragUp.bind(me);
-
         me._boundOnCloseClick = me.onCloseClick.bind(me);
-        me._boundOnTabClick = me.onTabClick.bind(me);
         me._boundOnContextMenu = me.onContextMenu.bind(me);
 
         me.build();
         me.initEventListeners();
         me.updateConfig(panel._state);
+
+        // Initialize DragTrigger
+        me._dragTrigger = new DragTrigger(me.element, {
+            threshold: 5,
+            onDragStart: (e, startCoords) => me._startDrag(e, startCoords),
+            onClick: e => me.onTabClick(e)
+        });
     }
 
     /**
@@ -163,18 +135,22 @@ export class PanelHeader {
         me._closeBtn.type = 'button';
         me._closeBtn.classList.add('panel-group__tab-close');
         me._closeBtn.textContent = '×';
+
+        // Important: Stop propagation on pointerdown to prevent DragTrigger
+        // from starting a drag when the user intends to click the close button.
+        me._closeBtn.addEventListener('pointerdown', e => e.stopPropagation());
+
         me.element.appendChild(me._closeBtn);
     }
 
     /**
-     * Initializes DND (pointer) and click listeners.
+     * Initializes context menu and close button listeners.
+     * Note: Drag/Click on the main element is handled by DragTrigger.
      * @returns {void}
      */
     initEventListeners() {
         const me = this;
-        me.element.addEventListener('pointerdown', me._boundOnPointerDown);
         me._closeBtn.addEventListener('click', me._boundOnCloseClick);
-        me.element.addEventListener('click', me._boundOnTabClick);
         me.element.addEventListener('contextmenu', me._boundOnContextMenu);
     }
 
@@ -184,135 +160,29 @@ export class PanelHeader {
      */
     destroy() {
         const me = this;
-        me.element.removeEventListener('pointerdown', me._boundOnPointerDown);
         me._closeBtn.removeEventListener('click', me._boundOnCloseClick);
-        me.element.removeEventListener('click', me._boundOnTabClick);
         me.element.removeEventListener('contextmenu', me._boundOnContextMenu);
 
-        // Clean up transient listeners if destroyed while pending
-        if (me._dragStartData) {
-            window.removeEventListener('pointermove', me._boundCheckDragMove);
-            window.removeEventListener('pointerup', me._boundCheckDragUp);
-            window.removeEventListener('pointercancel', me._boundCheckDragUp);
-            me._dragStartData = null;
-        }
-    }
-
-    /**
-     * Handles the initial pointer down.
-     * Sets up monitoring to detect if this is a click or a drag start.
-     * @param {PointerEvent} e
-     * @returns {void}
-     */
-    onPointerDown(e) {
-        const me = this;
-
-        // 1. Only left click or touch
-        if (e.button !== 0) return;
-
-        // 2. Check if draggable is enabled
-        if (!me.element.draggable) return;
-
-        // 3. Ignore if clicking the close button
-        if (e.target.closest('.panel-group__tab-close')) return;
-
-        e.preventDefault(); // Prevent default selection/scroll
-        e.stopPropagation();
-
-        const target = e.target;
-        target.setPointerCapture(e.pointerId);
-
-        // Store initial data to check threshold later
-        me._dragStartData = {
-            startX: e.clientX,
-            startY: e.clientY,
-            pointerId: e.pointerId,
-            target: target,
-            event: e // Keep original event for payload
-        };
-
-        // Attach transient global listeners
-        window.addEventListener('pointermove', me._boundCheckDragMove);
-        window.addEventListener('pointerup', me._boundCheckDragUp);
-        window.addEventListener('pointercancel', me._boundCheckDragUp);
-    }
-
-    /**
-     * Checks if the mouse moved enough to qualify as a drag.
-     * @param {PointerEvent} e
-     * @private
-     */
-    _onCheckDragMove(e) {
-        const me = this;
-        if (!me._dragStartData || e.pointerId !== me._dragStartData.pointerId) return;
-
-        const dx = Math.abs(e.clientX - me._dragStartData.startX);
-        const dy = Math.abs(e.clientY - me._dragStartData.startY);
-
-        // If moved beyond threshold, Start Drag
-        if (dx > me._dragThreshold || dy > me._dragThreshold) {
-            me._startDrag(e);
-        }
-    }
-
-    /**
-     * Called if pointer is released BEFORE drag threshold is met.
-     * Treats the action as a Click (activates the tab).
-     * @param {PointerEvent} e
-     * @private
-     */
-    _onCheckDragUp(e) {
-        const me = this;
-        if (!me._dragStartData || e.pointerId !== me._dragStartData.pointerId) return;
-
-        // Cleanup listeners
-        me._cleanupPendingDrag();
-
-        // Since we called preventDefault on pointerdown, native click might be suppressed.
-        // We manually trigger the tab activation logic here.
-        if (me._state.parentGroup) {
-            me._state.parentGroup.setActive(me._state.panel);
-        }
-    }
-
-    /**
-     * Cleans up temporary listeners and data for pending drag.
-     * @private
-     */
-    _cleanupPendingDrag() {
-        const me = this;
-        if (me._dragStartData) {
-            if (me._dragStartData.target) {
-                me._dragStartData.target.releasePointerCapture(me._dragStartData.pointerId);
-            }
-            window.removeEventListener('pointermove', me._boundCheckDragMove);
-            window.removeEventListener('pointerup', me._boundCheckDragUp);
-            window.removeEventListener('pointercancel', me._boundCheckDragUp);
-            me._dragStartData = null;
+        if (me._dragTrigger) {
+            me._dragTrigger.destroy();
+            me._dragTrigger = null;
         }
     }
 
     /**
      * Actually emits the dragstart event to the DragDropService.
-     * @param {PointerEvent} e
+     * @param {PointerEvent} e - The pointer event.
+     * @param {object} startCoords - { startX, startY } from DragTrigger.
      * @private
      */
-    _startDrag(e) {
+    _startDrag(e, startCoords) {
         const me = this;
 
-        // Calculate offset based on the original pointerdown position
+        // Calculate offset based on the original pointerdown position (startX/Y)
+        // to insure the ghost element is positioned correctly relative to the cursor.
         const rect = me.element.getBoundingClientRect();
-        // We use the CURRENT event coordinates for the start position logic in DDS,
-        // but offset is usually calculated relative to the element's top-left.
-        // Let's use the current pointer to ensure smoothness.
-        const offsetX = e.clientX - rect.left;
-        const offsetY = e.clientY - rect.top;
-
-        // Retrieve stored event to pass (or use current)
-        // const originalEvent = me._dragStartData.event;
-
-        // Cleanup local monitoring, handover to DragDropService
-        me._cleanupPendingDrag();
+        const offsetX = startCoords.startX - rect.left;
+        const offsetY = startCoords.startY - rect.top;
 
         appBus.emit('dragstart', {
             item: me._state.panel,
@@ -345,13 +215,12 @@ export class PanelHeader {
 
     /**
      * Handles clicks on the tab to activate it.
-     * (Kept for compatibility, but onPointerDown logic usually supercedes this for left clicks)
+     * Invoked by DragTrigger when the movement is below threshold.
      * @param {MouseEvent} e
      * @returns {void}
      */
     onTabClick(e) {
         const me = this;
-        // This might still fire for middle/right clicks or if preventDefault wasn't called
         if (me._state.parentGroup) {
             me._state.parentGroup.setActive(me._state.panel);
         }
@@ -424,17 +293,18 @@ export class PanelHeader {
         }
 
         if (config.movable === false) {
-            me.element.draggable = false; // Used as logic flag
+            // DragTrigger respects the attribute 'draggable'
+            me.element.setAttribute('draggable', 'false');
             me.element.style.cursor = 'default';
         } else {
-            me.element.draggable = true;
+            me.element.setAttribute('draggable', 'true');
             me.element.style.cursor = 'grab';
         }
     }
 
     /**
      * Toggles the visual appearance between 'simple' (header) and 'tab' mode.
-     * Also manages the draggable state logic.
+     * Also manages the draggable state logic via attributes.
      * @param {boolean} isSimpleMode
      * @returns {void}
      */
@@ -445,7 +315,7 @@ export class PanelHeader {
             me._closeBtn.style.display = 'none';
 
             // Single panel mode: Disable tab dragging
-            me.element.draggable = false;
+            me.element.setAttribute('draggable', 'false');
             me.element.style.cursor = 'default';
         } else {
             me.element.classList.add('panel-group__tab');
@@ -455,10 +325,10 @@ export class PanelHeader {
 
             // Multi panel mode: Restore draggable based on config
             if (me._state.panel._state.movable) {
-                me.element.draggable = true;
+                me.element.setAttribute('draggable', 'true');
                 me.element.style.cursor = 'grab';
             } else {
-                me.element.draggable = false;
+                me.element.setAttribute('draggable', 'false');
                 me.element.style.cursor = 'default';
             }
         }

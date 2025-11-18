@@ -26,6 +26,7 @@ import { Loader } from './services/Loader/Loader.js';
 import { ToolbarContainer } from './components/Toolbar/ToolbarContainer.js';
 import { ToolbarGroupFactory } from './components/Toolbar/ToolbarGroupFactory.js';
 import { ApplicationGroup } from './components/Toolbar/ApplicationGroup.js';
+import { DropZoneType } from './constants/DNDTypes.js';
 
 /**
  * Description:
@@ -201,11 +202,11 @@ export class App {
         me.stateService = ApplicationStateService.getInstance();
 
         const dds = DragDropService.getInstance();
-        dds.registerStrategy('column', new ColumnDropStrategy());
-        dds.registerStrategy('TabContainer', new TabContainerDropStrategy());
-        dds.registerStrategy('row', new RowDropStrategy());
-        dds.registerStrategy('container', new ContainerDropStrategy());
-        dds.registerStrategy('toolbar-container', new ToolbarContainerDropStrategy());
+        dds.registerStrategy(DropZoneType.COLUMN, new ColumnDropStrategy());
+        dds.registerStrategy(DropZoneType.TAB_CONTAINER, new TabContainerDropStrategy());
+        dds.registerStrategy(DropZoneType.ROW, new RowDropStrategy());
+        dds.registerStrategy(DropZoneType.CONTAINER, new ContainerDropStrategy());
+        dds.registerStrategy(DropZoneType.TOOLBAR_CONTAINER, new ToolbarContainerDropStrategy());
 
         const factory = PanelFactory.getInstance();
         factory.registerPanelClasses([Panel, TextPanel, ToolbarPanel, CounterPanel]);
