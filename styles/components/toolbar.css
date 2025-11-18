@@ -9,7 +9,6 @@
     position: relative;
     overflow: hidden;
     user-select: none;
-    /* REMOVIDO: border: 1px solid transparent; (Causa do bug dos 2px fantasmas) */
 }
 
 /* Toolbars vazias são removidas do fluxo de layout (Zero Footprint) */
@@ -95,29 +94,67 @@ body.dnd-active.dnd-type-toolbargroup .toolbar-container--right.is-empty {
 
 /* --- Botões de Scroll --- */
 .toolbar__scroll-btn {
-    display: none;
+    display: flex;
     flex-shrink: 0;
     background: var(--color-bg-hover);
     border: 1px solid var(--color-border-default);
     color: var(--color-text-primary);
     cursor: pointer;
     padding: 0;
-    width: 16px;
-    height: 100%;
     align-items: center;
     justify-content: center;
+
+    /* Estado Oculto (Default) com suporte a animação */
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    border-width: 0;
+    margin: 0;
+    transform: scale(0.8);
+
+    transition:
+        width 0.2s ease,
+        height 0.2s ease,
+        opacity 0.2s ease,
+        transform 0.2s ease,
+        border-width 0.2s ease;
 }
+
+/* Ajustes para Horizontal (Top/Bottom) */
+.toolbar-container--top .toolbar__scroll-btn,
+.toolbar-container--bottom .toolbar__scroll-btn {
+    height: 100%;
+    width: 0;
+    min-width: 0;
+}
+
+/* Ajustes para Vertical (Left/Right) */
 .toolbar-container--left .toolbar__scroll-btn,
 .toolbar-container--right .toolbar__scroll-btn {
     width: 100%;
-    height: 16px;
+    height: 0;
+    min-height: 0;
 }
 
-.toolbar-container.has-scroll-prev .toolbar__scroll-btn--prev {
-    display: flex;
+/* Estado Visível (acionado via JS class) */
+.toolbar__scroll-btn--visible {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: scale(1);
+    border-width: 1px;
 }
-.toolbar-container.has-scroll-next .toolbar__scroll-btn--next {
-    display: flex;
+
+/* Dimensões quando visível - Horizontal */
+.toolbar-container--top .toolbar__scroll-btn--visible,
+.toolbar-container--bottom .toolbar__scroll-btn--visible {
+    width: 16px;
+}
+
+/* Dimensões quando visível - Vertical */
+.toolbar-container--left .toolbar__scroll-btn--visible,
+.toolbar-container--right .toolbar__scroll-btn--visible {
+    height: 16px;
 }
 
 .toolbar__scroll-btn:hover {
@@ -133,8 +170,7 @@ body.dnd-active.dnd-type-toolbargroup .toolbar-container--right.is-empty {
 .toolbar-group {
     display: flex;
     flex-shrink: 0;
-    /* Borda placeholder mantida no item filho para alinhamento interno, se necessário,
-       mas não afeta o layout do container pai vazio */
+    /* Borda placeholder mantida no item filho para alinhamento interno */
     border: 1px solid transparent;
     border-radius: var(--border-radius-sm);
     background-color: var(--toolbar-background);
@@ -264,41 +300,15 @@ body.dnd-active.dnd-type-toolbargroup .toolbar-container--right.is-empty {
 
 /* --- Animações de Drop --- */
 .toolbar-container .container__placeholder--vertical {
-    animation: toolbarPlaceholderExpandH 0.2s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
     transform-origin: left center;
-    width: 0;
+    width: 5px;
+    opacity: 1;
     min-width: 0;
 }
 
 .toolbar-container .container__placeholder--horizontal {
-    animation: toolbarPlaceholderExpandV 0.2s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
     transform-origin: top center;
-    height: 0;
+    height: 5px;
+    opacity: 1;
     min-height: 0;
-}
-
-@keyframes toolbarPlaceholderExpandH {
-    from {
-        width: 0;
-        opacity: 0;
-        margin: 0;
-    }
-    to {
-        width: 5px;
-        opacity: 1;
-        margin: 0;
-    }
-}
-
-@keyframes toolbarPlaceholderExpandV {
-    from {
-        height: 0;
-        opacity: 0;
-        margin: 0;
-    }
-    to {
-        height: 5px;
-        opacity: 1;
-        margin: 0;
-    }
 }

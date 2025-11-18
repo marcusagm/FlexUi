@@ -27,7 +27,7 @@ import { throttleRAF } from '../../utils/ThrottleRAF.js';
  * - Listens to (DOM): 'click' on scroll buttons
  *
  * Business rules implemented:
- * - Manages scroll visibility using CSS classes 'has-scroll-prev' and 'has-scroll-next'.
+ * - Manages scroll visibility using CSS class 'toolbar__scroll-btn--visible' directly on buttons.
  * - Updates 'is-empty' class based on the number of child groups.
  * - Supports A11y with ARIA roles, labels, and dynamic tabindex management.
  * - Uses throttling for scroll updates to optimize performance.
@@ -272,9 +272,11 @@ export class ToolbarContainer {
             hasNext = scrollHeight > clientHeight + scrollTop + bufferPixel;
         }
 
-        me.element.classList.toggle('has-scroll-prev', hasPrevious);
-        me.element.classList.toggle('has-scroll-next', hasNext);
+        // Updates visibility via CSS class on the buttons
+        me._scrollPreviousButton.classList.toggle('toolbar__scroll-btn--visible', hasPrevious);
+        me._scrollNextButton.classList.toggle('toolbar__scroll-btn--visible', hasNext);
 
+        // Updates Accessibility (tabindex)
         if (hasPrevious) {
             me._scrollPreviousButton.removeAttribute('tabindex');
         } else {
