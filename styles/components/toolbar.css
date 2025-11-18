@@ -8,6 +8,7 @@
     gap: var(--spacing-2);
     position: relative;
     overflow: hidden;
+    user-select: none;
     /* REMOVIDO: border: 1px solid transparent; (Causa do bug dos 2px fantasmas) */
 }
 
