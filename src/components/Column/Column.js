@@ -2,11 +2,14 @@ import { PanelGroup } from '../Panel/PanelGroup.js';
 import { appBus } from '../../utils/EventBus.js';
 import { throttleRAF } from '../../utils/ThrottleRAF.js';
 import { generateId } from '../../utils/generateId.js';
+import { ResizeController } from '../../utils/ResizeController.js';
+import { DropZoneType } from '../../constants/DNDTypes.js';
 
 /**
  * Description:
  * Manages a single vertical column in the container. It holds and organizes
- * PanelGroups, manages horizontal resizing, and delegates drag/drop logic.
+ * PanelGroups, manages horizontal resizing via ResizeController, and delegates
+ * drag/drop logic.
  *
  * Properties summary:
  * - _state {object} : Internal state management (child PanelGroups, width, parent).
@@ -30,14 +33,16 @@ import { generateId } from '../../utils/generateId.js';
  * - Registers as a 'column' type drop zone.
  * - Listens for 'panelgroup:removed' and removes the child.
  * - If it becomes empty (last PanelGroup removed), emits 'column:empty'.
- * - Manages its own horizontal resize handle (via 'addResizeBars').
+ * - Manages its own horizontal resize handle via ResizeController.
  * - Resize logic respects the minWidth of its child PanelGroups.
  *
  * Dependencies:
  * - components/Panel/PanelGroup.js
- * - ../../utils/EventBus.js
- * - ../../utils/ThrottleRAF.js
- * - ../../utils/generateId.js
+ * - utils/EventBus.js
+ * - utils/ThrottleRAF.js
+ * - utils/generateId.js
+ * - utils/ResizeController.js
+ * - constants/DNDTypes.js
  */
 export class Column {
     /**
@@ -98,7 +103,7 @@ export class Column {
 
         me.element = document.createElement('div');
         me.element.classList.add('column');
-        me.dropZoneType = 'column';
+        me.dropZoneType = DropZoneType.COLUMN;
 
         me.element.dataset.dropzone = me.dropZoneType;
         me.element.dropZoneInstance = me;
@@ -220,6 +225,8 @@ export class Column {
 
     /**
      * Adds the horizontal resize bar to the column.
+     * Uses ResizeController to manage drag logic.
+     *
      * @param {boolean} isLast - Indicates if this is the last column in the row.
      * @returns {void}
      */
@@ -235,61 +242,43 @@ export class Column {
         me.element.classList.add('column--resize-right');
         const bar = document.createElement('div');
         bar.classList.add('column__resize-handle');
+        bar.style.touchAction = 'none'; // Critical for Pointer Events
         me.element.appendChild(bar);
-        bar.addEventListener('pointerdown', e => me.startResize(e));
-    }
 
-    /**
-     * Handles the start of a horizontal resize drag.
-     * Calculates the effective minimum width based on its own minWidth
-     * and the minWidth of its child PanelGroups.
-     * @param {PointerEvent} e - The pointerdown event.
-     * @returns {void}
-     */
-    startResize(e) {
-        const me = this;
-        const container = me._state.container;
+        let startWidth = 0;
+        let effectiveMinWidth = 0;
 
-        const columns = container.getColumns();
-        const cols = columns.map(c => c.element);
+        const controller = new ResizeController(me.element, 'horizontal', {
+            onStart: () => {
+                startWidth = me.element.offsetWidth;
+                effectiveMinWidth = me.getEffectiveMinWidth();
+            },
+            onUpdate: delta => {
+                me._state.width = Math.max(effectiveMinWidth, startWidth + delta);
+                if (me.getThrottledUpdate()) {
+                    me.getThrottledUpdate()();
+                }
+            },
+            onEnd: () => {
+                if (me._state.container) {
+                    me._state.container.requestLayoutUpdate();
+                }
+            }
+        });
 
-        const idx = cols.indexOf(me.element);
-        if (cols.length === 1 || idx === cols.length - 1) {
-            return;
-        }
+        bar.addEventListener('pointerdown', e => {
+            // Check logic to prevent resizing if not allowed
+            const container = me._state.container;
+            if (!container) return;
 
-        e.preventDefault();
-        const target = e.target;
-        const pointerId = e.pointerId;
-        target.setPointerCapture(pointerId);
-
-        const startX = e.clientX;
-        const startW = me.element.offsetWidth;
-
-        const effectiveMinWidth = me.getEffectiveMinWidth();
-
-        const onMove = ev => {
-            if (ev.pointerId !== pointerId) {
+            const columns = container.getColumns();
+            const idx = columns.indexOf(me);
+            if (columns.length === 1 || idx === columns.length - 1) {
                 return;
             }
-            const delta = ev.clientX - startX;
-            me._state.width = Math.max(effectiveMinWidth, startW + delta);
-            me.getThrottledUpdate()();
-        };
 
-        const onUp = ev => {
-            if (ev.pointerId !== pointerId) {
-                return;
-            }
-            target.releasePointerCapture(pointerId);
-            window.removeEventListener('pointermove', onMove);
-            window.removeEventListener('pointerup', onUp);
-            me.getThrottledUpdate()?.cancel();
-            container.requestLayoutUpdate();
-        };
-
-        window.addEventListener('pointermove', onMove);
-        window.addEventListener('pointerup', onUp);
+            controller.start(e);
+        });
     }
 
     /**

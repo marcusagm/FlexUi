@@ -5,6 +5,8 @@ import { appBus } from '../../utils/EventBus.js';
 import { throttleRAF } from '../../utils/ThrottleRAF.js';
 import { generateId } from '../../utils/generateId.js';
 import { FloatingPanelManagerService } from '../../services/DND/FloatingPanelManagerService.js';
+import { ResizeController } from '../../utils/ResizeController.js';
+import { ItemType, DropZoneType } from '../../constants/DNDTypes.js';
 
 /**
  * Description:
@@ -38,8 +40,7 @@ import { FloatingPanelManagerService } from '../../services/DND/FloatingPanelMan
  * - Orchestrates Panel DOM (header vs. content).
  * - Manages active tab state ('setActive').
  * - Renders in "simple mode" (no tabs) if only one child Panel exists.
- * - Manages its own vertical resize (docked and floating) via unified handlers.
- * - (Logic removed) 'canCollapse' rule now managed by LayoutService.
+ * - Manages its own vertical resize (docked) and 2D resize (floating) via ResizeController.
  * - If last Panel is removed, destroys itself ('removePanel' -> 'close').
  * - Calculates minHeight dynamically based on panel content and resize handle visibility.
  *
@@ -50,6 +51,9 @@ import { FloatingPanelManagerService } from '../../services/DND/FloatingPanelMan
  * - ../../utils/EventBus.js
  * - ../../utils/ThrottleRAF.js
  * - ../../utils/generateId.js
+ * - ../../services/DND/FloatingPanelManagerService.js
+ * - ../../utils/ResizeController.js
+ * - ../../constants/DNDTypes.js
  */
 export class PanelGroup {
     /**
@@ -141,58 +145,33 @@ export class PanelGroup {
     _boundOnToggleCollapseRequest = null;
 
     /**
+     * The docked resize handle (bottom).
      * @type {HTMLElement}
      * @private
      */
-    _resizeHandleSE = null;
+    _resizeHandleDocked = null;
 
     /**
-     * @type {HTMLElement}
+     * Floating resize handles.
+     * @type {{
+     * se: HTMLElement,
+     * s: HTMLElement,
+     * e: HTMLElement
+     * }}
      * @private
      */
-    _resizeHandleS = null;
-
-    /**
-     * @type {HTMLElement}
-     * @private
-     */
-    _resizeHandleE = null;
-
-    /**
-     * @type {Function | null}
-     * @private
-     */
-    _boundOnResizeStart = null;
-
-    /**
-     * @type {Function | null}
-     * @private
-     */
-    _boundOnResizeMove = null;
-
-    /**
-     * @type {Function | null}
-     * @private
-     */
-    _boundOnResizeUp = null;
-
-    /**
-     * Tracks coordinates during floating resize.
-     * @type {object}
-     * @private
-     */
-    _resizeState = {
-        startX: 0,
-        startY: 0,
-        startWidth: 0,
-        startHeight: 0,
-        direction: null,
-        pointerId: null,
-        target: null,
-        isDocked: false,
-        minHeight: 0,
-        minWidth: 0
+    _floatingHandles = {
+        se: null,
+        s: null,
+        e: null
     };
+
+    /**
+     * Controllers for resize logic.
+     * @type {Map<string, ResizeController>}
+     * @private
+     */
+    _resizeControllers = new Map();
 
     /**
      * @param {Panel | null} [initialPanel=null] - The optional first panel.
@@ -204,7 +183,7 @@ export class PanelGroup {
         const me = this;
         Object.assign(me._state, config);
 
-        me.dropZoneType = 'TabContainer';
+        me.dropZoneType = DropZoneType.TAB_CONTAINER;
 
         me._state.contentContainer = document.createElement('div');
         me._state.contentContainer.classList.add('panel-group__content');
@@ -214,6 +193,7 @@ export class PanelGroup {
         me.element.classList.add('panel-group');
         me.element.classList.add('panel');
 
+        // Bring to front on click when floating
         me.element.addEventListener('pointerdown', () => {
             if (me._state.isFloating) {
                 FloatingPanelManagerService.getInstance().bringToFront(me);
@@ -232,10 +212,6 @@ export class PanelGroup {
         me._boundOnToggleCollapseRequest = me.onToggleCollapseRequest.bind(me);
 
         me._createFloatingResizeHandles();
-        me._boundOnResizeStart = me._onResizeStart.bind(me);
-        me._boundOnResizeMove = me._onResizeMove.bind(me);
-        me._boundOnResizeUp = me._onResizeUp.bind(me);
-        me._initFloatingResizeListeners();
 
         me.build();
         me.setFloatingState(me._state.isFloating, me._state.x, me._state.y);
@@ -251,6 +227,8 @@ export class PanelGroup {
                 me.updateHeight();
             })
         );
+
+        me._initResizeControllers();
     }
 
     /**
@@ -291,7 +269,10 @@ export class PanelGroup {
             ? me._state.activePanel.getMinPanelHeight()
             : 0;
 
-        const handleHeight = me.resizeHandle ? me.resizeHandle.offsetHeight : 0;
+        const handleHeight =
+            me._resizeHandleDocked && me._resizeHandleDocked.offsetParent
+                ? me._resizeHandleDocked.offsetHeight
+                : 0;
 
         return Math.max(me._state.minHeight, activeMinHeight) + headerHeight + handleHeight;
     }
@@ -342,10 +323,9 @@ export class PanelGroup {
         if (isFloating) {
             me.element.classList.add('panel-group--floating');
 
-            // Reset constraints applied by LayoutService (e.g., when it was the only child)
+            // Reset constraints applied by LayoutService
             me.element.classList.remove('panel-group--fills-space');
             if (me._state.header && me._state.header.collapseBtn) {
-                // Re-enable the button based on configuration, not layout position
                 me._state.header.collapseBtn.disabled = !me._state.collapsible;
             }
 
@@ -383,8 +363,6 @@ export class PanelGroup {
     /**
      * Event handler for when a child Panel (tab) requests to close.
      * @param {object} eventData
-     * @param {Panel} eventData.panel - The child Panel.
-     * @param {PanelGroup} eventData.group - The parent PanelGroup.
      * @returns {void}
      */
     onChildCloseRequest({ panel, group }) {
@@ -396,8 +374,6 @@ export class PanelGroup {
     /**
      * Event handler for 'app:close-panel-request' from ContextMenu.
      * @param {object} contextData
-     * @param {Panel} contextData.panel - The child Panel.
-     * @param {PanelGroup} contextData.group - The parent PanelGroup.
      * @returns {void}
      */
     onChildCloseRequestFromContext(contextData) {
@@ -438,12 +414,8 @@ export class PanelGroup {
         me._state.panels.forEach(panel => panel.destroy());
         me.getThrottledUpdate()?.cancel();
 
-        me.resizeHandle?.removeEventListener('pointerdown', me._boundOnResizeStart);
-        me._resizeHandleSE?.removeEventListener('pointerdown', me._boundOnResizeStart);
-        me._resizeHandleS?.removeEventListener('pointerdown', me._boundOnResizeStart);
-        me._resizeHandleE?.removeEventListener('pointerdown', me._boundOnResizeStart);
-        window.removeEventListener('pointermove', me._boundOnResizeMove);
-        window.removeEventListener('pointerup', me._boundOnResizeUp);
+        // Clean up element
+        me.element.remove();
     }
 
     /**
@@ -452,18 +424,17 @@ export class PanelGroup {
      */
     build() {
         const me = this;
-        me.resizeHandle = document.createElement('div');
-        me.resizeHandle.classList.add('panel-group__resize-handle');
-        me.resizeHandle.dataset.direction = 's-docked';
-        me.resizeHandle.addEventListener('pointerdown', me._boundOnResizeStart);
+        me._resizeHandleDocked = document.createElement('div');
+        me._resizeHandleDocked.classList.add('panel-group__resize-handle');
+        me._resizeHandleDocked.style.touchAction = 'none';
 
         me.element.append(
             me._state.header.element,
             me._state.contentContainer,
-            me.resizeHandle,
-            me._resizeHandleSE,
-            me._resizeHandleS,
-            me._resizeHandleE
+            me._resizeHandleDocked,
+            me._floatingHandles.se,
+            me._floatingHandles.s,
+            me._floatingHandles.e
         );
 
         if (!me._state.movable) {
@@ -478,7 +449,7 @@ export class PanelGroup {
      * @returns {string}
      */
     getPanelType() {
-        return 'PanelGroup';
+        return ItemType.PANEL_GROUP;
     }
 
     /**
@@ -518,7 +489,7 @@ export class PanelGroup {
         me._state.collapsed = true;
         me.element.classList.add('panel--collapsed');
         me._state.contentContainer.style.display = 'none';
-        me.resizeHandle.style.display = 'none';
+        me._resizeHandleDocked.style.display = 'none';
         me.updateHeight();
     }
 
@@ -531,7 +502,7 @@ export class PanelGroup {
         me._state.collapsed = false;
         me.element.classList.remove('panel--collapsed');
         me._state.contentContainer.style.display = '';
-        me.resizeHandle.style.display = '';
+        me._resizeHandleDocked.style.display = '';
         me.updateHeight();
     }
 
@@ -740,10 +711,7 @@ export class PanelGroup {
     }
 
     /**
-     * Description:
      * Moves an existing Panel (tab) to a new index within this group.
-     * Used for drag-and-drop reordering.
-     *
      * @param {Panel} panel - The Panel instance to move.
      * @param {number} newIndex - The target index.
      * @returns {void}
@@ -783,7 +751,7 @@ export class PanelGroup {
     }
 
     /**
-     * Sets a child Panel (tab) as the active one, showing its content.
+     * Sets a child Panel (tab) as the active one.
      * @param {Panel} panel - The panel instance to activate.
      * @returns {void}
      */
@@ -839,154 +807,123 @@ export class PanelGroup {
      */
     _createFloatingResizeHandles() {
         const me = this;
-        me._resizeHandleSE = document.createElement('div');
-        me._resizeHandleS = document.createElement('div');
-        me._resizeHandleE = document.createElement('div');
+        me._floatingHandles.se = document.createElement('div');
+        me._floatingHandles.s = document.createElement('div');
+        me._floatingHandles.e = document.createElement('div');
 
-        me._resizeHandleSE.className =
+        me._floatingHandles.se.className =
             'panel-group__resize-handle--floating panel-group__resize-handle--se';
-        me._resizeHandleS.className =
+        me._floatingHandles.s.className =
             'panel-group__resize-handle--floating panel-group__resize-handle--s';
-        me._resizeHandleE.className =
+        me._floatingHandles.e.className =
             'panel-group__resize-handle--floating panel-group__resize-handle--e';
 
-        me._resizeHandleSE.dataset.direction = 'se';
-        me._resizeHandleS.dataset.direction = 's';
-        me._resizeHandleE.dataset.direction = 'e';
+        // Touch action none is critical for Pointer Events
+        me._floatingHandles.se.style.touchAction = 'none';
+        me._floatingHandles.s.style.touchAction = 'none';
+        me._floatingHandles.e.style.touchAction = 'none';
     }
 
     /**
-     * Attaches mousedown listeners to floating resize handles.
+     * Initializes ResizeControllers for all handles (docked and floating).
+     * Uses a composite strategy for the SE handle to allow 2D resizing using
+     * the 1D ResizeController.
      * @private
      * @returns {void}
      */
-    _initFloatingResizeListeners() {
+    _initResizeControllers() {
         const me = this;
-        me._resizeHandleSE.addEventListener('pointerdown', me._boundOnResizeStart);
-        me._resizeHandleS.addEventListener('pointerdown', me._boundOnResizeStart);
-        me._resizeHandleE.addEventListener('pointerdown', me._boundOnResizeStart);
-    }
+        let startH = 0;
+        let startW = 0;
 
-    /**
-     * Handles the start of a floating or docked resize drag.
-     * @param {PointerEvent} e
-     * @private
-     * @returns {void}
-     */
-    _onResizeStart(e) {
-        const me = this;
-        if (!me._state.isFloating && me._state.collapsed) return;
+        // --- 1. Docked Resize (Vertical Only) ---
+        const dockedController = new ResizeController(me._resizeHandleDocked, 'vertical', {
+            onStart: () => {
+                startH = me.element.offsetHeight;
+            },
+            onUpdate: delta => {
+                me._state.height = Math.max(me.getMinPanelHeight(), startH + delta);
+                me.getThrottledUpdate()();
+            },
+            onEnd: () => me.requestLayoutUpdate()
+        });
 
-        e.preventDefault();
-        e.stopPropagation();
+        me._resizeHandleDocked.addEventListener('pointerdown', e => {
+            if (!me._state.isFloating && !me._state.collapsed) {
+                dockedController.start(e);
+            }
+        });
 
-        const target = e.target;
-        const pointerId = e.pointerId;
-        target.setPointerCapture(pointerId);
+        // --- 2. Floating Resize Logic Helpers ---
+        const getBounds = () => FloatingPanelManagerService.getInstance().getContainerBounds();
 
-        const direction = target.dataset.direction;
-        const isDocked = direction === 's-docked';
-
-        me._resizeState.startX = e.clientX;
-        me._resizeState.startY = e.clientY;
-        const rect = me.element.getBoundingClientRect();
-        me._resizeState.startWidth = rect.width;
-        me._resizeState.startHeight = rect.height;
-        me._resizeState.direction = direction;
-        me._resizeState.pointerId = pointerId;
-        me._resizeState.target = target;
-        me._resizeState.isDocked = isDocked;
-        me._resizeState.minHeight = me.getMinPanelHeight();
-        me._resizeState.minWidth = me.getMinPanelWidth();
-
-        window.addEventListener('pointermove', me._boundOnResizeMove);
-        window.addEventListener('pointerup', me._boundOnResizeUp);
-    }
-
-    /**
-     * Handles mouse movement during floating or docked resize.
-     * @param {PointerEvent} e
-     * @private
-     * @returns {void}
-     */
-    _onResizeMove(e) {
-        const me = this;
-        if (e.pointerId !== me._resizeState.pointerId) {
-            return;
-        }
-
-        if (me._resizeState.isDocked) {
-            const deltaY = e.clientY - me._resizeState.startY;
-            me._state.height = Math.max(
-                me._resizeState.minHeight,
-                me._resizeState.startHeight + deltaY
-            );
-            me.getThrottledUpdate()();
-        } else {
-            const deltaX = e.clientX - me._resizeState.startX;
-            const deltaY = e.clientY - me._resizeState.startY;
-
-            const fpms = FloatingPanelManagerService.getInstance();
-            const bounds = fpms.getContainerBounds();
+        const updateFloatingSize = (deltaW, deltaH) => {
+            const bounds = getBounds();
             if (!bounds) return;
 
-            let newWidth = me._resizeState.startWidth;
-            let newHeight = me._resizeState.startHeight;
+            const minWidth = me.getMinPanelWidth();
+            const minHeight = me.getMinPanelHeight();
 
-            const direction = me._resizeState.direction;
-
-            if (direction.includes('e')) {
-                newWidth = me._resizeState.startWidth + deltaX;
-            }
-            if (direction.includes('s')) {
-                newHeight = me._resizeState.startHeight + deltaY;
-            }
-
-            const minWidth = me._resizeState.minWidth;
-            const minHeight = me._resizeState.minHeight;
-
+            // Clamping Logic
             const maxWidth = bounds.width - (me._state.x || 0);
             const maxHeight = bounds.height - (me._state.y || 0);
 
-            newWidth = Math.max(minWidth, Math.min(newWidth, maxWidth));
-            newHeight = Math.max(minHeight, Math.min(newHeight, maxHeight));
-
-            if (direction.includes('e')) {
-                me.element.style.width = `${newWidth}px`;
+            if (deltaW !== null) {
+                const newW = Math.max(minWidth, Math.min(startW + deltaW, maxWidth));
+                me.element.style.width = `${newW}px`;
+                me._state.width = newW;
             }
-            if (direction.includes('s')) {
-                me.element.style.height = `${newHeight}px`;
+            if (deltaH !== null) {
+                const newH = Math.max(minHeight, Math.min(startH + deltaH, maxHeight));
+                me.element.style.height = `${newH}px`;
+                me._state.height = newH;
             }
-        }
-    }
+        };
 
-    /**
-     * Handles mouse up after floating or docked resize.
-     * @param {PointerEvent} e
-     * @private
-     * @returns {void}
-     */
-    _onResizeUp(e) {
-        const me = this;
-        if (e.pointerId !== me._resizeState.pointerId) {
-            return;
-        }
+        // --- 3. Floating Handle: South (Vertical) ---
+        const floatS = new ResizeController(me._floatingHandles.s, 'vertical', {
+            onStart: () => {
+                startH = me.element.offsetHeight;
+            },
+            onUpdate: delta => updateFloatingSize(null, delta)
+        });
+        me._floatingHandles.s.addEventListener('pointerdown', e => {
+            if (me._state.isFloating) floatS.start(e);
+        });
 
-        me._resizeState.target.releasePointerCapture(me._resizeState.pointerId);
+        // --- 4. Floating Handle: East (Horizontal) ---
+        const floatE = new ResizeController(me._floatingHandles.e, 'horizontal', {
+            onStart: () => {
+                startW = me.element.offsetWidth;
+            },
+            onUpdate: delta => updateFloatingSize(delta, null)
+        });
+        me._floatingHandles.e.addEventListener('pointerdown', e => {
+            if (me._state.isFloating) floatE.start(e);
+        });
 
-        window.removeEventListener('pointermove', me._boundOnResizeMove);
-        window.removeEventListener('pointerup', me._boundOnResizeUp);
+        // --- 5. Floating Handle: South-East (2D) ---
+        // Uses two controllers simultaneously for 2D effect
+        const floatSE_V = new ResizeController(me._floatingHandles.se, 'vertical', {
+            onStart: () => {
+                startH = me.element.offsetHeight;
+            },
+            onUpdate: delta => updateFloatingSize(null, delta)
+        });
 
-        if (me._resizeState.isDocked) {
-            me.getThrottledUpdate()?.cancel();
-            me.requestLayoutUpdate();
-        } else {
-            me._state.width = me.element.offsetWidth;
-            me._state.height = me.element.offsetHeight;
-        }
+        const floatSE_H = new ResizeController(me._floatingHandles.se, 'horizontal', {
+            onStart: () => {
+                startW = me.element.offsetWidth;
+            },
+            onUpdate: delta => updateFloatingSize(delta, null)
+        });
 
-        me._resizeState.pointerId = null;
-        me._resizeState.target = null;
+        me._floatingHandles.se.addEventListener('pointerdown', e => {
+            if (me._state.isFloating) {
+                floatSE_V.start(e);
+                floatSE_H.start(e);
+            }
+        });
     }
 
     /**

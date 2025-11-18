@@ -2,6 +2,8 @@ import { Column } from '../Column/Column.js';
 import { appBus } from '../../utils/EventBus.js';
 import { throttleRAF } from '../../utils/ThrottleRAF.js';
 import { generateId } from '../../utils/generateId.js';
+import { ResizeController } from '../../utils/ResizeController.js';
+import { DropZoneType } from '../../constants/DNDTypes.js';
 
 /**
  * Description:
@@ -33,7 +35,7 @@ import { generateId } from '../../utils/generateId.js';
  * - Registers as a 'row' type drop zone.
  * - Listens for 'column:empty' and removes the child Column.
  * - If it becomes empty (last Column removed), emits 'row:empty'.
- * - Manages its own vertical resize handle and collapse button.
+ * - Manages its own vertical resize handle via ResizeController.
  * - Collapse state is managed locally but disabled by LayoutService.
  *
  * Dependencies:
@@ -42,6 +44,8 @@ import { generateId } from '../../utils/generateId.js';
  * - ../../utils/EventBus.js
  * - ../../utils/ThrottleRAF.js
  * - ../../utils/generateId.js
+ * - ../../utils/ResizeController.js
+ * - ../../constants/DNDTypes.js
  */
 export class Row {
     /**
@@ -125,7 +129,7 @@ export class Row {
         me._state.height = height;
         me.setMinHeight(me._minHeight);
 
-        me.dropZoneType = 'row';
+        me.dropZoneType = DropZoneType.ROW;
 
         me.element.dataset.dropzone = me.dropZoneType;
         me.element.dropZoneInstance = me;
@@ -226,7 +230,7 @@ export class Row {
 
     /**
      * Event handler for when a child Column reports it is empty.
-     * @param {Column} column - The Column instance that emitted the event.
+     * @param {import('../Column/Column.js').Column} column - The Column instance that emitted the event.
      * @returns {void}
      */
     onColumnEmpty(column) {
@@ -251,6 +255,8 @@ export class Row {
 
     /**
      * Adds the vertical resize handle and collapse button to this Row.
+     * Uses ResizeController to manage drag logic.
+     *
      * @param {boolean} isLast - True if this is the last Row in the Container.
      * @returns {void}
      */
@@ -280,58 +286,46 @@ export class Row {
         me.element.classList.add('row--resize-bottom');
         const bar = document.createElement('div');
         bar.classList.add('row__resize-handle');
+        // CRITICAL: Prevent browser default gestures like scrolling/panning while dragging
+        bar.style.touchAction = 'none';
         me.element.appendChild(bar);
-        bar.addEventListener('pointerdown', e => me.startResize(e));
-    }
 
-    /**
-     * Handles the start of a vertical resize drag for this Row.
-     * @param {PointerEvent} e - The pointerdown event.
-     * @returns {void}
-     */
-    startResize(e) {
-        const me = this;
-        if (me._state.collapsed) return;
-        const container = me._state.parentContainer;
-        if (!container) {
-            return;
-        }
+        let startHeight = 0;
 
-        const rows = container.getRows();
-        const idx = rows.indexOf(me);
-        if (rows.length === 1 || idx === rows.length - 1) {
-            return;
-        }
+        const controller = new ResizeController(me.element, 'vertical', {
+            onStart: () => {
+                startHeight = me.element.offsetHeight;
+            },
+            onUpdate: delta => {
+                me._state.height = Math.max(me.getMinHeight(), startHeight + delta);
+                if (me.getThrottledUpdate()) {
+                    me.getThrottledUpdate()();
+                }
+            },
+            onEnd: () => {
+                if (me._state.parentContainer) {
+                    me._state.parentContainer.requestLayoutUpdate();
+                }
+            }
+        });
 
-        e.preventDefault();
-        const target = e.target;
-        const pointerId = e.pointerId;
-        target.setPointerCapture(pointerId);
+        bar.addEventListener('pointerdown', e => {
+            // 1. Check collapsed state
+            if (me._state.collapsed) return;
 
-        const startY = e.clientY;
-        const startH = me.element.offsetHeight;
+            // 2. Check parent container existence
+            const container = me._state.parentContainer;
+            if (!container) return;
 
-        const onMove = ev => {
-            if (ev.pointerId !== pointerId) {
+            // 3. Check if it's the only row or the last row
+            const rows = container.getRows();
+            const idx = rows.indexOf(me);
+            if (rows.length === 1 || idx === rows.length - 1) {
                 return;
             }
-            const delta = ev.clientY - startY;
-            me._state.height = Math.max(me.getMinHeight(), startH + delta);
-            me.getThrottledUpdate()();
-        };
 
-        const onUp = ev => {
-            if (ev.pointerId !== pointerId) {
-                return;
-            }
-            target.releasePointerCapture(pointerId);
-            window.removeEventListener('pointermove', onMove);
-            window.removeEventListener('pointerup', onUp);
-            me.getThrottledUpdate()?.cancel();
-            container.requestLayoutUpdate();
-        };
-        window.addEventListener('pointermove', onMove);
-        window.addEventListener('pointerup', onUp);
+            controller.start(e);
+        });
     }
 
     /**
@@ -400,7 +394,7 @@ export class Row {
      * Creates and inserts a new Column component into this Row.
      * @param {number|null} [width=null] - The initial width of the column.
      * @param {number|null} [index=null] - The exact state array index to insert at.
-     * @returns {Column} The created Column instance.
+     * @returns {import('../Column/Column.js').Column} The created Column instance.
      */
     createColumn(width = null, index = null) {
         const me = this;
@@ -416,15 +410,12 @@ export class Row {
                 me.element.appendChild(column.element);
             }
         } else {
-            // Fix: Use _state.children to find the correct sibling element for insertion
-            // instead of relying on DOM index which might include buttons/handles.
             me._state.children.splice(index, 0, column);
 
-            const nextSiblingColumn = me._state.children[index + 1]; // The column that was at 'index'
+            const nextSiblingColumn = me._state.children[index + 1];
             let nextDomNode = nextSiblingColumn ? nextSiblingColumn.element : null;
 
             if (!nextDomNode) {
-                // If no next column, try to find the resize handle
                 const resizeHandle = me.element.querySelector('.row__resize-handle');
                 if (resizeHandle) {
                     nextDomNode = resizeHandle;
@@ -443,13 +434,13 @@ export class Row {
         }
 
         column.setParentContainer(me);
-        me.requestLayoutUpdate(); // Notifies LayoutService
+        me.requestLayoutUpdate();
         return column;
     }
 
     /**
      * Deletes a child Column.
-     * @param {Column} column - The Column instance to remove.
+     * @param {import('../Column/Column.js').Column} column - The Column instance to remove.
      * @returns {void}
      */
     deleteColumn(column) {
@@ -458,8 +449,6 @@ export class Row {
         if (index === -1) {
             return;
         }
-        // Remove check for instanceof to ensure we can remove any object in children array
-        // if (!(me._state.children[index] instanceof Column)) { return; }
 
         column.destroy();
         const columnEl = column.element;
@@ -467,12 +456,12 @@ export class Row {
             me.element.removeChild(columnEl);
         }
         me._state.children.splice(index, 1);
-        me.requestLayoutUpdate(); // Notifies LayoutService
+        me.requestLayoutUpdate();
     }
 
     /**
      * Returns all child Column instances.
-     * @returns {Array<Column>}
+     * @returns {Array<import('../Column/Column.js').Column>}
      */
     getColumns() {
         return this._state.children;
@@ -488,7 +477,7 @@ export class Row {
 
     /**
      * Returns the first child Column. If none exists, creates one.
-     * @returns {Column}
+     * @returns {import('../Column/Column.js').Column}
      */
     getFirstColumn() {
         const columns = this.getColumns();
@@ -497,7 +486,7 @@ export class Row {
 
     /**
      * Returns the last child Column. If none exists, creates one.
-     * @returns {Column}
+     * @returns {import('../Column/Column.js').Column}
      */
     getLastColumn() {
         const columns = this.getColumns();
@@ -539,7 +528,6 @@ export class Row {
      */
     clear() {
         const me = this;
-        // Create a copy to avoid modification during iteration issues if delete modifies array
         [...me.getColumns()].forEach(column => {
             me.deleteColumn(column);
         });
