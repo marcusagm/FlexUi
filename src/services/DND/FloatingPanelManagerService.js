@@ -66,7 +66,7 @@ export class FloatingPanelManagerService {
      * @type {number}
      * @private
      */
-    _zIndexCounter = 100;
+    _zIndexCounter = 50;
 
     /**
      * Unique namespace for appBus listeners.
@@ -98,6 +98,7 @@ export class FloatingPanelManagerService {
         FloatingPanelManagerService._instance = this;
 
         const me = this;
+        me._zIndexCounter = me._baseZIndex;
         me._boundOnPanelGroupRemoved = me._onPanelGroupRemoved.bind(me);
         me._boundOnUndockRequest = me._onUndockRequest.bind(me);
         me._initEventListeners();
@@ -159,7 +160,7 @@ export class FloatingPanelManagerService {
         });
 
         me._floatingPanels = [];
-        me._zIndexCounter = 100;
+        me._zIndexCounter = me._baseZIndex;
     }
 
     /**
@@ -215,11 +216,12 @@ export class FloatingPanelManagerService {
 
         me.container.appendChild(panelGroup.element);
         panelGroup.setFloatingState(true, x, y);
-        panelGroup.element.style.zIndex = me._zIndexCounter++;
 
         if (!me._floatingPanels.includes(panelGroup)) {
             me._floatingPanels.push(panelGroup);
         }
+
+        me._normalizeZIndexes();
     }
 
     /**
@@ -260,7 +262,6 @@ export class FloatingPanelManagerService {
 
         const containerRect = me.container.getBoundingClientRect();
 
-        // Calculate initial position based on drop point minus offset (grab point)
         const initialX = positionX - containerRect.left - (draggedData.offsetX || 0);
         const initialY = positionY - containerRect.top - (draggedData.offsetY || 0);
 
@@ -286,13 +287,10 @@ export class FloatingPanelManagerService {
 
         panelGroup.getColumn()?.removePanelGroup(panelGroup);
 
-        // 1. Add panel to DOM first (so it has dimensions)
         me.addFloatingPanel(panelGroup, initialX, initialY);
 
-        // 2. Apply clamping logic (using actual dimensions)
         const constrained = me.updatePanelPosition(panelGroup, initialX, initialY);
 
-        // 3. Sync state with constrained position
         panelGroup.setFloatingState(true, constrained.x, constrained.y);
     }
 
@@ -335,7 +333,6 @@ export class FloatingPanelManagerService {
         const x = nativeEvent.clientX - containerRect.left - 10;
         const y = nativeEvent.clientY - containerRect.top - 10;
 
-        // Add panel and then constrain it immediately
         me.addFloatingPanel(panelGroupToFloat, x, y);
         const constrained = me.updatePanelPosition(panelGroupToFloat, x, y);
         panelGroupToFloat.setFloatingState(true, constrained.x, constrained.y);
@@ -371,7 +368,23 @@ export class FloatingPanelManagerService {
         me._floatingPanels.splice(index, 1);
         me._floatingPanels.push(panelGroup);
 
-        panelGroup.element.style.zIndex = me._zIndexCounter++;
+        me._normalizeZIndexes();
+    }
+
+    /**
+     * Normalizes the z-indexes of all floating panels to avoid infinite growth.
+     * Reassigns sequential z-indexes starting from baseZIndex based on the
+     * current order in the _floatingPanels array.
+     * @private
+     * @returns {void}
+     */
+    _normalizeZIndexes() {
+        const me = this;
+        me._floatingPanels.forEach((panel, i) => {
+            const newZ = me._baseZIndex + i;
+            panel.element.style.zIndex = newZ;
+        });
+        me._zIndexCounter = me._baseZIndex + me._floatingPanels.length;
     }
 
     /**
