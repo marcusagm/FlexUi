@@ -85,15 +85,14 @@ export class TabContainerDropStrategy extends BaseDropStrategy {
             sourceGroup = draggedPanel.parentGroup;
         } else if (draggedData.type === ItemType.PANEL_GROUP) {
             if (!(draggedData.item instanceof PanelGroup)) return null;
-            // Use public getter 'panels'
             if (draggedData.item.panels.length === 1) {
                 sourceGroup = draggedData.item;
                 draggedPanel = sourceGroup.panels[0];
             } else {
-                return null; // Reject drop of multi-panel group
+                return null;
             }
         } else {
-            return null; // Unknown type
+            return null;
         }
 
         if (!targetGroup || !sourceGroup || !draggedPanel) {
@@ -112,11 +111,9 @@ export class TabContainerDropStrategy extends BaseDropStrategy {
     _cacheTabGeometry(dropZone) {
         const me = this;
         me._tabCache = [];
-        // Use public getter 'panels'
         const panels = dropZone.panels;
 
         panels.forEach((panel, index) => {
-            // Access header via public getter on Panel
             const tabElement = panel.header.element;
             const rect = tabElement.getBoundingClientRect();
             me._tabCache.push({
@@ -157,7 +154,7 @@ export class TabContainerDropStrategy extends BaseDropStrategy {
      */
     onDragEnter(point, dropZone, draggedData, dds) {
         const me = this;
-        me.clearCache(true); // Clear visual feedback only
+        me.clearCache(true);
         if (!draggedData.item) return false;
 
         if (draggedData.item === dropZone) {
@@ -169,7 +166,6 @@ export class TabContainerDropStrategy extends BaseDropStrategy {
             return false;
         }
 
-        // Check panels length via getter
         if (groups.sourceGroup === groups.targetGroup && groups.targetGroup.panels.length === 1) {
             return false;
         }
@@ -229,7 +225,6 @@ export class TabContainerDropStrategy extends BaseDropStrategy {
 
         for (let i = 0; i < panels.length; i++) {
             const panel = panels[i];
-            // Access header via public getter
             const tabElement = panel.header.element;
 
             const rect = tabElement.getBoundingClientRect();
