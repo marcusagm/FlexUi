@@ -5,13 +5,12 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * Description:
  * Manages the header element of a PanelGroup.
  * This class provides the group-level controls (Move, Collapse, Close)
- * and the 'tabContainer' where child PanelHeaders (tabs) são inseridos
+ * and the 'tabContainer' where child PanelHeaders (tabs) are inserted
  * by the parent PanelGroup. It also handles tab scrolling logic.
  *
  * Properties summary:
- * - _state {object} : Internal state (current title).
- * - _resizeObserver {ResizeObserver | null} : Observes the tabContainer for scrolling.
  * - panelGroup {PanelGroup} : Reference to the parent PanelGroup.
+ * - title {string} : The title used for ARIA labels.
  * - element {HTMLElement} : The main header element.
  * - tabContainer {HTMLElement} : The DOM node where tabs are injected.
  * - moveHandle {HTMLElement} : The drag handle element.
@@ -20,28 +19,30 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * - collapseBtn {HTMLElement} : Button to toggle collapse state.
  * - closeBtn {HTMLElement} : Button to close the group.
  *
- * Typical usage:
- * // Instantiated by PanelGroup.js
- * this._state.header = new PanelGroupHeader(this);
- *
  * Events:
  * - Emits (appBus): EventTypes.PANEL_TOGGLE_COLLAPSE, EventTypes.PANEL_CLOSE_REQUEST
  * - Emits (appBus): EventTypes.DND_DRAG_START (for the *entire group* via Pointer)
  *
  * Dependencies:
- * - ../../utils/EventBus.js
- * - ../../constants/EventTypes.js
+ * - {import('../../utils/EventBus.js').appBus}
+ * - {import('../../constants/EventTypes.js').EventTypes}
  */
 export class PanelGroupHeader {
     /**
-     * Internal state for the PanelGroupHeader.
+     * Reference to the parent PanelGroup.
      *
-     * @type {{title: string | null}}
+     * @type {import('./PanelGroup.js').PanelGroup | null}
      * @private
      */
-    _state = {
-        title: null
-    };
+    _panelGroup = null;
+
+    /**
+     * The title used for ARIA labels.
+     *
+     * @type {string | null}
+     * @private
+     */
+    _title = null;
 
     /**
      * Observes the tabContainer to show/hide scroll buttons.
@@ -50,14 +51,6 @@ export class PanelGroupHeader {
      * @private
      */
     _resizeObserver = null;
-
-    /**
-     * Reference to the parent PanelGroup.
-     *
-     * @type {import('./PanelGroup.js').PanelGroup}
-     * @public
-     */
-    panelGroup;
 
     /**
      * The main header element.
@@ -116,19 +109,73 @@ export class PanelGroupHeader {
     closeBtn;
 
     /**
+     * Creates a new PanelGroupHeader instance.
+     *
      * @param {import('./PanelGroup.js').PanelGroup} panelGroup - The parent PanelGroup instance.
      */
     constructor(panelGroup) {
         const me = this;
-        me.panelGroup = panelGroup;
         me.element = document.createElement('div');
         me.element.classList.add('panel-group__header');
 
-        me.element.dropZoneInstance = me.panelGroup;
-        me.element.dataset.dropzone = me.panelGroup.dropZoneType;
+        me.panelGroup = panelGroup;
 
         me.build();
         me._initResizeObserver();
+    }
+
+    /**
+     * Retrieves the parent PanelGroup instance.
+     *
+     * @returns {import('./PanelGroup.js').PanelGroup | null} The parent group.
+     */
+    get panelGroup() {
+        const me = this;
+        return me._panelGroup;
+    }
+
+    /**
+     * Sets the parent PanelGroup instance.
+     * Validates that the value is an object or null.
+     *
+     * @param {import('./PanelGroup.js').PanelGroup | null} value - The new parent group.
+     * @returns {void}
+     */
+    set panelGroup(value) {
+        if (value !== null && typeof value !== 'object') {
+            console.warn(
+                `[PanelGroupHeader] Invalid panelGroup assignment (${value}). Must be an object or null.`
+            );
+            return;
+        }
+        this._panelGroup = value;
+    }
+
+    /**
+     * Retrieves the title used for ARIA labels.
+     *
+     * @returns {string | null} The title.
+     */
+    get title() {
+        const me = this;
+        return me._title;
+    }
+
+    /**
+     * Sets the title.
+     * Validates that the value is a string or null.
+     *
+     * @param {string | null} value - The new title.
+     * @returns {void}
+     */
+    set title(value) {
+        if (value !== null && typeof value !== 'string') {
+            console.warn(
+                `[PanelGroupHeader] Invalid title assignment (${value}). Must be a string or null.`
+            );
+            return;
+        }
+        this._title = value;
     }
 
     /**
@@ -138,6 +185,13 @@ export class PanelGroupHeader {
      */
     build() {
         const me = this;
+
+        // Link DND properties from the parent group
+        if (me.panelGroup) {
+            me.element.dropZoneInstance = me.panelGroup;
+            me.element.dataset.dropzone = me.panelGroup.dropZoneType;
+        }
+
         me.moveHandle = document.createElement('div');
         me.moveHandle.classList.add('panel-group__move-handle', 'panel__move-handle');
 
@@ -173,14 +227,18 @@ export class PanelGroupHeader {
         me.collapseBtn.type = 'button';
         me.collapseBtn.classList.add('panel-group__collapse-btn', 'panel__collapse-btn');
         me.collapseBtn.addEventListener('click', () => {
-            appBus.emit(EventTypes.PANEL_TOGGLE_COLLAPSE, me.panelGroup);
+            if (me.panelGroup) {
+                appBus.emit(EventTypes.PANEL_TOGGLE_COLLAPSE, me.panelGroup);
+            }
         });
 
         me.closeBtn = document.createElement('button');
         me.closeBtn.type = 'button';
         me.closeBtn.classList.add('panel-group__close-btn', 'panel__close-btn');
         me.closeBtn.addEventListener('click', () => {
-            appBus.emit(EventTypes.PANEL_CLOSE_REQUEST, me.panelGroup);
+            if (me.panelGroup) {
+                appBus.emit(EventTypes.PANEL_CLOSE_REQUEST, me.panelGroup);
+            }
         });
 
         me.element.append(
@@ -241,12 +299,16 @@ export class PanelGroupHeader {
 
     /**
      * Updates ARIA labels for group control buttons.
+     * Uses the title from the parent PanelGroup state provisionally.
      *
      * @returns {void}
      */
     updateAriaLabels() {
         const me = this;
-        const title = me.panelGroup._state.title;
+        // Provisional access to parent state until PanelGroup is fully refactored.
+        // We fall back to a default title if none is available.
+        const title = me.panelGroup && me.panelGroup._state ? me.panelGroup._state.title : 'Grupo';
+
         me.moveHandle.setAttribute('aria-label', `Mover grupo ${title}`);
         me.collapseBtn.setAttribute('aria-label', `Recolher grupo ${title}`);
         me.closeBtn.setAttribute('aria-label', `Fechar grupo ${title}`);
@@ -262,7 +324,7 @@ export class PanelGroupHeader {
         const me = this;
         if (event.button !== 0) return;
 
-        if (!me.panelGroup._state.movable) return;
+        if (!me.panelGroup || !me.panelGroup._state.movable) return;
 
         event.preventDefault();
         event.stopPropagation();

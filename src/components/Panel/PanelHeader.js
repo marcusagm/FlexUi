@@ -14,44 +14,63 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * and a drag (to move/undock).
  *
  * Properties summary:
- * - _state {object} : Manages references to its parent Panel and PanelGroup.
+ * - _title {string|null} : The text displayed in the tab.
+ * - _panel {Panel|null} : The parent Panel instance.
+ * - _parentGroup {PanelGroup|null} : The PanelGroup this panel belongs to.
  * - element {HTMLElement} : The main DOM element (<div class="panel-group__tab">).
- * - _titleEl {HTMLElement} : The <span> element for the title.
- * - _closeBtn {HTMLElement} : The <button> element for the close button.
+ * - _titleEl {HTMLElement} : The <span> element holding the title text.
+ * - _closeBtn {HTMLElement} : The close <button> element.
  * - _dragTrigger {DragTrigger} : Utility to handle drag/click detection.
- * - _boundOnCloseClick {Function | null} : Bound handler for the close button click.
- * - _boundOnContextMenu {Function | null} : Bound handler for the context menu event.
  *
  * Typical usage:
  * // Instantiated by Panel.js
- * this._state.header = new PanelHeader(this, panelTitle);
+ * this._header = new PanelHeader(this, 'My Title');
+ * this._header.setParentGroup(someGroup);
  *
  * Events:
- * - Emits (appBus): EventTypes.DND_DRAG_START
- * - Emits (appBus): EventTypes.PANEL_GROUP_CHILD_CLOSE
+ * - Emits (appBus): EventTypes.DND_DRAG_START - When dragging starts.
+ * - Emits (appBus): EventTypes.PANEL_GROUP_CHILD_CLOSE - When close button is clicked.
+ *
+ * Business rules implemented:
+ * - Distinguishes between a "Click" (to activate tab) and "Drag" (to move panel) using DragTrigger.
+ * - Stops propagation on the close button to prevent activating/dragging when closing.
+ * - Shows a context menu on right-click with options to Undock or Close.
+ * - Updates visibility of close button based on Panel configuration.
+ * - Manages the draggable attribute based on configuration.
  *
  * Dependencies:
- * - ../../utils/EventBus.js
- * - ../../services/ContextMenu/ContextMenuService.js
- * - ../../utils/DragTrigger.js
- * - ../../constants/EventTypes.js
+ * - {import('../../utils/EventBus.js').appBus}
+ * - {import('../../services/ContextMenu/ContextMenuService.js').ContextMenuService}
+ * - {import('../../utils/DragTrigger.js').DragTrigger}
+ * - {import('../../constants/EventTypes.js').EventTypes}
+ *
+ * Notes / Additional:
+ * - This component is tightly coupled with Panel and PanelGroup.
  */
 export class PanelHeader {
     /**
-     * Internal state for the PanelHeader.
+     * The text displayed in the tab.
      *
-     * @type {{
-     * title: string | null,
-     * panel: import('./Panel.js').Panel | null,
-     * parentGroup: import('./PanelGroup.js').PanelGroup | null
-     * }}
+     * @type {string | null}
      * @private
      */
-    _state = {
-        title: null,
-        panel: null,
-        parentGroup: null
-    };
+    _title = null;
+
+    /**
+     * The parent Panel instance.
+     *
+     * @type {import('./Panel.js').Panel | null}
+     * @private
+     */
+    _panel = null;
+
+    /**
+     * The PanelGroup this panel belongs to.
+     *
+     * @type {import('./PanelGroup.js').PanelGroup | null}
+     * @private
+     */
+    _parentGroup = null;
 
     /**
      * The main DOM element (the tab: .panel-group__tab).
@@ -102,21 +121,25 @@ export class PanelHeader {
     _boundOnContextMenu = null;
 
     /**
+     * Creates a new PanelHeader instance.
+     *
      * @param {import('./Panel.js').Panel} panel - The parent Panel instance.
      * @param {string} title - The initial title.
      */
     constructor(panel, title) {
         const me = this;
-        me._state.panel = panel;
-        me._state.title = title;
         me.element = document.createElement('div');
 
         me._boundOnCloseClick = me.onCloseClick.bind(me);
         me._boundOnContextMenu = me.onContextMenu.bind(me);
 
         me.build();
+
+        // Initialize properties via setters
+        me.panel = panel;
+        me.title = title;
+
         me.initEventListeners();
-        me.updateConfig(panel._state);
 
         // Initialize DragTrigger
         me._dragTrigger = new DragTrigger(me.element, {
@@ -124,6 +147,94 @@ export class PanelHeader {
             onDragStart: (event, startCoords) => me._startDrag(event, startCoords),
             onClick: event => me.onTabClick(event)
         });
+    }
+
+    /**
+     * Retrieves the current title.
+     *
+     * @returns {string | null} The title text.
+     */
+    get title() {
+        const me = this;
+        return me._title;
+    }
+
+    /**
+     * Sets the title and updates the DOM element.
+     * Validates that the value is a string or null.
+     *
+     * @param {string | null} value - The new title.
+     * @returns {void}
+     */
+    set title(value) {
+        const me = this;
+        if (value !== null && typeof value !== 'string') {
+            console.warn(
+                `[PanelHeader] Invalid title assignment (${value}). Must be a string or null.`
+            );
+            return;
+        }
+        me._title = value;
+
+        if (me._titleEl) {
+            me._titleEl.textContent = value || 'No title';
+        }
+    }
+
+    /**
+     * Retrieves the parent Panel instance.
+     *
+     * @returns {import('./Panel.js').Panel | null} The panel instance.
+     */
+    get panel() {
+        const me = this;
+        return me._panel;
+    }
+
+    /**
+     * Sets the parent Panel instance.
+     * Validates that the value is an object (Panel instance) or null.
+     *
+     * @param {import('./Panel.js').Panel | null} value - The new panel instance.
+     * @returns {void}
+     */
+    set panel(value) {
+        const me = this;
+        if (value !== null && typeof value !== 'object') {
+            console.warn(
+                `[PanelHeader] Invalid panel assignment (${value}). Must be a Panel instance or null.`
+            );
+            return;
+        }
+        me._panel = value;
+    }
+
+    /**
+     * Retrieves the parent PanelGroup instance.
+     *
+     * @returns {import('./PanelGroup.js').PanelGroup | null} The parent group.
+     */
+    get parentGroup() {
+        const me = this;
+        return me._parentGroup;
+    }
+
+    /**
+     * Sets the parent PanelGroup instance.
+     * Validates that the value is an object (PanelGroup instance) or null.
+     *
+     * @param {import('./PanelGroup.js').PanelGroup | null} value - The new parent group.
+     * @returns {void}
+     */
+    set parentGroup(value) {
+        const me = this;
+        if (value !== null && typeof value !== 'object') {
+            console.warn(
+                `[PanelHeader] Invalid parentGroup assignment (${value}). Must be a PanelGroup instance or null.`
+            );
+            return;
+        }
+        me._parentGroup = value;
     }
 
     /**
@@ -143,7 +254,6 @@ export class PanelHeader {
 
         me._titleEl = document.createElement('span');
         me._titleEl.classList.add('panel__title');
-        me._titleEl.textContent = me._state.title || 'Sem Título';
         me.element.appendChild(me._titleEl);
 
         me._closeBtn = document.createElement('button');
@@ -204,7 +314,7 @@ export class PanelHeader {
         const offsetY = startCoords.startY - rect.top;
 
         appBus.emit(EventTypes.DND_DRAG_START, {
-            item: me._state.panel,
+            item: me.panel,
             type: 'Panel',
             element: me.element,
             event: event,
@@ -223,12 +333,13 @@ export class PanelHeader {
         event.stopPropagation();
         const me = this;
 
-        if (!me._state.panel._state.closable) return;
+        // Access state via panel getter (Panel class still has _state for now)
+        if (!me.panel || !me.panel._state.closable) return;
 
-        if (me._state.parentGroup) {
+        if (me.parentGroup) {
             appBus.emit(EventTypes.PANEL_GROUP_CHILD_CLOSE, {
-                panel: me._state.panel,
-                group: me._state.parentGroup
+                panel: me.panel,
+                group: me.parentGroup
             });
         }
     }
@@ -242,8 +353,8 @@ export class PanelHeader {
      */
     onTabClick(event) {
         const me = this;
-        if (me._state.parentGroup) {
-            me._state.parentGroup.setActive(me._state.panel);
+        if (me.parentGroup) {
+            me.parentGroup.setActive(me.panel);
         }
     }
 
@@ -258,12 +369,15 @@ export class PanelHeader {
         event.stopPropagation();
 
         const me = this;
-        const panelState = me._state.panel._state;
+        // Access panel state (assuming Panel.js structure)
+        const panelState = me.panel ? me.panel._state : {};
+        const parentGroupState = panelState.parentGroup ? panelState.parentGroup._state : {};
+
         const menuItems = [
             {
                 title: 'Desacoplar Painel',
                 event: EventTypes.APP_UNDOCK_PANEL_REQUEST,
-                disabled: !panelState.movable || panelState.parentGroup._state.isFloating
+                disabled: !panelState.movable || parentGroupState.isFloating
             },
             { isSeparator: true },
             {
@@ -274,8 +388,8 @@ export class PanelHeader {
         ];
 
         const contextData = {
-            panel: me._state.panel,
-            group: me._state.parentGroup,
+            panel: me.panel,
+            group: me.parentGroup,
             nativeEvent: event
         };
 
@@ -283,24 +397,23 @@ export class PanelHeader {
     }
 
     /**
-     * ParentGroup setter.
+     * Wrapper for the parentGroup setter.
      *
      * @param {import('./PanelGroup.js').PanelGroup | null} group - The parent PanelGroup instance.
      * @returns {void}
      */
     setParentGroup(group) {
-        this._state.parentGroup = group;
+        this.parentGroup = group;
     }
 
     /**
-     * Updates the title text in the DOM.
+     * Wrapper for the title setter.
      *
      * @param {string} title - The new title string.
      * @returns {void}
      */
     setTitle(title) {
-        this._state.title = title;
-        this._titleEl.textContent = title;
+        this.title = title;
     }
 
     /**
@@ -345,12 +458,14 @@ export class PanelHeader {
             me.element.style.cursor = 'default';
         } else {
             me.element.classList.add('panel-group__tab');
-            if (me._state.panel._state.closable) {
+
+            // Check panel state for closable
+            if (me.panel && me.panel._state.closable) {
                 me._closeBtn.style.display = '';
             }
 
             // Multi panel mode: Restore draggable based on config
-            if (me._state.panel._state.movable) {
+            if (me.panel && me.panel._state.movable) {
                 me.element.setAttribute('draggable', 'true');
                 me.element.style.cursor = 'grab';
             } else {
