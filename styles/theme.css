@@ -520,7 +520,7 @@
     --window-header-height: 32px;
     --window-header-bg-active: var(--primary-30);
     --window-header-color-active: var(--neutral-99);
-    --window-header-bg-inactive: var(--surface-level-2);
+    --window-header-bg-inactive: var(--surface-level-1);
     --window-header-color-inactive: var(--color-text-secondary);
 
     --window-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);

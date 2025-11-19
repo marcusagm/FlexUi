@@ -4,7 +4,6 @@ import { appBus } from '../../utils/EventBus.js';
 import { generateId } from '../../utils/generateId.js';
 import { EventTypes } from '../../constants/EventTypes.js';
 import { ItemType } from '../../constants/DNDTypes.js';
-import { FloatingPanelManagerService } from '../../services/DND/FloatingPanelManagerService.js';
 
 /**
  * Description:
@@ -45,10 +44,11 @@ import { FloatingPanelManagerService } from '../../services/DND/FloatingPanelMan
  *
  * Business rules implemented:
  * - Independent lifecycle management (mount/destroy).
- * - 8-direction resizing with boundary constraints (via FloatingPanelManagerService).
+ * - 8-direction resizing with boundary constraints relative to the parent Viewport.
  * - Geometry state persistence (maximize/restore).
  * - Intercepts close requests via `preventClose` (async support).
  * - Identifies as `ItemType.APPLICATION_WINDOW` for DND.
+ * - Automatically constrains itself to parent bounds on mount.
  *
  * Dependencies:
  * - ./ApplicationWindowHeader.js
@@ -57,7 +57,6 @@ import { FloatingPanelManagerService } from '../../services/DND/FloatingPanelMan
  * - ../../utils/generateId.js
  * - ../../constants/EventTypes.js
  * - ../../constants/DNDTypes.js
- * - ../../services/DND/FloatingPanelManagerService.js
  *
  * Notes / Additional:
  * - This class does not extend Panel or PanelGroup.
@@ -206,14 +205,6 @@ export class ApplicationWindow {
      * @private
      */
     _canCloseHandler = null;
-
-    /**
-     * Collapsed state (emulated for compatibility with PanelGroup concepts).
-     *
-     * @type {boolean}
-     * @private
-     */
-    _collapsed = false;
 
     /**
      * Creates an instance of ApplicationWindow.
@@ -413,7 +404,6 @@ export class ApplicationWindow {
     set collapsed(value) {
         const isMinimizing = !!value;
         if (this._isMinimized !== isMinimizing) {
-            // Use minimize() to handle full toggle logic including CSS
             this.minimize();
         }
     }
@@ -441,7 +431,6 @@ export class ApplicationWindow {
 
         me.contentElement = document.createElement('div');
         me.contentElement.classList.add('application-window__content');
-        // Default styles for content area
         me.contentElement.style.overflow = 'auto';
         me.contentElement.style.flex = '1';
         me.contentElement.style.position = 'relative';
@@ -457,24 +446,23 @@ export class ApplicationWindow {
      */
     _initResizeHandles() {
         const me = this;
-        const fpms = FloatingPanelManagerService.getInstance();
 
         me._resizeHandleManager = new ResizeHandleManager(me.element, {
             handles: ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'],
-            customClass: 'window-resize-handle', // Theme hook
-            getConstraints: () => ({
-                minimumWidth: me.minWidth,
-                maximumWidth: Infinity,
-                minimumHeight: me.minHeight,
-                maximumHeight: Infinity,
-                // Use container bounds from service or fallback to viewport
-                containerRectangle: fpms.getContainerBounds() || {
-                    width: window.innerWidth,
-                    height: window.innerHeight
-                }
-            }),
+            customClass: 'window-resize-handle',
+            getConstraints: () => {
+                // Use dynamic offsetParent to respect the actual container (Viewport)
+                const parent = me.element.offsetParent || document.body;
+                return {
+                    minimumWidth: me.minWidth,
+                    maximumWidth: Infinity,
+                    minimumHeight: me.minHeight,
+                    maximumHeight: Infinity,
+                    containerRectangle: parent.getBoundingClientRect()
+                };
+            },
             onResize: ({ xCoordinate, yCoordinate, width, height }) => {
-                if (me._isMaximized) return; // Block resize if maximized
+                if (me._isMaximized) return;
 
                 me._x = xCoordinate;
                 me._y = yCoordinate;
@@ -529,7 +517,6 @@ export class ApplicationWindow {
      * @returns {void}
      */
     renderContent(container) {
-        // Designed for override
         container;
     }
 
@@ -565,6 +552,39 @@ export class ApplicationWindow {
     }
 
     /**
+     * Constrains the window to fit within its parent container (Viewport).
+     * This ensures the window is not created or moved completely outside the visible area.
+     *
+     * @returns {void}
+     */
+    constrainToParent() {
+        const parent = this.element.offsetParent;
+        if (!parent) return;
+
+        const parentWidth = parent.clientWidth;
+        const parentHeight = parent.clientHeight;
+
+        // Constrain Size (if larger than parent, shrink to fit)
+        if (this._width > parentWidth) this._width = Math.max(this.minWidth, parentWidth);
+        if (this._height > parentHeight) this._height = Math.max(this.minHeight, parentHeight);
+
+        // Constrain Position
+        // Ensure at least some part of the window header is visible or keep it fully inside?
+        // Usually keeping fully inside is better for initial spawn.
+        if (this._x < 0) this._x = 0;
+        if (this._y < 0) this._y = 0;
+
+        if (this._x + this._width > parentWidth) {
+            this._x = Math.max(0, parentWidth - this._width);
+        }
+        if (this._y + this._height > parentHeight) {
+            this._y = Math.max(0, parentHeight - this._height);
+        }
+
+        this._updateGeometryStyles();
+    }
+
+    /**
      * Lifecycle hook: Mounts the window.
      *
      * @returns {void}
@@ -572,6 +592,8 @@ export class ApplicationWindow {
     mount() {
         appBus.emit(EventTypes.WINDOW_MOUNT, this);
         this.renderContent(this.contentElement);
+        // Apply constraints after mounting to ensure parent is available
+        this.constrainToParent();
     }
 
     /**
@@ -656,7 +678,6 @@ export class ApplicationWindow {
     togglePin() {
         this._isPinned = !this._isPinned;
         this.element.classList.toggle('application-window--pinned', this._isPinned);
-        // Z-Index boost handled by manager or CSS
     }
 
     /**

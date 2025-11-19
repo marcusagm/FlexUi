@@ -13,7 +13,8 @@ import { ItemType } from '../../constants/DNDTypes.js';
  * - Validates that the dragged item is strictly an ApplicationWindow.
  * - On DragOver: Hides placeholder (free movement logic).
  * - On Drop: Updates the x/y coordinates of the ApplicationWindow.
- * - Overrides base handleDrop to bypass placeholder check (since we don't use one).
+ * - Enforces boundaries: Keeps the window fully contained within the Viewport to match Ghost behavior.
+ * - Does NOT handle creation of new windows from Panels/Groups (delegated to Undock logic).
  *
  * Dependencies:
  * - {import('./BaseDropStrategy.js').BaseDropStrategy}
@@ -32,6 +33,7 @@ export class ViewportDropStrategy extends BaseDropStrategy {
      * @returns {boolean}
      */
     onDragEnter(point, dropZone, draggedData, dds) {
+        // Strictly allow only ApplicationWindow
         return draggedData.type === ItemType.APPLICATION_WINDOW;
     }
 
@@ -89,19 +91,30 @@ export class ViewportDropStrategy extends BaseDropStrategy {
         }
 
         const viewportRect = dropZone.element.getBoundingClientRect();
+        const windowInstance = draggedData.item;
 
         // Calculate relative coordinates
         let newX = point.x - viewportRect.left - (draggedData.offsetX || 0);
         let newY = point.y - viewportRect.top - (draggedData.offsetY || 0);
 
-        // Clamp constraints (prevent dropping completely outside)
-        // Allow title bar to be visible at minimum (assuming ~20px grab area)
-        newX = Math.max(0, Math.min(newX, viewportRect.width - 20));
-        newY = Math.max(0, Math.min(newY, viewportRect.height - 20));
+        // Get window dimensions (fallback to element size if property missing)
+        const winWidth =
+            windowInstance.width ||
+            (windowInstance.element ? windowInstance.element.offsetWidth : 200);
+        const winHeight =
+            windowInstance.height ||
+            (windowInstance.element ? windowInstance.element.offsetHeight : 150);
 
-        const windowInstance = draggedData.item;
+        // Clamp constraints: Keep the window FULLY inside the viewport
+        // This matches the behavior of GhostManager when bounds are provided.
+        const maxX = Math.max(0, viewportRect.width - winWidth);
+        const maxY = Math.max(0, viewportRect.height - winHeight);
+
+        newX = Math.max(0, Math.min(newX, maxX));
+        newY = Math.max(0, Math.min(newY, maxY));
 
         // Update position directly on the instance
+        // ApplicationWindow is expected to update its DOM/Styles via these setters
         if ('x' in windowInstance) windowInstance.x = newX;
         if ('y' in windowInstance) windowInstance.y = newY;
 
