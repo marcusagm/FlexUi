@@ -310,7 +310,7 @@ export class ToolbarGroup {
      */
     destroy() {
         const me = this;
-        if (me._state.movable && me._dragHandle) {
+        if (me.movable && me._dragHandle) {
             me._dragHandle.removeEventListener('pointerdown', me._boundOnPointerDown);
         }
         me.element.remove();
@@ -350,9 +350,8 @@ export class ToolbarGroup {
     toJSON() {
         const me = this;
         return {
-            id: me.id,
             type: me.getToolbarGroupType(),
-            title: me._state.title
+            title: me.title
         };
     }
 
@@ -364,9 +363,6 @@ export class ToolbarGroup {
      */
     fromJSON(data) {
         const me = this;
-        if (data.id) {
-            me.id = data.id;
-        }
         if (data.title !== undefined) {
             me.title = data.title;
         }

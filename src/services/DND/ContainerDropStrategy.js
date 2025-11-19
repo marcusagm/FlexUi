@@ -27,11 +27,11 @@ import { ItemType } from '../../constants/DNDTypes.js';
  * and moves the dropped Panel or PanelGroup into the new Column.
  *
  * Dependencies:
- * - ./BaseDropStrategy.js
- * - ../../components/Panel/PanelGroup.js
- * - ../../components/Row/Row.js
- * - ./FloatingPanelManagerService.js
- * - ../../constants/DNDTypes.js
+ * - {import('./BaseDropStrategy.js').BaseDropStrategy}
+ * - {import('../../components/Panel/PanelGroup.js').PanelGroup}
+ * - {import('../../components/Row/Row.js').Row}
+ * - {import('./FloatingPanelManagerService.js').FloatingPanelManagerService}
+ * - {import('../../constants/DNDTypes.js').ItemType}
  */
 export class ContainerDropStrategy extends BaseDropStrategy {
     /**
@@ -102,7 +102,7 @@ export class ContainerDropStrategy extends BaseDropStrategy {
         if (draggedData.type === ItemType.PANEL_GROUP) {
             effectiveItem = draggedData.item;
         } else {
-            effectiveItem = draggedData.item._state.parentGroup;
+            effectiveItem = draggedData.item.parentGroup;
             if (!effectiveItem) return false;
         }
 
@@ -121,7 +121,7 @@ export class ContainerDropStrategy extends BaseDropStrategy {
 
         const oldColumn = effectiveItem.getColumn();
         if (oldColumn) {
-            const oldRow = oldColumn._state.parentContainer;
+            const oldRow = oldColumn.parentContainer;
             if (oldRow && oldRow instanceof Row) {
                 const oldRowCacheItem = me._rowCache.find(item => item.element === oldRow.element);
 
@@ -135,7 +135,7 @@ export class ContainerDropStrategy extends BaseDropStrategy {
                             me._originRowHadOneColumn = true;
                         } else if (
                             draggedData.type === ItemType.PANEL &&
-                            effectiveItem._state.panels.length === 1
+                            effectiveItem.panels.length === 1
                         ) {
                             me._originRowHadOneColumn = true;
                         }
@@ -177,7 +177,7 @@ export class ContainerDropStrategy extends BaseDropStrategy {
         if (draggedData.type === ItemType.PANEL_GROUP) {
             effectiveItem = draggedData.item;
         } else {
-            effectiveItem = draggedData.item._state.parentGroup;
+            effectiveItem = draggedData.item.parentGroup;
             if (!effectiveItem) return false;
         }
 
@@ -252,11 +252,10 @@ export class ContainerDropStrategy extends BaseDropStrategy {
         if (draggedData.type === ItemType.PANEL_GROUP) {
             sourceGroup = draggedData.item;
         } else if (draggedData.type === ItemType.PANEL) {
-            sourceGroup = draggedData.item._state.parentGroup;
+            sourceGroup = draggedData.item.parentGroup;
         }
 
-        // Handle Floating Panel Removal
-        if (sourceGroup && sourceGroup._state.isFloating) {
+        if (sourceGroup && sourceGroup.isFloating) {
             if (draggedData.type === ItemType.PANEL_GROUP) {
                 FloatingPanelManagerService.getInstance().removeFloatingPanel(sourceGroup);
             }
@@ -276,11 +275,11 @@ export class ContainerDropStrategy extends BaseDropStrategy {
             if (oldColumn) {
                 oldColumn.removePanelGroup(draggedItem, true);
             }
-            draggedItem._state.height = null;
+            draggedItem.height = null;
             newColumn.addPanelGroup(draggedItem);
         } else if (draggedData.type === ItemType.PANEL) {
             const draggedPanel = draggedData.item;
-            const sourceParentGroup = draggedPanel._state.parentGroup;
+            const sourceParentGroup = draggedPanel.parentGroup;
 
             const newRow = dropZone.createRow(null, rowIndex);
             const newColumn = newRow.createColumn();
@@ -290,7 +289,7 @@ export class ContainerDropStrategy extends BaseDropStrategy {
             if (sourceParentGroup) {
                 sourceParentGroup.removePanel(draggedPanel, true);
             }
-            draggedPanel._state.height = null;
+            draggedPanel.height = null;
             newPanelGroup.addPanel(draggedPanel, true);
         }
 

@@ -1,6 +1,5 @@
 import { BaseDropStrategy } from './BaseDropStrategy.js';
 import { PanelGroup } from '../../components/Panel/PanelGroup.js';
-import { Panel } from '../../components/Panel/Panel.js';
 import { FloatingPanelManagerService } from './FloatingPanelManagerService.js';
 import { ItemType } from '../../constants/DNDTypes.js';
 
@@ -29,11 +28,11 @@ import { ItemType } from '../../constants/DNDTypes.js';
  * - Returns boolean indicating if the drop was handled.
  *
  * Dependencies:
- * - ./BaseDropStrategy.js
- * - ../../components/Panel/PanelGroup.js
- * - ../../components/Panel/Panel.js
- * - ./FloatingPanelManagerService.js
- * - ../../constants/DNDTypes.js
+ * - {import('./BaseDropStrategy.js').BaseDropStrategy}
+ * - {import('../../components/Panel/PanelGroup.js').PanelGroup}
+ * - {import('../../components/Panel/Panel.js').Panel}
+ * - {import('./FloatingPanelManagerService.js').FloatingPanelManagerService}
+ * - {import('../../constants/DNDTypes.js').ItemType}
  */
 export class ColumnDropStrategy extends BaseDropStrategy {
     /**
@@ -86,7 +85,7 @@ export class ColumnDropStrategy extends BaseDropStrategy {
         if (draggedData.type === ItemType.PANEL_GROUP) {
             draggedItem = draggedData.item;
         } else if (draggedData.type === ItemType.PANEL) {
-            draggedItem = draggedData.item._state.parentGroup;
+            draggedItem = draggedData.item.parentGroup;
             if (!draggedItem) return false;
         }
 
@@ -144,9 +143,9 @@ export class ColumnDropStrategy extends BaseDropStrategy {
             draggedItem = draggedData.item;
             isEffectiveGroupDrag = true;
         } else if (draggedData.type === ItemType.PANEL) {
-            draggedItem = draggedData.item._state.parentGroup;
+            draggedItem = draggedData.item.parentGroup;
             if (!draggedItem) return false;
-            if (draggedItem._state.panels.length === 1) {
+            if (draggedItem.panels.length === 1) {
                 isEffectiveGroupDrag = true;
             }
         }
@@ -210,10 +209,10 @@ export class ColumnDropStrategy extends BaseDropStrategy {
         if (draggedData.type === ItemType.PANEL_GROUP) {
             sourceGroup = draggedData.item;
         } else if (draggedData.type === ItemType.PANEL) {
-            sourceGroup = draggedData.item._state.parentGroup;
+            sourceGroup = draggedData.item.parentGroup;
         }
 
-        if (sourceGroup && sourceGroup._state.isFloating) {
+        if (sourceGroup && sourceGroup.isFloating) {
             if (draggedData.type === ItemType.PANEL_GROUP) {
                 FloatingPanelManagerService.getInstance().removeFloatingPanel(sourceGroup);
             }
@@ -223,7 +222,7 @@ export class ColumnDropStrategy extends BaseDropStrategy {
             const itemToUpdate =
                 draggedData.type === ItemType.PANEL_GROUP
                     ? draggedData.item
-                    : draggedData.item._state.parentGroup;
+                    : draggedData.item.parentGroup;
 
             if (itemToUpdate) {
                 const oldColumn = itemToUpdate.getColumn();
@@ -238,14 +237,14 @@ export class ColumnDropStrategy extends BaseDropStrategy {
             const draggedItem = draggedData.item;
             const oldColumn = draggedItem.getColumn();
 
-            draggedItem._state.height = null;
+            draggedItem.height = null;
             if (oldColumn) {
                 oldColumn.removePanelGroup(draggedItem, true);
             }
             dropZone.addPanelGroup(draggedItem, panelIndex);
         } else if (draggedData.type === ItemType.PANEL) {
             const draggedPanel = draggedData.item;
-            const sourceParentGroup = draggedPanel._state.parentGroup;
+            const sourceParentGroup = draggedPanel.parentGroup;
 
             const newPanelGroup = new PanelGroup();
             dropZone.addPanelGroup(newPanelGroup, panelIndex);

@@ -29,20 +29,24 @@ import { ItemType } from '../../constants/DNDTypes.js';
  * - Returns boolean indicating if the drop was handled.
  *
  * Dependencies:
- * - ./BaseDropStrategy.js
- * - ../../components/Panel/PanelGroup.js
- * - ../../components/Panel/Panel.js
- * - ./FloatingPanelManagerService.js
- * - ../../constants/DNDTypes.js
+ * - {import('./BaseDropStrategy.js').BaseDropStrategy}
+ * - {import('../../components/Panel/PanelGroup.js').PanelGroup}
+ * - {import('../../components/Panel/Panel.js').Panel}
+ * - {import('./FloatingPanelManagerService.js').FloatingPanelManagerService}
+ * - {import('../../constants/DNDTypes.js').ItemType}
  */
 export class TabContainerDropStrategy extends BaseDropStrategy {
     /**
+     * State flag, true if dragging within the same group.
+     *
      * @type {boolean}
      * @private
      */
     _isReordering = false;
 
     /**
+     * The calculated state index for reordering/merging.
+     *
      * @type {number | null}
      * @private
      */
@@ -78,12 +82,13 @@ export class TabContainerDropStrategy extends BaseDropStrategy {
         if (draggedData.type === ItemType.PANEL) {
             if (!(draggedData.item instanceof Panel)) return null;
             draggedPanel = draggedData.item;
-            sourceGroup = draggedPanel._state.parentGroup;
+            sourceGroup = draggedPanel.parentGroup;
         } else if (draggedData.type === ItemType.PANEL_GROUP) {
             if (!(draggedData.item instanceof PanelGroup)) return null;
-            if (draggedData.item._state.panels.length === 1) {
+            // Use public getter 'panels'
+            if (draggedData.item.panels.length === 1) {
                 sourceGroup = draggedData.item;
-                draggedPanel = sourceGroup._state.panels[0];
+                draggedPanel = sourceGroup.panels[0];
             } else {
                 return null; // Reject drop of multi-panel group
             }
@@ -107,10 +112,12 @@ export class TabContainerDropStrategy extends BaseDropStrategy {
     _cacheTabGeometry(dropZone) {
         const me = this;
         me._tabCache = [];
-        const panels = dropZone._state.panels;
+        // Use public getter 'panels'
+        const panels = dropZone.panels;
 
         panels.forEach((panel, index) => {
-            const tabElement = panel._state.header.element;
+            // Access header via public getter on Panel
+            const tabElement = panel.header.element;
             const rect = tabElement.getBoundingClientRect();
             me._tabCache.push({
                 element: tabElement,
@@ -162,10 +169,8 @@ export class TabContainerDropStrategy extends BaseDropStrategy {
             return false;
         }
 
-        if (
-            groups.sourceGroup === groups.targetGroup &&
-            groups.targetGroup._state.panels.length === 1
-        ) {
+        // Check panels length via getter
+        if (groups.sourceGroup === groups.targetGroup && groups.targetGroup.panels.length === 1) {
             return false;
         }
 
@@ -188,10 +193,9 @@ export class TabContainerDropStrategy extends BaseDropStrategy {
     onDragOver(point, dropZone, draggedData, dds) {
         const me = this;
         const placeholder = dds.getPlaceholder();
-        const tabContainerElement = dropZone._state.header.tabContainer;
+        const tabContainerElement = dropZone.header.tabContainer;
 
         if (draggedData.item === dropZone) {
-            // Delegate cleanup to BaseDropStrategy via return false
             return false;
         }
 
@@ -209,28 +213,24 @@ export class TabContainerDropStrategy extends BaseDropStrategy {
             return false;
         }
 
-        if (
-            groups.sourceGroup === groups.targetGroup &&
-            groups.targetGroup._state.panels.length === 1
-        ) {
+        if (groups.sourceGroup === groups.targetGroup && groups.targetGroup.panels.length === 1) {
             return false;
         }
 
-        // Robustness: Ensure _isReordering is set even if DragEnter was skipped
         me._isReordering = groups.sourceGroup === groups.targetGroup;
 
         const { draggedPanel } = groups;
-        const originalIndex = dropZone._state.panels.indexOf(draggedPanel);
+        const originalIndex = dropZone.panels.indexOf(draggedPanel);
 
-        // --- Live Geometry Calculation ---
-        const panels = dropZone._state.panels;
+        const panels = dropZone.panels;
         let targetElement = null;
         let placed = false;
         me._dropIndex = panels.length;
 
         for (let i = 0; i < panels.length; i++) {
             const panel = panels[i];
-            const tabElement = panel._state.header.element;
+            // Access header via public getter
+            const tabElement = panel.header.element;
 
             const rect = tabElement.getBoundingClientRect();
             const midX = rect.left + rect.width / 2;
@@ -281,7 +281,6 @@ export class TabContainerDropStrategy extends BaseDropStrategy {
             return false;
         }
 
-        // Recalculate isReordering just to be safe
         me._isReordering = groups.sourceGroup === groups.targetGroup;
 
         const { draggedPanel, sourceGroup, targetGroup } = groups;
@@ -291,7 +290,7 @@ export class TabContainerDropStrategy extends BaseDropStrategy {
                 dropZone.movePanel(draggedPanel, me._dropIndex);
             }
         } else {
-            if (sourceGroup._state.isFloating) {
+            if (sourceGroup.isFloating) {
                 if (draggedData.type === ItemType.PANEL_GROUP) {
                     FloatingPanelManagerService.getInstance().removeFloatingPanel(sourceGroup);
                 }

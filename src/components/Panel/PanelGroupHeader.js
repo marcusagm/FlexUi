@@ -299,15 +299,13 @@ export class PanelGroupHeader {
 
     /**
      * Updates ARIA labels for group control buttons.
-     * Uses the title from the parent PanelGroup state provisionally.
+     * Uses the title from the parent PanelGroup.
      *
      * @returns {void}
      */
     updateAriaLabels() {
         const me = this;
-        // Provisional access to parent state until PanelGroup is fully refactored.
-        // We fall back to a default title if none is available.
-        const title = me.panelGroup && me.panelGroup._state ? me.panelGroup._state.title : 'Grupo';
+        const title = me.panelGroup && me.panelGroup.title ? me.panelGroup.title : 'Grupo';
 
         me.moveHandle.setAttribute('aria-label', `Mover grupo ${title}`);
         me.collapseBtn.setAttribute('aria-label', `Recolher grupo ${title}`);
@@ -324,7 +322,7 @@ export class PanelGroupHeader {
         const me = this;
         if (event.button !== 0) return;
 
-        if (!me.panelGroup || !me.panelGroup._state.movable) return;
+        if (!me.panelGroup || !me.panelGroup.movable) return;
 
         event.preventDefault();
         event.stopPropagation();

@@ -3,52 +3,62 @@ import { globalState } from '../../services/GlobalStateService.js';
 
 /**
  * Description:
- * Um painel reativo que exibe um contador.
- * Todas as instâncias deste painel são sincronizadas usando o GlobalStateService.
+ * A reactive panel that displays a counter.
+ * All instances of this panel are synchronized using the GlobalStateService.
  *
  * Properties summary:
- * - _valueEl {HTMLElement} : O elemento DOM que exibe o valor do contador.
- * - _boundOnIncrease {Function} : Listener vinculado para o botão de aumentar.
- * - _boundOnDecrease {Function} : Listener vinculado para o botão de diminuir.
- * - _boundOnReset {Function} : Listener vinculado para o botão de resetar.
+ * - _valueEl {HTMLElement|null} : The DOM element that displays the counter value.
+ * - _boundOnIncrease {Function|null} : Bound listener for the increase button.
+ * - _boundOnDecrease {Function|null} : Bound listener for the decrease button.
+ * - _boundOnReset {Function|null} : Bound listener for the reset button.
  *
  * Events:
  * - Listens to (globalState): 'counterValue'
  * - Emits to (globalState): 'counterValue'
  *
  * Dependencies:
- * - ./Panel.js
- * - ../../services/GlobalStateService.js
+ * - {import('./Panel.js').Panel}
+ * - {import('../../services/GlobalStateService.js').globalState}
  */
 export class CounterPanel extends Panel {
     /**
+     * The DOM element that displays the counter value.
+     *
      * @type {HTMLElement | null}
      * @private
      */
     _valueEl = null;
 
     /**
+     * Bound listener for the increase button.
+     *
      * @type {Function | null}
      * @private
      */
     _boundOnIncrease = null;
 
     /**
+     * Bound listener for the decrease button.
+     *
      * @type {Function | null}
      * @private
      */
     _boundOnDecrease = null;
 
     /**
+     * Bound listener for the reset button.
+     *
      * @type {Function | null}
      * @private
      */
     _boundOnReset = null;
 
     /**
-     * @param {string} title - O título do painel.
-     * @param {number|null} [height=null] - A altura inicial.
-     * @param {object} [config={}] - Configurações de override.
+     * Creates a new CounterPanel instance.
+     *
+     * @param {string} title - The panel title.
+     * @param {number|null} [height=null] - The initial height.
+     * @param {object} [config={}] - Configuration overrides.
      */
     constructor(title, height = null, config = {}) {
         super(title, height, {
@@ -67,23 +77,26 @@ export class CounterPanel extends Panel {
     }
 
     /**
-     * <panelType> static getter.
-     * @returns {string}
+     * Returns the unique type identifier for this panel class.
+     *
+     * @returns {string} The type identifier.
      */
     static get panelType() {
         return 'CounterPanel';
     }
 
     /**
-     * <PanelType> getter.
-     * @returns {string}
+     * Returns the instance type identifier.
+     *
+     * @returns {string} The type identifier string.
      */
     getPanelType() {
         return 'CounterPanel';
     }
 
     /**
-     * (Sobrescreve Panel) Cria o DOM para o contador.
+     * (Overrides Panel) Creates the DOM for the counter.
+     *
      * @returns {void}
      */
     render() {
@@ -128,17 +141,19 @@ export class CounterPanel extends Panel {
     }
 
     /**
-     * (Sobrescreve Panel) Define quais chaves do estado global observar.
-     * @returns {Array<string>}
+     * (Overrides Panel) Defines which global state keys to observe.
+     *
+     * @returns {Array<string>} The list of observed keys.
      */
     getObservedStateKeys() {
         return ['counterValue'];
     }
 
     /**
-     * (Sobrescreve Panel) Lida com atualizações do estado global.
-     * @param {string} key - A chave de estado que mudou.
-     * @param {*} value - O novo valor.
+     * (Overrides Panel) Handles global state updates.
+     *
+     * @param {string} key - The state key that changed.
+     * @param {*} value - The new value.
      * @returns {void}
      */
     onStateUpdate(key, value) {
@@ -152,7 +167,8 @@ export class CounterPanel extends Panel {
     }
 
     /**
-     * (Sobrescreve Panel) Limpa os listeners do DOM.
+     * (Overrides Panel) Cleans up DOM listeners.
+     *
      * @returns {void}
      */
     destroy() {
@@ -172,7 +188,8 @@ export class CounterPanel extends Panel {
     }
 
     /**
-     * Lida com o clique no botão de aumentar.
+     * Handles the click on the increase button.
+     *
      * @private
      * @returns {void}
      */
@@ -182,7 +199,8 @@ export class CounterPanel extends Panel {
     }
 
     /**
-     * Lida com o clique no botão de diminuir.
+     * Handles the click on the decrease button.
+     *
      * @private
      * @returns {void}
      */
@@ -192,7 +210,8 @@ export class CounterPanel extends Panel {
     }
 
     /**
-     * Lida com o clique no botão de resetar.
+     * Handles the click on the reset button.
+     *
      * @private
      * @returns {void}
      */

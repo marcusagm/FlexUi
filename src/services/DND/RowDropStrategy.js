@@ -1,6 +1,5 @@
 import { BaseDropStrategy } from './BaseDropStrategy.js';
 import { PanelGroup } from '../../components/Panel/PanelGroup.js';
-import { Panel } from '../../components/Panel/Panel.js';
 import { FloatingPanelManagerService } from './FloatingPanelManagerService.js';
 import { ItemType } from '../../constants/DNDTypes.js';
 
@@ -25,11 +24,11 @@ import { ItemType } from '../../constants/DNDTypes.js';
  * and moves the dropped Panel or PanelGroup into the new group.
  *
  * Dependencies:
- * - ./BaseDropStrategy.js
- * - ../../components/Panel/PanelGroup.js
- * - ../../components/Panel/Panel.js
- * - ./FloatingPanelManagerService.js
- * - ../../constants/DNDTypes.js
+ * - {import('./BaseDropStrategy.js').BaseDropStrategy}
+ * - {import('../../components/Panel/PanelGroup.js').PanelGroup}
+ * - {import('../../components/Panel/Panel.js').Panel}
+ * - {import('./FloatingPanelManagerService.js').FloatingPanelManagerService}
+ * - {import('../../constants/DNDTypes.js').ItemType}
  */
 export class RowDropStrategy extends BaseDropStrategy {
     /**
@@ -87,10 +86,6 @@ export class RowDropStrategy extends BaseDropStrategy {
         const me = this;
         const placeholder = dds.getPlaceholder();
 
-        // Strict Target Check:
-        // We only accept the drag if the pointer is directly over the Row element
-        // or the Placeholder. If it is over a child (like a Column), we assume
-        // that specific child's strategy should handle it.
         if (point.target !== dropZone.element && point.target !== placeholder) {
             dds.hidePlaceholder();
             me._dropIndex = null;
@@ -104,24 +99,21 @@ export class RowDropStrategy extends BaseDropStrategy {
             return false;
         }
 
-        // 1. Identify effective item (PanelGroup)
         let effectiveItem;
         if (draggedData.type === ItemType.PANEL_GROUP) {
             effectiveItem = draggedData.item;
         } else {
-            effectiveItem = draggedData.item._state.parentGroup;
+            effectiveItem = draggedData.item.parentGroup;
             if (!effectiveItem) return false;
         }
 
-        // 2. Calculate Source State (Live)
-        // This determines if the item being dragged is the ONLY content of its current column.
         let originalColumnIndex = -1;
         let isOriginSingle = false;
 
         const oldColumn = effectiveItem.getColumn();
         const columns = dropZone.getColumns();
 
-        if (oldColumn && oldColumn._state.parentContainer === dropZone) {
+        if (oldColumn && oldColumn.parentContainer === dropZone) {
             originalColumnIndex = columns.indexOf(oldColumn);
 
             if (originalColumnIndex !== -1) {
@@ -129,20 +121,17 @@ export class RowDropStrategy extends BaseDropStrategy {
                     draggedData.type === ItemType.PANEL_GROUP &&
                     oldColumn.getTotalPanelGroups() === 1
                 ) {
-                    // Dragging the only group of the column
                     isOriginSingle = true;
                 } else if (
                     draggedData.type === ItemType.PANEL &&
-                    effectiveItem._state.panels.length === 1 && // Group has 1 panel
-                    oldColumn.getTotalPanelGroups() === 1 // Column has 1 group
+                    effectiveItem.panels.length === 1 &&
+                    oldColumn.getTotalPanelGroups() === 1
                 ) {
-                    // Dragging the only panel of the only group of the column
                     isOriginSingle = true;
                 }
             }
         }
 
-        // 3. Live Geometry Calculation for Drop Index
         const mouseX = point.x;
         let targetElement = null;
         let placed = false;
@@ -161,7 +150,6 @@ export class RowDropStrategy extends BaseDropStrategy {
             }
         }
 
-        // 4. Ghost Logic (Block redundant drops)
         const isLeftGap = me._dropIndex === originalColumnIndex;
         const isRightGap = me._dropIndex === originalColumnIndex + 1;
 
@@ -171,18 +159,15 @@ export class RowDropStrategy extends BaseDropStrategy {
             return false;
         }
 
-        // 5. Render Placeholder
         dds.showPlaceholder('vertical');
 
         if (placed && targetElement) {
-            // Live insert before the target element (column)
             if (dropZone.element.contains(targetElement)) {
                 dropZone.element.insertBefore(placeholder, targetElement);
             } else {
                 dropZone.element.appendChild(placeholder);
             }
         } else {
-            // Append to end if no split point found
             dropZone.element.appendChild(placeholder);
         }
 
@@ -214,11 +199,10 @@ export class RowDropStrategy extends BaseDropStrategy {
         if (draggedData.type === ItemType.PANEL_GROUP) {
             sourceGroup = draggedData.item;
         } else if (draggedData.type === ItemType.PANEL) {
-            sourceGroup = draggedData.item._state.parentGroup;
+            sourceGroup = draggedData.item.parentGroup;
         }
 
-        // Handle floating panel removal
-        if (sourceGroup && sourceGroup._state.isFloating) {
+        if (sourceGroup && sourceGroup.isFloating) {
             if (draggedData.type === ItemType.PANEL_GROUP) {
                 FloatingPanelManagerService.getInstance().removeFloatingPanel(sourceGroup);
             }
@@ -237,11 +221,11 @@ export class RowDropStrategy extends BaseDropStrategy {
             if (oldColumn) {
                 oldColumn.removePanelGroup(draggedItem, true);
             }
-            draggedItem._state.height = null;
+            draggedItem.height = null;
             newColumn.addPanelGroup(draggedItem);
         } else if (draggedData.type === ItemType.PANEL) {
             const draggedPanel = draggedData.item;
-            const sourceParentGroup = draggedPanel._state.parentGroup;
+            const sourceParentGroup = draggedPanel.parentGroup;
 
             const newColumn = dropZone.createColumn(null, panelIndex);
             const newPanelGroup = new PanelGroup(null);
@@ -250,6 +234,7 @@ export class RowDropStrategy extends BaseDropStrategy {
             if (sourceParentGroup) {
                 sourceParentGroup.removePanel(draggedPanel, true);
             }
+            draggedPanel.height = null;
             newPanelGroup.addPanel(draggedPanel, true);
         }
 

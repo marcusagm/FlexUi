@@ -15,17 +15,19 @@ import { Modal } from '../../services/Modal/Modal.js';
  *
  * Business rules implemented:
  * - Identifies itself as 'ToolbarPanel' to the factory.
- * - Overrides default config to be non-collapsible and non-movable.
+ * - Overrides default config to be non-collapsible and non-movable via constructor.
  * - Content is static and rebuilt in 'render'.
  * - Does not save/load 'content' in toJSON/fromJSON.
  *
  * Dependencies:
- * - ./Panel.js
- * - ../../services/Notification/Notification.js
- * - ../../services/Modal/Modal.js
+ * - {import('./Panel.js').Panel}
+ * - {import('../../services/Notification/Notification.js').appNotifications}
+ * - {import('../../services/Modal/Modal.js').Modal}
  */
 export class ToolbarPanel extends Panel {
     /**
+     * Creates a new ToolbarPanel instance.
+     *
      * @param {string} title - The panel title.
      * @param {number|null} [height=null] - The initial height.
      * @param {object} [config={}] - Configuration overrides.
@@ -42,8 +44,9 @@ export class ToolbarPanel extends Panel {
     }
 
     /**
-     * <panelType> static getter.
-     * @returns {string}
+     * Returns the unique type identifier for this panel class.
+     *
+     * @returns {string} The type identifier.
      */
     static get panelType() {
         return 'ToolbarPanel';
@@ -51,10 +54,12 @@ export class ToolbarPanel extends Panel {
 
     /**
      * (Overrides Panel) Populates the content element with demo buttons.
+     *
      * @returns {void}
      */
     render() {
-        const contentEl = this.contentElement;
+        const me = this;
+        const contentEl = me.contentElement;
         contentEl.classList.add('panel__content--toolbar');
 
         const btn1 = document.createElement('button');
@@ -112,7 +117,7 @@ export class ToolbarPanel extends Panel {
             Modal.confirm('Are you sure you want to continue?', 'Confirmation');
         };
         const btn8 = document.createElement('button');
-        btn8.textContent = 'Pompt';
+        btn8.textContent = 'Prompt';
         btn8.onclick = () => {
             Modal.prompt('What is your name?', 'Prompt', 'Anonymous');
         };
@@ -121,8 +126,9 @@ export class ToolbarPanel extends Panel {
     }
 
     /**
-     * <PanelType> getter.
-     * @returns {string}
+     * Returns the instance type identifier.
+     *
+     * @returns {string} The type identifier string.
      */
     getPanelType() {
         return 'ToolbarPanel';
@@ -130,16 +136,19 @@ export class ToolbarPanel extends Panel {
 
     /**
      * Overrides base method; content is static and should not be set externally.
-     * @param {string} htmlString
+     *
+     * @param {string} htmlString - The HTML content.
      * @returns {void}
      */
     setContent(htmlString) {
+        htmlString;
         // Does nothing. Content is populated by render().
     }
 
     /**
      * Serializes the Panel's state.
-     * @returns {object}
+     *
+     * @returns {object} The serialized data.
      */
     toJSON() {
         return super.toJSON();
@@ -147,6 +156,7 @@ export class ToolbarPanel extends Panel {
 
     /**
      * Deserializes state.
+     *
      * @param {object} data - The state object.
      * @returns {void}
      */

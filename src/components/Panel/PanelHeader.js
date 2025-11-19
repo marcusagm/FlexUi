@@ -333,8 +333,8 @@ export class PanelHeader {
         event.stopPropagation();
         const me = this;
 
-        // Access state via panel getter (Panel class still has _state for now)
-        if (!me.panel || !me.panel._state.closable) return;
+        // Use public getter 'closable' from Panel
+        if (!me.panel || !me.panel.closable) return;
 
         if (me.parentGroup) {
             appBus.emit(EventTypes.PANEL_GROUP_CHILD_CLOSE, {
@@ -354,7 +354,7 @@ export class PanelHeader {
     onTabClick(event) {
         const me = this;
         if (me.parentGroup) {
-            me.parentGroup.setActive(me.panel);
+            me.parentGroup.activePanel = me.panel; // Use setter
         }
     }
 
@@ -369,27 +369,30 @@ export class PanelHeader {
         event.stopPropagation();
 
         const me = this;
-        // Access panel state (assuming Panel.js structure)
-        const panelState = me.panel ? me.panel._state : {};
-        const parentGroupState = panelState.parentGroup ? panelState.parentGroup._state : {};
+        const panel = me.panel;
+        const parentGroup = me.parentGroup;
+
+        const isMovable = panel ? panel.movable : false;
+        const isClosable = panel ? panel.closable : false;
+        const isFloating = parentGroup ? parentGroup.isFloating : false;
 
         const menuItems = [
             {
                 title: 'Desacoplar Painel',
                 event: EventTypes.APP_UNDOCK_PANEL_REQUEST,
-                disabled: !panelState.movable || parentGroupState.isFloating
+                disabled: !isMovable || isFloating
             },
             { isSeparator: true },
             {
                 title: 'Fechar Aba',
                 event: EventTypes.APP_CLOSE_PANEL_REQUEST,
-                disabled: !panelState.closable
+                disabled: !isClosable
             }
         ];
 
         const contextData = {
-            panel: me.panel,
-            group: me.parentGroup,
+            panel: panel,
+            group: parentGroup,
             nativeEvent: event
         };
 
@@ -460,12 +463,12 @@ export class PanelHeader {
             me.element.classList.add('panel-group__tab');
 
             // Check panel state for closable
-            if (me.panel && me.panel._state.closable) {
+            if (me.panel && me.panel.closable) {
                 me._closeBtn.style.display = '';
             }
 
             // Multi panel mode: Restore draggable based on config
-            if (me.panel && me.panel._state.movable) {
+            if (me.panel && me.panel.movable) {
                 me.element.setAttribute('draggable', 'true');
                 me.element.style.cursor = 'grab';
             } else {

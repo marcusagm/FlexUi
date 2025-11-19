@@ -14,9 +14,13 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * and collapse state using the unified ResizeHandleManager.
  *
  * Properties summary:
- * - _state {object} : Internal state (child Columns, parent Container, height, collapse).
  * - element {HTMLElement} : The main DOM element (<div class="row">).
- * - dropZoneType {string} : The identifier for the DragDropService.
+ * - columns {Array<Column>} : List of child Columns.
+ * - parentContainer {Container} : The parent Container instance.
+ * - height {number|null} : The height of the row.
+ * - collapsed {boolean} : Whether the row is collapsed.
+ * - collapsible {boolean} : Whether the row can be collapsed.
+ * - minHeight {number} : Minimum height constraint.
  * - collapseBtn {HTMLElement|null} : The button element to toggle collapse state.
  * - _id {string} : Unique ID for this instance.
  * - _namespace {string} : Unique namespace for appBus listeners.
@@ -34,32 +38,62 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * - Emits: EventTypes.LAYOUT_COLUMNS_CHANGED (to notify LayoutService)
  * - Emits: EventTypes.ROW_EMPTY (to notify Container when this row is empty)
  *
+ * Business rules implemented:
+ * - Renders 'Column' children horizontally.
+ * - Registers as a 'row' type drop zone.
+ * - Automatically removes empty columns via 'onColumnEmpty'.
+ * - Manages vertical resizing via ResizeHandleManager.
+ * - Supports collapsing, which hides all child columns and reduces height.
+ *
  * Dependencies:
  * - {import('../Column/Column.js').Column}
  * - {import('../../utils/EventBus.js').appBus}
  * - {import('../../utils/ThrottleRAF.js').throttleRAF}
+ * - {import('../../utils/generateId.js').generateId}
  * - {import('../../utils/ResizeHandleManager.js').ResizeHandleManager}
+ * - {import('../../constants/DNDTypes.js').DropZoneType}
+ * - {import('../../constants/EventTypes.js').EventTypes}
  */
 export class Row {
     /**
-     * Internal state holding child Column components and dimensions.
+     * List of child Column components.
      *
-     * @type {{
-     * children: Array<import('../Column/Column.js').Column>,
-     * parentContainer: import('../Container/Container.js').Container | null,
-     * height: number | null,
-     * collapsed: boolean,
-     * collapsible: boolean
-     * }}
+     * @type {Array<import('../Column/Column.js').Column>}
      * @private
      */
-    _state = {
-        children: [],
-        parentContainer: null,
-        height: null,
-        collapsed: false,
-        collapsible: true
-    };
+    _columns = [];
+
+    /**
+     * The parent Container instance.
+     *
+     * @type {import('../Container/Container.js').Container | null}
+     * @private
+     */
+    _parentContainer = null;
+
+    /**
+     * The height of the row in pixels, or null if flexible.
+     *
+     * @type {number | null}
+     * @private
+     */
+    _height = null;
+
+    /**
+     * Whether the row is currently collapsed.
+     *
+     * @type {boolean}
+     * @private
+     */
+    _collapsed = false;
+
+    /**
+     * Whether the row allows collapsing.
+     *
+     * @type {boolean}
+     * @private
+     */
+    _collapsible = true;
 
     /**
      * Unique ID for this instance, used for namespacing events.
@@ -112,7 +146,7 @@ export class Row {
     /**
      * Stores the resize handle manager instance.
      *
-     * @type {import('../../utils/ResizeHandleManager.js').ResizeHandleManager | null}
+     * @type {ResizeHandleManager | null}
      * @private
      */
     _resizeHandleManager = null;
@@ -127,6 +161,22 @@ export class Row {
     collapseBtn = null;
 
     /**
+     * The main DOM element.
+     *
+     * @type {HTMLElement}
+     * @public
+     */
+    element;
+
+    /**
+     * The drop zone type identifier.
+     *
+     * @type {string}
+     * @public
+     */
+    dropZoneType;
+
+    /**
      * Creates an instance of Row.
      *
      * @param {import('../Container/Container.js').Container} container - The parent Container instance.
@@ -136,9 +186,10 @@ export class Row {
         const me = this;
         me.element = document.createElement('div');
         me.element.classList.add('row');
-        me._state.parentContainer = container;
-        me._state.height = height;
-        me.setMinHeight(me._minHeight);
+
+        me.parentContainer = container;
+        me.height = height;
+        me.minHeight = me._minHeight; // Use default or trigger setter
 
         me.dropZoneType = DropZoneType.ROW;
 
@@ -160,35 +211,178 @@ export class Row {
     }
 
     /**
-     * MinimumHeight setter with validation.
+     * Columns getter.
      *
-     * @param {number} height - The minimum height in pixels.
-     * @returns {void}
+     * @returns {Array<import('../Column/Column.js').Column>} The list of child columns.
      */
-    setMinHeight(height) {
-        const me = this;
-        const minimumHeight = Number(height);
-        if (!Number.isFinite(minimumHeight) || minimumHeight < 0) {
-            console.warn('Row: Invalid minimumHeight value. Setting to 0.');
-            me._minHeight = 0;
-            return;
-        }
-        me._minHeight = minimumHeight;
+    get columns() {
+        return this._columns;
     }
 
     /**
-     * MinimumHeight getter.
+     * ParentContainer getter.
      *
-     * @returns {number} The minimum height in pixels.
+     * @returns {import('../Container/Container.js').Container | null} The parent container.
+     */
+    get parentContainer() {
+        return this._parentContainer;
+    }
+
+    /**
+     * ParentContainer setter.
+     * Validates that the value looks like a Container.
+     *
+     * @param {import('../Container/Container.js').Container | null} value
+     * @returns {void}
+     */
+    set parentContainer(value) {
+        if (value !== null && typeof value !== 'object') {
+            console.warn(`[Row] Invalid parentContainer assignment (${value}).`);
+            return;
+        }
+        this._parentContainer = value;
+    }
+
+    /**
+     * Height getter.
+     *
+     * @returns {number | null} The height in pixels or null.
+     */
+    get height() {
+        return this._height;
+    }
+
+    /**
+     * Height setter.
+     * Validates that the value is a positive number or null.
+     *
+     * @param {number | null} value
+     * @returns {void}
+     */
+    set height(value) {
+        if (value !== null && (!Number.isFinite(value) || value < 0)) {
+            console.warn(
+                `[Row] Invalid height assignment (${value}). Must be positive number or null.`
+            );
+            return;
+        }
+        this._height = value;
+    }
+
+    /**
+     * Collapsed getter.
+     *
+     * @returns {boolean}
+     */
+    get collapsed() {
+        return this._collapsed;
+    }
+
+    /**
+     * Collapsed setter.
+     * Manages UI state: adds/removes classes, hides/shows columns, updates button, updates height.
+     *
+     * @param {boolean} value
+     * @returns {void}
+     */
+    set collapsed(value) {
+        const me = this;
+        if (typeof value !== 'boolean') {
+            console.warn(`[Row] Invalid collapsed assignment (${value}). Must be boolean.`);
+            return;
+        }
+        me._collapsed = value;
+
+        if (value) {
+            me.element.classList.add('row--collapsed');
+            me._columns.forEach(column => (column.element.style.display = 'none'));
+            if (me.collapseBtn) {
+                me.collapseBtn.classList.add('row__collapse-btn--collapsed');
+            }
+        } else {
+            me.element.classList.remove('row--collapsed');
+            me._columns.forEach(column => (column.element.style.display = ''));
+            if (me.collapseBtn) {
+                me.collapseBtn.classList.remove('row__collapse-btn--collapsed');
+            }
+        }
+        me.updateHeight(false);
+    }
+
+    /**
+     * Collapsible getter.
+     *
+     * @returns {boolean}
+     */
+    get collapsible() {
+        return this._collapsible;
+    }
+
+    /**
+     * Collapsible setter.
+     * Updates the internal state and refreshes the collapse button UI.
+     *
+     * @param {boolean} value
+     * @returns {void}
+     */
+    set collapsible(value) {
+        const me = this;
+        if (typeof value !== 'boolean') {
+            console.warn(`[Row] Invalid collapsible assignment (${value}). Must be boolean.`);
+            return;
+        }
+        me._collapsible = value;
+        me._setupCollapseButton(); // Re-render button if state changes
+    }
+
+    /**
+     * MinHeight getter.
+     *
+     * @returns {number}
+     */
+    get minHeight() {
+        return this._minHeight;
+    }
+
+    /**
+     * MinHeight setter.
+     *
+     * @param {number} value
+     * @returns {void}
+     */
+    set minHeight(value) {
+        const num = Number(value);
+        if (!Number.isFinite(num) || num < 0) {
+            console.warn('Row: Invalid minHeight value. Setting to 0.');
+            this._minHeight = 0;
+            return;
+        }
+        this._minHeight = num;
+    }
+
+    /**
+     * Wrapper for minHeight setter (compatibility).
+     *
+     * @param {number} height
+     * @returns {void}
+     */
+    setMinHeight(height) {
+        this.minHeight = height;
+    }
+
+    /**
+     * Wrapper for minHeight getter (compatibility).
+     *
+     * @returns {number}
      */
     getMinHeight() {
-        return this._minHeight;
+        return this.minHeight;
     }
 
     /**
      * ThrottledUpdate setter.
      *
-     * @param {Function} throttledFunction - The throttled function.
+     * @param {Function} throttledFunction
      * @returns {void}
      */
     setThrottledUpdate(throttledFunction) {
@@ -198,20 +392,20 @@ export class Row {
     /**
      * ThrottledUpdate getter.
      *
-     * @returns {Function | null} The throttled update function.
+     * @returns {Function | null}
      */
     getThrottledUpdate() {
         return this._throttledUpdate;
     }
 
     /**
-     * ParentContainer setter.
+     * Wrapper for parentContainer setter (compatibility).
      *
-     * @param {import('../Container/Container.js').Container} container - The parent container instance.
+     * @param {import('../Container/Container.js').Container} container
      * @returns {void}
      */
     setParentContainer(container) {
-        this._state.parentContainer = container;
+        this.parentContainer = container;
     }
 
     /**
@@ -250,7 +444,7 @@ export class Row {
 
         me._resizeHandleManager?.destroy();
 
-        [...me.getColumns()].forEach(column => column.destroy());
+        [...me.columns].forEach(column => column.destroy());
     }
 
     /**
@@ -262,7 +456,7 @@ export class Row {
     onColumnEmpty(column) {
         this.deleteColumn(column);
 
-        if (this.getTotalColumns() === 0 && this._state.parentContainer) {
+        if (this.getTotalColumns() === 0 && this.parentContainer) {
             appBus.emit(EventTypes.ROW_EMPTY, this);
         }
     }
@@ -274,7 +468,7 @@ export class Row {
      * @returns {void}
      */
     updateAllResizeBars() {
-        const columns = this.getColumns();
+        const columns = this.columns;
         columns.forEach((column, index) => {
             column.addResizeBars(index === columns.length - 1);
         });
@@ -291,12 +485,12 @@ export class Row {
         me.element.querySelectorAll('.row__collapse-btn').forEach(button => button.remove());
         me.collapseBtn = null;
 
-        if (me._state.collapsible) {
+        if (me.collapsible) {
             me.collapseBtn = document.createElement('button');
             me.collapseBtn.type = 'button';
             me.collapseBtn.className = 'row__collapse-btn';
             me.collapseBtn.setAttribute('aria-label', 'Toggle Row Collapse');
-            if (me._state.collapsed) {
+            if (me.collapsed) {
                 me.collapseBtn.classList.add('row__collapse-btn--collapsed');
             }
             me.collapseBtn.addEventListener('click', me._boundOnToggleCollapseRequest);
@@ -335,12 +529,12 @@ export class Row {
                 containerRectangle: null
             }),
             onResize: ({ height }) => {
-                me._state.height = height;
+                me.height = height;
                 me.getThrottledUpdate()();
             },
             onEnd: () => {
-                if (me._state.parentContainer) {
-                    me._state.parentContainer.requestLayoutUpdate();
+                if (me.parentContainer) {
+                    me.parentContainer.requestLayoutUpdate();
                 }
             }
         });
@@ -353,16 +547,11 @@ export class Row {
      */
     toggleCollapse() {
         const me = this;
-        if (!me._state.collapsible) return;
+        if (!me.collapsible) return;
+        me.collapsed = !me.collapsed; // Triggers setter
 
-        if (me._state.collapsed) {
-            me.unCollapse();
-        } else {
-            me.collapse();
-        }
-
-        if (me._state.parentContainer) {
-            me._state.parentContainer.requestLayoutUpdate();
+        if (me.parentContainer) {
+            me.parentContainer.requestLayoutUpdate();
         }
     }
 
@@ -372,12 +561,7 @@ export class Row {
      * @returns {void}
      */
     updateCollapse() {
-        const me = this;
-        if (me._state.collapsed) {
-            me.collapse();
-        } else {
-            me.unCollapse();
-        }
+        this.collapsed = this._collapsed;
     }
 
     /**
@@ -386,14 +570,7 @@ export class Row {
      * @returns {void}
      */
     collapse() {
-        const me = this;
-        me._state.collapsed = true;
-        me.element.classList.add('row--collapsed');
-        me.getColumns().forEach(column => (column.element.style.display = 'none'));
-        if (me.collapseBtn) {
-            me.collapseBtn.classList.add('row__collapse-btn--collapsed');
-        }
-        me.updateHeight(false);
+        this.collapsed = true;
     }
 
     /**
@@ -402,14 +579,7 @@ export class Row {
      * @returns {void}
      */
     unCollapse() {
-        const me = this;
-        me._state.collapsed = false;
-        me.element.classList.remove('row--collapsed');
-        me.getColumns().forEach(column => (column.element.style.display = ''));
-        if (me.collapseBtn) {
-            me.collapseBtn.classList.remove('row__collapse-btn--collapsed');
-        }
-        me.updateHeight(false);
+        this.collapsed = false;
     }
 
     /**
@@ -424,7 +594,7 @@ export class Row {
         const column = new Column(me, width);
 
         if (index === null) {
-            me._state.children.push(column);
+            me._columns.push(column);
             const resizeHandle = me.element.querySelector('.row__resize-handle');
             if (resizeHandle) {
                 me.element.insertBefore(column.element, resizeHandle);
@@ -432,9 +602,9 @@ export class Row {
                 me.element.appendChild(column.element);
             }
         } else {
-            me._state.children.splice(index, 0, column);
+            me._columns.splice(index, 0, column);
 
-            const nextSiblingColumn = me._state.children[index + 1];
+            const nextSiblingColumn = me._columns[index + 1];
             let nextDomNode = nextSiblingColumn ? nextSiblingColumn.element : null;
 
             if (!nextDomNode) {
@@ -451,7 +621,7 @@ export class Row {
             }
         }
 
-        if (me._state.collapsed) {
+        if (me.collapsed) {
             column.element.style.display = 'none';
         }
 
@@ -468,7 +638,7 @@ export class Row {
      */
     deleteColumn(column) {
         const me = this;
-        const index = me._state.children.indexOf(column);
+        const index = me._columns.indexOf(column);
         if (index === -1) {
             return;
         }
@@ -478,7 +648,7 @@ export class Row {
         if (columnElement && me.element.contains(columnElement)) {
             me.element.removeChild(columnElement);
         }
-        me._state.children.splice(index, 1);
+        me._columns.splice(index, 1);
         me.requestLayoutUpdate();
     }
 
@@ -488,7 +658,7 @@ export class Row {
      * @returns {Array<import('../Column/Column.js').Column>} All child column instances.
      */
     getColumns() {
-        return this._state.children;
+        return this.columns;
     }
 
     /**
@@ -497,7 +667,7 @@ export class Row {
      * @returns {number} The total number of columns.
      */
     getTotalColumns() {
-        return this.getColumns().length;
+        return this.columns.length;
     }
 
     /**
@@ -506,7 +676,7 @@ export class Row {
      * @returns {import('../Column/Column.js').Column} The first column instance.
      */
     getFirstColumn() {
-        const columns = this.getColumns();
+        const columns = this.columns;
         return columns[0] || this.createColumn();
     }
 
@@ -516,7 +686,7 @@ export class Row {
      * @returns {import('../Column/Column.js').Column} The last column instance.
      */
     getLastColumn() {
-        const columns = this.getColumns();
+        const columns = this.columns;
         return columns[columns.length - 1] || this.createColumn();
     }
 
@@ -530,7 +700,7 @@ export class Row {
         const me = this;
         me.element.style.minHeight = `${me.getMinHeight()}px`;
 
-        if (me._state.collapsed) {
+        if (me.collapsed) {
             me.element.style.flex = '0 0 auto';
             me.element.style.height = 'auto';
             me.element.classList.add('row--collapsed');
@@ -542,9 +712,9 @@ export class Row {
 
         if (isLast) {
             me.element.style.flex = '1 1 auto';
-            me._state.height = null;
-        } else if (me._state.height !== null) {
-            me.element.style.flex = `0 0 ${me._state.height}px`;
+            me.height = null; // Reset internal height for fluid layout
+        } else if (me.height !== null) {
+            me.element.style.flex = `0 0 ${me.height}px`;
         } else {
             me.element.style.flex = '1 1 auto';
         }
@@ -557,12 +727,12 @@ export class Row {
      */
     clear() {
         const me = this;
-        [...me.getColumns()].forEach(column => {
+        [...me.columns].forEach(column => {
             me.deleteColumn(column);
         });
 
         me.element.innerHTML = '';
-        me._state.children = [];
+        me._columns = [];
         me.collapseBtn = null;
     }
 
@@ -572,11 +742,12 @@ export class Row {
      * @returns {object} The serialized state object.
      */
     toJSON() {
+        const me = this;
         return {
-            height: this._state.height,
-            collapsed: this._state.collapsed,
-            collapsible: this._state.collapsible,
-            columns: this.getColumns().map(column => column.toJSON())
+            height: me.height,
+            collapsed: me.collapsed,
+            collapsible: me.collapsible,
+            columns: me.columns.map(column => column.toJSON())
         };
     }
 
@@ -591,13 +762,10 @@ export class Row {
         me.clear();
 
         if (data.height !== undefined) {
-            me._state.height = data.height;
-        }
-        if (data.collapsed !== undefined) {
-            me._state.collapsed = data.collapsed;
+            me.height = data.height;
         }
         if (data.collapsible !== undefined) {
-            me._state.collapsible = data.collapsible;
+            me.collapsible = data.collapsible;
         }
 
         const columnsData = data.columns || [];
@@ -609,6 +777,10 @@ export class Row {
 
         me.requestLayoutUpdate();
         me.updateHeight(false);
-        me.updateCollapse();
+
+        // Apply collapsed state last to trigger UI update
+        if (data.collapsed !== undefined) {
+            me.collapsed = data.collapsed;
+        }
     }
 }

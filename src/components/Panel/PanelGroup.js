@@ -24,8 +24,13 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * - id {string} : Unique ID for this instance (also used as namespace).
  * - _namespace {string} : Unique namespace for appBus listeners.
  * - _throttledUpdate {Function | null} : The throttled function for height updates (docked only).
- * - _state {object} : Internal state (child Panels, layout, parent Column, dimensions).
  * - element {HTMLElement} : The main DOM element (<div class="panel-group">).
+ * - panels {Array<Panel>} : The list of child panels.
+ * - activePanel {Panel|null} : The currently visible panel.
+ * - collapsed {boolean} : Whether the group is collapsed.
+ * - height {number|null} : The height of the group.
+ * - width {number|null} : The width of the group.
+ * - isFloating {boolean} : Whether the group is floating.
  * - _resizeHandleManager {ResizeHandleManager | null} : Manages all resize handles (docked or floating).
  *
  * Typical usage:
@@ -39,6 +44,14 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * - Emits: EventTypes.PANEL_GROUP_REMOVED (when closed or empty)
  * - Emits: EventTypes.LAYOUT_PANELGROUPS_CHANGED (to notify LayoutService)
  *
+ * Business rules implemented:
+ * - Orchestrates Panel DOM (header vs. content).
+ * - Manages active tab state ('setActive').
+ * - Renders in "simple mode" (no tabs) if only one child Panel exists.
+ * - Manages its own vertical resize (docked) and 2D resize (floating) via ResizeController.
+ * - If last Panel is removed, destroys itself ('removePanel' -> 'close').
+ * - Calculates minHeight dynamically based on panel content and resize handle visibility.
+ *
  * Dependencies:
  * - {import('./PanelGroupHeader.js').PanelGroupHeader}
  * - {import('./PanelFactory.js').PanelFactory}
@@ -51,16 +64,18 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * - {import('../../constants/DNDTypes.js').ItemType}
  * - {import('../../constants/DNDTypes.js').DropZoneType}
  * - {import('../../constants/EventTypes.js').EventTypes}
+ *
+ * Notes / Additional:
+ * - The group acts as a Tab Container.
  */
 export class PanelGroup {
     /**
      * Unique ID for this PanelGroup instance.
-     * Also used as the appBus namespace.
      *
      * @type {string}
      * @public
      */
-    id = generateId();
+    _id = generateId();
 
     /**
      * Unique namespace for appBus listeners.
@@ -79,51 +94,151 @@ export class PanelGroup {
     _throttledUpdate = null;
 
     /**
-     * Internal state for orientation, position, and groups.
+     * Reference to the parent Column.
      *
-     * @type {{
-     * column: import('../Column/Column.js').Column | null,
-     * header: PanelGroupHeader | null,
-     * contentContainer: HTMLElement | null,
-     * panels: Array<Panel>,
-     * activePanel: Panel | null,
-     * collapsed: boolean,
-     * height: number | null,
-     * width: number | null,
-     * minHeight: number,
-     * minWidth: number,
-     * closable: boolean,
-     * collapsible: boolean,
-     * movable: boolean,
-     * title: string | null,
-     * isFloating: boolean,
-     * x: number | null,
-     * y: number | null
-     * }}
+     * @type {import('../Column/Column.js').Column | null}
      * @private
      */
-    _state = {
-        column: null,
-        header: null,
-        contentContainer: null,
-        panels: [],
-        activePanel: null,
-        collapsed: false,
-        height: null,
-        width: null,
-        minHeight: 10,
-        minWidth: 150,
-        closable: true,
-        collapsible: true,
-        movable: true,
-        title: null,
-        isFloating: false,
-        x: null,
-        y: null
-    };
+    _column = null;
 
     /**
-     * Bound handler for panel child close requests.
+     * The header component instance.
+     *
+     * @type {PanelGroupHeader | null}
+     * @private
+     */
+    _header = null;
+
+    /**
+     * The container element for panels content.
+     *
+     * @type {HTMLElement | null}
+     * @private
+     */
+    _contentContainer = null;
+
+    /**
+     * List of child panels.
+     *
+     * @type {Array<Panel>}
+     * @private
+     */
+    _panels = [];
+
+    /**
+     * The currently active panel.
+     *
+     * @type {Panel | null}
+     * @private
+     */
+    _activePanel = null;
+
+    /**
+     * Whether the group is collapsed.
+     *
+     * @type {boolean}
+     * @private
+     */
+    _collapsed = false;
+
+    /**
+     * Height of the group.
+     *
+     * @type {number | null}
+     * @private
+     */
+    _height = null;
+
+    /**
+     * Width of the group.
+     *
+     * @type {number | null}
+     * @private
+     */
+    _width = null;
+
+    /**
+     * Minimum height.
+     *
+     * @type {number}
+     * @private
+     */
+    _minHeight = 10;
+
+    /**
+     * Minimum width.
+     *
+     * @type {number}
+     * @private
+     */
+    _minWidth = 150;
+
+    /**
+     * Whether the group is closable.
+     *
+     * @type {boolean}
+     * @private
+     */
+    _closable = true;
+
+    /**
+     * Whether the group is collapsible.
+     *
+     * @type {boolean}
+     * @private
+     */
+    _collapsible = true;
+
+    /**
+     * Whether the group is movable.
+     *
+     * @type {boolean}
+     * @private
+     */
+    _movable = true;
+
+    /**
+     * The current title of the group (usually from active panel).
+     *
+     * @type {string | null}
+     * @private
+     */
+    _title = null;
+
+    /**
+     * Whether the group is floating.
+     *
+     * @type {boolean}
+     * @private
+     */
+    _isFloating = false;
+
+    /**
+     * X coordinate (if floating).
+     *
+     * @type {number | null}
+     * @private
+     */
+    _x = null;
+
+    /**
+     * Y coordinate (if floating).
+     *
+     * @type {number | null}
+     * @private
+     */
+    _y = null;
+
+    /**
+     * The unified manager for all resize handles.
+     *
+     * @type {ResizeHandleManager | null}
+     * @private
+     */
+    _resizeHandleManager = null;
+
+    /**
+     * Bound handler for the children close request event.
      *
      * @type {Function | null}
      * @private
@@ -131,7 +246,7 @@ export class PanelGroup {
     _boundOnChildCloseRequest = null;
 
     /**
-     * Bound handler for app close panel request from context menu.
+     * Bound handler for the context close request event.
      *
      * @type {Function | null}
      * @private
@@ -139,7 +254,7 @@ export class PanelGroup {
     _boundOnChildCloseRequestFromContext = null;
 
     /**
-     * Bound handler for panel group close request.
+     * Bound handler for the close request event.
      *
      * @type {Function | null}
      * @private
@@ -147,20 +262,12 @@ export class PanelGroup {
     _boundOnCloseRequest = null;
 
     /**
-     * Bound handler for panel group toggle collapse request.
+     * Bound handler for the collapse request event.
      *
      * @type {Function | null}
      * @private
      */
     _boundOnToggleCollapseRequest = null;
-
-    /**
-     * The unified manager for all resize handles (docked vertical or floating 8-way).
-     *
-     * @type {ResizeHandleManager | null}
-     * @private
-     */
-    _resizeHandleManager = null;
 
     /**
      * @param {Panel | null} [initialPanel=null] - The optional first panel.
@@ -170,29 +277,32 @@ export class PanelGroup {
      */
     constructor(initialPanel = null, height = null, collapsed = false, config = {}) {
         const me = this;
-        Object.assign(me._state, config);
+
+        if (config.minHeight !== undefined) me._minHeight = config.minHeight;
+        if (config.minWidth !== undefined) me._minWidth = config.minWidth;
+        if (config.closable !== undefined) me._closable = config.closable;
+        if (config.collapsible !== undefined) me._collapsible = config.collapsible;
+        if (config.movable !== undefined) me._movable = config.movable;
 
         me.dropZoneType = DropZoneType.TAB_CONTAINER;
 
-        me._state.contentContainer = document.createElement('div');
-        me._state.contentContainer.classList.add('panel-group__content');
+        me._contentContainer = document.createElement('div');
+        me._contentContainer.classList.add('panel-group__content');
 
-        me._state.collapsed = collapsed;
         me.element = document.createElement('div');
         me.element.classList.add('panel-group');
         me.element.classList.add('panel');
 
-        // Bring to front on click when floating
         me.element.addEventListener('pointerdown', () => {
-            if (me._state.isFloating) {
+            if (me.isFloating) {
                 FloatingPanelManagerService.getInstance().bringToFront(me);
             }
         });
 
-        me._state.header = new PanelGroupHeader(me);
+        me._header = new PanelGroupHeader(me);
 
         if (height !== null) {
-            me._state.height = height;
+            me.height = height;
         }
 
         me._boundOnChildCloseRequest = me.onChildCloseRequest.bind(me);
@@ -201,7 +311,14 @@ export class PanelGroup {
         me._boundOnToggleCollapseRequest = me.onToggleCollapseRequest.bind(me);
 
         me.build();
-        me.setFloatingState(me._state.isFloating, me._state.x, me._state.y);
+
+        if (config.isFloating) {
+            me.setFloatingState(true, config.x, config.y);
+        } else {
+            me.setFloatingState(false, null, null);
+        }
+
+        me.collapsed = collapsed;
 
         if (initialPanel) {
             me.addPanel(initialPanel, null, true);
@@ -217,85 +334,331 @@ export class PanelGroup {
     }
 
     /**
-     * ThrottledUpdate setter.
+     * Id getter.
      *
-     * @param {Function} throttledFunction - The throttled function to set.
+     * @returns {string}
+     */
+    get id() {
+        return this._id;
+    }
+
+    /**
+     * Header getter.
+     *
+     * @returns {PanelGroupHeader}
+     */
+    get header() {
+        return this._header;
+    }
+
+    /**
+     * ContentContainer getter.
+     *
+     * @returns {HTMLElement}
+     */
+    get contentContainer() {
+        return this._contentContainer;
+    }
+
+    /**
+     * Panels getter.
+     *
+     * @returns {Array<Panel>}
+     */
+    get panels() {
+        return this._panels;
+    }
+
+    /**
+     * Collapsed getter.
+     *
+     * @returns {boolean}
+     */
+    get collapsed() {
+        return this._collapsed;
+    }
+
+    /**
+     * Collapsed setter.
+     * Updates DOM classes, visibility of content, and resize handles.
+     *
+     * @param {boolean} value
      * @returns {void}
      */
-    setThrottledUpdate(throttledFunction) {
-        this._throttledUpdate = throttledFunction;
+    set collapsed(value) {
+        const me = this;
+        if (typeof value !== 'boolean') return;
+        me._collapsed = value;
+
+        const handles = me.element.querySelectorAll('.resize-handle');
+
+        if (value) {
+            me.element.classList.add('panel--collapsed');
+            me._contentContainer.style.display = 'none';
+            handles.forEach(h => (h.style.display = 'none'));
+        } else {
+            me.element.classList.remove('panel--collapsed');
+            me._contentContainer.style.display = '';
+            handles.forEach(h => (h.style.display = ''));
+        }
+
+        me.updateHeight();
+
+        if (me._header && me._header.collapseBtn) {
+            if (value) {
+                me._header.collapseBtn.classList.add('panel-group__collapse-btn--collapsed');
+            } else {
+                me._header.collapseBtn.classList.remove('panel-group__collapse-btn--collapsed');
+            }
+        }
+    }
+
+    /**
+     * ActivePanel getter.
+     *
+     * @returns {Panel|null}
+     */
+    get activePanel() {
+        return this._activePanel;
+    }
+
+    /**
+     * ActivePanel setter.
+     * Manages panel visibility, mounting, and header updates.
+     *
+     * @param {Panel|null} panel
+     * @returns {void}
+     */
+    set activePanel(panel) {
+        const me = this;
+
+        const isSimpleMode = me._panels.length === 1;
+
+        if (!panel) return;
+        if (panel === me._activePanel && !isSimpleMode) return;
+
+        if (me._activePanel) {
+            me._activePanel.unmount();
+        }
+
+        me._panels.forEach(p => {
+            p.header.element.classList.remove('panel-group__tab--active');
+            p.contentElement.style.display = 'none';
+        });
+
+        if (!isSimpleMode) {
+            panel.header.element.classList.add('panel-group__tab--active');
+        }
+        panel.contentElement.style.display = '';
+
+        me._activePanel = panel;
+        me.title = panel.title;
+
+        if (me._header) {
+            me._header.updateAriaLabels();
+        }
+
+        panel.mount();
+        me.updateHeight();
+    }
+
+    /**
+     * Title getter.
+     *
+     * @returns {string|null}
+     */
+    get title() {
+        return this._title;
+    }
+
+    /**
+     * Title setter.
+     *
+     * @param {string|null} value
+     */
+    set title(value) {
+        const me = this;
+        if (value !== null && typeof value !== 'string') {
+            console.warn(
+                `[PanelGroup] Invalid title assignment (${value}). Must be a string or null.`
+            );
+            return;
+        }
+        me._title = value;
+    }
+
+    /**
+     * IsFloating getter.
+     *
+     * @returns {boolean}
+     */
+    get isFloating() {
+        return this._isFloating;
+    }
+
+    /**
+     * Column getter.
+     *
+     * @returns {import('../Column/Column.js').Column | null}
+     */
+    get column() {
+        return this._column;
+    }
+
+    /**
+     * Height getter.
+     *
+     * @returns {number|null}
+     */
+    get height() {
+        return this._height;
+    }
+
+    /**
+     * Height setter.
+     *
+     * @param {number|null} value
+     */
+    set height(value) {
+        const me = this;
+        const num = Number(value);
+        if (!Number.isFinite(num) || num < 0) {
+            console.warn(
+                `[PanelGroup] invalid height assignment (${value}). Must be a positive number.`
+            );
+            return;
+        }
+        me._height = value;
+    }
+
+    /**
+     * Width getter.
+     *
+     * @returns {number|null}
+     */
+    get width() {
+        return this._width;
+    }
+
+    /**
+     * Width setter.
+     *
+     * @param {number|null} value
+     */
+    set width(value) {
+        const me = this;
+        const num = Number(value);
+        if (!Number.isFinite(num) || num < 0) {
+            console.warn(
+                `[PanelGroup] invalid width assignment (${value}). Must be a positive number.`
+            );
+            return;
+        }
+        me._width = value;
+    }
+
+    /**
+     * X coordinate getter.
+     *
+     * @returns {number|null}
+     */
+    get x() {
+        return this._x;
+    }
+
+    /**
+     * Y coordinate getter.
+     *
+     * @returns {number|null}
+     */
+    get y() {
+        return this._y;
+    }
+
+    /**
+     * MinHeight getter.
+     *
+     * @returns {number}
+     */
+    get minHeight() {
+        return this._minHeight;
+    }
+
+    /**
+     * MinWidth getter.
+     *
+     * @returns {number}
+     */
+    get minWidth() {
+        return this._minWidth;
+    }
+
+    /**
+     * Closable getter.
+     *
+     * @returns {boolean}
+     */
+    get closable() {
+        return this._closable;
+    }
+
+    /**
+     * Collapsible getter.
+     *
+     * @returns {boolean}
+     */
+    get collapsible() {
+        return this._collapsible;
+    }
+
+    /**
+     * Movable getter.
+     *
+     * @returns {boolean}
+     */
+    get movable() {
+        return this._movable;
+    }
+
+    /**
+     * ThrottledUpdate setter.
+     *
+     * @param {Function} func
+     */
+    setThrottledUpdate(func) {
+        this._throttledUpdate = func;
     }
 
     /**
      * ThrottledUpdate getter.
      *
-     * @returns {Function | null} The throttled update function.
+     * @returns {Function|null}
      */
     getThrottledUpdate() {
         return this._throttledUpdate;
     }
 
     /**
-     * HeaderHeight getter.
+     * Sets the parent column.
      *
-     * @returns {number} The height of the header element.
-     */
-    getHeaderHeight() {
-        return this._state.header ? this._state.header.element.offsetHeight : 0;
-    }
-
-    /**
-     * MinPanelHeight getter.
-     * Calculates the minimum panel height based on header height and active panel content's minHeight.
-     *
-     * @returns {number} The calculated minimum panel height.
-     */
-    getMinPanelHeight() {
-        const me = this;
-        const headerHeight = me.getHeaderHeight();
-        const activeMinHeight = me._state.activePanel
-            ? me._state.activePanel.getMinPanelHeight()
-            : 0;
-
-        // For docked mode, we might want to include the resize handle height in calculation if needed
-        return Math.max(me._state.minHeight, activeMinHeight) + headerHeight;
-    }
-
-    /**
-     * MinPanelWidth getter.
-     *
-     * @returns {number} The calculated minimum panel width.
-     */
-    getMinPanelWidth() {
-        const me = this;
-        const activePanelMinWidth = me._state.activePanel
-            ? me._state.activePanel.getMinPanelWidth()
-            : 0;
-
-        return Math.max(me._state.minWidth, activePanelMinWidth);
-    }
-
-    /**
-     * ParentColumn setter.
-     *
-     * @param {import('../Column/Column.js').Column} column - The parent column instance.
-     * @returns {void}
+     * @param {import('../Column/Column.js').Column} column
      */
     setParentColumn(column) {
-        this._state.column = column;
+        this._column = column;
     }
 
     /**
-     * Column getter.
+     * Gets the parent column (alias for property getter for compatibility).
      *
-     * @returns {import('../Column/Column.js').Column | null} The parent column instance.
+     * @returns {import('../Column/Column.js').Column | null}
      */
     getColumn() {
-        return this._state.column;
+        return this._column;
     }
 
     /**
      * Sets the floating state and updates the DOM, managing the correct resize handles.
+     * This method acts as a coordinator for floating state properties.
      *
      * @param {boolean} isFloating - Whether the panel should be floating.
      * @param {number|null} x - The initial X coordinate (relative to container).
@@ -305,31 +668,28 @@ export class PanelGroup {
     setFloatingState(isFloating, x, y) {
         const me = this;
 
-        // 1. Clean up old manager regardless of new state
         me._resizeHandleManager?.destroy();
         me._resizeHandleManager = null;
 
-        me._state.isFloating = isFloating;
-        me._state.x = x;
-        me._state.y = y;
+        me._isFloating = isFloating;
+        me._x = x;
+        me._y = y;
 
-        if (me._state.header && me._state.header.collapseBtn) {
-            me._state.header.collapseBtn.disabled = !me._state.collapsible;
+        if (me._header && me._header.collapseBtn) {
+            me._header.collapseBtn.disabled = !me._collapsible;
         }
 
         if (isFloating) {
-            // --- FLOATING STATE SETUP (8-way Resize) ---
-
             me.element.classList.add('panel-group--floating');
             me.element.classList.remove('panel-group--fills-space');
 
             me.element.style.left = `${x}px`;
             me.element.style.top = `${y}px`;
-            if (me._state.width !== null) {
-                me.element.style.width = `${me._state.width}px`;
+            if (me._width !== null) {
+                me.element.style.width = `${me._width}px`;
             }
-            if (me._state.height !== null) {
-                me.element.style.height = `${me._state.height}px`;
+            if (me._height !== null) {
+                me.element.style.height = `${me._height}px`;
             }
 
             const fpms = FloatingPanelManagerService.getInstance();
@@ -342,36 +702,30 @@ export class PanelGroup {
                     maximumWidth: Infinity,
                     minimumHeight: me.getMinPanelHeight(),
                     maximumHeight: Infinity,
-                    // Critical for preventing panels from being dragged or resized outside of the main container
                     containerRectangle: fpms.getContainerBounds()
                 }),
                 onResize: ({ xCoordinate, yCoordinate, width, height }) => {
-                    // Apply dimensions and position directly to the DOM and state
                     me.element.style.left = `${xCoordinate}px`;
                     me.element.style.top = `${yCoordinate}px`;
                     me.element.style.width = `${width}px`;
                     me.element.style.height = `${height}px`;
 
-                    me._state.x = xCoordinate;
-                    me._state.y = yCoordinate;
-                    me._state.width = width;
-                    me._state.height = height;
+                    me._x = xCoordinate;
+                    me._y = yCoordinate;
+                    me._width = width;
+                    me._height = height;
 
                     me.updateHeight();
                 }
             });
         } else {
-            // --- DOCKED STATE SETUP (Vertical 's' only) ---
-
             me.element.classList.remove('panel-group--floating');
             me.element.style.left = '';
             me.element.style.top = '';
             me.element.style.width = '';
             me.element.style.height = '';
 
-            // Only allow resize if the group is collapsible.
-            // Removed the '&& me._state.column' check to ensure handles appear even if column is not set yet.
-            if (me._state.collapsible) {
+            if (me._collapsible) {
                 me._resizeHandleManager = new ResizeHandleManager(me.element, {
                     handles: ['s'],
                     customClass: 'panel-group__resize-handle',
@@ -383,19 +737,18 @@ export class PanelGroup {
                         containerRectangle: null
                     }),
                     onResize: ({ height }) => {
-                        me._state.height = height;
+                        me._height = height;
                         me.getThrottledUpdate()();
                     },
                     onEnd: () => me.requestLayoutUpdate()
                 });
             }
         }
-        // Ensure buttons update correctly
         me._updateHeaderMode();
     }
 
     /**
-     * Initializes appBus event listeners for this component.
+     * Initializes appBus event listeners.
      *
      * @returns {void}
      */
@@ -414,21 +767,21 @@ export class PanelGroup {
     }
 
     /**
-     * Event handler for when a child Panel (tab) requests to close.
+     * Handler for child panel close request.
      *
-     * @param {object} eventData - The event payload containing panel and group references.
+     * @param {object} eventData
      * @returns {void}
      */
     onChildCloseRequest({ panel, group }) {
-        if (group === this && this._state.panels.includes(panel)) {
+        if (group === this && this._panels.includes(panel)) {
             this.removePanel(panel, false);
         }
     }
 
     /**
-     * Event handler for 'app:close-panel-request' from ContextMenu.
+     * Handler for context menu close request.
      *
-     * @param {object} contextData - The data from the context menu action.
+     * @param {object} contextData
      * @returns {void}
      */
     onChildCloseRequestFromContext(contextData) {
@@ -436,9 +789,9 @@ export class PanelGroup {
     }
 
     /**
-     * Event handler for when this entire PanelGroup requests to close.
+     * Handler for group close request.
      *
-     * @param {Panel | PanelGroup} panel - The component instance requesting closure.
+     * @param {PanelGroup} panel
      * @returns {void}
      */
     onCloseRequest(panel) {
@@ -448,9 +801,9 @@ export class PanelGroup {
     }
 
     /**
-     * Event handler to toggle the collapse state of this PanelGroup.
+     * Handler for toggle collapse request.
      *
-     * @param {Panel | PanelGroup} panel - The component instance requesting collapse toggle.
+     * @param {PanelGroup} panel
      * @returns {void}
      */
     onToggleCollapseRequest(panel) {
@@ -460,7 +813,39 @@ export class PanelGroup {
     }
 
     /**
-     * Cleans up appBus listeners and destroys child components.
+     * HeaderHeight getter.
+     *
+     * @returns {number}
+     */
+    getHeaderHeight() {
+        return this._header ? this._header.element.offsetHeight : 0;
+    }
+
+    /**
+     * MinPanelHeight getter.
+     *
+     * @returns {number}
+     */
+    getMinPanelHeight() {
+        const me = this;
+        const headerHeight = me.getHeaderHeight();
+        const activeMinHeight = me._activePanel ? me._activePanel.minHeight : 0;
+        return Math.max(me._minHeight, activeMinHeight) + headerHeight;
+    }
+
+    /**
+     * MinPanelWidth getter.
+     *
+     * @returns {number}
+     */
+    getMinPanelWidth() {
+        const me = this;
+        const activeMin = me._activePanel ? me._activePanel.minWidth : 0;
+        return Math.max(me._minWidth, activeMin);
+    }
+
+    /**
+     * Cleans up and destroys the group.
      *
      * @returns {void}
      */
@@ -468,139 +853,104 @@ export class PanelGroup {
         const me = this;
         appBus.offByNamespace(me._namespace);
 
-        me._state.header?.destroy();
-        me._state.panels.forEach(panel => panel.destroy());
+        me._header?.destroy();
+        me._panels.forEach(panel => panel.destroy());
         me.getThrottledUpdate()?.cancel();
 
         me._resizeHandleManager?.destroy();
 
-        // Clean up element
         me.element.remove();
     }
 
     /**
-     * Builds the component's main DOM structure.
+     * Builds the DOM structure.
      *
      * @returns {void}
      */
     build() {
         const me = this;
+        me.element.append(me._header.element, me._contentContainer);
 
-        // The manager will create and append the resize handle DOM elements when instantiated.
-        me.element.append(me._state.header.element, me._state.contentContainer);
-
-        if (!me._state.movable) {
+        if (!me._movable) {
             me.element.classList.add('panel--not-movable');
         }
-
-        me.updateCollapse();
+        me.collapsed = me._collapsed;
     }
 
     /**
-     * Gets the panel type identifier.
+     * Returns the panel type identifier.
      *
-     * @returns {string} The item type constant string.
+     * @returns {string}
      */
     getPanelType() {
         return ItemType.PANEL_GROUP;
     }
 
     /**
-     * Toggles the collapse state and requests a layout update.
+     * Toggles collapse state.
      *
      * @returns {void}
      */
     toggleCollapse() {
         const me = this;
-        if (me._state.collapsed) {
-            me.unCollapse();
-        } else {
-            me.collapse();
-        }
-
+        me.collapsed = !me.collapsed;
         me.requestLayoutUpdate();
     }
 
     /**
-     * Applies the correct visibility state based on the internal state.
+     * Helper to apply visibility state.
      *
      * @returns {void}
      */
     updateCollapse() {
-        const me = this;
-        if (me._state.collapsed) {
-            me.collapse();
-        } else {
-            me.unCollapse();
-        }
+        this.collapsed = this._collapsed;
     }
 
     /**
-     * Hides the content and applies collapsed styles.
-     * Also ensures resize handles are hidden to prevent resizing while collapsed.
+     * Explicit collapse method.
      *
      * @returns {void}
      */
     collapse() {
-        const me = this;
-        me._state.collapsed = true;
-        me.element.classList.add('panel--collapsed');
-        me._state.contentContainer.style.display = 'none';
-
-        // Rule: Hide resize handles when collapsed
-        const handles = me.element.querySelectorAll('.resize-handle');
-        handles.forEach(h => (h.style.display = 'none'));
-
-        me.updateHeight();
+        this.collapsed = true;
     }
 
     /**
-     * Shows the content and removes collapsed styles.
-     * Also restores resize handles.
+     * Explicit uncollapse method.
      *
      * @returns {void}
      */
     unCollapse() {
-        const me = this;
-        me._state.collapsed = false;
-        me.element.classList.remove('panel--collapsed');
-        me._state.contentContainer.style.display = '';
-
-        // Rule: Show resize handles when uncollapsed
-        const handles = me.element.querySelectorAll('.resize-handle');
-        handles.forEach(h => (h.style.display = ''));
-
-        me.updateHeight();
+        this.collapsed = false;
     }
 
     /**
-     * Closes the entire PanelGroup and notifies its parent Column.
+     * Closes the group.
      *
      * @returns {void}
      */
     close() {
         const me = this;
-        if (!me._state.closable) return;
-
-        appBus.emit(EventTypes.PANEL_GROUP_REMOVED, { panel: me, column: me._state.column });
+        if (!me._closable) return;
+        appBus.emit(EventTypes.PANEL_GROUP_REMOVED, { panel: me, column: me._column });
         me.destroy();
     }
 
     /**
-     * Updates the CSS height/flex properties based on the current state.
+     * Updates the height styles based on state.
      *
      * @returns {void}
      */
     updateHeight() {
         const me = this;
-        if (me._state.collapsed) {
+        if (me._collapsed) {
             me.element.style.height = 'auto';
             me.element.style.flex = '0 0 auto';
             me.element.classList.add('panel--collapsed');
             me.element.style.minHeight = 'auto';
 
-            if (me._state.header) {
-                me._state.header.updateScrollButtons();
+            if (me._header) {
+                me._header.updateScrollButtons();
             }
             return;
         }
@@ -610,54 +960,51 @@ export class PanelGroup {
         const minPanelHeight = me.getMinPanelHeight();
         me.element.style.minHeight = `${minPanelHeight}px`;
 
-        if (me._state.height !== null && !me._state.isFloating) {
-            me.element.style.height = `${me._state.height}px`;
+        if (me._height !== null && !me._isFloating) {
+            me.element.style.height = `${me._height}px`;
             me.element.style.flex = '0 0 auto';
-        } else if (!me._state.isFloating) {
+        } else if (!me._isFloating) {
             me.element.style.height = 'auto';
             me.element.style.flex = '0 0 auto';
         }
 
-        if (me._state.header) {
-            me._state.header.updateScrollButtons();
+        if (me._header) {
+            me._header.updateScrollButtons();
         }
     }
 
     /**
-     * Updates the header's visual mode (simple vs. tabs).
+     * Updates the header mode (tabs vs simple).
      *
      * @private
      * @returns {void}
      */
     _updateHeaderMode() {
         const me = this;
-        if (!me._state.header) return;
+        if (!me._header) return;
 
-        const isSimpleMode = me._state.panels.length === 1;
+        const isSimpleMode = me._panels.length === 1;
+        me._header.element.classList.toggle('panel-group__header--simple', isSimpleMode);
 
-        me._state.header.element.classList.toggle('panel-group__header--simple', isSimpleMode);
-
-        if (isSimpleMode && me._state.panels.length === 1) {
-            const panel = me._state.panels[0];
-            me._state.header.collapseBtn.style.display =
-                panel._state.collapsible && me._state.collapsible ? '' : 'none';
-            me._state.header.closeBtn.style.display =
-                panel._state.closable && me._state.closable ? '' : 'none';
-            me._state.header.moveHandle.style.display =
-                panel._state.movable && me._state.movable ? '' : 'none';
+        if (isSimpleMode && me._panels.length === 1) {
+            const panel = me._panels[0];
+            me._header.collapseBtn.style.display =
+                panel.collapsible && me._collapsible ? '' : 'none';
+            me._header.closeBtn.style.display = panel.closable && me._closable ? '' : 'none';
+            me._header.moveHandle.style.display = panel.movable && me._movable ? '' : 'none';
         } else {
-            me._state.header.collapseBtn.style.display = me._state.collapsible ? '' : 'none';
-            me._state.header.closeBtn.style.display = me._state.closable ? '' : 'none';
-            me._state.header.moveHandle.style.display = me._state.movable ? '' : 'none';
+            me._header.collapseBtn.style.display = me._collapsible ? '' : 'none';
+            me._header.closeBtn.style.display = me._closable ? '' : 'none';
+            me._header.moveHandle.style.display = me._movable ? '' : 'none';
         }
     }
 
     /**
-     * Adds a child Panel (tab) to this group at a specific index.
+     * Adds a panel to the group.
      *
-     * @param {Panel} panel - The panel instance to add.
-     * @param {number|null} [index=null] - The index to insert at. Appends if null.
-     * @param {boolean} [makeActive=false] - Whether to make this panel active.
+     * @param {Panel} panel
+     * @param {number|null} [index=null]
+     * @param {boolean} [makeActive=false]
      * @returns {void}
      */
     addPanel(panel, index = null, makeActive = false) {
@@ -666,46 +1013,43 @@ export class PanelGroup {
             console.warn('PanelGroup.addPanel: item is not an instance of Panel.', panel);
             return;
         }
-        if (me._state.panels.includes(panel)) {
-            if (makeActive) me.setActive(panel);
+        if (me._panels.includes(panel)) {
+            if (makeActive) me.activePanel = panel;
             return;
         }
 
-        const currentPanelCount = me._state.panels.length;
-
-        if (currentPanelCount === 0) {
-            panel._state.header.setMode(true);
-        } else if (currentPanelCount === 1) {
-            me._state.panels[0]._state.header.setMode(false);
-            panel._state.header.setMode(false);
+        const currentCount = me._panels.length;
+        if (currentCount === 0) {
+            panel.header.setMode(true);
+        } else if (currentCount === 1) {
+            me._panels[0].header.setMode(false);
+            panel.header.setMode(false);
         } else {
-            panel._state.header.setMode(false);
+            panel.header.setMode(false);
         }
 
-        panel.setParentGroup(me);
-        me._state.contentContainer.appendChild(panel.contentElement);
+        panel.parentGroup = me;
+        me._contentContainer.appendChild(panel.contentElement);
 
-        const tabContainer = me._state.header.tabContainer;
-        const tabElement = panel._state.header.element;
-        const safeIndex = index === null ? me._state.panels.length : index;
+        const tabContainer = me._header.tabContainer;
+        const tabElement = panel.header.element;
+        const safeIndex = index === null ? me._panels.length : index;
 
-        if (safeIndex >= me._state.panels.length) {
-            me._state.panels.push(panel);
+        if (safeIndex >= me._panels.length) {
+            me._panels.push(panel);
             tabContainer.appendChild(tabElement);
         } else {
-            me._state.panels.splice(safeIndex, 0, panel);
-            const nextSiblingPanel = me._state.panels[safeIndex + 1];
-            const nextSiblingTabElement = nextSiblingPanel
-                ? nextSiblingPanel._state.header.element
-                : null;
+            me._panels.splice(safeIndex, 0, panel);
+            const nextSiblingPanel = me._panels[safeIndex + 1];
+            const nextSiblingTabElement = nextSiblingPanel ? nextSiblingPanel.header.element : null;
             tabContainer.insertBefore(tabElement, nextSiblingTabElement);
         }
 
         me._updateHeaderMode();
-        me._state.header.updateScrollButtons();
+        me._header.updateScrollButtons();
 
-        if (makeActive || me._state.panels.length === 1) {
-            me.setActive(panel);
+        if (makeActive || me._panels.length === 1) {
+            me.activePanel = panel;
         } else {
             panel.contentElement.style.display = 'none';
             me.requestLayoutUpdate();
@@ -713,9 +1057,9 @@ export class PanelGroup {
     }
 
     /**
-     * Adds multiple child Panels (tabs) at once, optimized for state loading.
+     * Bulk adds panels.
      *
-     * @param {Array<Panel>} panels - The panel instances to add.
+     * @param {Array<Panel>} panels
      * @returns {void}
      */
     addPanelsBulk(panels) {
@@ -723,219 +1067,155 @@ export class PanelGroup {
         if (!panels || panels.length === 0) return;
 
         panels.forEach(panel => {
-            panel._state.header.setMode(false);
-            panel.setParentGroup(me);
-
-            me._state.header.tabContainer.appendChild(panel._state.header.element);
-            me._state.contentContainer.appendChild(panel.contentElement);
-
+            panel.header.setMode(false);
+            panel.parentGroup = me;
+            me._header.tabContainer.appendChild(panel.header.element);
+            me._contentContainer.appendChild(panel.contentElement);
             panel.contentElement.style.display = 'none';
         });
-
-        me._state.panels.push(...panels);
+        me._panels.push(...panels);
     }
 
     /**
-     * Removes a child Panel (tab) from this group.
+     * Removes a panel from the group.
      *
-     * @param {Panel} panel - The panel instance to remove.
-     * @param {boolean} [isMoving=false] - If true, panel is not destroyed (DND operation).
+     * @param {Panel} panel
+     * @param {boolean} [isMoving=false]
      * @returns {void}
      */
     removePanel(panel, isMoving = false) {
         const me = this;
-        const index = me._state.panels.indexOf(panel);
+        const index = me._panels.indexOf(panel);
         if (index === -1) return;
 
         if (!isMoving) {
             panel.destroy();
         }
 
-        panel._state.header.element.classList.remove('panel-group__tab--active');
-        panel._state.header.element.remove();
+        panel.header.element.classList.remove('panel-group__tab--active');
+        panel.header.element.remove();
         panel.contentElement.remove();
 
-        me._state.panels.splice(index, 1);
-        panel.setParentGroup(null);
+        me._panels.splice(index, 1);
+        panel.parentGroup = null;
 
-        const newPanelCount = me._state.panels.length;
-        if (newPanelCount === 1) {
-            const remainingPanel = me._state.panels[0];
-            remainingPanel._state.header.setMode(true);
-            me.setActive(remainingPanel);
+        const newCount = me._panels.length;
+        if (newCount === 1) {
+            const remaining = me._panels[0];
+            remaining.header.setMode(true);
+            me.activePanel = remaining;
         }
 
         me._updateHeaderMode();
-        me._state.header.updateScrollButtons();
+        me._header.updateScrollButtons();
 
-        if (me._state.panels.length === 0) {
+        if (me._panels.length === 0) {
             me.close();
             return;
         }
 
-        if (panel === me._state.activePanel) {
-            const newActive = me._state.panels[index] || me._state.panels[index - 1];
-            me.setActive(newActive);
+        if (panel === me._activePanel) {
+            const newActive = me._panels[index] || me._panels[index - 1];
+            me.activePanel = newActive;
         } else {
-            if (newPanelCount > 1) {
-                me.requestLayoutUpdate();
-            }
+            if (newCount > 1) me.requestLayoutUpdate();
         }
     }
 
     /**
-     * Moves an existing Panel (tab) to a new index within this group.
+     * Moves a panel to a new index.
      *
-     * @param {Panel} panel - The Panel instance to move.
-     * @param {number} newIndex - The target index.
+     * @param {Panel} panel
+     * @param {number} newIndex
      * @returns {void}
      */
     movePanel(panel, newIndex) {
         const me = this;
-        if (!panel || newIndex < 0) {
-            return;
-        }
+        if (!panel || newIndex < 0) return;
 
-        const oldIndex = me._state.panels.indexOf(panel);
+        const oldIndex = me._panels.indexOf(panel);
         if (oldIndex === -1) {
             console.warn('PanelGroup.movePanel: Panel not found in this group.');
             return;
         }
+        if (oldIndex === newIndex) return;
 
-        if (oldIndex === newIndex) {
-            return;
-        }
+        me._panels.splice(oldIndex, 1);
+        const adjustedIndex = oldIndex < newIndex ? newIndex - 1 : newIndex;
+        me._panels.splice(adjustedIndex, 0, panel);
 
-        me._state.panels.splice(oldIndex, 1);
-
-        const adjustedNewIndex = oldIndex < newIndex ? newIndex - 1 : newIndex;
-        me._state.panels.splice(adjustedNewIndex, 0, panel);
-
-        const tabContainer = me._state.header.tabContainer;
-        const tabElement = panel._state.header.element;
-
-        const nextSiblingPanel = me._state.panels[adjustedNewIndex + 1];
-        const nextSiblingTabElement = nextSiblingPanel
-            ? nextSiblingPanel._state.header.element
-            : null;
+        const tabContainer = me._header.tabContainer;
+        const tabElement = panel.header.element;
+        const nextSiblingPanel = me._panels[adjustedIndex + 1];
+        const nextSiblingTabElement = nextSiblingPanel ? nextSiblingPanel.header.element : null;
 
         tabContainer.insertBefore(tabElement, nextSiblingTabElement);
-
-        me._state.header.updateScrollButtons();
+        me._header.updateScrollButtons();
     }
 
     /**
-     * Sets a child Panel (tab) as the active one.
-     *
-     * @param {Panel} panel - The panel instance to activate.
-     * @returns {void}
-     */
-    setActive(panel) {
-        const me = this;
-        const isSimpleMode = me._state.panels.length === 1;
-
-        if (!panel) {
-            return;
-        }
-        if (panel === me._state.activePanel && !isSimpleMode) {
-            return;
-        }
-
-        const oldActivePanel = me._state.activePanel;
-        oldActivePanel?.unmount();
-
-        me._state.panels.forEach(p => {
-            p._state.header.element.classList.remove('panel-group__tab--active');
-            p.contentElement.style.display = 'none';
-        });
-
-        if (!isSimpleMode) {
-            panel._state.header.element.classList.add('panel-group__tab--active');
-        }
-
-        panel.contentElement.style.display = '';
-
-        me._state.activePanel = panel;
-        me._state.title = panel._state.title;
-        me._state.header.updateAriaLabels();
-
-        panel.mount();
-
-        me.updateHeight();
-    }
-
-    /**
-     * Emits an event to the LayoutService if this group is attached to a column.
+     * Notifies layout service of changes.
      *
      * @returns {void}
      */
     requestLayoutUpdate() {
-        const column = this.getColumn();
-        if (column && !this._state.isFloating) {
-            appBus.emit(EventTypes.LAYOUT_PANELGROUPS_CHANGED, column);
+        if (this._column && !this._isFloating) {
+            appBus.emit(EventTypes.LAYOUT_PANELGROUPS_CHANGED, this._column);
         }
     }
 
     /**
-     * Serializes the PanelGroup state (and its child Panels) to JSON.
+     * Serializes state to JSON.
      *
-     * @returns {object} The serialized state object.
+     * @returns {object}
      */
     toJSON() {
         const me = this;
         return {
-            id: me.id,
             type: me.getPanelType(),
-            height: me._state.height,
-            width: me._state.width,
-            collapsed: me._state.collapsed,
-            activePanelId: me._state.activePanel ? me._state.activePanel.id : null,
-            isFloating: me._state.isFloating,
-            x: me._state.x,
-            y: me._state.y,
+            height: me.height,
+            width: me.width,
+            collapsed: me.collapsed,
+            activePanelId: me.activePanel ? me.activePanel.id : null,
+            isFloating: me.isFloating,
+            x: me.x,
+            y: me.y,
             config: {
-                closable: me._state.closable,
-                collapsible: me._state.collapsible,
-                movable: me._state.movable,
-                minHeight: me._state.minHeight,
-                minWidth: me._state.minWidth
+                closable: me.closable,
+                collapsible: me.collapsible,
+                movable: me.movable,
+                minHeight: me.minHeight,
+                minWidth: me.minWidth
             },
-            panels: me._state.panels.map(panel => panel.toJSON())
+            panels: me.panels.map(panel => panel.toJSON())
         };
     }
 
     /**
-     * Deserializes state from JSON data.
+     * Deserializes state from JSON.
      *
-     * @param {object} data - The state object.
+     * @param {object} data
      * @returns {void}
      */
     fromJSON(data) {
         const me = this;
-        if (data.id) {
-            me.id = data.id;
-            me._namespace = me.id;
-        }
-        if (data.height !== undefined) {
-            me._state.height = data.height;
-        }
-        if (data.width !== undefined) {
-            me._state.width = data.width;
-        }
-        if (data.collapsed !== undefined) {
-            me._state.collapsed = data.collapsed;
-        }
-        if (data.isFloating !== undefined) {
-            me._state.isFloating = data.isFloating;
-        }
-        if (data.x !== undefined) {
-            me._state.x = data.x;
-        }
-        if (data.y !== undefined) {
-            me._state.y = data.y;
-        }
+        if (data.height !== undefined) me.height = data.height;
+        if (data.width !== undefined) me.width = data.width;
+        if (data.isFloating !== undefined) me._isFloating = data.isFloating;
+        if (data.x !== undefined) me._x = data.x;
+        if (data.y !== undefined) me._y = data.y;
         if (data.config) {
-            Object.assign(me._state, data.config);
+            if (data.config.closable !== undefined) me._closable = data.config.closable;
+            if (data.config.collapsible !== undefined) me._collapsible = data.config.collapsible;
+            if (data.config.movable !== undefined) me._movable = data.config.movable;
+            if (data.config.minHeight !== undefined) me._minHeight = data.config.minHeight;
+            if (data.config.minWidth !== undefined) me._minWidth = data.config.minWidth;
+        }
+
+        if (me.isFloating) {
+            me.setFloatingState(true, me.x, me.y);
+        } else {
+            me.setFloatingState(false, null, null);
         }
 
         const activePanelId = data.activePanelId;
@@ -944,7 +1224,6 @@ export class PanelGroup {
 
         if (data.panels && Array.isArray(data.panels)) {
             const factory = PanelFactory.getInstance();
-
             data.panels.forEach(panelData => {
                 const panel = factory.createPanel(panelData);
                 if (panel) {
@@ -960,16 +1239,11 @@ export class PanelGroup {
             me.addPanel(panelInstances[0], null, true);
         } else if (panelInstances.length > 1) {
             me.addPanelsBulk(panelInstances);
-
-            if (!activePanelInstance) {
-                activePanelInstance = panelInstances[0];
-            }
-            if (activePanelInstance) {
-                me.setActive(activePanelInstance);
-            }
+            if (!activePanelInstance) activePanelInstance = panelInstances[0];
+            if (activePanelInstance) me.activePanel = activePanelInstance;
         }
 
+        if (data.collapsed !== undefined) me.collapsed = data.collapsed;
         me.updateHeight();
-        me.updateCollapse();
     }
 }

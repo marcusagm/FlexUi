@@ -13,12 +13,15 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * drag/drop logic.
  *
  * Properties summary:
- * - _state {object} : Internal state management (child PanelGroups, width, parent).
+ * - _namespace {string} : Unique namespace for appBus listeners.
  * - element {HTMLElement} : The main DOM element (<div class="column">).
  * - dropZoneType {string} : The identifier for the DragDropService.
- * - _id {string} : Unique ID for this instance.
+ * - id {string} : Unique ID for this instance.
  * - _namespace {string} : Unique namespace for appBus listeners.
- * - _minWidth {number} : The minimum width in pixels for horizontal resizing.
+ * - minWidth {number} : The minimum width of the column.
+ * - parentContainer {Row} : The parent Row instance.
+ * - panelGroups {Array<PanelGroup>} : List of child PanelGroups.
+ * - width {number|null} : The width of the column.
  * - _throttledUpdate {Function | null} : The throttled function for resizing.
  * - _boundOnPanelGroupRemoved {Function | null} : Bound handler for group removal.
  * - _resizeHandleManager {ResizeHandleManager | null} : Manages the horizontal resize handles.
@@ -33,42 +36,47 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * - Emits: EventTypes.LAYOUT_PANELGROUPS_CHANGED (to notify LayoutService)
  * - Emits: EventTypes.COLUMN_EMPTY (to notify Row when this column is empty)
  *
+ * Business rules implemented:
+ * - Renders 'PanelGroup' children vertically.
+ * - Registers as a 'column' type drop zone.
+ * - Listens for EventTypes.PANEL_GROUP_REMOVED and removes the child.
+ * - If it becomes empty (last PanelGroup removed), emits EventTypes.COLUMN_EMPTY.
+ * - Manages its own horizontal resize handle via ResizeHandleManager.
+ * - Resize logic respects the minWidth of its child PanelGroups.
+ *
  * Dependencies:
  * - {import('../Panel/PanelGroup.js').PanelGroup}
  * - {import('../../utils/EventBus.js').appBus}
  * - {import('../../utils/ThrottleRAF.js').throttleRAF}
+ * - {import('../../utils/generateId.js').generateId}
  * - {import('../../utils/ResizeHandleManager.js').ResizeHandleManager}
  * - {import('../../constants/DNDTypes.js').DropZoneType}
  * - {import('../../constants/EventTypes.js').EventTypes}
  */
 export class Column {
     /**
-     * Internal state holding child PanelGroups and dimensions.
+     * The parent Row instance.
      *
-     * @type {{container: import('../Row/Row.js').Row | null, panelGroups: Array<PanelGroup>, width: number | null}}
+     * @type {import('../Row/Row.js').Row | null}
      * @private
      */
-    _state = {
-        container: null,
-        panelGroups: [],
-        width: null
-    };
+    _parentContainer = null;
 
     /**
-     * Unique ID for this instance, used for namespacing events.
+     * List of child PanelGroups.
      *
-     * @type {string}
+     * @type {Array<PanelGroup>}
      * @private
      */
-    _id = generateId();
+    _panelGroups = [];
 
     /**
-     * Unique namespace for appBus listeners.
+     * The width of the column in pixels.
      *
-     * @type {string}
+     * @type {number | null}
      * @private
      */
-    _namespace = this._id;
+    _width = null;
 
     /**
      * The minimum width in pixels for horizontal resizing.
@@ -77,6 +85,22 @@ export class Column {
      * @private
      */
     _minWidth = 150;
+
+    /**
+     * Unique ID for this instance, used for namespacing events.
+     *
+     * @type {string}
+     * @public
+     */
+    id = generateId();
+
+    /**
+     * Unique namespace for appBus listeners.
+     *
+     * @type {string}
+     * @private
+     */
+    _namespace = this.id;
 
     /**
      * The throttled (rAF) update function for resizing.
@@ -97,10 +121,26 @@ export class Column {
     /**
      * Stores the resize handle manager instance.
      *
-     * @type {import('../../utils/ResizeHandleManager.js').ResizeHandleManager | null}
+     * @type {ResizeHandleManager | null}
      * @private
      */
     _resizeHandleManager = null;
+
+    /**
+     * The main DOM element.
+     *
+     * @type {HTMLElement}
+     * @public
+     */
+    element;
+
+    /**
+     * The drop zone type identifier.
+     *
+     * @type {string}
+     * @public
+     */
+    dropZoneType;
 
     /**
      * @param {import('../Row/Row.js').Row} container - The parent Row instance.
@@ -108,9 +148,11 @@ export class Column {
      */
     constructor(container, width = null) {
         const me = this;
-        me.setMinWidth(me._minWidth);
-        me.setParentContainer(container);
-        me._state.width = width;
+
+        // Use setters for initialization
+        me.minWidth = me._minWidth;
+        me.parentContainer = container;
+        me.width = width;
 
         me.element = document.createElement('div');
         me.element.classList.add('column');
@@ -121,8 +163,8 @@ export class Column {
 
         me.setThrottledUpdate(
             throttleRAF(() => {
-                if (me._state.width !== null) {
-                    me.element.style.flex = `0 0 ${me._state.width}px`;
+                if (me.width !== null) {
+                    me.element.style.flex = `0 0 ${me.width}px`;
                 }
             })
         );
@@ -133,28 +175,113 @@ export class Column {
     }
 
     /**
-     * MinimumWidth setter with validation.
+     * Width getter.
      *
-     * @param {number} width - The minimum width in pixels.
+     * @returns {number | null} The current width.
+     */
+    get width() {
+        return this._width;
+    }
+
+    /**
+     * Width setter.
+     * Validates input and requests layout update on change.
+     *
+     * @param {number | null} value - The new width.
      * @returns {void}
      */
-    setMinWidth(width) {
-        const minimumWidth = Number(width);
-        if (!Number.isFinite(minimumWidth) || minimumWidth < 0) {
-            console.warn(`Column: Invalid minimumWidth "${width}". Setting to 0.`);
-            this._minWidth = 0;
+    set width(value) {
+        const me = this;
+        if (value !== null && (!Number.isFinite(value) || value < 0)) {
+            console.warn(
+                `[Column] Invalid width assignment (${value}). Must be positive number or null.`
+            );
             return;
         }
-        this._minWidth = minimumWidth;
+        if (me._width === value) return;
+
+        me._width = value;
+        // Trigger layout update on width change (except during drag which might handle it differently)
+        me.requestLayoutUpdate();
+    }
+
+    /**
+     * PanelGroups getter.
+     *
+     * @returns {Array<PanelGroup>} The list of panel groups.
+     */
+    get panelGroups() {
+        return this._panelGroups;
+    }
+
+    /**
+     * ParentContainer getter.
+     *
+     * @returns {import('../Row/Row.js').Row | null} The parent row.
+     */
+    get parentContainer() {
+        return this._parentContainer;
+    }
+
+    /**
+     * ParentContainer setter.
+     * Validates that the value looks like a Row component.
+     *
+     * @param {import('../Row/Row.js').Row | null} value - The new parent container.
+     * @returns {void}
+     */
+    set parentContainer(value) {
+        if (value !== null && typeof value !== 'object') {
+            console.warn(`[Column] Invalid parentContainer assignment (${value}).`);
+            return;
+        }
+        this._parentContainer = value;
     }
 
     /**
      * MinimumWidth getter.
      *
-     * @returns {number} The minimum width in pixels.
+     * @returns {number} The minimum width.
+     */
+    get minWidth() {
+        return this._minWidth;
+    }
+
+    /**
+     * MinimumWidth setter.
+     * Validates that the value is a positive number.
+     *
+     * @param {number} value - The new minimum width.
+     * @returns {void}
+     */
+    set minWidth(value) {
+        const num = Number(value);
+        if (!Number.isFinite(num) || num < 0) {
+            console.warn(
+                `[Column] Invalid minWidth assignment (${value}). Must be positive number.`
+            );
+            return;
+        }
+        this._minWidth = num;
+    }
+
+    /**
+     * Wrapper method for minWidth setter (for compatibility).
+     *
+     * @param {number} width
+     * @returns {void}
+     */
+    setMinWidth(width) {
+        this.minWidth = width;
+    }
+
+    /**
+     * Wrapper method for minWidth getter (for compatibility).
+     *
+     * @returns {number}
      */
     getMinWidth() {
-        return this._minWidth;
+        return this.minWidth;
     }
 
     /**
@@ -177,29 +304,25 @@ export class Column {
     }
 
     /**
-     * ParentContainer setter.
+     * Wrapper for parentContainer setter (for compatibility).
      *
      * @param {import('../Row/Row.js').Row} container - The parent Row instance.
      * @returns {void}
      */
     setParentContainer(container) {
-        if (!container) {
-            console.warn('Column: setParentContainer received a null container.');
-            return;
-        }
-        this._state.container = container;
+        this.parentContainer = container;
     }
 
     /**
      * Calculates the effective minimum width by checking its own minWidth
      * and the minWidth of all child PanelGroups.
      *
-     * @returns {number} The calculated effective minimum width.
+     * @returns {number} The calculated effective minWidth.
      */
     getEffectiveMinWidth() {
         const me = this;
-        let effectiveMinWidth = me.getMinWidth();
-        me.getPanelGroups().forEach(group => {
+        let effectiveMinWidth = me.minWidth;
+        me.panelGroups.forEach(group => {
             effectiveMinWidth = Math.max(effectiveMinWidth, group.getMinPanelWidth());
         });
         return effectiveMinWidth;
@@ -241,7 +364,7 @@ export class Column {
         me.getThrottledUpdate()?.cancel();
         me._resizeHandleManager?.destroy();
 
-        [...me._state.panelGroups].forEach(panel => panel.destroy());
+        [...me._panelGroups].forEach(panel => panel.destroy());
     }
 
     /**
@@ -273,12 +396,12 @@ export class Column {
                 containerRectangle: null
             }),
             onResize: ({ width }) => {
-                me._state.width = width;
+                me._width = width;
                 me.getThrottledUpdate()();
             },
             onEnd: () => {
-                if (me._state.container) {
-                    me._state.container.requestLayoutUpdate();
+                if (me.parentContainer) {
+                    me.parentContainer.requestLayoutUpdate();
                 }
             }
         });
@@ -294,9 +417,9 @@ export class Column {
         const me = this;
         if (isLast) {
             me.element.style.flex = `1 1 auto`;
-            me._state.width = null;
-        } else if (me._state.width !== null) {
-            me.element.style.flex = `0 0 ${me._state.width}px`;
+            me._width = null;
+        } else if (me.width !== null) {
+            me.element.style.flex = `0 0 ${me.width}px`;
         }
         me.requestLayoutUpdate();
     }
@@ -311,7 +434,7 @@ export class Column {
         const me = this;
         const resizeHandle = me.element.querySelector('.column__resize-handle');
         panelGroups.forEach(panelGroup => {
-            me._state.panelGroups.push(panelGroup);
+            me._panelGroups.push(panelGroup);
             me.element.insertBefore(panelGroup.element, resizeHandle);
             panelGroup.setParentColumn(me);
         });
@@ -330,11 +453,11 @@ export class Column {
         const resizeHandle = me.element.querySelector('.column__resize-handle');
 
         if (index === null) {
-            me._state.panelGroups.push(panelGroup);
+            me._panelGroups.push(panelGroup);
             me.element.insertBefore(panelGroup.element, resizeHandle);
         } else {
-            me._state.panelGroups.splice(index, 0, panelGroup);
-            const nextSiblingPanel = me._state.panelGroups[index + 1];
+            me._panelGroups.splice(index, 0, panelGroup);
+            const nextSiblingPanel = me._panelGroups[index + 1];
             let nextSiblingElement = nextSiblingPanel ? nextSiblingPanel.element : null;
 
             if (!nextSiblingElement) {
@@ -352,7 +475,7 @@ export class Column {
      * @returns {Array<PanelGroup>} Collapsed PanelGroup instances.
      */
     getPanelGroupsCollapsed() {
-        return this._state.panelGroups.filter(p => p._state.collapsed);
+        return this._panelGroups.filter(p => p.collapsed);
     }
 
     /**
@@ -361,16 +484,16 @@ export class Column {
      * @returns {Array<PanelGroup>} Uncollapsed PanelGroup instances.
      */
     getPanelGroupsUncollapsed() {
-        return this._state.panelGroups.filter(p => !p._state.collapsed);
+        return this._panelGroups.filter(p => !p.collapsed);
     }
 
     /**
-     * PanelGroups getter.
+     * PanelGroups getter (wrapper for compatibility).
      *
      * @returns {Array<PanelGroup>} All child PanelGroup instances.
      */
     getPanelGroups() {
-        return this._state.panelGroups;
+        return this.panelGroups;
     }
 
     /**
@@ -387,7 +510,7 @@ export class Column {
             return;
         }
 
-        me._state.panelGroups.splice(index, 1);
+        me._panelGroups.splice(index, 1);
         panelGroup.setParentColumn(null);
 
         if (me.element.contains(panelGroup.element)) {
@@ -407,7 +530,7 @@ export class Column {
      * @returns {void}
      */
     requestLayoutUpdate() {
-        if (this._state.container) {
+        if (this.parentContainer) {
             appBus.emit(EventTypes.LAYOUT_PANELGROUPS_CHANGED, this);
         }
     }
@@ -419,7 +542,7 @@ export class Column {
      * @returns {number} The index, or -1 if not found.
      */
     getPanelGroupIndex(panelGroup) {
-        return this._state.panelGroups.findIndex(p => p === panelGroup);
+        return this._panelGroups.findIndex(p => p === panelGroup);
     }
 
     /**
@@ -437,7 +560,7 @@ export class Column {
                 break;
             }
             if (
-                me._state.panelGroups.some(p => p.element === child) &&
+                me._panelGroups.some(p => p.element === child) &&
                 child.classList.contains('panel-group')
             ) {
                 panelIndex++;
@@ -452,7 +575,7 @@ export class Column {
      * @returns {number} The total number of PanelGroups.
      */
     getTotalPanelGroups() {
-        return this._state.panelGroups.length;
+        return this._panelGroups.length;
     }
 
     /**
@@ -463,8 +586,8 @@ export class Column {
     toJSON() {
         const me = this;
         return {
-            width: me._state.width,
-            panelGroups: me._state.panelGroups
+            width: me.width,
+            panelGroups: me.panelGroups
                 .filter(group => group instanceof PanelGroup)
                 .map(group => group.toJSON())
         };
@@ -479,7 +602,7 @@ export class Column {
     fromJSON(data) {
         const me = this;
         if (data.width !== undefined) {
-            me._state.width = data.width;
+            me.width = data.width;
         }
 
         const groupsToRestore = [];

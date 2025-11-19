@@ -16,10 +16,12 @@ import { Panel } from './Panel.js';
  * - Extends fromJSON() to restore its 'textContent'.
  *
  * Dependencies:
- * - ./Panel.js
+ * - {import('./Panel.js').Panel}
  */
 export class TextPanel extends Panel {
     /**
+     * Creates a new TextPanel instance.
+     *
      * @param {string} title - The panel title.
      * @param {string} initialText - The text to display.
      * @param {number|null} [height=null] - (Ignored) Kept for API compatibility.
@@ -31,16 +33,18 @@ export class TextPanel extends Panel {
     }
 
     /**
-     * <panelType> static getter.
-     * @returns {string}
+     * Returns the unique type identifier for this panel class.
+     *
+     * @returns {string} The type identifier.
      */
     static get panelType() {
         return 'TextPanel';
     }
 
     /**
-     * <PanelType> getter.
-     * @returns {string}
+     * Returns the instance type identifier.
+     *
+     * @returns {string} The type identifier string.
      */
     getPanelType() {
         return 'TextPanel';
@@ -48,7 +52,8 @@ export class TextPanel extends Panel {
 
     /**
      * Serializes the Panel's state, including its text content.
-     * @returns {object}
+     *
+     * @returns {object} The serialized data.
      */
     toJSON() {
         const me = this;
@@ -62,12 +67,15 @@ export class TextPanel extends Panel {
 
     /**
      * Deserializes state, restoring the text content.
+     *
      * @param {object} data - The state object.
      * @returns {void}
      */
     fromJSON(data) {
         const me = this;
         super.fromJSON(data); // Restore base properties first
-        me.contentElement.textContent = data.content;
+        if (data.content) {
+            me.contentElement.textContent = data.content;
+        }
     }
 }

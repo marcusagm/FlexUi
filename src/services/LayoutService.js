@@ -14,6 +14,10 @@ import { EventTypes } from '../constants/EventTypes.js';
  * Properties summary:
  * - _instance {LayoutService | null} : The private static instance for the Singleton.
  * - _namespace {string} : Unique namespace for appBus listeners.
+ * - _boundOnPanelGroupsChanged {Function | null} : Bound handler for panel groups changed event.
+ * - _boundOnRowsChanged {Function | null} : Bound handler for rows changed event.
+ * - _boundOnColumnsChanged {Function | null} : Bound handler for columns changed event.
+ * - _boundOnLayoutInitialized {Function | null} : Bound handler for layout initialized event.
  *
  * Typical usage:
  * // In App.js (on init):
@@ -42,15 +46,16 @@ import { EventTypes } from '../constants/EventTypes.js';
  * - Applies dynamic CSS 'min-width' to Columns based on their children.
  *
  * Dependencies:
- * - ../components/Column/Column.js
- * - ../components/Container/Container.js
- * - ../components/Row/Row.js
- * - ../utils/EventBus.js
- * - ../constants/EventTypes.js
+ * - {import('../components/Column/Column.js').Column}
+ * - {import('../components/Container/Container.js').Container}
+ * - {import('../components/Row/Row.js').Row}
+ * - {import('../utils/EventBus.js').appBus}
+ * - {import('../constants/EventTypes.js').EventTypes}
  */
 export class LayoutService {
     /**
      * The private static instance for the Singleton.
+     *
      * @type {LayoutService | null}
      * @private
      */
@@ -58,6 +63,7 @@ export class LayoutService {
 
     /**
      * Unique namespace for appBus listeners.
+     *
      * @type {string}
      * @private
      */
@@ -65,6 +71,7 @@ export class LayoutService {
 
     /**
      * Bound handler for the 'layout:panel-groups-changed' event.
+     *
      * @type {Function | null}
      * @private
      */
@@ -72,6 +79,7 @@ export class LayoutService {
 
     /**
      * Bound handler for the 'layout:rows-changed' event.
+     *
      * @type {Function | null}
      * @private
      */
@@ -79,6 +87,7 @@ export class LayoutService {
 
     /**
      * Bound handler for the 'layout:columns-changed' event.
+     *
      * @type {Function | null}
      * @private
      */
@@ -86,12 +95,15 @@ export class LayoutService {
 
     /**
      * Bound handler for the 'app:layout-initialized' event.
+     *
      * @type {Function | null}
      * @private
      */
     _boundOnLayoutInitialized = null;
 
     /**
+     * Creates a new LayoutService instance.
+     *
      * @private
      */
     constructor() {
@@ -112,7 +124,8 @@ export class LayoutService {
 
     /**
      * Gets the single instance of the LayoutService.
-     * @returns {LayoutService}
+     *
+     * @returns {LayoutService} The singleton instance.
      */
     static getInstance() {
         if (!LayoutService._instance) {
@@ -123,6 +136,7 @@ export class LayoutService {
 
     /**
      * Subscribes to layout-related events on the appBus.
+     *
      * @private
      * @returns {void}
      */
@@ -138,6 +152,7 @@ export class LayoutService {
 
     /**
      * Cleans up all appBus listeners.
+     *
      * @returns {void}
      */
     destroy() {
@@ -149,6 +164,7 @@ export class LayoutService {
      * Handles the 'app:layout-initialized' event.
      * Runs a full, cascading layout check on the entire container
      * to ensure all UI (buttons, sizes, min-widths) is correct on load.
+     *
      * @param {Container} container - The root Container instance.
      * @private
      * @returns {void}
@@ -173,6 +189,7 @@ export class LayoutService {
     /**
      * Handles the 'layout:rows-changed' event (Vertical).
      * Applies space-filling logic and collapse button rules.
+     *
      * @param {Container} container - The Container needing an update.
      * @private
      * @returns {void}
@@ -189,7 +206,7 @@ export class LayoutService {
         }
 
         const totalRows = rows.length;
-        let uncollapsedRows = rows.filter(row => !row._state.collapsed);
+        let uncollapsedRows = rows.filter(row => !row.collapsed);
 
         if (uncollapsedRows.length === 0) {
             const lastRow = rows[rows.length - 1];
@@ -211,7 +228,7 @@ export class LayoutService {
                     row.collapseBtn.style.display = '';
                     const isThisRowTheOnlyUncollapsed = isOnlyOneUncollapsed && isLastVisible;
 
-                    if (!row._state.collapsible || isThisRowTheOnlyUncollapsed) {
+                    if (!row.collapsible || isThisRowTheOnlyUncollapsed) {
                         row.collapseBtn.disabled = true;
                     } else {
                         row.collapseBtn.disabled = false;
@@ -223,6 +240,7 @@ export class LayoutService {
 
     /**
      * Handles the 'layout:columns-changed' event (Horizontal).
+     *
      * @param {Row} row - The Row needing an update.
      * @private
      * @returns {void}
@@ -245,6 +263,7 @@ export class LayoutService {
 
     /**
      * Handles the 'layout:panel-groups-changed' event (Vertical in Column).
+     *
      * @param {Column} column - The column instance needing a layout update.
      * @private
      * @returns {void}
@@ -263,6 +282,7 @@ export class LayoutService {
     /**
      * Recalculates sizes, applies 'panel-group--fills-space',
      * and manages the collapse button state for all PanelGroups in a column.
+     *
      * @param {Column} column - The column to update.
      * @private
      * @returns {void}
@@ -274,7 +294,7 @@ export class LayoutService {
             return;
         }
 
-        let uncollapsedPanelGroups = panelGroups.filter(panelGroup => !panelGroup._state.collapsed);
+        let uncollapsedPanelGroups = panelGroups.filter(panelGroup => !panelGroup.collapsed);
 
         if (uncollapsedPanelGroups.length === 0) {
             const lastGroup = panelGroups[panelGroups.length - 1];
@@ -289,17 +309,17 @@ export class LayoutService {
             const shouldFillSpace = panelGroup === lastUncollapsedGroup;
 
             if (shouldFillSpace) {
-                panelGroup._state.height = null;
+                panelGroup.height = null;
                 panelGroup.element.classList.add('panel-group--fills-space');
             } else {
                 panelGroup.element.classList.remove('panel-group--fills-space');
             }
 
-            const collapseButton = panelGroup._state.header?.collapseBtn;
+            const collapseButton = panelGroup.header?.collapseBtn;
             if (collapseButton) {
                 const isThisPanelTheOnlyUncollapsed = isOnlyOneUncollapsed && shouldFillSpace;
 
-                if (!panelGroup._state.collapsible || isThisPanelTheOnlyUncollapsed) {
+                if (!panelGroup.collapsible || isThisPanelTheOnlyUncollapsed) {
                     collapseButton.disabled = true;
                 } else {
                     collapseButton.disabled = false;

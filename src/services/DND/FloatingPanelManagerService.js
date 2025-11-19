@@ -32,9 +32,9 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * - Listens to: EventTypes.PANEL_GROUP_REMOVED, EventTypes.APP_UNDOCK_PANEL_REQUEST
  *
  * Dependencies:
- * - components/Panel/PanelGroup.js
- * - utils/EventBus.js
- * - ../../constants/EventTypes.js
+ * - {import('../../components/Panel/PanelGroup.js').PanelGroup}
+ * - {import('../../utils/EventBus.js').appBus}
+ * - {import('../../constants/EventTypes.js').EventTypes}
  */
 export class FloatingPanelManagerService {
     /**
@@ -299,9 +299,9 @@ export class FloatingPanelManagerService {
             panelGroup = draggedData.item;
         } else if (draggedData.type === 'Panel') {
             const panel = draggedData.item;
-            const sourceGroup = panel._state.parentGroup;
+            const sourceGroup = panel.parentGroup;
 
-            if (sourceGroup._state.panels.length === 1) {
+            if (sourceGroup.panels.length === 1) {
                 panelGroup = sourceGroup;
             } else {
                 sourceGroup.removePanel(panel, true);
@@ -346,7 +346,7 @@ export class FloatingPanelManagerService {
             return;
         }
 
-        const isLastPanel = group._state.panels.length === 1;
+        const isLastPanel = group.panels.length === 1;
         let panelGroupToFloat;
 
         if (isLastPanel) {
@@ -495,8 +495,8 @@ export class FloatingPanelManagerService {
             const panelGroup = new PanelGroup();
             panelGroup.fromJSON(groupData);
 
-            if (panelGroup._state.isFloating) {
-                me.addFloatingPanel(panelGroup, panelGroup._state.x, panelGroup._state.y);
+            if (panelGroup.isFloating) {
+                me.addFloatingPanel(panelGroup, panelGroup.x, panelGroup.y);
             }
         });
     }
