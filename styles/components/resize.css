@@ -1,0 +1,130 @@
+@import '../theme.css';
+
+/**
+ * Description:
+ * Base class for all 8 resize handles (N, S, E, W, NE, NW, SE, SW).
+ * Defines critical properties like absolute positioning, pointer event handling,
+ * and default visual states using theme tokens.
+ *
+ * Dependencies:
+ * - ../theme.css (for --resize-handle-*, --color-*)
+ */
+.resize-handle {
+    position: absolute;
+    /* CRITICAL: Prevents default browser actions (scrolling, text selection) */
+    touch-action: none;
+    /* Default visibility and layering */
+    background-color: transparent;
+    opacity: 0.1;
+    z-index: var(--resize-handle-z-index);
+    transition: background-color 0.2s ease-in-out;
+}
+
+/* Hover/Active states - Consuming theme tokens */
+.resize-handle:hover {
+    background-color: var(--resize-handle-color-hover);
+    opacity: 0.5;
+}
+
+.resize-handle:active {
+    background-color: var(--resize-handle-color-active);
+    opacity: 0.8;
+}
+
+/* --- Edge Handles (N, S, E, W) --- */
+
+/* North (Top) Handle */
+.resize-handle--n {
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: var(--resize-handle-size);
+    /* Centers the handle visually over the border */
+    /* transform: translateY(calc(-0.5 * var(--resize-handle-size))); */
+    cursor: ns-resize;
+}
+
+/* South (Bottom) Handle */
+.resize-handle--s {
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: var(--resize-handle-size);
+    /* transform: translateY(calc(0.5 * var(--resize-handle-size))); */
+    cursor: ns-resize;
+}
+
+/* East (Right) Handle */
+.resize-handle--e {
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: var(--resize-handle-size);
+    /* transform: translateX(calc(0.5 * var(--resize-handle-size))); */
+    cursor: ew-resize;
+}
+
+/* West (Left) Handle */
+.resize-handle--w {
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: var(--resize-handle-size);
+    /* transform: translateX(calc(-0.5 * var(--resize-handle-size))); */
+    cursor: ew-resize;
+}
+
+/* --- Corner Handles (NE, NW, SE, SW) --- */
+
+/* Northwest (Top-Left) Handle - nwse-resize (top-left to bottom-right diagonal) */
+.resize-handle--nw {
+    top: 0;
+    left: 0;
+    width: var(--resize-handle-corner-size);
+    height: var(--resize-handle-corner-size);
+    /* Offset by half the size to cover both top and left edges */
+    /* transform: translate(
+        calc(-0.5 * var(--resize-handle-size)),
+        calc(-0.5 * var(--resize-handle-size))
+    ); */
+    cursor: nwse-resize;
+}
+
+/* Northeast (Top-Right) Handle - nesw-resize (top-right to bottom-left diagonal) */
+.resize-handle--ne {
+    top: 0;
+    right: 0;
+    width: var(--resize-handle-corner-size);
+    height: var(--resize-handle-corner-size);
+    transform: translate(
+        calc(0.5 * var(--resize-handle-size)),
+        calc(-0.5 * var(--resize-handle-size))
+    );
+    cursor: nesw-resize;
+}
+
+/* Southeast (Bottom-Right) Handle - nwse-resize (top-left to bottom-right diagonal) */
+.resize-handle--se {
+    bottom: 0;
+    right: 0;
+    width: var(--resize-handle-corner-size);
+    height: var(--resize-handle-corner-size);
+    transform: translate(
+        calc(0.5 * var(--resize-handle-size)),
+        calc(0.5 * var(--resize-handle-size))
+    );
+    cursor: nwse-resize;
+}
+
+/* Southwest (Bottom-Left) Handle - nesw-resize (top-right to bottom-left diagonal) */
+.resize-handle--sw {
+    bottom: 0;
+    left: 0;
+    width: var(--resize-handle-corner-size);
+    height: var(--resize-handle-corner-size);
+    transform: translate(
+        calc(-0.5 * var(--resize-handle-size)),
+        calc(0.5 * var(--resize-handle-size))
+    );
+    cursor: nesw-resize;
+}

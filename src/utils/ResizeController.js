@@ -1,3 +1,5 @@
+import { generateId } from './generateId.js';
+
 /**
  * Description:
  * A utility class designed to encapsulate and manage the logic for resizing
@@ -9,20 +11,21 @@
  * Rows, Columns, and Panels that require similar resizing behaviors.
  *
  * Properties summary:
+ * - _id {string} : Unique ID for this instance.
  * - _targetElement {HTMLElement} : The element being resized (or the reference context).
- * - _direction {string} : The axis of resize ('horizontal' or 'vertical').
+ * - _direction {string} : The axis of resize ('horizontal', 'vertical', or 'both').
  * - _callbacks {object} : Hook functions for resize lifecycle events.
- * - _startPosition {number} : The starting cursor coordinate (X or Y).
+ * - _startPositionX {number} : The starting cursor coordinate X.
+ * - _startPositionY {number} : The starting cursor coordinate Y.
  * - _activePointerId {number|null} : The ID of the pointer currently performing the resize.
  * - _boundOnMove {Function} : Bound event listener for pointer move.
  * - _boundOnUp {Function} : Bound event listener for pointer up.
  *
  * Typical usage:
- * const resizer = new ResizeController(element, 'horizontal', {
+ * const resizer = new ResizeController(element, 'both', {
  * onStart: () => console.log('Resize started'),
- * onUpdate: (delta) => {
- * const newWidth = initialWidth + delta;
- * element.style.width = `${newWidth}px`;
+ * onUpdate: (deltaX, deltaY) => {
+ * // Handle 2D resize logic
  * },
  * onEnd: () => console.log('Resize ended')
  * });
@@ -37,7 +40,7 @@
  * Business rules implemented:
  * - Enforces pointer capture to ensure drag continuity even if the cursor leaves the element.
  * - Calculates delta relative to the initial pointer down position.
- * - Supports both horizontal and vertical axes.
+ * - Supports horizontal, vertical, and both axes.
  * - Cleans up all global listeners automatically when the drag ends.
  *
  * Dependencies:
@@ -45,14 +48,24 @@
  */
 export class ResizeController {
     /**
+     * Unique ID for this instance, used for namespacing events.
+     *
+     * @type {string}
+     * @private
+     */
+    _id = generateId();
+
+    /**
      * The element associated with this resize controller.
+     *
      * @type {HTMLElement}
      * @private
      */
     _targetElement;
 
     /**
-     * The direction of the resize operation ('horizontal' | 'vertical').
+     * The direction of the resize operation ('horizontal' | 'vertical' | 'both').
+     *
      * @type {string}
      * @private
      */
@@ -60,6 +73,7 @@ export class ResizeController {
 
     /**
      * Lifecycle callbacks for the resize operation.
+     *
      * @type {{
      * onStart?: Function,
      * onUpdate?: Function,
@@ -70,14 +84,24 @@ export class ResizeController {
     _callbacks;
 
     /**
-     * The initial coordinate (clientX or clientY) when dragging starts.
+     * The initial cursor X coordinate when dragging starts.
+     *
      * @type {number}
      * @private
      */
-    _startPosition = 0;
+    _startPositionX = 0;
+
+    /**
+     * The initial cursor Y coordinate when dragging starts.
+     *
+     * @type {number}
+     * @private
+     */
+    _startPositionY = 0;
 
     /**
      * The ID of the active pointer to track.
+     *
      * @type {number|null}
      * @private
      */
@@ -85,6 +109,7 @@ export class ResizeController {
 
     /**
      * Bound move event listener.
+     *
      * @type {Function}
      * @private
      */
@@ -92,6 +117,7 @@ export class ResizeController {
 
     /**
      * Bound up event listener.
+     *
      * @type {Function}
      * @private
      */
@@ -101,19 +127,23 @@ export class ResizeController {
      * Creates an instance of ResizeController.
      *
      * @param {HTMLElement} targetElement - The element context for the resize.
-     * @param {'horizontal'|'vertical'} direction - The axis to track.
+     * @param {'horizontal'|'vertical'|'both'} direction - The axis to track.
      * @param {object} callbacks - Lifecycle hooks.
      * @param {Function} [callbacks.onStart] - Called when resize starts.
-     * @param {Function} [callbacks.onUpdate] - Called on move with the calculated delta (number).
+     * @param {Function} [callbacks.onUpdate] - Called on move with the calculated delta (number, or deltaX, deltaY if direction is 'both').
      * @param {Function} [callbacks.onEnd] - Called when resize ends.
+     * @throws {Error} If targetElement is missing or direction is invalid.
      */
     constructor(targetElement, direction, callbacks = {}) {
         const me = this;
+
         if (!targetElement) {
             throw new Error('ResizeController: targetElement is required.');
         }
-        if (direction !== 'horizontal' && direction !== 'vertical') {
-            throw new Error('ResizeController: direction must be "horizontal" or "vertical".');
+        if (direction !== 'horizontal' && direction !== 'vertical' && direction !== 'both') {
+            throw new Error(
+                'ResizeController: direction must be "horizontal", "vertical" or "both".'
+            );
         }
 
         me._targetElement = targetElement;
@@ -122,6 +152,15 @@ export class ResizeController {
 
         me._boundOnMove = me._onMove.bind(me);
         me._boundOnUp = me._onUp.bind(me);
+    }
+
+    /**
+     * Cleans up all listeners and stops any ongoing drag operation.
+     *
+     * @returns {void}
+     */
+    destroy() {
+        this._cleanupDragState();
     }
 
     /**
@@ -137,36 +176,27 @@ export class ResizeController {
             return;
         }
 
-        // Prevent default browser behavior (text selection, scrolling)
-        event.preventDefault();
-        event.stopPropagation();
-
         const target = event.target;
-
-        // Corrected Validation: Check setPointerCapture on the TARGET, not the event object
         if (target && typeof target.setPointerCapture === 'function') {
             me._activePointerId = event.pointerId;
             target.setPointerCapture(me._activePointerId);
         } else {
-            // Fallback if target is invalid, though unlikely in pointerdown
             return;
         }
 
-        // Record initial position
-        if (me._direction === 'horizontal') {
-            me._startPosition = event.clientX;
-        } else {
-            me._startPosition = event.clientY;
-        }
+        event.preventDefault();
+        event.stopPropagation();
 
-        // Notify start
+        me._startPositionX = event.clientX;
+        me._startPositionY = event.clientY;
+
         if (typeof me._callbacks.onStart === 'function') {
             me._callbacks.onStart();
         }
 
-        // Attach global listeners
         window.addEventListener('pointermove', me._boundOnMove);
         window.addEventListener('pointerup', me._boundOnUp);
+        window.addEventListener('pointercancel', me._boundOnUp);
     }
 
     /**
@@ -182,20 +212,19 @@ export class ResizeController {
             return;
         }
 
-        let currentPosition;
-        if (me._direction === 'horizontal') {
-            currentPosition = event.clientX;
-        } else {
-            currentPosition = event.clientY;
+        if (typeof me._callbacks.onUpdate !== 'function') {
+            return;
         }
 
-        const delta = currentPosition - me._startPosition;
+        const deltaX = event.clientX - me._startPositionX;
+        const deltaY = event.clientY - me._startPositionY;
 
-        if (typeof me._callbacks.onUpdate === 'function') {
-            // We pass the raw delta. The consumer is expected to handle
-            // any heavy throttling (e.g., requestAnimationFrame) if
-            // the update operation is expensive.
-            me._callbacks.onUpdate(delta);
+        if (me._direction === 'both') {
+            me._callbacks.onUpdate(deltaX, deltaY);
+        } else if (me._direction === 'horizontal') {
+            me._callbacks.onUpdate(deltaX);
+        } else if (me._direction === 'vertical') {
+            me._callbacks.onUpdate(deltaY);
         }
     }
 
@@ -212,18 +241,39 @@ export class ResizeController {
             return;
         }
 
-        const target = event.target;
-        if (target && typeof target.releasePointerCapture === 'function') {
-            target.releasePointerCapture(me._activePointerId);
+        me._cleanupDragState();
+
+        if (typeof me._callbacks.onEnd === 'function') {
+            me._callbacks.onEnd();
+        }
+    }
+
+    /**
+     * Performs cleanup of global listeners and pointer capture release.
+     *
+     * @private
+     * @returns {void}
+     */
+    _cleanupDragState() {
+        const me = this;
+        const target = me._targetElement;
+
+        if (
+            me._activePointerId !== null &&
+            target &&
+            typeof target.releasePointerCapture === 'function'
+        ) {
+            try {
+                target.releasePointerCapture(me._activePointerId);
+            } catch (e) {
+                // Ignore if pointer was already released or lost
+            }
         }
 
         me._activePointerId = null;
 
         window.removeEventListener('pointermove', me._boundOnMove);
         window.removeEventListener('pointerup', me._boundOnUp);
-
-        if (typeof me._callbacks.onEnd === 'function') {
-            me._callbacks.onEnd();
-        }
+        window.removeEventListener('pointercancel', me._boundOnUp);
     }
 }

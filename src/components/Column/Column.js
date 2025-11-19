@@ -2,14 +2,14 @@ import { PanelGroup } from '../Panel/PanelGroup.js';
 import { appBus } from '../../utils/EventBus.js';
 import { throttleRAF } from '../../utils/ThrottleRAF.js';
 import { generateId } from '../../utils/generateId.js';
-import { ResizeController } from '../../utils/ResizeController.js';
+import { ResizeHandleManager } from '../../utils/ResizeHandleManager.js';
 import { DropZoneType } from '../../constants/DNDTypes.js';
 import { EventTypes } from '../../constants/EventTypes.js';
 
 /**
  * Description:
  * Manages a single vertical column in the container. It holds and organizes
- * PanelGroups, manages horizontal resizing via ResizeController, and delegates
+ * PanelGroups, manages horizontal resizing via ResizeHandleManager, and delegates
  * drag/drop logic.
  *
  * Properties summary:
@@ -18,6 +18,10 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * - dropZoneType {string} : The identifier for the DragDropService.
  * - _id {string} : Unique ID for this instance.
  * - _namespace {string} : Unique namespace for appBus listeners.
+ * - _minWidth {number} : The minimum width in pixels for horizontal resizing.
+ * - _throttledUpdate {Function | null} : The throttled function for resizing.
+ * - _boundOnPanelGroupRemoved {Function | null} : Bound handler for group removal.
+ * - _resizeHandleManager {ResizeHandleManager | null} : Manages the horizontal resize handles.
  *
  * Typical usage:
  * // In Row.js
@@ -29,22 +33,13 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * - Emits: EventTypes.LAYOUT_PANELGROUPS_CHANGED (to notify LayoutService)
  * - Emits: EventTypes.COLUMN_EMPTY (to notify Row when this column is empty)
  *
- * Business rules implemented:
- * - Renders 'PanelGroup' children vertically.
- * - Registers as a 'column' type drop zone.
- * - Listens for EventTypes.PANEL_GROUP_REMOVED and removes the child.
- * - If it becomes empty (last PanelGroup removed), emits EventTypes.COLUMN_EMPTY.
- * - Manages its own horizontal resize handle via ResizeController.
- * - Resize logic respects the minWidth of its child PanelGroups.
- *
  * Dependencies:
- * - components/Panel/PanelGroup.js
- * - utils/EventBus.js
- * - utils/ThrottleRAF.js
- * - utils/generateId.js
- * - utils/ResizeController.js
- * - constants/DNDTypes.js
- * - ../../constants/EventTypes.js
+ * - {import('../Panel/PanelGroup.js').PanelGroup}
+ * - {import('../../utils/EventBus.js').appBus}
+ * - {import('../../utils/ThrottleRAF.js').throttleRAF}
+ * - {import('../../utils/ResizeHandleManager.js').ResizeHandleManager}
+ * - {import('../../constants/DNDTypes.js').DropZoneType}
+ * - {import('../../constants/EventTypes.js').EventTypes}
  */
 export class Column {
     /**
@@ -100,6 +95,14 @@ export class Column {
     _boundOnPanelGroupRemoved = null;
 
     /**
+     * Stores the resize handle manager instance.
+     *
+     * @type {import('../../utils/ResizeHandleManager.js').ResizeHandleManager | null}
+     * @private
+     */
+    _resizeHandleManager = null;
+
+    /**
      * @param {import('../Row/Row.js').Row} container - The parent Row instance.
      * @param {number|null} [width=null] - The initial width of the column.
      */
@@ -130,25 +133,25 @@ export class Column {
     }
 
     /**
-     * MinWidth setter with validation.
+     * MinimumWidth setter with validation.
      *
-     * @param {number} width
+     * @param {number} width - The minimum width in pixels.
      * @returns {void}
      */
     setMinWidth(width) {
-        const sanitizedWidth = Number(width);
-        if (isNaN(sanitizedWidth) || sanitizedWidth < 0) {
-            console.warn(`Column: Invalid minWidth "${width}". Must be a non-negative number.`);
+        const minimumWidth = Number(width);
+        if (!Number.isFinite(minimumWidth) || minimumWidth < 0) {
+            console.warn(`Column: Invalid minimumWidth "${width}". Setting to 0.`);
             this._minWidth = 0;
             return;
         }
-        this._minWidth = sanitizedWidth;
+        this._minWidth = minimumWidth;
     }
 
     /**
-     * MinWidth getter.
+     * MinimumWidth getter.
      *
-     * @returns {number}
+     * @returns {number} The minimum width in pixels.
      */
     getMinWidth() {
         return this._minWidth;
@@ -157,7 +160,7 @@ export class Column {
     /**
      * ThrottledUpdate setter.
      *
-     * @param {Function} throttledFunction
+     * @param {Function} throttledFunction - The throttled function.
      * @returns {void}
      */
     setThrottledUpdate(throttledFunction) {
@@ -167,7 +170,7 @@ export class Column {
     /**
      * ThrottledUpdate getter.
      *
-     * @returns {Function | null}
+     * @returns {Function | null} The throttled update function.
      */
     getThrottledUpdate() {
         return this._throttledUpdate;
@@ -191,7 +194,7 @@ export class Column {
      * Calculates the effective minimum width by checking its own minWidth
      * and the minWidth of all child PanelGroups.
      *
-     * @returns {number} The calculated effective minWidth.
+     * @returns {number} The calculated effective minimum width.
      */
     getEffectiveMinWidth() {
         const me = this;
@@ -236,65 +239,48 @@ export class Column {
         const me = this;
         appBus.offByNamespace(me._namespace);
         me.getThrottledUpdate()?.cancel();
+        me._resizeHandleManager?.destroy();
 
         [...me._state.panelGroups].forEach(panel => panel.destroy());
     }
 
     /**
-     * Adds the horizontal resize bar to the column.
-     * Uses ResizeController to manage drag logic.
+     * Adds the horizontal resize handle to the column using ResizeHandleManager.
      *
      * @param {boolean} isLast - Indicates if this is the last column in the row.
      * @returns {void}
      */
     addResizeBars(isLast) {
         const me = this;
-        me.element.querySelectorAll('.column__resize-handle').forEach(button => button.remove());
+        me.element.querySelectorAll('.column__resize-handle').forEach(element => element.remove());
         me.element.classList.remove('column--resize-right');
+        me._resizeHandleManager?.destroy();
 
         if (isLast) {
             return;
         }
 
         me.element.classList.add('column--resize-right');
-        const bar = document.createElement('div');
-        bar.classList.add('column__resize-handle');
-        bar.style.touchAction = 'none'; // Critical for Pointer Events
-        me.element.appendChild(bar);
 
-        let startWidth = 0;
-        let effectiveMinWidth = 0;
-
-        const controller = new ResizeController(me.element, 'horizontal', {
-            onStart: () => {
-                startWidth = me.element.offsetWidth;
-                effectiveMinWidth = me.getEffectiveMinWidth();
-            },
-            onUpdate: delta => {
-                me._state.width = Math.max(effectiveMinWidth, startWidth + delta);
-                if (me.getThrottledUpdate()) {
-                    me.getThrottledUpdate()();
-                }
+        me._resizeHandleManager = new ResizeHandleManager(me.element, {
+            handles: ['e'],
+            customClass: 'column__resize-handle',
+            getConstraints: () => ({
+                minimumWidth: me.getEffectiveMinWidth(),
+                maximumWidth: Infinity,
+                minimumHeight: 0,
+                maximumHeight: Infinity,
+                containerRectangle: null
+            }),
+            onResize: ({ width }) => {
+                me._state.width = width;
+                me.getThrottledUpdate()();
             },
             onEnd: () => {
                 if (me._state.container) {
                     me._state.container.requestLayoutUpdate();
                 }
             }
-        });
-
-        bar.addEventListener('pointerdown', event => {
-            // Check logic to prevent resizing if not allowed
-            const container = me._state.container;
-            if (!container) return;
-
-            const columns = container.getColumns();
-            const index = columns.indexOf(me);
-            if (columns.length === 1 || index === columns.length - 1) {
-                return;
-            }
-
-            controller.start(event);
         });
     }
 
@@ -308,6 +294,7 @@ export class Column {
         const me = this;
         if (isLast) {
             me.element.style.flex = `1 1 auto`;
+            me._state.width = null;
         } else if (me._state.width !== null) {
             me.element.style.flex = `0 0 ${me._state.width}px`;
         }
@@ -317,7 +304,7 @@ export class Column {
     /**
      * Adds multiple PanelGroups at once (used for state restoration).
      *
-     * @param {Array<PanelGroup>} panelGroups
+     * @param {Array<PanelGroup>} panelGroups - Array of PanelGroup instances.
      * @returns {void}
      */
     addPanelGroupsBulk(panelGroups) {
@@ -334,8 +321,8 @@ export class Column {
     /**
      * Adds a single PanelGroup to the column at a specific index.
      *
-     * @param {PanelGroup} panelGroup
-     * @param {number|null} [index=null]
+     * @param {PanelGroup} panelGroup - The PanelGroup instance to add.
+     * @param {number|null} [index=null] - The index to insert at.
      * @returns {void}
      */
     addPanelGroup(panelGroup, index = null) {
@@ -362,7 +349,7 @@ export class Column {
     /**
      * Gets all collapsed PanelGroups.
      *
-     * @returns {Array<PanelGroup>}
+     * @returns {Array<PanelGroup>} Collapsed PanelGroup instances.
      */
     getPanelGroupsCollapsed() {
         return this._state.panelGroups.filter(p => p._state.collapsed);
@@ -371,7 +358,7 @@ export class Column {
     /**
      * Gets all uncollapsed PanelGroups.
      *
-     * @returns {Array<PanelGroup>}
+     * @returns {Array<PanelGroup>} Uncollapsed PanelGroup instances.
      */
     getPanelGroupsUncollapsed() {
         return this._state.panelGroups.filter(p => !p._state.collapsed);
@@ -380,7 +367,7 @@ export class Column {
     /**
      * PanelGroups getter.
      *
-     * @returns {Array<PanelGroup>}
+     * @returns {Array<PanelGroup>} All child PanelGroup instances.
      */
     getPanelGroups() {
         return this._state.panelGroups;
@@ -389,7 +376,7 @@ export class Column {
     /**
      * Removes a PanelGroup from the column.
      *
-     * @param {PanelGroup} panelGroup
+     * @param {PanelGroup} panelGroup - The PanelGroup instance to remove.
      * @param {boolean} [emitEmpty=true] - Whether to emit EventTypes.COLUMN_EMPTY.
      * @returns {void}
      */
@@ -428,7 +415,7 @@ export class Column {
     /**
      * Finds the state index of a PanelGroup instance.
      *
-     * @param {PanelGroup} panelGroup
+     * @param {PanelGroup} panelGroup - The PanelGroup to find.
      * @returns {number} The index, or -1 if not found.
      */
     getPanelGroupIndex(panelGroup) {
@@ -438,7 +425,7 @@ export class Column {
     /**
      * Finds the state index of a PanelGroup based on its DOM element.
      *
-     * @param {HTMLElement} element
+     * @param {HTMLElement} element - The DOM element of the PanelGroup.
      * @returns {number} The index.
      */
     getPanelGroupIndexByElement(element) {
@@ -462,7 +449,7 @@ export class Column {
     /**
      * Gets the total number of PanelGroups in this column.
      *
-     * @returns {number}
+     * @returns {number} The total number of PanelGroups.
      */
     getTotalPanelGroups() {
         return this._state.panelGroups.length;
@@ -471,7 +458,7 @@ export class Column {
     /**
      * Serializes the Column state (and its child PanelGroups) to JSON.
      *
-     * @returns {object}
+     * @returns {object} The serialized state object.
      */
     toJSON() {
         const me = this;

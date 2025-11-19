@@ -15,7 +15,7 @@
     padding: var(--dnd-active-column-padding);
 }
 
-.column__resize-handle {
+/* .column__resize-handle {
     height: 3px;
     cursor: ns-resize;
     background: transparent;
@@ -50,4 +50,4 @@
 
 .dnd-active .column__resize-handle {
     pointer-events: none;
-}
+} */

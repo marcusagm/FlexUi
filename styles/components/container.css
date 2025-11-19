@@ -47,7 +47,7 @@
     align-self: stretch;
 }
 
-.row__resize-handle {
+/* .row__resize-handle {
     height: var(--panel-resize-handle-height);
     width: 100%;
     cursor: ns-resize;
@@ -67,7 +67,7 @@
 
 .dnd-active .row__resize-handle {
     pointer-events: none;
-}
+} */
 
 /* --- Row Collapse --- */
 

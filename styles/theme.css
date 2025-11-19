@@ -506,4 +506,11 @@
     --notification-close-button-hover-opacity: 1;
     --notification-animation-transform-y: 20px;
     --notification-icon-size: 1.2em;
+
+    /* Component: Resize Handles */
+    --resize-handle-size: 3px;
+    --resize-handle-corner-size: 6px;
+    --resize-handle-color-hover: var(--color-accent-hover);
+    --resize-handle-color-active: var(--color-accent-active);
+    --resize-handle-z-index: 100;
 }

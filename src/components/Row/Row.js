@@ -2,7 +2,7 @@ import { Column } from '../Column/Column.js';
 import { appBus } from '../../utils/EventBus.js';
 import { throttleRAF } from '../../utils/ThrottleRAF.js';
 import { generateId } from '../../utils/generateId.js';
-import { ResizeController } from '../../utils/ResizeController.js';
+import { ResizeHandleManager } from '../../utils/ResizeHandleManager.js';
 import { DropZoneType } from '../../constants/DNDTypes.js';
 import { EventTypes } from '../../constants/EventTypes.js';
 
@@ -11,7 +11,7 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * Manages a single horizontal Row, which contains and organizes Columns.
  * It acts as a 'drop zone' (type 'row') to detect drops in the horizontal
  * gaps *between* columns. It also manages its own vertical (height) resizing
- * and collapse state.
+ * and collapse state using the unified ResizeHandleManager.
  *
  * Properties summary:
  * - _state {object} : Internal state (child Columns, parent Container, height, collapse).
@@ -20,6 +20,9 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * - collapseBtn {HTMLElement|null} : The button element to toggle collapse state.
  * - _id {string} : Unique ID for this instance.
  * - _namespace {string} : Unique namespace for appBus listeners.
+ * - _minHeight {number} : Minimum height in pixels for vertical resizing.
+ * - _throttledUpdate {Function|null} : The throttled function for height updates.
+ * - _resizeHandleManager {ResizeHandleManager|null} : Manages the vertical resize handles.
  *
  * Typical usage:
  * // In Container.js
@@ -31,29 +34,18 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * - Emits: EventTypes.LAYOUT_COLUMNS_CHANGED (to notify LayoutService)
  * - Emits: EventTypes.ROW_EMPTY (to notify Container when this row is empty)
  *
- * Business rules implemented:
- * - Renders 'Column' children horizontally.
- * - Registers as a 'row' type drop zone.
- * - Listens for EventTypes.COLUMN_EMPTY and removes the child Column.
- * - If it becomes empty (last Column removed), emits EventTypes.ROW_EMPTY.
- * - Manages its own vertical resize handle via ResizeController.
- * - Collapse state is managed locally but disabled by LayoutService.
- *
  * Dependencies:
- * - components/Column/Column.js
- * - utils/EventBus.js
- * - ../../utils/ThrottleRAF.js
- * - ../../utils/generateId.js
- * - ../../utils/ResizeController.js
- * - ../../constants/DNDTypes.js
- * - ../../constants/EventTypes.js
+ * - {import('../Column/Column.js').Column}
+ * - {import('../../utils/EventBus.js').appBus}
+ * - {import('../../utils/ThrottleRAF.js').throttleRAF}
+ * - {import('../../utils/ResizeHandleManager.js').ResizeHandleManager}
  */
 export class Row {
     /**
      * Internal state holding child Column components and dimensions.
      *
      * @type {{
-     * children: Array<Column>,
+     * children: Array<import('../Column/Column.js').Column>,
      * parentContainer: import('../Container/Container.js').Container | null,
      * height: number | null,
      * collapsed: boolean,
@@ -110,6 +102,22 @@ export class Row {
     _boundOnColumnEmpty = null;
 
     /**
+     * Stores the bound reference for the collapse button listener.
+     *
+     * @type {Function | null}
+     * @private
+     */
+    _boundOnToggleCollapseRequest = null;
+
+    /**
+     * Stores the resize handle manager instance.
+     *
+     * @type {import('../../utils/ResizeHandleManager.js').ResizeHandleManager | null}
+     * @private
+     */
+    _resizeHandleManager = null;
+
+    /**
      * The button element to toggle collapse state.
      * Stored for access by LayoutService (to disable).
      *
@@ -119,14 +127,8 @@ export class Row {
     collapseBtn = null;
 
     /**
-     * Stores the bound reference for the collapse button listener.
+     * Creates an instance of Row.
      *
-     * @type {Function | null}
-     @private
-     */
-    _boundOnToggleCollapseRequest = null;
-
-    /**
      * @param {import('../Container/Container.js').Container} container - The parent Container instance.
      * @param {number|null} [height=null] - The initial height of the row.
      */
@@ -158,22 +160,24 @@ export class Row {
     }
 
     /**
-     * MinHeight setter with validation.
+     * MinimumHeight setter with validation.
      *
      * @param {number} height - The minimum height in pixels.
      * @returns {void}
      */
     setMinHeight(height) {
-        const sanitizedHeight = Number(height);
-        if (isNaN(sanitizedHeight) || sanitizedHeight < 0) {
-            this._minHeight = 0;
+        const me = this;
+        const minimumHeight = Number(height);
+        if (!Number.isFinite(minimumHeight) || minimumHeight < 0) {
+            console.warn('Row: Invalid minimumHeight value. Setting to 0.');
+            me._minHeight = 0;
             return;
         }
-        this._minHeight = sanitizedHeight;
+        me._minHeight = minimumHeight;
     }
 
     /**
-     * MinHeight getter.
+     * MinimumHeight getter.
      *
      * @returns {number} The minimum height in pixels.
      */
@@ -184,7 +188,7 @@ export class Row {
     /**
      * ThrottledUpdate setter.
      *
-     * @param {Function} throttledFunction
+     * @param {Function} throttledFunction - The throttled function.
      * @returns {void}
      */
     setThrottledUpdate(throttledFunction) {
@@ -194,7 +198,7 @@ export class Row {
     /**
      * ThrottledUpdate getter.
      *
-     * @returns {Function | null}
+     * @returns {Function | null} The throttled update function.
      */
     getThrottledUpdate() {
         return this._throttledUpdate;
@@ -244,6 +248,8 @@ export class Row {
             me.collapseBtn.removeEventListener('click', me._boundOnToggleCollapseRequest);
         }
 
+        me._resizeHandleManager?.destroy();
+
         [...me.getColumns()].forEach(column => column.destroy());
     }
 
@@ -257,7 +263,7 @@ export class Row {
         this.deleteColumn(column);
 
         if (this.getTotalColumns() === 0 && this._state.parentContainer) {
-            appBus.emit(EventTypes.ROW_EMPTY, this); // Notifies the Container (parent)
+            appBus.emit(EventTypes.ROW_EMPTY, this);
         }
     }
 
@@ -275,17 +281,14 @@ export class Row {
     }
 
     /**
-     * Adds the vertical resize handle and collapse button to this Row.
-     * Uses ResizeController to manage drag logic.
+     * Sets up the collapse button logic and DOM.
      *
-     * @param {boolean} isLast - True if this is the last Row in the Container.
      * @returns {void}
+     * @private
      */
-    addResizeBars(isLast) {
+    _setupCollapseButton() {
         const me = this;
-        me.element.querySelectorAll('.row__resize-handle').forEach(button => button.remove());
         me.element.querySelectorAll('.row__collapse-btn').forEach(button => button.remove());
-        me.element.classList.remove('row--resize-bottom');
         me.collapseBtn = null;
 
         if (me._state.collapsible) {
@@ -299,53 +302,47 @@ export class Row {
             me.collapseBtn.addEventListener('click', me._boundOnToggleCollapseRequest);
             me.element.appendChild(me.collapseBtn);
         }
+    }
+
+    /**
+     * Adds the vertical resize handle to this Row using ResizeHandleManager.
+     *
+     * @param {boolean} isLast - True if this is the last Row in the Container.
+     * @returns {void}
+     */
+    addResizeBars(isLast) {
+        const me = this;
+        me.element.querySelectorAll('.row__resize-handle').forEach(element => element.remove());
+        me.element.classList.remove('row--resize-bottom');
+        me._resizeHandleManager?.destroy();
+
+        me._setupCollapseButton();
 
         if (isLast) {
             return;
         }
 
         me.element.classList.add('row--resize-bottom');
-        const bar = document.createElement('div');
-        bar.classList.add('row__resize-handle');
-        // CRITICAL: Prevent browser default gestures like scrolling/panning while dragging
-        bar.style.touchAction = 'none';
-        me.element.appendChild(bar);
 
-        let startHeight = 0;
-
-        const controller = new ResizeController(me.element, 'vertical', {
-            onStart: () => {
-                startHeight = me.element.offsetHeight;
-            },
-            onUpdate: delta => {
-                me._state.height = Math.max(me.getMinHeight(), startHeight + delta);
-                if (me.getThrottledUpdate()) {
-                    me.getThrottledUpdate()();
-                }
+        me._resizeHandleManager = new ResizeHandleManager(me.element, {
+            handles: ['s'],
+            customClass: 'row__resize-handle',
+            getConstraints: () => ({
+                minimumHeight: me.getMinHeight(),
+                maximumHeight: Infinity,
+                minimumWidth: 0,
+                maximumWidth: Infinity,
+                containerRectangle: null
+            }),
+            onResize: ({ height }) => {
+                me._state.height = height;
+                me.getThrottledUpdate()();
             },
             onEnd: () => {
                 if (me._state.parentContainer) {
                     me._state.parentContainer.requestLayoutUpdate();
                 }
             }
-        });
-
-        bar.addEventListener('pointerdown', event => {
-            // 1. Check collapsed state
-            if (me._state.collapsed) return;
-
-            // 2. Check parent container existence
-            const container = me._state.parentContainer;
-            if (!container) return;
-
-            // 3. Check if it's the only row or the last row
-            const rows = container.getRows();
-            const index = rows.indexOf(me);
-            if (rows.length === 1 || index === rows.length - 1) {
-                return;
-            }
-
-            controller.start(event);
         });
     }
 
@@ -428,7 +425,6 @@ export class Row {
 
         if (index === null) {
             me._state.children.push(column);
-            // Append before the row resize handle if it exists
             const resizeHandle = me.element.querySelector('.row__resize-handle');
             if (resizeHandle) {
                 me.element.insertBefore(column.element, resizeHandle);
@@ -478,9 +474,9 @@ export class Row {
         }
 
         column.destroy();
-        const columnEl = column.element;
-        if (columnEl && me.element.contains(columnEl)) {
-            me.element.removeChild(columnEl);
+        const columnElement = column.element;
+        if (columnElement && me.element.contains(columnElement)) {
+            me.element.removeChild(columnElement);
         }
         me._state.children.splice(index, 1);
         me.requestLayoutUpdate();
