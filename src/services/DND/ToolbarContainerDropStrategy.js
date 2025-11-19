@@ -22,10 +22,10 @@ import { ItemType } from '../../constants/DNDTypes.js';
  * - Returns false on drop if the placeholder is not active (enables undock fallback).
  *
  * Dependencies:
- * - ./BaseDropStrategy.js
- * - ../../components/Toolbar/ToolbarGroup.js
- * - ../../components/Toolbar/ToolbarContainer.js
- * - ../../constants/DNDTypes.js
+ * - {import('./BaseDropStrategy.js').BaseDropStrategy}
+ * - {import('../../components/Toolbar/ToolbarGroup.js').ToolbarGroup}
+ * - {import('../../components/Toolbar/ToolbarContainer.js').ToolbarContainer}
+ * - {import('../../constants/DNDTypes.js').ItemType}
  */
 export class ToolbarContainerDropStrategy extends BaseDropStrategy {
     /**
@@ -102,9 +102,9 @@ export class ToolbarContainerDropStrategy extends BaseDropStrategy {
         const draggedItem = draggedData.item;
 
         me._sourceContainer = draggedItem.parentContainer;
-        me._orientation = dropZone._state.orientation;
+        me._orientation = dropZone.orientation;
 
-        const groups = dropZone._state.groups;
+        const groups = dropZone.groups;
 
         groups.forEach((group, index) => {
             const rect = group.element.getBoundingClientRect();
@@ -147,11 +147,11 @@ export class ToolbarContainerDropStrategy extends BaseDropStrategy {
             return false;
         }
 
-        if (me._dropZoneCache.length === 0 && dropZone._state.groups.length > 0) {
+        if (me._dropZoneCache.length === 0 && dropZone.groups.length > 0) {
             me.onDragEnter(point, dropZone, draggedData, dds);
         }
 
-        const scrollContainer = dropZone._scrollContainer;
+        const scrollContainer = dropZone.scrollContainer;
 
         if (!dropZone.element.contains(point.target)) {
             dds.hidePlaceholder();

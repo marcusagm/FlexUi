@@ -9,7 +9,9 @@ import { throttleRAF } from '../../utils/ThrottleRAF.js';
  * drop zone for ToolbarGroups.
  *
  * Properties summary:
- * - _state {object} : Internal state for orientation, position, and groups.
+ * - _orientation {string} : The orientation of the toolbar ('horizontal' | 'vertical').
+ * - _position {string} : The position in the layout ('top' | 'bottom' | 'left' | 'right').
+ * - _groups {Array} : The list of child ToolbarGroups.
  * - id {string} : Unique identifier for the container instance.
  * - element {HTMLElement} : The main DOM element of the container.
  * - _scrollContainer {HTMLElement} : The scrollable content wrapper.
@@ -31,6 +33,7 @@ import { throttleRAF } from '../../utils/ThrottleRAF.js';
  * - Updates 'is-empty' class based on the number of child groups.
  * - Supports A11y with ARIA roles, labels, and dynamic tabindex management.
  * - Uses throttling for scroll updates to optimize performance.
+ * - Reactively updates DOM attributes/classes when orientation or position changes.
  *
  * Dependencies:
  * - {import('./ToolbarGroupFactory.js').ToolbarGroupFactory}
@@ -42,20 +45,28 @@ import { throttleRAF } from '../../utils/ThrottleRAF.js';
  */
 export class ToolbarContainer {
     /**
-     * Internal state for orientation, position, and groups.
+     * The orientation of the toolbar ('horizontal' | 'vertical').
      *
-     * @type {{
-     * orientation: 'horizontal' | 'vertical',
-     * position: 'top' | 'bottom' | 'left' | 'right',
-     * groups: Array<import('./ToolbarGroup.js').ToolbarGroup>
-     * }}
+     * @type {'horizontal' | 'vertical'}
      * @private
      */
-    _state = {
-        orientation: 'horizontal',
-        position: 'top',
-        groups: []
-    };
+    _orientation = 'horizontal';
+
+    /**
+     * The position in the layout ('top' | 'bottom' | 'left' | 'right').
+     *
+     * @type {'top' | 'bottom' | 'left' | 'right'}
+     * @private
+     */
+    _position = 'top';
+
+    /**
+     * The list of child ToolbarGroups.
+     *
+     * @type {Array<import('./ToolbarGroup.js').ToolbarGroup>}
+     * @private
+     */
+    _groups = [];
 
     /**
      * Unique identifier for the container instance.
@@ -121,15 +132,121 @@ export class ToolbarContainer {
      */
     constructor(position, orientation) {
         const me = this;
-        me._state.position = position;
-        me._state.orientation = orientation;
         me.dropZoneType = 'toolbar-container';
-
         me._boundUpdateScrollButtons = throttleRAF(me._updateScrollButtons.bind(me));
+
+        // Initial assignment (direct assignment to avoid premature side effects before DOM build)
+        if (['top', 'bottom', 'left', 'right'].includes(position)) {
+            me._position = position;
+        }
+        if (['horizontal', 'vertical'].includes(orientation)) {
+            me._orientation = orientation;
+        }
 
         me._buildDOM();
         me._initObservers();
         me._updateEmptyState();
+    }
+
+    /**
+     * Retrieves the current orientation.
+     *
+     * @returns {'horizontal' | 'vertical'} The orientation.
+     */
+    get orientation() {
+        const me = this;
+        return me._orientation;
+    }
+
+    /**
+     * Sets the orientation and updates DOM classes/attributes.
+     * Validates input to ensure it is either 'horizontal' or 'vertical'.
+     *
+     * @param {'horizontal' | 'vertical'} value - The new orientation.
+     * @returns {void}
+     */
+    set orientation(value) {
+        const me = this;
+        if (value !== 'horizontal' && value !== 'vertical') {
+            console.warn(`[ToolbarContainer] Invalid orientation: ${value}`);
+            return;
+        }
+        if (me._orientation === value) return;
+
+        const oldValue = me._orientation;
+        me._orientation = value;
+
+        if (me.element) {
+            me.element.classList.remove(`toolbar-container--${oldValue}`);
+            me.element.classList.add(`toolbar-container--${value}`);
+            me.element.setAttribute('aria-orientation', value);
+
+            // Update scroll button icons
+            if (me._scrollPreviousButton) {
+                me._scrollPreviousButton.innerHTML = value === 'horizontal' ? '&#8249;' : '&#708;';
+            }
+            if (me._scrollNextButton) {
+                me._scrollNextButton.innerHTML = value === 'horizontal' ? '&#8250;' : '&#709;';
+            }
+            // Force scroll update
+            me._boundUpdateScrollButtons();
+        }
+    }
+
+    /**
+     * Retrieves the current position.
+     *
+     * @returns {'top' | 'bottom' | 'left' | 'right'} The position.
+     */
+    get position() {
+        const me = this;
+        return me._position;
+    }
+
+    /**
+     * Sets the position and updates DOM classes/attributes.
+     * Validates input.
+     *
+     * @param {'top' | 'bottom' | 'left' | 'right'} value - The new position.
+     * @returns {void}
+     */
+    set position(value) {
+        const me = this;
+        if (!['top', 'bottom', 'left', 'right'].includes(value)) {
+            console.warn(`[ToolbarContainer] Invalid position: ${value}`);
+            return;
+        }
+        if (me._position === value) return;
+
+        const oldValue = me._position;
+        me._position = value;
+
+        if (me.element) {
+            me.element.classList.remove(`toolbar-container--${oldValue}`);
+            me.element.classList.add(`toolbar-container--${value}`);
+            me.element.setAttribute('aria-label', `${value} toolbar`);
+        }
+    }
+
+    /**
+     * Retrieves the list of groups.
+     * This is a read-only public accessor. Modification happens via addGroup/removeGroup.
+     *
+     * @returns {Array<import('./ToolbarGroup.js').ToolbarGroup>} The list of groups.
+     */
+    get groups() {
+        const me = this;
+        return me._groups;
+    }
+
+    /**
+     * Retrieves the scrollable content wrapper.
+     *
+     * @returns {HTMLElement | null} The scroll container element.
+     */
+    get scrollContainer() {
+        const me = this;
+        return me._scrollContainer;
     }
 
     /**
@@ -141,19 +258,20 @@ export class ToolbarContainer {
     _buildDOM() {
         const me = this;
         me.element = document.createElement('div');
-        me.element.className = `toolbar-container toolbar-container--${me._state.position} toolbar-container--${me._state.orientation}`;
+
+        me.element.className = `toolbar-container toolbar-container--${me._position} toolbar-container--${me._orientation}`;
         me.element.dataset.dropzone = me.dropZoneType;
         me.element.dropZoneInstance = me;
 
         me.element.setAttribute('role', 'toolbar');
-        me.element.setAttribute('aria-orientation', me._state.orientation);
-        me.element.setAttribute('aria-label', `${me._state.position} toolbar`);
+        me.element.setAttribute('aria-orientation', me._orientation);
+        me.element.setAttribute('aria-label', `${me._position} toolbar`);
 
         me._scrollPreviousButton = document.createElement('button');
         me._scrollPreviousButton.type = 'button';
         me._scrollPreviousButton.className = 'toolbar__scroll-btn toolbar__scroll-btn--prev';
         me._scrollPreviousButton.innerHTML =
-            me._state.orientation === 'horizontal' ? '&#8249;' : '&#708;';
+            me._orientation === 'horizontal' ? '&#8249;' : '&#708;';
         me._scrollPreviousButton.setAttribute('aria-label', 'Scroll Previous');
         me._scrollPreviousButton.setAttribute('tabindex', '-1');
         me._scrollPreviousButton.addEventListener('click', me._onScrollPrevious.bind(me));
@@ -168,8 +286,7 @@ export class ToolbarContainer {
         me._scrollNextButton = document.createElement('button');
         me._scrollNextButton.type = 'button';
         me._scrollNextButton.className = 'toolbar__scroll-btn toolbar__scroll-btn--next';
-        me._scrollNextButton.innerHTML =
-            me._state.orientation === 'horizontal' ? '&#8250;' : '&#709;';
+        me._scrollNextButton.innerHTML = me._orientation === 'horizontal' ? '&#8250;' : '&#709;';
         me._scrollNextButton.setAttribute('aria-label', 'Scroll Next');
         me._scrollNextButton.setAttribute('tabindex', '-1');
         me._scrollNextButton.addEventListener('click', me._onScrollNext.bind(me));
@@ -203,7 +320,7 @@ export class ToolbarContainer {
         }
         me._boundUpdateScrollButtons?.cancel();
 
-        me._state.groups.forEach(group => group.destroy());
+        me._groups.forEach(group => group.destroy());
         me.element.remove();
     }
 
@@ -218,7 +335,7 @@ export class ToolbarContainer {
         const amount = -100;
         const options = { behavior: 'smooth' };
 
-        if (me._state.orientation === 'horizontal') {
+        if (me._orientation === 'horizontal') {
             options.left = amount;
         } else {
             options.top = amount;
@@ -237,7 +354,7 @@ export class ToolbarContainer {
         const amount = 100;
         const options = { behavior: 'smooth' };
 
-        if (me._state.orientation === 'horizontal') {
+        if (me._orientation === 'horizontal') {
             options.left = amount;
         } else {
             options.top = amount;
@@ -262,7 +379,7 @@ export class ToolbarContainer {
         let hasPrevious = false;
         let hasNext = false;
 
-        if (me._state.orientation === 'horizontal') {
+        if (me._orientation === 'horizontal') {
             const { scrollLeft, scrollWidth, clientWidth } = target;
             hasPrevious = scrollLeft > bufferPixel;
             hasNext = scrollWidth > clientWidth + scrollLeft + bufferPixel;
@@ -272,11 +389,9 @@ export class ToolbarContainer {
             hasNext = scrollHeight > clientHeight + scrollTop + bufferPixel;
         }
 
-        // Updates visibility via CSS class on the buttons
         me._scrollPreviousButton.classList.toggle('toolbar__scroll-btn--visible', hasPrevious);
         me._scrollNextButton.classList.toggle('toolbar__scroll-btn--visible', hasNext);
 
-        // Updates Accessibility (tabindex)
         if (hasPrevious) {
             me._scrollPreviousButton.removeAttribute('tabindex');
         } else {
@@ -298,7 +413,7 @@ export class ToolbarContainer {
      */
     _updateEmptyState() {
         const me = this;
-        const isEmpty = me._state.groups.length === 0;
+        const isEmpty = me._groups.length === 0;
         me.element.classList.toggle('is-empty', isEmpty);
     }
 
@@ -315,17 +430,18 @@ export class ToolbarContainer {
             return;
         }
 
-        const safeIndex = index === null ? me._state.groups.length : index;
+        const safeIndex = index === null ? me._groups.length : index;
 
-        if (safeIndex >= me._state.groups.length) {
-            me._state.groups.push(group);
+        if (safeIndex >= me._groups.length) {
+            me._groups.push(group);
             me._scrollContainer.appendChild(group.element);
         } else {
-            me._state.groups.splice(safeIndex, 0, group);
-            const nextSiblingGroup = me._state.groups[safeIndex + 1];
+            me._groups.splice(safeIndex, 0, group);
+            const nextSiblingGroup = me._groups[safeIndex + 1];
             const nextSiblingElement = nextSiblingGroup ? nextSiblingGroup.element : null;
             me._scrollContainer.insertBefore(group.element, nextSiblingElement);
         }
+        // Uses public API of the group
         group.setParentContainer(me);
 
         requestAnimationFrame(me._boundUpdateScrollButtons);
@@ -340,12 +456,12 @@ export class ToolbarContainer {
      */
     removeGroup(group) {
         const me = this;
-        const index = me._state.groups.indexOf(group);
+        const index = me._groups.indexOf(group);
         if (index === -1) {
             return;
         }
 
-        me._state.groups.splice(index, 1);
+        me._groups.splice(index, 1);
         group.element.remove();
         group.setParentContainer(null);
 
@@ -362,7 +478,7 @@ export class ToolbarContainer {
      */
     moveGroup(group, newIndex) {
         const me = this;
-        const oldIndex = me._state.groups.indexOf(group);
+        const oldIndex = me._groups.indexOf(group);
         if (oldIndex === -1) {
             return;
         }
@@ -371,12 +487,13 @@ export class ToolbarContainer {
             return;
         }
 
-        me._state.groups.splice(oldIndex, 1);
+        me._groups.splice(oldIndex, 1);
         const adjustedNewIndex = oldIndex < newIndex ? newIndex - 1 : newIndex;
-        me._state.groups.splice(adjustedNewIndex, 0, group);
+        me._groups.splice(adjustedNewIndex, 0, group);
 
-        const nextSiblingGroup = me._state.groups[adjustedNewIndex + 1];
+        const nextSiblingGroup = me._groups[adjustedNewIndex + 1];
         const nextSiblingElement = nextSiblingGroup ? nextSiblingGroup.element : null;
+
         me._scrollContainer.insertBefore(group.element, nextSiblingElement);
 
         requestAnimationFrame(me._boundUpdateScrollButtons);
@@ -390,7 +507,7 @@ export class ToolbarContainer {
      */
     toJSON() {
         const me = this;
-        return me._state.groups.map(group => group.toJSON());
+        return me._groups.map(group => group.toJSON());
     }
 
     /**
@@ -401,8 +518,8 @@ export class ToolbarContainer {
      */
     fromJSON(data) {
         const me = this;
-        me._state.groups.forEach(group => group.destroy());
-        me._state.groups = [];
+        me._groups.forEach(group => group.destroy());
+        me._groups = [];
         me._scrollContainer.innerHTML = '';
 
         if (!Array.isArray(data)) {
