@@ -1,5 +1,6 @@
 import { PanelGroup } from '../../components/Panel/PanelGroup.js';
 import { appBus } from '../../utils/EventBus.js';
+import { EventTypes } from '../../constants/EventTypes.js';
 
 /**
  * Description:
@@ -12,6 +13,9 @@ import { appBus } from '../../utils/EventBus.js';
  * - _floatingPanels {Array<PanelGroup>} : Tracks all active floating panels.
  * - _baseZIndex {number} : The starting z-index for floating panels.
  * - _zIndexCounter {number} : The incrementing z-index counter.
+ * - _namespace {string} : Unique namespace for appBus listeners.
+ * - _boundOnPanelGroupRemoved {Function | null} : Bound handler for group removal event.
+ * - _boundOnUndockRequest {Function | null} : Bound handler for undock command event.
  *
  * Typical usage:
  * // In App.js
@@ -25,16 +29,17 @@ import { appBus } from '../../utils/EventBus.js';
  * fpms.removeFloatingPanel(panelGroup);
  *
  * Events:
- * - Listens to: 'panelgroup:removed'
- * - Listens to: 'app:undock-panel-request'
+ * - Listens to: EventTypes.PANEL_GROUP_REMOVED, EventTypes.APP_UNDOCK_PANEL_REQUEST
  *
  * Dependencies:
  * - components/Panel/PanelGroup.js
  * - utils/EventBus.js
+ * - ../../constants/EventTypes.js
  */
 export class FloatingPanelManagerService {
     /**
      * The singleton instance.
+     *
      * @type {FloatingPanelManagerService|null}
      * @private
      */
@@ -42,6 +47,7 @@ export class FloatingPanelManagerService {
 
     /**
      * The DOM element that floating panels are relative to (the .container).
+     *
      * @type {HTMLElement|null}
      * @private
      */
@@ -49,6 +55,7 @@ export class FloatingPanelManagerService {
 
     /**
      * Tracks all active floating PanelGroup instances.
+     *
      * @type {Array<import('../../components/Panel/PanelGroup.js').PanelGroup>}
      * @private
      */
@@ -56,6 +63,7 @@ export class FloatingPanelManagerService {
 
     /**
      * The starting z-index for floating panels.
+     *
      * @type {number}
      * @private
      */
@@ -63,6 +71,7 @@ export class FloatingPanelManagerService {
 
     /**
      * The incrementing z-index counter to ensure the last-clicked panel is on top.
+     *
      * @type {number}
      * @private
      */
@@ -70,18 +79,23 @@ export class FloatingPanelManagerService {
 
     /**
      * Unique namespace for appBus listeners.
+     *
      * @type {string}
      * @private
      */
     _namespace = 'fpms_service';
 
     /**
+     * Bound handler for group removal event.
+     *
      * @type {Function | null}
      * @private
      */
     _boundOnPanelGroupRemoved = null;
 
     /**
+     * Bound handler for undock command event.
+     *
      * @type {Function | null}
      * @private
      */
@@ -105,7 +119,9 @@ export class FloatingPanelManagerService {
     }
 
     /**
+     * Description:
      * Gets the singleton instance.
+     *
      * @returns {FloatingPanelManagerService} The singleton instance.
      */
     static getInstance() {
@@ -116,7 +132,8 @@ export class FloatingPanelManagerService {
     }
 
     /**
-     * <Container> setter.
+     * Container setter with validation.
+     *
      * @param {HTMLElement} element - The main .container element.
      * @returns {void}
      */
@@ -132,7 +149,8 @@ export class FloatingPanelManagerService {
     }
 
     /**
-     * <Container> getter.
+     * Container getter.
+     *
      * @returns {HTMLElement|null} The main .container element.
      */
     get container() {
@@ -160,19 +178,23 @@ export class FloatingPanelManagerService {
     }
 
     /**
+     * Description:
      * Initializes appBus event listeners for this component.
+     *
      * @private
      * @returns {void}
      */
     _initEventListeners() {
         const me = this;
         const options = { namespace: me._namespace };
-        appBus.on('panelgroup:removed', me._boundOnPanelGroupRemoved, options);
-        appBus.on('app:undock-panel-request', me._boundOnUndockRequest, options);
+        appBus.on(EventTypes.PANEL_GROUP_REMOVED, me._boundOnPanelGroupRemoved, options);
+        appBus.on(EventTypes.APP_UNDOCK_PANEL_REQUEST, me._boundOnUndockRequest, options);
     }
 
     /**
+     * Description:
      * Cleans up appBus listeners.
+     *
      * @returns {void}
      */
     destroy() {
@@ -181,8 +203,10 @@ export class FloatingPanelManagerService {
     }
 
     /**
+     * Description:
      * Registers the main container element used for coordinate calculations
      * and appending floating panels.
+     *
      * @param {HTMLElement} containerElement - The main .container element.
      * @returns {void}
      */
@@ -191,7 +215,9 @@ export class FloatingPanelManagerService {
     }
 
     /**
+     * Description:
      * Adds a PanelGroup to the manager, making it floating.
+     *
      * @param {import('../../components/Panel/PanelGroup.js').PanelGroup} panelGroup - The PanelGroup instance.
      * @param {number} x - The initial X coordinate (relative to container).
      * @param {number} y - The initial Y coordinate (relative to container).
@@ -221,7 +247,9 @@ export class FloatingPanelManagerService {
     }
 
     /**
+     * Description:
      * Removes a PanelGroup from the manager (e.g., when docking).
+     *
      * @param {import('../../components/Panel/PanelGroup.js').PanelGroup} panelGroup - The PanelGroup instance.
      * @returns {void}
      */
@@ -242,6 +270,7 @@ export class FloatingPanelManagerService {
     }
 
     /**
+     * Description:
      * Handles the drop event for an item being "undocked" (dropped outside a dropzone).
      * Applies constraints to ensure the panel stays within container bounds.
      *
@@ -294,7 +323,9 @@ export class FloatingPanelManagerService {
     }
 
     /**
+     * Description:
      * Event handler for 'app:undock-panel-request' from ContextMenu.
+     *
      * @param {object} contextData - The data from the context menu action.
      * @param {import('../../components/Panel/Panel.js').Panel} contextData.panel - The panel to undock.
      * @param {import('../../components/Panel/PanelGroup.js').PanelGroup} contextData.group - The source group.
@@ -329,8 +360,8 @@ export class FloatingPanelManagerService {
             panelGroupToFloat = new PanelGroup(panel);
         }
 
-        const x = nativeEvent.clientX - containerRect.left - 10;
-        const y = nativeEvent.clientY - containerRect.top - 10;
+        const x = nativeEvent.clientX - containerRect.left;
+        const y = nativeEvent.clientY - containerRect.top;
 
         me.addFloatingPanel(panelGroupToFloat, x, y);
         const constrained = me.updatePanelPosition(panelGroupToFloat, x, y, containerRect);
@@ -338,9 +369,11 @@ export class FloatingPanelManagerService {
     }
 
     /**
+     * Description:
      * Event handler for when any PanelGroup is removed from the layout.
-     * @param {object} eventData
-     * @param {PanelGroup} eventData.panel - The PanelGroup instance being removed.
+     *
+     * @param {object} eventData - The event payload containing panel reference.
+     * @param {import('../../components/Panel/PanelGroup.js').PanelGroup} eventData.panel - The PanelGroup instance being removed.
      * @private
      * @returns {void}
      */
@@ -352,7 +385,9 @@ export class FloatingPanelManagerService {
     }
 
     /**
+     * Description:
      * Brings a specific floating panel to the top (highest z-index).
+     *
      * @param {import('../../components/Panel/PanelGroup.js').PanelGroup} panelGroup - The panel to bring front.
      * @returns {void}
      */
@@ -371,23 +406,27 @@ export class FloatingPanelManagerService {
     }
 
     /**
+     * Description:
      * Normalizes the z-indexes of all floating panels to avoid infinite growth.
      * Reassigns sequential z-indexes starting from baseZIndex based on the
      * current order in the _floatingPanels array.
+     *
      * @private
      * @returns {void}
      */
     _normalizeZIndexes() {
         const me = this;
-        me._floatingPanels.forEach((panel, i) => {
-            const newZ = me._baseZIndex + i;
+        me._floatingPanels.forEach((panel, index) => {
+            const newZ = me._baseZIndex + index;
             panel.element.style.zIndex = newZ;
         });
         me._zIndexCounter = me._baseZIndex + me._floatingPanels.length;
     }
 
     /**
+     * Description:
      * Gets the bounding rectangle of the registered container.
+     *
      * @returns {DOMRect|null} The bounds or null if container is not set.
      */
     getContainerBounds() {
@@ -399,6 +438,7 @@ export class FloatingPanelManagerService {
     }
 
     /**
+     * Description:
      * Updates a floating panel's position, applying container constraints.
      * Explicitly requires bounds to be passed in, making the method pure
      * regarding DOM reads.
@@ -428,7 +468,9 @@ export class FloatingPanelManagerService {
     }
 
     /**
+     * Description:
      * Serializes the state of all managed floating panels.
+     *
      * @returns {Array<object>} An array of serialized PanelGroup data.
      */
     toJSON() {
@@ -437,7 +479,9 @@ export class FloatingPanelManagerService {
     }
 
     /**
+     * Description:
      * Deserializes and restores floating panels from saved data.
+     *
      * @param {Array<object>} floatingPanelsData - Data from StateService.
      * @returns {void}
      */

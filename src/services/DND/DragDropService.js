@@ -1,11 +1,9 @@
 import { appBus } from '../../utils/EventBus.js';
 import { FloatingPanelManagerService } from './FloatingPanelManagerService.js';
-import { Panel } from '../../components/Panel/Panel.js';
-import { PanelGroup } from '../../components/Panel/PanelGroup.js';
 import { throttleRAF } from '../../utils/ThrottleRAF.js';
-import { ToolbarContainerDropStrategy } from './ToolbarContainerDropStrategy.js';
-import { DropZoneType, ItemType } from '../../constants/DNDTypes.js';
+import { ItemType } from '../../constants/DNDTypes.js';
 import { GhostManager } from './GhostManager.js';
+import { EventTypes } from '../../constants/EventTypes.js';
 
 /**
  * Description:
@@ -31,22 +29,19 @@ import { GhostManager } from './GhostManager.js';
  * - _activePointerId {number | null} : The ID of the pointer initiating the drag.
  * - _activeDropZone {object | null} : The current DropZone instance being hovered.
  * - _ghostManager {GhostManager} : Manages the visual drag proxy.
+ * - _boundOnDragStart {Function | null} : Bound handler for bus dragstart.
+ * - _boundOnPointerMove {Function | null} : Bound handler for window pointermove.
+ * - _boundOnPointerUp {Function | null} : Bound handler for window pointerup.
+ * - _throttledMoveHandler {Function | null} : Throttled logic for visual updates and hit-testing.
+ * - _lastCoordinates {object} : Caches the last known pointer coordinates.
  *
  * Typical usage:
  * const dds = DragDropService.getInstance();
  * dds.registerStrategy(DropZoneType.COLUMN, new ColumnDropStrategy());
  *
- * // In PanelHeader.js (Drag Source)
- * appBus.emit('dragstart', { item: panel, type: 'Panel', ... });
- *
- * // In Column.js (Drop Target)
- * this.dropZoneType = 'column';
- * this.element.dataset.dropzone = 'column';
- * this.element.dropZoneInstance = this;
- *
  * Events:
- * - Listens to (appBus): 'dragstart'
- * - Emits (appBus): 'dragend'
+ * - Listens to (appBus): EventTypes.DND_DRAG_START
+ * - Emits (appBus): EventTypes.DND_DRAG_END
  *
  * Business rules implemented:
  * - Uses the "DOM Bridge" pattern with synthetic pointer events.
@@ -62,9 +57,12 @@ import { GhostManager } from './GhostManager.js';
  * - ./ToolbarContainerDropStrategy.js
  * - ../../constants/DNDTypes.js
  * - ./GhostManager.js
+ * - ../../constants/EventTypes.js
  */
 export class DragDropService {
     /**
+     * The private static instance.
+     *
      * @type {DragDropService | null}
      * @private
      */
@@ -72,6 +70,7 @@ export class DragDropService {
 
     /**
      * Stores the item, type, and element being dragged.
+     *
      * @type {{
      * item: object | null,
      * type: string | null,
@@ -95,6 +94,7 @@ export class DragDropService {
 
     /**
      * The single shared DOM element for drop feedback.
+     *
      * @type {HTMLElement}
      * @private
      */
@@ -102,6 +102,7 @@ export class DragDropService {
 
     /**
      * Flag indicating if a drag operation is active.
+     *
      * @type {boolean}
      * @private
      */
@@ -110,6 +111,7 @@ export class DragDropService {
     /**
      * Caches the current placeholder mode ('horizontal' | 'vertical')
      * to avoid redundant DOM writes.
+     *
      * @type {'horizontal' | 'vertical' | null}
      * @private
      */
@@ -117,6 +119,7 @@ export class DragDropService {
 
     /**
      * Registry for the Strategy Pattern.
+     *
      * @type {Map<string, object>}
      * @private
      */
@@ -124,6 +127,7 @@ export class DragDropService {
 
     /**
      * Unique namespace for appBus listeners.
+     *
      * @type {string}
      * @private
      */
@@ -131,6 +135,7 @@ export class DragDropService {
 
     /**
      * The ID of the pointer initiating the drag.
+     *
      * @type {number | null}
      * @private
      */
@@ -138,6 +143,7 @@ export class DragDropService {
 
     /**
      * The current DropZone instance being hovered.
+     *
      * @type {object | null}
      * @private
      */
@@ -145,6 +151,7 @@ export class DragDropService {
 
     /**
      * Manages the visual drag proxy (ghost).
+     *
      * @type {GhostManager}
      * @private
      */
@@ -152,6 +159,7 @@ export class DragDropService {
 
     /**
      * Bound handler for bus 'dragstart'.
+     *
      * @type {Function | null}
      * @private
      */
@@ -159,6 +167,7 @@ export class DragDropService {
 
     /**
      * Bound handler for window 'pointermove'.
+     *
      * @type {Function | null}
      * @private
      */
@@ -166,6 +175,7 @@ export class DragDropService {
 
     /**
      * Bound handler for window 'pointerup'.
+     *
      * @type {Function | null}
      * @private
      */
@@ -173,6 +183,7 @@ export class DragDropService {
 
     /**
      * Throttled logic for visual updates and hit-testing.
+     *
      * @type {Function | null}
      * @private
      */
@@ -180,6 +191,7 @@ export class DragDropService {
 
     /**
      * Caches the last known pointer coordinates.
+     *
      * @type {{x: number, y: number}}
      * @private
      */
@@ -187,6 +199,7 @@ export class DragDropService {
 
     /**
      * Private constructor. Use getInstance().
+     *
      * @private
      */
     constructor() {
@@ -210,8 +223,10 @@ export class DragDropService {
     }
 
     /**
+     * Description:
      * Gets the single instance of the DragDropService.
-     * @returns {DragDropService}
+     *
+     * @returns {DragDropService} The singleton instance.
      */
     static getInstance() {
         if (!DragDropService._instance) {
@@ -221,9 +236,12 @@ export class DragDropService {
     }
 
     /**
+     * Description:
      * Registers a DND strategy for a specific drop zone type.
-     * @param {string} dropZoneType
-     * @param {object} strategyInstance
+     *
+     * @param {string} dropZoneType - The type of the drop zone (e.g., 'column').
+     * @param {object} strategyInstance - The instance of the drop strategy.
+     * @returns {void}
      */
     registerStrategy(dropZoneType, strategyInstance) {
         if (
@@ -238,31 +256,40 @@ export class DragDropService {
     }
 
     /**
+     * Description:
      * Getter for the current drag state data.
-     * @returns {object}
+     *
+     * @returns {object} The current drag state data.
      */
     getDraggedData() {
         return this._dragState;
     }
 
     /**
+     * Description:
      * Getter for the visual placeholder element.
-     * @returns {HTMLElement}
+     *
+     * @returns {HTMLElement} The placeholder element.
      */
     getPlaceholder() {
         return this._placeholder;
     }
 
     /**
+     * Description:
      * Checks if a drag operation is currently active.
-     * @returns {boolean}
+     *
+     * @returns {boolean} True if dragging, false otherwise.
      */
     isDragging() {
         return this._isDragging;
     }
 
     /**
+     * Description:
      * Hides the visual placeholder from the DOM.
+     *
+     * @returns {void}
      */
     hidePlaceholder() {
         const me = this;
@@ -276,11 +303,14 @@ export class DragDropService {
     }
 
     /**
+     * Description:
      * Shows the visual placeholder in the specified mode.
-     * @param {'horizontal' | 'vertical'} mode
-     * @param {number|null} [dimension=null]
+     *
+     * @param {'horizontal' | 'vertical'} mode - The orientation of the placeholder.
+     * @param {number|null} [dimension=null] - Optional dimension hint.
+     * @returns {void}
      */
-    showPlaceholder(mode, dimension = null) {
+    showPlaceholder(mode) {
         const me = this;
         if (mode === me._placeholderMode) {
             return;
@@ -298,7 +328,10 @@ export class DragDropService {
     }
 
     /**
+     * Description:
      * Cleans up the service.
+     *
+     * @returns {void}
      */
     destroy() {
         const me = this;
@@ -314,8 +347,11 @@ export class DragDropService {
     }
 
     /**
+     * Description:
      * Creates the shared placeholder DOM element.
+     *
      * @private
+     * @returns {void}
      */
     _createPlaceholder() {
         this._placeholder = document.createElement('div');
@@ -323,18 +359,24 @@ export class DragDropService {
     }
 
     /**
+     * Description:
      * Initializes the 'dragstart' listener on the event bus.
+     *
      * @private
+     * @returns {void}
      */
     _initEventListeners() {
         const me = this;
         const options = { namespace: me._namespace };
-        appBus.on('dragstart', me._boundOnDragStart, options);
+        appBus.on(EventTypes.DND_DRAG_START, me._boundOnDragStart, options);
     }
 
     /**
+     * Description:
      * Clears the internal cache of all registered strategies.
+     *
      * @private
+     * @returns {void}
      */
     _clearStrategyCaches() {
         this._strategyRegistry.forEach(strategy => {
@@ -345,9 +387,12 @@ export class DragDropService {
     }
 
     /**
+     * Description:
      * Handles the start of a drag operation.
-     * @param {object} payload
+     *
+     * @param {object} payload - The event payload from the drag source.
      * @private
+     * @returns {void}
      */
     _onDragStart(payload) {
         const me = this;
@@ -405,8 +450,12 @@ export class DragDropService {
     }
 
     /**
+     * Description:
      * Handles global pointermove event.
+     *
+     * @param {PointerEvent} event - The native pointer move event.
      * @private
+     * @returns {void}
      */
     _onSyntheticPointerMove(event) {
         const me = this;
@@ -423,11 +472,14 @@ export class DragDropService {
     }
 
     /**
+     * Description:
      * Throttled move handler.
      * Updates ghost position via GhostManager and performs hit-testing.
-     * @param {number} clientX - Pointer X.
-     * @param {number} clientY - Pointer Y.
+     *
+     * @param {number} clientX - Pointer X coordinate.
+     * @param {number} clientY - Pointer Y coordinate.
      * @private
+     * @returns {void}
      */
     _processMove(clientX, clientY) {
         const me = this;
@@ -487,8 +539,12 @@ export class DragDropService {
     }
 
     /**
+     * Description:
      * Handles global pointerup event.
+     *
+     * @param {PointerEvent} event - The native pointer up event.
      * @private
+     * @returns {void}
      */
     _onSyntheticPointerUp(event) {
         const me = this;
@@ -525,12 +581,15 @@ export class DragDropService {
         }
 
         me._cleanupDrag();
-        appBus.emit('dragend', { ...me._dragState });
+        appBus.emit(EventTypes.DND_DRAG_END, { ...me._dragState });
     }
 
     /**
+     * Description:
      * Resets state.
+     *
      * @private
+     * @returns {void}
      */
     _cleanupDrag() {
         const me = this;
@@ -565,8 +624,11 @@ export class DragDropService {
     }
 
     /**
-     * Removes listeners.
+     * Description:
+     * Removes global window listeners for pointermove and pointerup/cancel.
+     *
      * @private
+     * @returns {void}
      */
     _removeGlobalListeners() {
         const me = this;

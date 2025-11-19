@@ -78,8 +78,8 @@ export const EventTypes = Object.freeze({
     ROW_EMPTY: 'row:empty',
 
     // --- Drag and Drop Events ---
-    DND_DRAG_START: 'dragstart',
-    DND_DRAG_END: 'dragend',
+    DND_DRAG_START: 'dnd:dragstart',
+    DND_DRAG_END: 'dnd:dragend',
 
     // --- Menu / Context Menu Events ---
     MENU_ITEM_SELECTED: 'menu:item-selected',
