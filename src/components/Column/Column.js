@@ -1,35 +1,40 @@
 import { PanelGroup } from '../Panel/PanelGroup.js';
+import { Viewport } from '../Viewport/Viewport.js';
 import { appBus } from '../../utils/EventBus.js';
 import { throttleRAF } from '../../utils/ThrottleRAF.js';
 import { generateId } from '../../utils/generateId.js';
 import { ResizeHandleManager } from '../../utils/ResizeHandleManager.js';
-import { DropZoneType } from '../../constants/DNDTypes.js';
+import { DropZoneType, ItemType } from '../../constants/DNDTypes.js';
 import { EventTypes } from '../../constants/EventTypes.js';
 
 /**
  * Description:
  * Manages a single vertical column in the container. It holds and organizes
- * PanelGroups, manages horizontal resizing via ResizeHandleManager, and delegates
- * drag/drop logic.
+ * generic children components (PanelGroups or Viewports), manages horizontal
+ * resizing via ResizeHandleManager, and delegates drag/drop logic.
+ *
+ * This class is agnostic to the specific type of child (PanelGroup or Viewport),
+ * treating them as generic layout units provided they implement the expected interface
+ * (element, destroy, toJSON, etc.).
  *
  * Properties summary:
  * - _namespace {string} : Unique namespace for appBus listeners.
  * - element {HTMLElement} : The main DOM element (<div class="column">).
  * - dropZoneType {string} : The identifier for the DragDropService.
  * - id {string} : Unique ID for this instance.
- * - _namespace {string} : Unique namespace for appBus listeners.
  * - minWidth {number} : The minimum width of the column.
  * - parentContainer {Row} : The parent Row instance.
- * - panelGroups {Array<PanelGroup>} : List of child PanelGroups.
+ * - children {Array<PanelGroup|Viewport>} : List of child components.
  * - width {number|null} : The width of the column.
  * - _throttledUpdate {Function | null} : The throttled function for resizing.
- * - _boundOnPanelGroupRemoved {Function | null} : Bound handler for group removal.
+ * - _boundOnChildRemoved {Function | null} : Bound handler for child removal via events.
  * - _resizeHandleManager {ResizeHandleManager | null} : Manages the horizontal resize handles.
  *
  * Typical usage:
  * // In Row.js
  * const column = new Column(this, width);
  * this.element.appendChild(column.element);
+ * column.addChild(new PanelGroup(...));
  *
  * Events:
  * - Listens to: EventTypes.PANEL_GROUP_REMOVED (to clean up empty groups)
@@ -37,15 +42,19 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * - Emits: EventTypes.COLUMN_EMPTY (to notify Row when this column is empty)
  *
  * Business rules implemented:
- * - Renders 'PanelGroup' children vertically.
+ * - Renders children vertically.
  * - Registers as a 'column' type drop zone.
- * - Listens for EventTypes.PANEL_GROUP_REMOVED and removes the child.
- * - If it becomes empty (last PanelGroup removed), emits EventTypes.COLUMN_EMPTY.
+ * - Automatically removes children via 'onChildRemoved' if they request removal.
+ * - If it becomes empty (last child removed), emits EventTypes.COLUMN_EMPTY.
  * - Manages its own horizontal resize handle via ResizeHandleManager.
- * - Resize logic respects the minWidth of its child PanelGroups.
+ * - Resize logic dynamically calculates minWidth based on children constraints.
+ * - Supports serialization (toJSON/fromJSON) for both PanelGroups and Viewports.
  *
  * Dependencies:
  * - {import('../Panel/PanelGroup.js').PanelGroup}
+ * - {import('../Viewport/Viewport.js').Viewport}
+ * - {import('../Panel/PanelFactory.js').PanelFactory}
+ * - {import('../Viewport/ViewportFactory.js').ViewportFactory}
  * - {import('../../utils/EventBus.js').appBus}
  * - {import('../../utils/ThrottleRAF.js').throttleRAF}
  * - {import('../../utils/generateId.js').generateId}
@@ -63,12 +72,12 @@ export class Column {
     _parentContainer = null;
 
     /**
-     * List of child PanelGroups.
+     * List of child components (PanelGroups or Viewports).
      *
-     * @type {Array<PanelGroup>}
+     * @type {Array<PanelGroup|Viewport>}
      * @private
      */
-    _panelGroups = [];
+    _children = [];
 
     /**
      * The width of the column in pixels.
@@ -111,12 +120,12 @@ export class Column {
     _throttledUpdate = null;
 
     /**
-     * Stores the bound reference for the 'onPanelGroupRemoved' listener.
+     * Stores the bound reference for the child removal listener.
      *
      * @type {Function | null}
      * @private
      */
-    _boundOnPanelGroupRemoved = null;
+    _boundOnChildRemoved = null;
 
     /**
      * Stores the resize handle manager instance.
@@ -149,7 +158,6 @@ export class Column {
     constructor(container, width = null) {
         const me = this;
 
-        // Use setters for initialization
         me.minWidth = me._minWidth;
         me.parentContainer = container;
         me.width = width;
@@ -169,7 +177,7 @@ export class Column {
             })
         );
 
-        me._boundOnPanelGroupRemoved = me.onPanelGroupRemoved.bind(me);
+        me._boundOnChildRemoved = me.onChildRemoved.bind(me);
 
         me.initEventListeners();
     }
@@ -201,17 +209,16 @@ export class Column {
         if (me._width === value) return;
 
         me._width = value;
-        // Trigger layout update on width change (except during drag which might handle it differently)
         me.requestLayoutUpdate();
     }
 
     /**
-     * PanelGroups getter.
+     * Children getter.
      *
-     * @returns {Array<PanelGroup>} The list of panel groups.
+     * @returns {Array<PanelGroup|Viewport>} The list of children.
      */
-    get panelGroups() {
-        return this._panelGroups;
+    get children() {
+        return this._children;
     }
 
     /**
@@ -225,7 +232,6 @@ export class Column {
 
     /**
      * ParentContainer setter.
-     * Validates that the value looks like a Row component.
      *
      * @param {import('../Row/Row.js').Row | null} value - The new parent container.
      * @returns {void}
@@ -249,7 +255,6 @@ export class Column {
 
     /**
      * MinimumWidth setter.
-     * Validates that the value is a positive number.
      *
      * @param {number} value - The new minimum width.
      * @returns {void}
@@ -304,26 +309,23 @@ export class Column {
     }
 
     /**
-     * Wrapper for parentContainer setter (for compatibility).
-     *
-     * @param {import('../Row/Row.js').Row} container - The parent Row instance.
-     * @returns {void}
-     */
-    setParentContainer(container) {
-        this.parentContainer = container;
-    }
-
-    /**
      * Calculates the effective minimum width by checking its own minWidth
-     * and the minWidth of all child PanelGroups.
+     * and the minWidth of all children.
      *
      * @returns {number} The calculated effective minWidth.
      */
     getEffectiveMinWidth() {
         const me = this;
         let effectiveMinWidth = me.minWidth;
-        me.panelGroups.forEach(group => {
-            effectiveMinWidth = Math.max(effectiveMinWidth, group.getMinPanelWidth());
+        me._children.forEach(child => {
+            let childMin = 0;
+            // PanelGroup has getMinPanelWidth(), Viewport/Windows usually have minWidth property
+            if (typeof child.getMinPanelWidth === 'function') {
+                childMin = child.getMinPanelWidth();
+            } else if (child.minWidth !== undefined) {
+                childMin = child.minWidth;
+            }
+            effectiveMinWidth = Math.max(effectiveMinWidth, childMin);
         });
         return effectiveMinWidth;
     }
@@ -334,27 +336,28 @@ export class Column {
      * @returns {void}
      */
     initEventListeners() {
-        appBus.on(EventTypes.PANEL_GROUP_REMOVED, this._boundOnPanelGroupRemoved, {
+        // Listens for legacy PanelGroup removal events to support PanelGroup closure
+        appBus.on(EventTypes.PANEL_GROUP_REMOVED, this._boundOnChildRemoved, {
             namespace: this._namespace
         });
     }
 
     /**
-     * Event handler for when a child PanelGroup is removed.
+     * Event handler for when a child (specifically PanelGroup) reports removal via EventBus.
      *
      * @param {object} eventData - The event data.
-     * @param {PanelGroup} eventData.panel - The PanelGroup instance being removed.
+     * @param {PanelGroup} eventData.panel - The instance being removed.
      * @param {Column} eventData.column - The Column it is being removed from.
      * @returns {void}
      */
-    onPanelGroupRemoved({ panel, column }) {
-        if (column === this && panel instanceof PanelGroup) {
-            this.removePanelGroup(panel, true);
+    onChildRemoved({ panel, column }) {
+        if (column === this) {
+            this.removeChild(panel, true);
         }
     }
 
     /**
-     * Cleans up appBus listeners and destroys all child PanelGroups.
+     * Cleans up appBus listeners and destroys all children.
      *
      * @returns {void}
      */
@@ -364,7 +367,7 @@ export class Column {
         me.getThrottledUpdate()?.cancel();
         me._resizeHandleManager?.destroy();
 
-        [...me._panelGroups].forEach(panel => panel.destroy());
+        [...me._children].forEach(child => child.destroy());
     }
 
     /**
@@ -425,101 +428,113 @@ export class Column {
     }
 
     /**
-     * Adds multiple PanelGroups at once (used for state restoration).
+     * Adds multiple children at once.
      *
-     * @param {Array<PanelGroup>} panelGroups - Array of PanelGroup instances.
+     * @param {Array<PanelGroup|Viewport>} children - Array of children instances.
      * @returns {void}
      */
-    addPanelGroupsBulk(panelGroups) {
+    addChildrenBulk(children) {
         const me = this;
         const resizeHandle = me.element.querySelector('.column__resize-handle');
-        panelGroups.forEach(panelGroup => {
-            me._panelGroups.push(panelGroup);
-            me.element.insertBefore(panelGroup.element, resizeHandle);
-            panelGroup.setParentColumn(me);
+        children.forEach(child => {
+            me._children.push(child);
+            me.element.insertBefore(child.element, resizeHandle);
+            if (typeof child.setParentColumn === 'function') {
+                child.setParentColumn(me);
+            }
         });
         me.requestLayoutUpdate();
     }
 
     /**
-     * Adds a single PanelGroup to the column at a specific index.
+     * Adds a single child (PanelGroup or Viewport) to the column at a specific index.
      *
-     * @param {PanelGroup} panelGroup - The PanelGroup instance to add.
+     * @param {PanelGroup|Viewport} child - The component instance to add.
      * @param {number|null} [index=null] - The index to insert at.
      * @returns {void}
      */
-    addPanelGroup(panelGroup, index = null) {
+    addChild(child, index = null) {
         const me = this;
         const resizeHandle = me.element.querySelector('.column__resize-handle');
 
         if (index === null) {
-            me._panelGroups.push(panelGroup);
-            me.element.insertBefore(panelGroup.element, resizeHandle);
+            me._children.push(child);
+            me.element.insertBefore(child.element, resizeHandle);
         } else {
-            me._panelGroups.splice(index, 0, panelGroup);
-            const nextSiblingPanel = me._panelGroups[index + 1];
-            let nextSiblingElement = nextSiblingPanel ? nextSiblingPanel.element : null;
+            me._children.splice(index, 0, child);
+            const nextSibling = me._children[index + 1];
+            let nextSiblingElement = nextSibling ? nextSibling.element : null;
 
             if (!nextSiblingElement) {
                 nextSiblingElement = resizeHandle;
             }
-            me.element.insertBefore(panelGroup.element, nextSiblingElement);
+            me.element.insertBefore(child.element, nextSiblingElement);
         }
-        panelGroup.setParentColumn(me);
+
+        if (typeof child.setParentColumn === 'function') {
+            child.setParentColumn(me);
+        }
+
         me.requestLayoutUpdate();
     }
 
     /**
-     * Gets all collapsed PanelGroups.
+     * Gets all collapsed children.
+     * Viewports are never collapsed, so this returns only collapsed PanelGroups.
      *
-     * @returns {Array<PanelGroup>} Collapsed PanelGroup instances.
+     * @returns {Array<PanelGroup|Viewport>} Collapsed children instances.
      */
-    getPanelGroupsCollapsed() {
-        return this._panelGroups.filter(p => p.collapsed);
+    getChildrenCollapsed() {
+        return this._children.filter(child => {
+            if (child instanceof PanelGroup) {
+                return child.collapsed;
+            }
+            // Viewports are not collapsible
+            return false;
+        });
     }
 
     /**
-     * Gets all uncollapsed PanelGroups.
+     * Gets all uncollapsed children.
+     * Includes open PanelGroups and all Viewports.
      *
-     * @returns {Array<PanelGroup>} Uncollapsed PanelGroup instances.
+     * @returns {Array<PanelGroup|Viewport>} Uncollapsed children instances.
      */
-    getPanelGroupsUncollapsed() {
-        return this._panelGroups.filter(p => !p.collapsed);
+    getChildrenUncollapsed() {
+        return this._children.filter(child => {
+            if (child instanceof Viewport) {
+                return true;
+            }
+            return !child.collapsed;
+        });
     }
 
     /**
-     * PanelGroups getter (wrapper for compatibility).
+     * Removes a child from the column.
      *
-     * @returns {Array<PanelGroup>} All child PanelGroup instances.
-     */
-    getPanelGroups() {
-        return this.panelGroups;
-    }
-
-    /**
-     * Removes a PanelGroup from the column.
-     *
-     * @param {PanelGroup} panelGroup - The PanelGroup instance to remove.
+     * @param {PanelGroup|Viewport} child - The instance to remove.
      * @param {boolean} [emitEmpty=true] - Whether to emit EventTypes.COLUMN_EMPTY.
      * @returns {void}
      */
-    removePanelGroup(panelGroup, emitEmpty = true) {
+    removeChild(child, emitEmpty = true) {
         const me = this;
-        const index = me.getPanelGroupIndex(panelGroup);
+        const index = me.getChildIndex(child);
         if (index === -1) {
             return;
         }
 
-        me._panelGroups.splice(index, 1);
-        panelGroup.setParentColumn(null);
+        me._children.splice(index, 1);
+        if (typeof child.setParentColumn === 'function') {
+            child.setParentColumn(null);
+        }
 
-        if (me.element.contains(panelGroup.element)) {
-            me.element.removeChild(panelGroup.element);
+        if (me.element.contains(child.element)) {
+            me.element.removeChild(child.element);
         }
 
         me.requestLayoutUpdate();
 
-        if (emitEmpty && me.getTotalPanelGroups() === 0) {
+        if (emitEmpty && me.getChildCount() === 0) {
             appBus.emit(EventTypes.COLUMN_EMPTY, me);
         }
     }
@@ -536,22 +551,22 @@ export class Column {
     }
 
     /**
-     * Finds the state index of a PanelGroup instance.
+     * Finds the state index of a child instance.
      *
-     * @param {PanelGroup} panelGroup - The PanelGroup to find.
+     * @param {PanelGroup|Viewport} child - The child to find.
      * @returns {number} The index, or -1 if not found.
      */
-    getPanelGroupIndex(panelGroup) {
-        return this._panelGroups.findIndex(p => p === panelGroup);
+    getChildIndex(child) {
+        return this._children.findIndex(p => p === child);
     }
 
     /**
-     * Finds the state index of a PanelGroup based on its DOM element.
+     * Finds the state index of a child based on its DOM element.
      *
-     * @param {HTMLElement} element - The DOM element of the PanelGroup.
+     * @param {HTMLElement} element - The DOM element of the child.
      * @returns {number} The index.
      */
-    getPanelGroupIndexByElement(element) {
+    getChildIndexByElement(element) {
         const me = this;
         const allChildren = Array.from(me.element.children);
         let panelIndex = 0;
@@ -560,8 +575,8 @@ export class Column {
                 break;
             }
             if (
-                me._panelGroups.some(p => p.element === child) &&
-                child.classList.contains('panel-group')
+                (child.classList.contains('panel-group') || child.classList.contains('viewport')) &&
+                me._children.some(p => p.element === child)
             ) {
                 panelIndex++;
             }
@@ -570,16 +585,17 @@ export class Column {
     }
 
     /**
-     * Gets the total number of PanelGroups in this column.
+     * Gets the total number of children.
      *
-     * @returns {number} The total number of PanelGroups.
+     * @returns {number} The total count.
      */
-    getTotalPanelGroups() {
-        return this._panelGroups.length;
+    getChildCount() {
+        return this._children.length;
     }
 
     /**
-     * Serializes the Column state (and its child PanelGroups) to JSON.
+     * Serializes the Column state to JSON.
+     * Handles polymorphic children types (PanelGroup vs Viewport).
      *
      * @returns {object} The serialized state object.
      */
@@ -587,14 +603,20 @@ export class Column {
         const me = this;
         return {
             width: me.width,
-            panelGroups: me.panelGroups
-                .filter(group => group instanceof PanelGroup)
-                .map(group => group.toJSON())
+            children: me._children
+                .map(child => {
+                    if (typeof child.toJSON === 'function') {
+                        return child.toJSON();
+                    }
+                    return null;
+                })
+                .filter(Boolean)
         };
     }
 
     /**
      * Deserializes state from JSON data.
+     * Uses factories to instantiate correct child types (PanelGroup or Viewport).
      *
      * @param {object} data - The state object.
      * @returns {void}
@@ -605,17 +627,38 @@ export class Column {
             me.width = data.width;
         }
 
-        const groupsToRestore = [];
-        if (data.panelGroups && Array.isArray(data.panelGroups)) {
-            data.panelGroups.forEach(groupData => {
-                const group = new PanelGroup();
-                group.fromJSON(groupData);
-                groupsToRestore.push(group);
+        // Support 'children' (new) or 'panelGroups' (legacy)
+        const childrenData = data.children || data.panelGroups;
+        const itemsToRestore = [];
+
+        if (childrenData && Array.isArray(childrenData)) {
+            childrenData.forEach(itemData => {
+                let item = null;
+
+                // Check for Viewport type
+                if (
+                    itemData.type === ItemType.VIEWPORT ||
+                    itemData.type === DropZoneType.VIEWPORT
+                ) {
+                    item = new Viewport();
+                    // Viewport hydration if it supports fromJSON in the future
+                    if (typeof item.fromJSON === 'function') {
+                        item.fromJSON(itemData);
+                    }
+                } else {
+                    // Default to PanelGroup for backward compatibility or explicit type
+                    item = new PanelGroup();
+                    item.fromJSON(itemData);
+                }
+
+                if (item) {
+                    itemsToRestore.push(item);
+                }
             });
         }
 
-        if (groupsToRestore.length > 0) {
-            me.addPanelGroupsBulk(groupsToRestore);
+        if (itemsToRestore.length > 0) {
+            me.addChildrenBulk(itemsToRestore);
         }
 
         me.updateWidth(false);

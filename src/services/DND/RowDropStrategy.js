@@ -20,8 +20,9 @@ import { ItemType } from '../../constants/DNDTypes.js';
  * redundant drops (e.g., dropping the sole content of a column next to itself).
  * - Validates drop zone strictly: The target MUST be the row element itself
  * or the placeholder.
- * - On drop: Creates a new Column, creates a new PanelGroup inside it,
- * and moves the dropped Panel or PanelGroup into the new group.
+ * - On drop: Creates a new Column, creates a new PanelGroup inside it (or adds existing),
+ * and moves the dropped Panel or PanelGroup into the new Column.
+ * - Supports the new Column API (addChild, removeChild, getChildCount).
  *
  * Dependencies:
  * - {import('./BaseDropStrategy.js').BaseDropStrategy}
@@ -110,22 +111,24 @@ export class RowDropStrategy extends BaseDropStrategy {
         let originalColumnIndex = -1;
         let isOriginSingle = false;
 
-        const oldColumn = effectiveItem.getColumn();
+        // Safe check for getColumn existence (PanelGroup specific)
+        const oldColumn =
+            typeof effectiveItem.getColumn === 'function' ? effectiveItem.getColumn() : null;
         const columns = dropZone.getColumns();
 
         if (oldColumn && oldColumn.parentContainer === dropZone) {
             originalColumnIndex = columns.indexOf(oldColumn);
 
             if (originalColumnIndex !== -1) {
-                if (
-                    draggedData.type === ItemType.PANEL_GROUP &&
-                    oldColumn.getTotalPanelGroups() === 1
-                ) {
+                // Use new Column API: getChildCount() instead of getTotalPanelGroups()
+                const childCount = oldColumn.getChildCount();
+
+                if (draggedData.type === ItemType.PANEL_GROUP && childCount === 1) {
                     isOriginSingle = true;
                 } else if (
                     draggedData.type === ItemType.PANEL &&
                     effectiveItem.panels.length === 1 &&
-                    oldColumn.getTotalPanelGroups() === 1
+                    childCount === 1
                 ) {
                     isOriginSingle = true;
                 }
@@ -214,22 +217,28 @@ export class RowDropStrategy extends BaseDropStrategy {
 
         if (draggedData.type === ItemType.PANEL_GROUP) {
             const draggedItem = draggedData.item;
-            const oldColumn = draggedItem.getColumn();
+            const oldColumn =
+                typeof draggedItem.getColumn === 'function' ? draggedItem.getColumn() : null;
 
             const newColumn = dropZone.createColumn(null, panelIndex);
 
             if (oldColumn) {
-                oldColumn.removePanelGroup(draggedItem, true);
+                // Use new Column API: removeChild() instead of removePanelGroup()
+                oldColumn.removeChild(draggedItem, true);
             }
             draggedItem.height = null;
-            newColumn.addPanelGroup(draggedItem);
+
+            // Use new Column API: addChild() instead of addPanelGroup()
+            newColumn.addChild(draggedItem);
         } else if (draggedData.type === ItemType.PANEL) {
             const draggedPanel = draggedData.item;
             const sourceParentGroup = draggedPanel.parentGroup;
 
             const newColumn = dropZone.createColumn(null, panelIndex);
             const newPanelGroup = new PanelGroup(null);
-            newColumn.addPanelGroup(newPanelGroup);
+
+            // Use new Column API: addChild()
+            newColumn.addChild(newPanelGroup);
 
             if (sourceParentGroup) {
                 sourceParentGroup.removePanel(draggedPanel, true);

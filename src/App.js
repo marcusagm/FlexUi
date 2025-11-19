@@ -16,6 +16,7 @@ import { RowDropStrategy } from './services/DND/RowDropStrategy.js';
 import { ContainerDropStrategy } from './services/DND/ContainerDropStrategy.js';
 import { TabContainerDropStrategy } from './services/DND/TabContainerDropStrategy.js';
 import { ToolbarContainerDropStrategy } from './services/DND/ToolbarContainerDropStrategy.js';
+import { ViewportDropStrategy } from './services/DND/ViewportDropStrategy.js';
 import { LayoutService } from './services/LayoutService.js';
 import { appBus } from './utils/EventBus.js';
 import { FloatingPanelManagerService } from './services/DND/FloatingPanelManagerService.js';
@@ -26,8 +27,12 @@ import { Loader } from './services/Loader/Loader.js';
 import { ToolbarContainer } from './components/Toolbar/ToolbarContainer.js';
 import { ToolbarGroupFactory } from './components/Toolbar/ToolbarGroupFactory.js';
 import { ApplicationGroup } from './components/Toolbar/ApplicationGroup.js';
-import { DropZoneType } from './constants/DNDTypes.js';
+import { DropZoneType, ItemType } from './constants/DNDTypes.js';
 import { EventTypes } from './constants/EventTypes.js';
+import { ViewportFactory } from './components/Viewport/ViewportFactory.js';
+import { ApplicationWindow } from './components/Viewport/ApplicationWindow.js';
+import { NotepadWindow } from './components/Viewport/ConcreteWindows/NotepadWindow.js';
+import { Viewport } from './components/Viewport/Viewport.js'; // Added import
 
 /**
  * Description:
@@ -60,7 +65,7 @@ import { EventTypes } from './constants/EventTypes.js';
  * await app.init();
  *
  * Events:
- * - Listens to: EventTypes.APP_ADD_NEW_PANEL, EventTypes.APP_SAVE_STATE, EventTypes.APP_RESTORE_STATE, EventTypes.APP_RESET_STATE
+ * - Listens to: EventTypes.APP_ADD_NEW_PANEL, EventTypes.APP_SAVE_STATE, EventTypes.APP_RESTORE_STATE, EventTypes.APP_RESET_STATE, EventTypes.APP_ADD_NEW_WINDOW
  * - Emits: EventTypes.STATUSBAR_SET_PERMANENT_STATUS (on init)
  * - Emits: EventTypes.LAYOUT_INITIALIZED (on init, after load)
  * - Emits: EventTypes.STATUSBAR_SET_STATUS (on reset)
@@ -79,6 +84,9 @@ import { EventTypes } from './constants/EventTypes.js';
  * - components/Toolbar/ToolbarContainer.js
  * - components/Toolbar/ToolbarGroupFactory.js
  * - components/Toolbar/ApplicationGroup.js
+ * - components/Viewport/ViewportFactory.js
+ * - components/Viewport/ApplicationWindow.js
+ * - components/Viewport/ConcreteWindows/NotepadWindow.js
  * - services/ApplicationStateService.js
  * - services/LayoutService.js
  * - services/DND/DragDropService.js (and all strategies)
@@ -212,6 +220,14 @@ export class App {
     _boundAddNewPanel = null;
 
     /**
+     * Bound handler for adding a new window.
+     *
+     * @type {Function | null}
+     * @private
+     */
+    _boundAddNewWindow = null;
+
+    /**
      * Bound handler for resetting the layout silently.
      *
      * @type {Function | null}
@@ -260,6 +276,7 @@ export class App {
         me._initializeUI();
 
         me._boundAddNewPanel = me.addNewPanel.bind(me);
+        me._boundAddNewWindow = me.addNewWindow.bind(me);
         me._boundResetLayoutSilent = me.resetLayout.bind(me, true);
         me._boundSaveLayout = me.saveLayout.bind(me);
         me._boundRestoreLayout = me.restoreLayout.bind(me);
@@ -285,6 +302,7 @@ export class App {
         // Initialize factories and layout service for registration
         PanelFactory.getInstance();
         ToolbarGroupFactory.getInstance();
+        ViewportFactory.getInstance();
         LayoutService.getInstance();
         FloatingPanelManagerService.getInstance();
 
@@ -308,12 +326,17 @@ export class App {
         dds.registerStrategy(DropZoneType.ROW, new RowDropStrategy());
         dds.registerStrategy(DropZoneType.CONTAINER, new ContainerDropStrategy());
         dds.registerStrategy(DropZoneType.TOOLBAR_CONTAINER, new ToolbarContainerDropStrategy());
+        dds.registerStrategy(DropZoneType.VIEWPORT, new ViewportDropStrategy());
 
         const panelFactory = PanelFactory.getInstance();
         panelFactory.registerPanelClasses([Panel, TextPanel, ToolbarPanel, CounterPanel]);
 
         const toolbarFactory = ToolbarGroupFactory.getInstance();
         toolbarFactory.registerToolbarGroupClasses([ApplicationGroup]);
+
+        const viewportFactory = ViewportFactory.getInstance();
+        viewportFactory.registerWindowType(ItemType.APPLICATION_WINDOW, ApplicationWindow);
+        viewportFactory.registerWindowType('NotepadWindow', NotepadWindow);
     }
 
     /**
@@ -427,6 +450,7 @@ export class App {
         const options = { namespace: me.namespace };
 
         appBus.on(EventTypes.APP_ADD_NEW_PANEL, me._boundAddNewPanel, options);
+        appBus.on(EventTypes.APP_ADD_NEW_WINDOW, me._boundAddNewWindow, options);
         appBus.on(EventTypes.APP_RESET_STATE, me._boundResetLayoutSilent, options);
         appBus.on(EventTypes.APP_SAVE_STATE, me._boundSaveLayout, options);
         appBus.on(EventTypes.APP_RESTORE_STATE, me._boundRestoreLayout, options);
@@ -595,6 +619,49 @@ export class App {
 
         const panelGroup = new PanelGroup(panel);
 
-        column.addPanelGroup(panelGroup);
+        column.addChild(panelGroup);
+    }
+
+    /**
+     * Handles the 'app:add-new-window' event by creating a new
+     * NotepadWindow in the first available Viewport found.
+     *
+     * @returns {void}
+     */
+    addNewWindow() {
+        const me = this;
+        let targetViewport = null;
+
+        // Traverse the container to find the first Viewport
+        const traverse = node => {
+            if (targetViewport) return;
+            if (node instanceof Viewport) {
+                targetViewport = node;
+                return;
+            }
+
+            if (node.children) {
+                // Column
+                node.children.forEach(traverse);
+            } else if (node.columns) {
+                // Row
+                node.columns.forEach(traverse);
+            } else if (node.rows) {
+                // Container
+                node.rows.forEach(traverse);
+            }
+        };
+
+        traverse(me.container);
+
+        if (targetViewport) {
+            const note = new NotepadWindow({ x: 10, y: 10, width: 200, height: 150 });
+            targetViewport.addWindow(note);
+            appNotifications.success('Nova janela criada.');
+        } else {
+            appNotifications.warning(
+                'Nenhum Viewport encontrado para abrir a janela. Adicione um Viewport ao layout primeiro.'
+            );
+        }
     }
 }

@@ -24,7 +24,7 @@ import { ItemType } from '../../constants/DNDTypes.js';
  * or the placeholder. Hovering over children (Rows) is considered an invalid
  * drop for the Container (allowing specific Row strategies or Undock to take over).
  * - On drop: Creates a new Row, creates a new Column inside it,
- * and moves the dropped Panel or PanelGroup into the new Column.
+ * and moves the dropped Panel or PanelGroup into the new Column using the new `Column` API.
  *
  * Dependencies:
  * - {import('./BaseDropStrategy.js').BaseDropStrategy}
@@ -119,7 +119,8 @@ export class ContainerDropStrategy extends BaseDropStrategy {
             };
         });
 
-        const oldColumn = effectiveItem.getColumn();
+        const oldColumn =
+            typeof effectiveItem.getColumn === 'function' ? effectiveItem.getColumn() : null;
         if (oldColumn) {
             const oldRow = oldColumn.parentContainer;
             if (oldRow && oldRow instanceof Row) {
@@ -130,14 +131,16 @@ export class ContainerDropStrategy extends BaseDropStrategy {
                     if (oldRow.getTotalColumns() === 1) {
                         if (
                             draggedData.type === ItemType.PANEL_GROUP &&
-                            oldColumn.getTotalPanelGroups() === 1
+                            oldColumn.getChildCount() === 1
                         ) {
                             me._originRowHadOneColumn = true;
                         } else if (
                             draggedData.type === ItemType.PANEL &&
                             effectiveItem.panels.length === 1
                         ) {
-                            me._originRowHadOneColumn = true;
+                            if (oldColumn.getChildCount() === 1) {
+                                me._originRowHadOneColumn = true;
+                            }
                         }
                     }
                 }
@@ -267,16 +270,19 @@ export class ContainerDropStrategy extends BaseDropStrategy {
 
         if (draggedData.type === ItemType.PANEL_GROUP) {
             const draggedItem = draggedData.item;
-            const oldColumn = draggedItem.getColumn();
+            const oldColumn =
+                typeof draggedItem.getColumn === 'function' ? draggedItem.getColumn() : null;
 
             const newRow = dropZone.createRow(null, rowIndex);
             const newColumn = newRow.createColumn();
 
             if (oldColumn) {
-                oldColumn.removePanelGroup(draggedItem, true);
+                // New API: removeChild
+                oldColumn.removeChild(draggedItem, true);
             }
             draggedItem.height = null;
-            newColumn.addPanelGroup(draggedItem);
+            // New API: addChild
+            newColumn.addChild(draggedItem);
         } else if (draggedData.type === ItemType.PANEL) {
             const draggedPanel = draggedData.item;
             const sourceParentGroup = draggedPanel.parentGroup;
@@ -284,7 +290,9 @@ export class ContainerDropStrategy extends BaseDropStrategy {
             const newRow = dropZone.createRow(null, rowIndex);
             const newColumn = newRow.createColumn();
             const newPanelGroup = new PanelGroup(null);
-            newColumn.addPanelGroup(newPanelGroup);
+
+            // New API: addChild
+            newColumn.addChild(newPanelGroup);
 
             if (sourceParentGroup) {
                 sourceParentGroup.removePanel(draggedPanel, true);

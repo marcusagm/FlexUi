@@ -83,16 +83,23 @@
                         "width": null,
                         "panelGroups": [
                             {
-                                "type": "PanelGroup",
-                                "height": null,
-                                "collapsed": false,
-                                "activePanelId": null,
-                                "config": {},
-                                "panels": [
+                                "type": "viewport",
+                                "windows": [
                                     {
-                                        "type": "TextPanel",
-                                        "title": "Text panel 3",
-                                        "content": "Este é o painel de texto 3."
+                                        "type": "NotepadWindow",
+                                        "title": "Document 1",
+                                        "geometry": {
+                                            "x": 50,
+                                            "y": 50,
+                                            "width": 200,
+                                            "height": 150
+                                        },
+                                        "state": {
+                                            "maximized": false,
+                                            "minimized": false,
+                                            "pinned": false
+                                        },
+                                        "content": "Welcome to Notepad FlexUI."
                                     }
                                 ]
                             },
@@ -124,8 +131,8 @@
                                 "panels": [
                                     {
                                         "type": "TextPanel",
-                                        "title": "Text panel 2",
-                                        "content": "Painel de texto 2 (Coluna 3)."
+                                        "title": "Text panel 3",
+                                        "content": "Painel de texto 3 (Coluna 3)."
                                     }
                                 ]
                             },

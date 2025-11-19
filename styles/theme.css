@@ -513,4 +513,23 @@
     --resize-handle-color-hover: var(--color-accent-hover);
     --resize-handle-color-active: var(--color-accent-active);
     --resize-handle-z-index: 100;
+
+    /* Component: Viewport & ApplicationWindow */
+    --color-bg-viewport: var(--neutral-5);
+
+    --window-header-height: 32px;
+    --window-header-bg-active: var(--primary-30);
+    --window-header-color-active: var(--neutral-99);
+    --window-header-bg-inactive: var(--surface-level-2);
+    --window-header-color-inactive: var(--color-text-secondary);
+
+    --window-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    --window-border-active: 1px solid var(--primary-40);
+    --window-border-inactive: 1px solid var(--color-border-default);
+
+    /* Viewport Z-Index Stacking Context */
+    --viewport-z-base: 10;
+    --viewport-z-floating: 100;
+    --viewport-z-internal-modal: 200;
+    --viewport-z-always-on-top: 300;
 }

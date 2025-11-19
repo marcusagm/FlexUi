@@ -23,6 +23,15 @@
         "restore_fail": "Falha ao restaurar área de trabalho (dados corrompidos).",
         "no_save": "Nenhuma área de trabalho salva encontrada."
     },
+    "documents": {
+        "menu": "Documentos",
+        "new": "Novo Documento"
+    },
+    "windows": {
+        "menu": "Janelas",
+        "cascade": "Organizar em Cascata",
+        "tile": "Organizar Lado a Lado"
+    },
     "panels": {
         "menu": "Painéis",
         "add": "Novo painel"

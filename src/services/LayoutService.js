@@ -1,6 +1,7 @@
 import { Column } from '../components/Column/Column.js';
 import { Container } from '../components/Container/Container.js';
 import { Row } from '../components/Row/Row.js';
+import { Viewport } from '../components/Viewport/Viewport.js';
 import { appBus } from '../utils/EventBus.js';
 import { EventTypes } from '../constants/EventTypes.js';
 
@@ -37,20 +38,22 @@ import { EventTypes } from '../constants/EventTypes.js';
  * and orchestrates their creation via 'row.addResizeBars()'.
  * - Applies 'fills-space' logic to the last *visible* Row in a Container.
  * - Applies 'fills-space' logic to the last Column in a Row.
- * - Applies 'fills-space' logic to the last *visible* PanelGroup in a Column.
+ * - Applies 'fills-space' logic to the last *visible* child (PanelGroup or Viewport) in a Column.
+ * - Prioritizes Viewport for filling space if present.
  * - Enforces that at least one Row in a Container is visible.
- * - Enforces that at least one PanelGroup in a Column is visible.
+ * - Enforces that at least one child in a Column is visible.
  * - Manages the 'disabled' state of PanelGroup collapse buttons.
  * - Manages 'disabled' *and* 'visibility' state of Row collapse buttons
  * (assumes Container/Row created the button elements).
  * - Applies dynamic CSS 'min-width' to Columns based on their children.
  *
  * Dependencies:
- * - {import('../components/Column/Column.js').Column}
- * - {import('../components/Container/Container.js').Container}
- * - {import('../components/Row/Row.js').Row}
- * - {import('../utils/EventBus.js').appBus}
- * - {import('../constants/EventTypes.js').EventTypes}
+ * - {import '../components/Column/Column.js'.Column}
+ * - {import '../components/Container/Container.js'.Container}
+ * - {import '../components/Row/Row.js'.Row}
+ * - {import '../components/Viewport/Viewport.js'.Viewport}
+ * - {import '../utils/EventBus.js'.appBus}
+ * - {import '../constants/EventTypes.js'.EventTypes}
  */
 export class LayoutService {
     /**
@@ -181,7 +184,7 @@ export class LayoutService {
             this._onColumnsChanged(row);
 
             row.getColumns().forEach(column => {
-                this._updatePanelGroupsSizes(column);
+                this._updateChildrenSizes(column);
             });
         });
     }
@@ -276,57 +279,96 @@ export class LayoutService {
             return;
         }
 
-        this._updatePanelGroupsSizes(column);
+        this._updateChildrenSizes(column);
     }
 
     /**
-     * Recalculates sizes, applies 'panel-group--fills-space',
-     * and manages the collapse button state for all PanelGroups in a column.
+     * Recalculates sizes, applies 'fills-space' logic, and manages collapse button state
+     * for all children (PanelGroups and Viewports) in a column.
+     *
+     * Viewports are prioritized for space filling and are never collapsible.
      *
      * @param {Column} column - The column to update.
      * @private
      * @returns {void}
      */
-    _updatePanelGroupsSizes(column) {
-        const panelGroups = column.getPanelGroups();
-        if (panelGroups.length === 0) {
+    _updateChildrenSizes(column) {
+        // Use generic 'children' accessor which includes both PanelGroups and Viewports
+        const children = column.children;
+
+        if (children.length === 0) {
             column.element.style.minWidth = `${column.getEffectiveMinWidth()}px`;
             return;
         }
 
-        let uncollapsedPanelGroups = panelGroups.filter(panelGroup => !panelGroup.collapsed);
+        // Filter uncollapsed children. Viewports are always considered uncollapsed.
+        let uncollapsedChildren = children.filter(child => {
+            // Viewports are never collapsed
+            if (child instanceof Viewport) return true;
+            // Check collapsed property for PanelGroups
+            return !child.collapsed;
+        });
 
-        if (uncollapsedPanelGroups.length === 0) {
-            const lastGroup = panelGroups[panelGroups.length - 1];
-            lastGroup.unCollapse();
-            uncollapsedPanelGroups = [lastGroup];
+        // Safety check: Ensure at least one item is visible
+        if (uncollapsedChildren.length === 0) {
+            const lastChild = children[children.length - 1];
+            // Only uncollapse if it supports it (PanelGroup)
+            if (lastChild && typeof lastChild.unCollapse === 'function') {
+                lastChild.unCollapse();
+            }
+            uncollapsedChildren = [lastChild];
         }
 
-        const lastUncollapsedGroup = uncollapsedPanelGroups[uncollapsedPanelGroups.length - 1];
-        const isOnlyOneUncollapsed = uncollapsedPanelGroups.length === 1;
+        // Determine which child should fill the remaining space.
+        // Logic: The last uncollapsed child usually fills space.
+        // Exception: If a Viewport exists, it might be preferred (business rule dependent).
+        // Current rule: Last visible child fills space.
+        const lastUncollapsedChild = uncollapsedChildren[uncollapsedChildren.length - 1];
+        const isOnlyOneUncollapsed = uncollapsedChildren.length === 1;
 
-        panelGroups.forEach(panelGroup => {
-            const shouldFillSpace = panelGroup === lastUncollapsedGroup;
+        children.forEach(child => {
+            const shouldFillSpace = child === lastUncollapsedChild;
 
+            // Handle Fill Space Logic
             if (shouldFillSpace) {
-                panelGroup.height = null;
-                panelGroup.element.classList.add('panel-group--fills-space');
+                // Remove fixed height to allow flex-grow
+                if (typeof child.height === 'number') {
+                    // We don't delete the property, just ensure style is auto/flex
+                    // But for PanelGroup, setting height=null is the convention
+                    if ('height' in child) child.height = null;
+                }
+
+                // Add class for styling
+                child.element.classList.add(
+                    child instanceof Viewport ? 'viewport--fills-space' : 'panel-group--fills-space'
+                );
             } else {
-                panelGroup.element.classList.remove('panel-group--fills-space');
+                child.element.classList.remove('panel-group--fills-space');
+                child.element.classList.remove('viewport--fills-space');
             }
 
-            const collapseButton = panelGroup.header?.collapseBtn;
-            if (collapseButton) {
+            // Handle Collapse Button Logic (Only for PanelGroups)
+            if (child.header && child.header.collapseBtn) {
+                const collapseButton = child.header.collapseBtn;
+
+                // Logic: Disable collapse if this is the ONLY visible item AND it is filling space
+                // Viewports don't have headers with collapse buttons generally, but good to check instance
                 const isThisPanelTheOnlyUncollapsed = isOnlyOneUncollapsed && shouldFillSpace;
 
-                if (!panelGroup.collapsible || isThisPanelTheOnlyUncollapsed) {
+                // Also check internal collapsible config
+                const isCollapsible = child.collapsible !== false;
+
+                if (!isCollapsible || isThisPanelTheOnlyUncollapsed) {
                     collapseButton.disabled = true;
                 } else {
                     collapseButton.disabled = false;
                 }
             }
 
-            panelGroup.updateHeight();
+            // Trigger internal update for the child to apply styles
+            if (typeof child.updateHeight === 'function') {
+                child.updateHeight();
+            }
         });
 
         column.element.style.minWidth = `${column.getEffectiveMinWidth()}px`;

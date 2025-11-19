@@ -5,12 +5,33 @@
  * A classe 'Menu.js' irá carregar este módulo dinamicamente.
  *
  * Estrutura do Objeto:
- * - titleKey {string}: A chave de tradução (i18n) para o título (Ex: "panels.menu").
+ * - titleKey {string}: A chave de tradução (i18n) para o título.
  * - event {string} (Opcional): O evento a ser disparado no appBus quando clicado.
- * - callback {function} (Opcional): Uma função a ser executada diretamente (preferir 'event' se possível).
  * - children {Array} (Opcional): Um array de sub-itens com a mesma estrutura.
  */
 export default [
+    {
+        titleKey: 'documents.menu',
+        children: [
+            {
+                titleKey: 'documents.new',
+                event: 'app:add-new-window'
+            }
+        ]
+    },
+    {
+        titleKey: 'windows.menu',
+        children: [
+            {
+                titleKey: 'windows.cascade',
+                event: 'viewport:arrange-cascade'
+            },
+            {
+                titleKey: 'windows.tile',
+                event: 'viewport:arrange-tile'
+            }
+        ]
+    },
     {
         titleKey: 'panels.menu',
         children: [
@@ -35,15 +56,6 @@ export default [
                 titleKey: 'workspace.reset',
                 event: 'app:reset-state'
             }
-            // Exemplo de como 'callback' (solicitado por você) seria usado:
-            // {
-            //     titleKey: 'actions.complex', // Chave de tradução fictícia
-            //     callback: () => {
-            //         console.log('Uma ação complexa foi executada!');
-            //         // import { appBus } from '../scripts/EventBus.js';
-            //         // appBus.emit('evento:complexo');
-            //     }
-            // }
         ]
     }
 ];

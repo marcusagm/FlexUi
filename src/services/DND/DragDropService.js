@@ -48,6 +48,7 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * - Delegates visual "ghost" management to GhostManager.
  * - Applies constraints to panel movement via GhostManager updates.
  * - Centralizes magic strings using DNDTypes constants.
+ * - Supports ApplicationWindow constraints relative to their Viewport.
  *
  * Dependencies:
  * - ../../utils/EventBus.js
@@ -426,11 +427,13 @@ export class DragDropService {
 
         element.style.pointerEvents = 'none';
 
-        if (
-            me._dragState.item &&
-            me._dragState.item._state &&
-            me._dragState.item._state.isFloating
-        ) {
+        // Hide original element logic for Floating Panels AND Application Windows
+        const isFloatingPanel =
+            me._dragState.item && me._dragState.item._state && me._dragState.item._state.isFloating;
+
+        const isApplicationWindow = me._dragState.type === ItemType.APPLICATION_WINDOW;
+
+        if (isFloatingPanel || isApplicationWindow) {
             element.style.opacity = '0';
         }
 
@@ -492,15 +495,24 @@ export class DragDropService {
         const isPanel =
             me._dragState.type === ItemType.PANEL || me._dragState.type === ItemType.PANEL_GROUP;
 
+        const isWindow = me._dragState.type === ItemType.APPLICATION_WINDOW;
+
         if (isPanel) {
             const fpms = FloatingPanelManagerService.getInstance();
             bounds = fpms.getContainerBounds();
+        } else if (isWindow && me._dragState.element) {
+            // Windows are constrained by their Viewport
+            const viewport = me._dragState.element.closest('.viewport');
+            if (viewport) {
+                bounds = viewport.getBoundingClientRect();
+            }
         }
 
         // 2. Update Ghost
         me._ghostManager.update(clientX, clientY, bounds);
 
         // 3. Hit Test
+        // Important: Ghost element must have pointer-events: none (handled in GhostManager)
         const targetBelow = document.elementFromPoint(clientX, clientY);
         const dropZoneElement = targetBelow ? targetBelow.closest('[data-dropzone]') : null;
         const newDropZoneInstance = dropZoneElement ? dropZoneElement.dropZoneInstance : null;
@@ -574,10 +586,18 @@ export class DragDropService {
             }
         }
 
-        // Fallback to Undock if not handled
+        // Fallback to Undock if not handled AND if it's not a Window (Windows stay in viewport or revert)
+        // Note: ViewportDropStrategy handles free movement (floating) inside viewport as a successful drop.
+        // If dropHandled is false, it means we dropped outside any valid zone.
         if (!dropHandled) {
-            const floatingManager = FloatingPanelManagerService.getInstance();
-            floatingManager.handleUndockDrop(me._dragState, clientX, clientY);
+            // Only undock Panels/Groups. Windows are Viewport-bound.
+            if (
+                me._dragState.type === ItemType.PANEL ||
+                me._dragState.type === ItemType.PANEL_GROUP
+            ) {
+                const floatingManager = FloatingPanelManagerService.getInstance();
+                floatingManager.handleUndockDrop(me._dragState, clientX, clientY);
+            }
         }
 
         me._cleanupDrag();

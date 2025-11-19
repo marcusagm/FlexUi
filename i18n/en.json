@@ -23,6 +23,15 @@
         "restore_fail": "Failed to restore workspace (corrupted data).",
         "no_save": "No saved workspace found."
     },
+    "documents": {
+        "menu": "Documents",
+        "new": "New Document"
+    },
+    "windows": {
+        "menu": "Windows",
+        "cascade": "Cascade",
+        "tile": "Tile"
+    },
     "panels": {
         "menu": "Panels",
         "add": "New panel"

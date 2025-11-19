@@ -1,0 +1,19 @@
+@import '../theme.css';
+
+/*
+ * Viewport Container
+ * Acts as the "desktop" boundary for floating ApplicationWindows.
+ * It consumes the full available space of its parent column/row.
+ */
+.viewport {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: 100%;
+    flex-grow: 1;
+    overflow: hidden;
+    background-color: var(--color-bg-viewport);
+
+    /* Ensures that clicks on the empty background don't select text elsewhere */
+    user-select: none;
+}

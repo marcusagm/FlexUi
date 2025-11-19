@@ -313,7 +313,10 @@ export class FloatingPanelManagerService {
             return;
         }
 
-        panelGroup.getColumn()?.removePanelGroup(panelGroup);
+        // Ensure proper removal from Column using new API
+        if (panelGroup.getColumn()) {
+            panelGroup.getColumn().removeChild(panelGroup);
+        }
 
         me.addFloatingPanel(panelGroup, initialX, initialY);
 
@@ -352,8 +355,9 @@ export class FloatingPanelManagerService {
         if (isLastPanel) {
             panelGroupToFloat = group;
             const sourceColumn = panelGroupToFloat.getColumn();
+            // Ensure proper removal from Column using new API
             if (sourceColumn) {
-                sourceColumn.removePanelGroup(panelGroupToFloat, true);
+                sourceColumn.removeChild(panelGroupToFloat, true);
             }
         } else {
             group.removePanel(panel, true);

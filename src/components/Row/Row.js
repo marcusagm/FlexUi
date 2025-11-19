@@ -44,6 +44,7 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * - Automatically removes empty columns via 'onColumnEmpty'.
  * - Manages vertical resizing via ResizeHandleManager.
  * - Supports collapsing, which hides all child columns and reduces height.
+ * - Validates all property assignments.
  *
  * Dependencies:
  * - {import('../Column/Column.js').Column}
@@ -53,6 +54,9 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * - {import('../../utils/ResizeHandleManager.js').ResizeHandleManager}
  * - {import('../../constants/DNDTypes.js').DropZoneType}
  * - {import('../../constants/EventTypes.js').EventTypes}
+ *
+ * Notes / Additional:
+ * - The Row delegates horizontal resizing to its child Columns.
  */
 export class Row {
     /**
@@ -189,7 +193,7 @@ export class Row {
 
         me.parentContainer = container;
         me.height = height;
-        me.minHeight = me._minHeight; // Use default or trigger setter
+        me.minHeight = me._minHeight;
 
         me.dropZoneType = DropZoneType.ROW;
 
@@ -232,15 +236,18 @@ export class Row {
      * ParentContainer setter.
      * Validates that the value looks like a Container.
      *
-     * @param {import('../Container/Container.js').Container | null} value
+     * @param {import('../Container/Container.js').Container | null} value - The new parent container.
      * @returns {void}
      */
     set parentContainer(value) {
+        const me = this;
         if (value !== null && typeof value !== 'object') {
-            console.warn(`[Row] Invalid parentContainer assignment (${value}).`);
+            console.warn(
+                `[Row] invalid parentContainer assignment (${value}). Must be an object. Keeping previous value: ${me._parentContainer}`
+            );
             return;
         }
-        this._parentContainer = value;
+        me._parentContainer = value;
     }
 
     /**
@@ -256,17 +263,23 @@ export class Row {
      * Height setter.
      * Validates that the value is a positive number or null.
      *
-     * @param {number | null} value
+     * @param {number | null} value - The new height.
      * @returns {void}
      */
     set height(value) {
-        if (value !== null && (!Number.isFinite(value) || value < 0)) {
-            console.warn(
-                `[Row] Invalid height assignment (${value}). Must be positive number or null.`
-            );
-            return;
+        const me = this;
+        if (value !== null) {
+            const num = Number(value);
+            if (!Number.isFinite(num) || num < 0) {
+                console.warn(
+                    `[Row] invalid height assignment (${value}). Must be a positive number or null. Keeping previous value: ${me._height}`
+                );
+                return;
+            }
+            me._height = num;
+        } else {
+            me._height = null;
         }
-        this._height = value;
     }
 
     /**
@@ -282,13 +295,15 @@ export class Row {
      * Collapsed setter.
      * Manages UI state: adds/removes classes, hides/shows columns, updates button, updates height.
      *
-     * @param {boolean} value
+     * @param {boolean} value - The new collapsed state.
      * @returns {void}
      */
     set collapsed(value) {
         const me = this;
         if (typeof value !== 'boolean') {
-            console.warn(`[Row] Invalid collapsed assignment (${value}). Must be boolean.`);
+            console.warn(
+                `[Row] invalid collapsed assignment (${value}). Must be boolean. Keeping previous value: ${me._collapsed}`
+            );
             return;
         }
         me._collapsed = value;
@@ -322,17 +337,19 @@ export class Row {
      * Collapsible setter.
      * Updates the internal state and refreshes the collapse button UI.
      *
-     * @param {boolean} value
+     * @param {boolean} value - The new collapsible state.
      * @returns {void}
      */
     set collapsible(value) {
         const me = this;
         if (typeof value !== 'boolean') {
-            console.warn(`[Row] Invalid collapsible assignment (${value}). Must be boolean.`);
+            console.warn(
+                `[Row] invalid collapsible assignment (${value}). Must be boolean. Keeping previous value: ${me._collapsible}`
+            );
             return;
         }
         me._collapsible = value;
-        me._setupCollapseButton(); // Re-render button if state changes
+        me._setupCollapseButton();
     }
 
     /**
@@ -346,22 +363,25 @@ export class Row {
 
     /**
      * MinHeight setter.
+     * Validates that the value is a positive number.
      *
-     * @param {number} value
+     * @param {number} value - The new minimum height.
      * @returns {void}
      */
     set minHeight(value) {
+        const me = this;
         const num = Number(value);
         if (!Number.isFinite(num) || num < 0) {
-            console.warn('Row: Invalid minHeight value. Setting to 0.');
-            this._minHeight = 0;
+            console.warn(
+                `[Row] invalid minHeight assignment (${value}). Must be a positive number. Keeping previous value: ${me._minHeight}`
+            );
             return;
         }
-        this._minHeight = num;
+        me._minHeight = num;
     }
 
     /**
-     * Wrapper for minHeight setter (compatibility).
+     * Wrapper method for minHeight setter (compatibility).
      *
      * @param {number} height
      * @returns {void}
@@ -371,7 +391,7 @@ export class Row {
     }
 
     /**
-     * Wrapper for minHeight getter (compatibility).
+     * Wrapper method for minHeight getter (compatibility).
      *
      * @returns {number}
      */
@@ -382,7 +402,7 @@ export class Row {
     /**
      * ThrottledUpdate setter.
      *
-     * @param {Function} throttledFunction
+     * @param {Function} throttledFunction - The throttled function.
      * @returns {void}
      */
     setThrottledUpdate(throttledFunction) {
@@ -454,10 +474,11 @@ export class Row {
      * @returns {void}
      */
     onColumnEmpty(column) {
-        this.deleteColumn(column);
+        const me = this;
+        me.deleteColumn(column);
 
-        if (this.getTotalColumns() === 0 && this.parentContainer) {
-            appBus.emit(EventTypes.ROW_EMPTY, this);
+        if (me.getTotalColumns() === 0 && me.parentContainer) {
+            appBus.emit(EventTypes.ROW_EMPTY, me);
         }
     }
 
@@ -468,7 +489,8 @@ export class Row {
      * @returns {void}
      */
     updateAllResizeBars() {
-        const columns = this.columns;
+        const me = this;
+        const columns = me.columns;
         columns.forEach((column, index) => {
             column.addResizeBars(index === columns.length - 1);
         });
@@ -477,8 +499,8 @@ export class Row {
     /**
      * Sets up the collapse button logic and DOM.
      *
-     * @returns {void}
      * @private
+     * @returns {void}
      */
     _setupCollapseButton() {
         const me = this;
@@ -548,7 +570,7 @@ export class Row {
     toggleCollapse() {
         const me = this;
         if (!me.collapsible) return;
-        me.collapsed = !me.collapsed; // Triggers setter
+        me.collapsed = !me.collapsed;
 
         if (me.parentContainer) {
             me.parentContainer.requestLayoutUpdate();
@@ -625,7 +647,7 @@ export class Row {
             column.element.style.display = 'none';
         }
 
-        column.setParentContainer(me);
+        column.parentContainer = me;
         me.requestLayoutUpdate();
         return column;
     }
@@ -676,8 +698,9 @@ export class Row {
      * @returns {import('../Column/Column.js').Column} The first column instance.
      */
     getFirstColumn() {
-        const columns = this.columns;
-        return columns[0] || this.createColumn();
+        const me = this;
+        const columns = me.columns;
+        return columns[0] || me.createColumn();
     }
 
     /**
@@ -686,8 +709,9 @@ export class Row {
      * @returns {import('../Column/Column.js').Column} The last column instance.
      */
     getLastColumn() {
-        const columns = this.columns;
-        return columns[columns.length - 1] || this.createColumn();
+        const me = this;
+        const columns = me.columns;
+        return columns[columns.length - 1] || me.createColumn();
     }
 
     /**

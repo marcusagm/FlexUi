@@ -63,6 +63,13 @@ export class ApplicationGroup extends ToolbarGroup {
             'icon-add-panel',
             'Adicionar Novo Painel'
         );
+
+        const btnAddWindow = me._createButton(
+            EventTypes.APP_ADD_NEW_WINDOW,
+            'icon-add-panel', // Reusing existing icon
+            'Novo Documento'
+        );
+
         const btnSave = me._createButton(
             EventTypes.APP_SAVE_STATE,
             'icon-save',
@@ -82,7 +89,7 @@ export class ApplicationGroup extends ToolbarGroup {
         const divider1 = me._createDivider();
         const divider2 = me._createDivider();
 
-        contentEl.append(btnAdd, divider1, btnSave, btnRestore, divider2, btnReset);
+        contentEl.append(btnAdd, btnAddWindow, divider1, btnSave, btnRestore, divider2, btnReset);
     }
 
     /**

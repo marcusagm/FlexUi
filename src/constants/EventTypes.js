@@ -34,6 +34,11 @@
  * - MENU_ITEM_SELECTED {string} : Signals a final menu item was clicked (used to close all menus).
  * - MENU_CLOSE_SIBLINGS {string} : Signals a menu item is hovering, requesting siblings to close.
  * - CONTEXT_MENU_OPENED {string} : Signals a context menu was opened (used to close other menus).
+ * - WINDOW_CLOSE_REQUEST {string} : Request to close an ApplicationWindow.
+ * - WINDOW_FOCUS {string} : Request to focus an ApplicationWindow (bring to front).
+ * - WINDOW_MOUNT {string} : Signals that an ApplicationWindow has been mounted.
+ * - VIEWPORT_ARRANGE_CASCADE {string} : Command to arrange windows in a cascade pattern.
+ * - VIEWPORT_ARRANGE_TILE {string} : Command to arrange windows in a tile pattern.
  *
  * Typical usage:
  * // Instead of: appBus.emit('app:save-state');
@@ -67,6 +72,7 @@ export const EventTypes = Object.freeze({
     APP_RESET_STATE: 'app:reset-state',
     APP_ADD_NEW_PANEL: 'app:add-new-panel',
     APP_CLOSE_PANEL_REQUEST: 'app:close-panel-request',
+    APP_ADD_NEW_WINDOW: 'app:add-new-window',
     APP_UNDOCK_PANEL_REQUEST: 'app:undock-panel-request',
 
     // --- Panel Structural Operations (Emitted by PanelGroup, Column, Row) ---
@@ -84,5 +90,12 @@ export const EventTypes = Object.freeze({
     // --- Menu / Context Menu Events ---
     MENU_ITEM_SELECTED: 'menu:item-selected',
     MENU_CLOSE_SIBLINGS: 'menu:close-siblings',
-    CONTEXT_MENU_OPENED: 'contextmenu:opened'
+    CONTEXT_MENU_OPENED: 'contextmenu:opened',
+
+    // --- Viewport / Window Events ---
+    WINDOW_CLOSE_REQUEST: 'window:close-request',
+    WINDOW_FOCUS: 'window:focus',
+    WINDOW_MOUNT: 'window:mount',
+    VIEWPORT_ARRANGE_CASCADE: 'viewport:arrange-cascade',
+    VIEWPORT_ARRANGE_TILE: 'viewport:arrange-tile'
 });

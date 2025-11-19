@@ -40,7 +40,8 @@
  * ROW: 'row',
  * CONTAINER: 'container',
  * TAB_CONTAINER: 'tab-container',
- * TOOLBAR_CONTAINER: 'toolbar-container'
+ * TOOLBAR_CONTAINER: 'toolbar-container',
+ * VIEWPORT: 'viewport'
  * }>}
  */
 export const DropZoneType = Object.freeze({
@@ -48,7 +49,8 @@ export const DropZoneType = Object.freeze({
     ROW: 'row',
     CONTAINER: 'container',
     TAB_CONTAINER: 'tab-container',
-    TOOLBAR_CONTAINER: 'toolbar-container'
+    TOOLBAR_CONTAINER: 'toolbar-container',
+    VIEWPORT: 'viewport'
 });
 
 /**
@@ -59,11 +61,13 @@ export const DropZoneType = Object.freeze({
  * @type {Readonly<{
  * PANEL: 'Panel',
  * PANEL_GROUP: 'PanelGroup',
- * TOOLBAR_GROUP: 'ToolbarGroup'
+ * TOOLBAR_GROUP: 'ToolbarGroup',
+ * APPLICATION_WINDOW: 'ApplicationWindow'
  * }>}
  */
 export const ItemType = Object.freeze({
     PANEL: 'Panel',
     PANEL_GROUP: 'PanelGroup',
-    TOOLBAR_GROUP: 'ToolbarGroup'
+    TOOLBAR_GROUP: 'ToolbarGroup',
+    APPLICATION_WINDOW: 'ApplicationWindow'
 });
