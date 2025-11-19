@@ -116,46 +116,6 @@ export class App {
     namespace = 'app_singleton';
 
     /**
-     * Bound handler for adding a new panel.
-     *
-     * @type {Function | null}
-     * @private
-     */
-    _boundAddNewPanel = null;
-
-    /**
-     * Bound handler for resetting the layout silently.
-     *
-     * @type {Function | null}
-     * @private
-     */
-    _boundResetLayoutSilent = null;
-
-    /**
-     * Bound handler for saving the layout.
-     *
-     * @type {Function | null}
-     * @private
-     */
-    _boundSaveLayout = null;
-
-    /**
-     * Bound handler for restoring the layout.
-     *
-     * @type {Function | null}
-     * @private
-     */
-    _boundRestoreLayout = null;
-
-    /**
-     * Bound handler for resetting the layout.
-     *
-     * @type {Function | null}
-     * @private
-     */
-    _boundResetLayout = null;
-
-    /**
      * The debounced window resize handler.
      *
      * @type {Function | null}
@@ -220,6 +180,70 @@ export class App {
     stateService;
 
     /**
+     * The main menu component instance.
+     *
+     * @type {import('./components/Menu/Menu.js').Menu}
+     * @public
+     */
+    menu;
+
+    /**
+     * The root layout container component instance.
+     *
+     * @type {import('./components/Container/Container.js').Container}
+     * @public
+     */
+    container;
+
+    /**
+     * The application status bar instance.
+     *
+     * @type {import('./components/StatusBar/StatusBar.js').StatusBar}
+     * @public
+     */
+    statusBar;
+
+    /**
+     * Bound handler for adding a new panel.
+     *
+     * @type {Function | null}
+     * @private
+     */
+    _boundAddNewPanel = null;
+
+    /**
+     * Bound handler for resetting the layout silently.
+     *
+     * @type {Function | null}
+     * @private
+     */
+    _boundResetLayoutSilent = null;
+
+    /**
+     * Bound handler for saving the layout.
+     *
+     * @type {Function | null}
+     * @private
+     */
+    _boundSaveLayout = null;
+
+    /**
+     * Bound handler for restoring the layout.
+     *
+     * @type {Function | null}
+     * @private
+     */
+    _boundRestoreLayout = null;
+
+    /**
+     * Bound handler for resetting the layout.
+     *
+     * @type {Function | null}
+     * @private
+     */
+    _boundResetLayout = null;
+
+    /**
      * Creates an instance of App.
      * Implements the Singleton pattern.
      */
@@ -231,6 +255,76 @@ export class App {
 
         const me = this;
 
+        me._initializeServices();
+        me._registerStrategies();
+        me._initializeUI();
+
+        me._boundAddNewPanel = me.addNewPanel.bind(me);
+        me._boundResetLayoutSilent = me.resetLayout.bind(me, true);
+        me._boundSaveLayout = me.saveLayout.bind(me);
+        me._boundRestoreLayout = me.restoreLayout.bind(me);
+        me._boundResetLayout = me.resetLayout.bind(me, false);
+
+        me.initEventListeners();
+        me._registerGlobalShortcuts();
+
+        const uiListener = new NotificationUIListener(document.body);
+        uiListener.listen(appNotifications);
+    }
+
+    /**
+     * Initializes all core singleton services.
+     *
+     * @private
+     * @returns {void}
+     */
+    _initializeServices() {
+        const me = this;
+        me.stateService = ApplicationStateService.getInstance();
+
+        // Initialize factories and layout service for registration
+        PanelFactory.getInstance();
+        ToolbarGroupFactory.getInstance();
+        LayoutService.getInstance();
+        FloatingPanelManagerService.getInstance();
+
+        // Initialize global state keys for the application
+        globalState.set('counterValue', 0);
+        globalState.set('activeTool', 'pointer');
+        globalState.set('activeColor', '#FFFFFF');
+    }
+
+    /**
+     * Registers all necessary DND strategies and component classes with factories.
+     *
+     * @private
+     * @returns {void}
+     */
+    _registerStrategies() {
+        const dds = DragDropService.getInstance();
+
+        dds.registerStrategy(DropZoneType.COLUMN, new ColumnDropStrategy());
+        dds.registerStrategy(DropZoneType.TAB_CONTAINER, new TabContainerDropStrategy());
+        dds.registerStrategy(DropZoneType.ROW, new RowDropStrategy());
+        dds.registerStrategy(DropZoneType.CONTAINER, new ContainerDropStrategy());
+        dds.registerStrategy(DropZoneType.TOOLBAR_CONTAINER, new ToolbarContainerDropStrategy());
+
+        const panelFactory = PanelFactory.getInstance();
+        panelFactory.registerPanelClasses([Panel, TextPanel, ToolbarPanel, CounterPanel]);
+
+        const toolbarFactory = ToolbarGroupFactory.getInstance();
+        toolbarFactory.registerToolbarGroupClasses([ApplicationGroup]);
+    }
+
+    /**
+     * Instantiates all main UI components (Menu, Container, Toolbars) and mounts them to the DOM Grid.
+     *
+     * @private
+     * @returns {void}
+     */
+    _initializeUI() {
+        const me = this;
+
         me.menu = new Menu();
         me.container = new Container();
         me.statusBar = new StatusBar();
@@ -238,29 +332,6 @@ export class App {
         me._toolbarBottom = new ToolbarContainer('bottom', 'horizontal');
         me._toolbarLeft = new ToolbarContainer('left', 'vertical');
         me._toolbarRight = new ToolbarContainer('right', 'vertical');
-
-        me.stateService = ApplicationStateService.getInstance();
-
-        const dds = DragDropService.getInstance();
-        dds.registerStrategy(DropZoneType.COLUMN, new ColumnDropStrategy());
-        dds.registerStrategy(DropZoneType.TAB_CONTAINER, new TabContainerDropStrategy());
-        dds.registerStrategy(DropZoneType.ROW, new RowDropStrategy());
-        dds.registerStrategy(DropZoneType.CONTAINER, new ContainerDropStrategy());
-        dds.registerStrategy(DropZoneType.TOOLBAR_CONTAINER, new ToolbarContainerDropStrategy());
-
-        const factory = PanelFactory.getInstance();
-        factory.registerPanelClasses([Panel, TextPanel, ToolbarPanel, CounterPanel]);
-
-        const toolbarFactory = ToolbarGroupFactory.getInstance();
-        toolbarFactory.registerToolbarGroupClasses([ApplicationGroup]);
-
-        LayoutService.getInstance();
-
-        // Initialize global state keys for the application
-        // 'activeScopes' is now initialized by GlobalStateService itself.
-        globalState.set('counterValue', 0);
-        globalState.set('activeTool', 'pointer');
-        globalState.set('activeColor', '#FFFFFF');
 
         const fpms = FloatingPanelManagerService.getInstance();
         fpms.registerContainer(me.container.element);
@@ -291,51 +362,6 @@ export class App {
         );
         // Append only the wrapper to the body
         document.body.append(me._mainWrapper);
-
-        me._boundAddNewPanel = me.addNewPanel.bind(me);
-        me._boundResetLayoutSilent = me.resetLayout.bind(me, true);
-        me._boundSaveLayout = me.saveLayout.bind(me);
-        me._boundRestoreLayout = me.restoreLayout.bind(me);
-        me._boundResetLayout = me.resetLayout.bind(me, false);
-
-        me.initEventListeners();
-        me._registerGlobalShortcuts();
-
-        const uiListener = new NotificationUIListener(document.body);
-        uiListener.listen(appNotifications);
-    }
-
-    /**
-     * Initializes the application asynchronously, loading the menu and layout.
-     * This must be called after instantiation.
-     *
-     * @returns {Promise<void>}
-     */
-    async init() {
-        const me = this;
-        await me.menu.load();
-        await me.loadInitialLayout();
-
-        appBus.emit(EventTypes.LAYOUT_INITIALIZED, me.container);
-
-        appBus.emit(EventTypes.STATUSBAR_SET_PERMANENT_STATUS, 'Pronto');
-    }
-
-    /**
-     * Initializes all global appBus event listeners for this singleton.
-     * Uses namespaces for easy cleanup.
-     *
-     * @returns {void}
-     */
-    initEventListeners() {
-        const me = this;
-        const options = { namespace: me.namespace };
-
-        appBus.on(EventTypes.APP_ADD_NEW_PANEL, me._boundAddNewPanel, options);
-        appBus.on(EventTypes.APP_RESET_STATE, me._boundResetLayoutSilent, options);
-        appBus.on(EventTypes.APP_SAVE_STATE, me._boundSaveLayout, options);
-        appBus.on(EventTypes.APP_RESTORE_STATE, me._boundRestoreLayout, options);
-        appBus.on(EventTypes.APP_RESET_STATE, me._boundResetLayout, options);
     }
 
     /**
@@ -372,6 +398,39 @@ export class App {
             scopes: ['global'],
             preventDefault: true
         });
+    }
+
+    /**
+     * Initializes the application asynchronously, loading the menu and layout.
+     * This must be called after instantiation.
+     *
+     * @returns {Promise<void>}
+     */
+    async init() {
+        const me = this;
+        await me.menu.load();
+        await me.loadInitialLayout();
+
+        appBus.emit(EventTypes.LAYOUT_INITIALIZED, me.container);
+
+        appBus.emit(EventTypes.STATUSBAR_SET_PERMANENT_STATUS, 'Pronto');
+    }
+
+    /**
+     * Initializes all global appBus event listeners for this singleton.
+     * Uses namespaces for easy cleanup.
+     *
+     * @returns {void}
+     */
+    initEventListeners() {
+        const me = this;
+        const options = { namespace: me.namespace };
+
+        appBus.on(EventTypes.APP_ADD_NEW_PANEL, me._boundAddNewPanel, options);
+        appBus.on(EventTypes.APP_RESET_STATE, me._boundResetLayoutSilent, options);
+        appBus.on(EventTypes.APP_SAVE_STATE, me._boundSaveLayout, options);
+        appBus.on(EventTypes.APP_RESTORE_STATE, me._boundRestoreLayout, options);
+        appBus.on(EventTypes.APP_RESET_STATE, me._boundResetLayout, options);
     }
 
     /**
