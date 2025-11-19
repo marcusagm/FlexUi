@@ -1,6 +1,7 @@
 import { Row } from '../Row/Row.js';
 import { appBus } from '../../utils/EventBus.js';
 import { FloatingPanelManagerService } from '../../services/DND/FloatingPanelManagerService.js';
+import { EventTypes } from '../../constants/EventTypes.js';
 
 /**
  * Description:
@@ -20,13 +21,13 @@ import { FloatingPanelManagerService } from '../../services/DND/FloatingPanelMan
  * document.body.append(this.container.element);
  *
  * Events:
- * - Listens to: 'row:empty' (to clean up empty rows)
- * - Emits: 'layout:rows-changed' (to notify LayoutService)
+ * - Listens to: EventTypes.ROW_EMPTY (to clean up empty rows)
+ * - Emits: EventTypes.LAYOUT_ROWS_CHANGED (to notify LayoutService)
  *
  * Business rules implemented:
  * - Renders 'Row' children vertically.
  * - Registers as a 'container' type drop zone.
- * - Listens for 'row:empty' and automatically removes any Row that
+ * - Listens for EventTypes.ROW_EMPTY and automatically removes any Row that
  * reports its last Column has been removed.
  * - Manages the vertical resize handles/collapse buttons for its child Rows.
  * - Forces recalculation of *column* resize handles on all child Rows
@@ -35,10 +36,13 @@ import { FloatingPanelManagerService } from '../../services/DND/FloatingPanelMan
  * Dependencies:
  * - components/Row/Row.js
  * - utils/EventBus.js
+ * - services/DND/FloatingPanelManagerService.js
+ * - ../../constants/EventTypes.js
  */
 export class Container {
     /**
      * Internal state holding child Row components.
+     *
      * @type {{children: Array<Row>}}
      * @private
      */
@@ -48,6 +52,7 @@ export class Container {
 
     /**
      * Unique namespace for this component's appBus listeners.
+     *
      * @type {string}
      * @private
      */
@@ -55,11 +60,16 @@ export class Container {
 
     /**
      * Stores the bound reference for the 'onRowEmpty' listener.
+     *
      * @type {Function | null}
      * @private
      */
     _boundOnRowEmpty = null;
 
+    /**
+     * Description:
+     * Creates an instance of Container.
+     */
     constructor() {
         const me = this;
         me.element = document.createElement('div');
@@ -77,16 +87,20 @@ export class Container {
     }
 
     /**
+     * Description:
      * Initializes appBus event listeners for this component.
+     *
      * @returns {void}
      */
     initEventListeners() {
         const me = this;
-        appBus.on('row:empty', me._boundOnRowEmpty, { namespace: me._namespace });
+        appBus.on(EventTypes.ROW_EMPTY, me._boundOnRowEmpty, { namespace: me._namespace });
     }
 
     /**
+     * Description:
      * Cleans up appBus listeners and destroys all child Row components.
+     *
      * @returns {void}
      */
     destroy() {
@@ -98,15 +112,19 @@ export class Container {
     }
 
     /**
+     * Description:
      * Notifies the LayoutService that the row layout has changed.
+     *
      * @returns {void}
      */
     requestLayoutUpdate() {
-        appBus.emit('layout:rows-changed', this);
+        appBus.emit(EventTypes.LAYOUT_ROWS_CHANGED, this);
     }
 
     /**
+     * Description:
      * Event handler for when a child Row reports it is empty.
+     *
      * @param {Row} row - The Row instance that emitted the event.
      * @returns {void}
      */
@@ -115,20 +133,24 @@ export class Container {
     }
 
     /**
+     * Description:
      * Updates the vertical resize bars for all child Rows.
      * The last Row is instructed not to show its bar.
+     *
      * @returns {void}
      */
     updateAllResizeBars() {
         const rows = this.getRows();
-        rows.forEach((row, idx) => {
-            row.addResizeBars(idx === rows.length - 1);
+        rows.forEach((row, index) => {
+            row.addResizeBars(index === rows.length - 1);
         });
     }
 
     /**
+     * Description:
      * Forces all child Rows to recalculate their *column* resize handles.
      * (Required to fix DND bugs where the "last" row changes).
+     *
      * @private
      * @returns {void}
      */
@@ -141,7 +163,9 @@ export class Container {
     }
 
     /**
+     * Description:
      * Creates and inserts a new Row component into the container.
+     *
      * @param {number|null} [height=null] - The initial height of the row.
      * @param {number|null} [index=null] - The exact state array index to insert at.
      * @returns {Row} The created Row instance.
@@ -171,7 +195,9 @@ export class Container {
     }
 
     /**
+     * Description:
      * Deletes a child Row.
+     *
      * @param {Row} row - The Row instance to remove.
      * @returns {void}
      */
@@ -195,24 +221,30 @@ export class Container {
     }
 
     /**
+     * Description:
      * Returns all child Row instances.
-     * @returns {Array<Row>}
+     *
+     * @returns {Array<Row>} All child row instances.
      */
     getRows() {
         return this._state.children;
     }
 
     /**
+     * Description:
      * Returns the total number of child Rows.
-     * @returns {number}
+     *
+     * @returns {number} The total number of rows.
      */
     getTotalRows() {
         return this.getRows().length;
     }
 
     /**
+     * Description:
      * Returns the first child Row. If none exists, creates one.
-     * @returns {Row}
+     *
+     * @returns {Row} The first row instance.
      */
     getFirstRow() {
         const rows = this.getRows();
@@ -220,7 +252,9 @@ export class Container {
     }
 
     /**
+     * Description:
      * Clears the container, destroying and removing all child Rows.
+     *
      * @returns {void}
      */
     clear() {
@@ -234,8 +268,10 @@ export class Container {
     }
 
     /**
+     * Description:
      * Serializes the Container state (and its child Rows) to JSON.
-     * @returns {object}
+     *
+     * @returns {object} The serialized layout object.
      */
     toJSON() {
         const me = this;
@@ -249,7 +285,9 @@ export class Container {
     }
 
     /**
+     * Description:
      * Deserializes state from JSON data.
+     *
      * @param {object} data - The state object (from default.json or localStorage).
      * @returns {void}
      */

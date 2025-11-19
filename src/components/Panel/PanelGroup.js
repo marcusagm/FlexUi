@@ -7,6 +7,7 @@ import { generateId } from '../../utils/generateId.js';
 import { FloatingPanelManagerService } from '../../services/DND/FloatingPanelManagerService.js';
 import { ResizeController } from '../../utils/ResizeController.js';
 import { ItemType, DropZoneType } from '../../constants/DNDTypes.js';
+import { EventTypes } from '../../constants/EventTypes.js';
 
 /**
  * Description:
@@ -17,10 +18,14 @@ import { ItemType, DropZoneType } from '../../constants/DNDTypes.js';
  * containers (TabContainer and ContentContainer).
  *
  * Properties summary:
+ * - id {string} : Unique ID for this instance (also used as namespace).
+ * - _namespace {string} : Unique namespace for appBus listeners.
+ * - _throttledUpdate {Function | null} : The throttled function for height updates.
  * - _state {object} : Internal state (child Panels, layout, parent Column).
  * - element {HTMLElement} : The main DOM element (<div class="panel-group">).
- * - id {string} : Unique ID for this instance.
- * - _namespace {string} : Unique namespace for appBus listeners (uses this.id).
+ * - _resizeHandleDocked {HTMLElement} : The bottom resize handle for docked state.
+ * - _floatingHandles {object} : Floating resize handles (se, s, e).
+ * - _resizeControllers {Map<string, ResizeController>} : Controllers for resize logic.
  *
  * Typical usage:
  * // In Column.js
@@ -29,12 +34,9 @@ import { ItemType, DropZoneType } from '../../constants/DNDTypes.js';
  * column.addPanelGroup(panelGroup);
  *
  * Events:
- * - Listens to: 'panel:group-child-close-request' (from PanelHeader via Panel)
- * - Listens to: 'panel:close-request' (from PanelGroupHeader)
- * - Listens to: 'panel:toggle-collapse-request' (from PanelGroupHeader)
- * - Listens to: 'app:close-panel-request' (from ContextMenu)
- * - Emits: 'panelgroup:removed' (when closed or empty)
- * - Emits: 'layout:panel-groups-changed' (to notify LayoutService)
+ * - Listens to: EventTypes.PANEL_GROUP_CHILD_CLOSE, EventTypes.APP_CLOSE_PANEL_REQUEST, EventTypes.PANEL_CLOSE_REQUEST, EventTypes.PANEL_TOGGLE_COLLAPSE
+ * - Emits: EventTypes.PANEL_GROUP_REMOVED (when closed or empty)
+ * - Emits: EventTypes.LAYOUT_PANELGROUPS_CHANGED (to notify LayoutService)
  *
  * Business rules implemented:
  * - Orchestrates Panel DOM (header vs. content).
@@ -54,11 +56,13 @@ import { ItemType, DropZoneType } from '../../constants/DNDTypes.js';
  * - ../../services/DND/FloatingPanelManagerService.js
  * - ../../utils/ResizeController.js
  * - ../../constants/DNDTypes.js
+ * - ../../constants/EventTypes.js
  */
 export class PanelGroup {
     /**
      * Unique ID for this PanelGroup instance.
      * Also used as the appBus namespace.
+     *
      * @type {string}
      * @public
      */
@@ -66,6 +70,7 @@ export class PanelGroup {
 
     /**
      * Unique namespace for appBus listeners.
+     *
      * @type {string}
      * @private
      */
@@ -73,12 +78,15 @@ export class PanelGroup {
 
     /**
      * The throttled (rAF) update function for resizing.
+     *
      * @type {Function | null}
      * @private
      */
     _throttledUpdate = null;
 
     /**
+     * Internal state for orientation, position, and groups.
+     *
      * @type {{
      * column: import('../Column/Column.js').Column | null,
      * header: PanelGroupHeader | null,
@@ -121,24 +129,32 @@ export class PanelGroup {
     };
 
     /**
+     * Bound handler for panel child close requests.
+     *
      * @type {Function | null}
      * @private
      */
     _boundOnChildCloseRequest = null;
 
     /**
+     * Bound handler for app close panel request from context menu.
+     *
      * @type {Function | null}
      * @private
      */
     _boundOnChildCloseRequestFromContext = null;
 
     /**
+     * Bound handler for panel group close request.
+     *
      * @type {Function | null}
      * @private
      */
     _boundOnCloseRequest = null;
 
     /**
+     * Bound handler for panel group toggle collapse request.
+     *
      * @type {Function | null}
      * @private
      */
@@ -146,6 +162,7 @@ export class PanelGroup {
 
     /**
      * The docked resize handle (bottom).
+     *
      * @type {HTMLElement}
      * @private
      */
@@ -153,6 +170,7 @@ export class PanelGroup {
 
     /**
      * Floating resize handles.
+     *
      * @type {{
      * se: HTMLElement,
      * s: HTMLElement,
@@ -165,13 +183,6 @@ export class PanelGroup {
         s: null,
         e: null
     };
-
-    /**
-     * Controllers for resize logic.
-     * @type {Map<string, ResizeController>}
-     * @private
-     */
-    _resizeControllers = new Map();
 
     /**
      * @param {Panel | null} [initialPanel=null] - The optional first panel.
@@ -232,8 +243,9 @@ export class PanelGroup {
     }
 
     /**
-     * <ThrottledUpdate> setter.
-     * @param {Function} throttledFunction
+     * ThrottledUpdate setter.
+     *
+     * @param {Function} throttledFunction - The throttled function to set.
      * @returns {void}
      */
     setThrottledUpdate(throttledFunction) {
@@ -241,15 +253,17 @@ export class PanelGroup {
     }
 
     /**
-     * <ThrottledUpdate> getter.
-     * @returns {Function | null}
+     * ThrottledUpdate getter.
+     *
+     * @returns {Function | null} The throttled update function.
      */
     getThrottledUpdate() {
         return this._throttledUpdate;
     }
 
     /**
-     * <HeaderHeight> getter.
+     * HeaderHeight getter.
+     *
      * @returns {number} The height of the header element.
      */
     getHeaderHeight() {
@@ -257,9 +271,10 @@ export class PanelGroup {
     }
 
     /**
-     * <MinPanelHeight> getter.
+     * MinPanelHeight getter.
      * Calculates the minimum panel height, including the dynamic height
      * of the docked resize handle (if visible).
+     *
      * @returns {number} The calculated minimum panel height.
      */
     getMinPanelHeight() {
@@ -278,7 +293,8 @@ export class PanelGroup {
     }
 
     /**
-     * <MinPanelWidth> getter.
+     * MinPanelWidth getter.
+     *
      * @returns {number} The calculated minimum panel width.
      */
     getMinPanelWidth() {
@@ -291,7 +307,8 @@ export class PanelGroup {
     }
 
     /**
-     * <ParentColumn> setter.
+     * ParentColumn setter.
+     *
      * @param {import('../Column/Column.js').Column} column - The parent column instance.
      * @returns {void}
      */
@@ -300,8 +317,9 @@ export class PanelGroup {
     }
 
     /**
-     * <Column> getter.
-     * @returns {import('../Column/Column.js').Column | null}
+     * Column getter.
+     *
+     * @returns {import('../Column/Column.js').Column | null} The parent column instance.
      */
     getColumn() {
         return this._state.column;
@@ -309,9 +327,10 @@ export class PanelGroup {
 
     /**
      * Sets the floating state and updates the DOM.
+     *
      * @param {boolean} isFloating - Whether the panel should be floating.
-     * @param {number|null} x - The X coordinate.
-     * @param {number|null} y - The Y coordinate.
+     * @param {number|null} x - The X coordinate (relative to container).
+     * @param {number|null} y - The Y coordinate (relative to container).
      * @returns {void}
      */
     setFloatingState(isFloating, x, y) {
@@ -348,21 +367,27 @@ export class PanelGroup {
 
     /**
      * Initializes appBus event listeners for this component.
+     *
      * @returns {void}
      */
     initEventListeners() {
         const me = this;
         const options = { namespace: me._namespace };
 
-        appBus.on('panel:group-child-close-request', me._boundOnChildCloseRequest, options);
-        appBus.on('app:close-panel-request', me._boundOnChildCloseRequestFromContext, options);
-        appBus.on('panel:close-request', me._boundOnCloseRequest, options);
-        appBus.on('panel:toggle-collapse-request', me._boundOnToggleCollapseRequest, options);
+        appBus.on(EventTypes.PANEL_GROUP_CHILD_CLOSE, me._boundOnChildCloseRequest, options);
+        appBus.on(
+            EventTypes.APP_CLOSE_PANEL_REQUEST,
+            me._boundOnChildCloseRequestFromContext,
+            options
+        );
+        appBus.on(EventTypes.PANEL_CLOSE_REQUEST, me._boundOnCloseRequest, options);
+        appBus.on(EventTypes.PANEL_TOGGLE_COLLAPSE, me._boundOnToggleCollapseRequest, options);
     }
 
     /**
      * Event handler for when a child Panel (tab) requests to close.
-     * @param {object} eventData
+     *
+     * @param {object} eventData - The event payload containing panel and group references.
      * @returns {void}
      */
     onChildCloseRequest({ panel, group }) {
@@ -373,7 +398,8 @@ export class PanelGroup {
 
     /**
      * Event handler for 'app:close-panel-request' from ContextMenu.
-     * @param {object} contextData
+     *
+     * @param {object} contextData - The data from the context menu action.
      * @returns {void}
      */
     onChildCloseRequestFromContext(contextData) {
@@ -382,7 +408,8 @@ export class PanelGroup {
 
     /**
      * Event handler for when this entire PanelGroup requests to close.
-     * @param {Panel | PanelGroup} panel
+     *
+     * @param {Panel | PanelGroup} panel - The component instance requesting closure.
      * @returns {void}
      */
     onCloseRequest(panel) {
@@ -393,7 +420,8 @@ export class PanelGroup {
 
     /**
      * Event handler to toggle the collapse state of this PanelGroup.
-     * @param {Panel | PanelGroup} panel
+     *
+     * @param {Panel | PanelGroup} panel - The component instance requesting collapse toggle.
      * @returns {void}
      */
     onToggleCollapseRequest(panel) {
@@ -404,6 +432,7 @@ export class PanelGroup {
 
     /**
      * Cleans up appBus listeners and destroys child components.
+     *
      * @returns {void}
      */
     destroy() {
@@ -420,6 +449,7 @@ export class PanelGroup {
 
     /**
      * Builds the component's main DOM structure.
+     *
      * @returns {void}
      */
     build() {
@@ -446,7 +476,8 @@ export class PanelGroup {
 
     /**
      * Gets the panel type identifier.
-     * @returns {string}
+     *
+     * @returns {string} The item type constant string.
      */
     getPanelType() {
         return ItemType.PANEL_GROUP;
@@ -454,6 +485,7 @@ export class PanelGroup {
 
     /**
      * Toggles the collapse state and requests a layout update.
+     *
      * @returns {void}
      */
     toggleCollapse() {
@@ -469,6 +501,7 @@ export class PanelGroup {
 
     /**
      * Applies the correct visibility state based on the internal state.
+     *
      * @returns {void}
      */
     updateCollapse() {
@@ -482,6 +515,7 @@ export class PanelGroup {
 
     /**
      * Hides the content and applies collapsed styles.
+     *
      * @returns {void}
      */
     collapse() {
@@ -495,6 +529,7 @@ export class PanelGroup {
 
     /**
      * Shows the content and removes collapsed styles.
+     *
      * @returns {void}
      */
     unCollapse() {
@@ -508,18 +543,20 @@ export class PanelGroup {
 
     /**
      * Closes the entire PanelGroup and notifies its parent Column.
+     *
      * @returns {void}
      */
     close() {
         const me = this;
         if (!me._state.closable) return;
 
-        appBus.emit('panelgroup:removed', { panel: me, column: me._state.column });
+        appBus.emit(EventTypes.PANEL_GROUP_REMOVED, { panel: me, column: me._state.column });
         me.destroy();
     }
 
     /**
      * Updates the CSS height/flex properties based on the current state.
+     *
      * @returns {void}
      */
     updateHeight() {
@@ -556,6 +593,7 @@ export class PanelGroup {
 
     /**
      * Updates the header's visual mode (simple vs. tabs).
+     *
      * @private
      * @returns {void}
      */
@@ -584,6 +622,7 @@ export class PanelGroup {
 
     /**
      * Adds a child Panel (tab) to this group at a specific index.
+     *
      * @param {Panel} panel - The panel instance to add.
      * @param {number|null} [index=null] - The index to insert at. Appends if null.
      * @param {boolean} [makeActive=false] - Whether to make this panel active.
@@ -643,6 +682,7 @@ export class PanelGroup {
 
     /**
      * Adds multiple child Panels (tabs) at once, optimized for state loading.
+     *
      * @param {Array<Panel>} panels - The panel instances to add.
      * @returns {void}
      */
@@ -665,8 +705,9 @@ export class PanelGroup {
 
     /**
      * Removes a child Panel (tab) from this group.
+     *
      * @param {Panel} panel - The panel instance to remove.
-     * @param {boolean} [isMoving=false] - If true, panel is not destroyed (DND).
+     * @param {boolean} [isMoving=false] - If true, panel is not destroyed (DND operation).
      * @returns {void}
      */
     removePanel(panel, isMoving = false) {
@@ -712,6 +753,7 @@ export class PanelGroup {
 
     /**
      * Moves an existing Panel (tab) to a new index within this group.
+     *
      * @param {Panel} panel - The Panel instance to move.
      * @param {number} newIndex - The target index.
      * @returns {void}
@@ -752,6 +794,7 @@ export class PanelGroup {
 
     /**
      * Sets a child Panel (tab) as the active one.
+     *
      * @param {Panel} panel - The panel instance to activate.
      * @returns {void}
      */
@@ -786,22 +829,24 @@ export class PanelGroup {
 
         panel.mount();
 
-        me.requestLayoutUpdate();
+        me.updateHeight();
     }
 
     /**
      * Emits an event to the LayoutService if this group is attached to a column.
+     *
      * @returns {void}
      */
     requestLayoutUpdate() {
         const column = this.getColumn();
         if (column && !this._state.isFloating) {
-            appBus.emit('layout:panel-groups-changed', column);
+            appBus.emit(EventTypes.LAYOUT_PANELGROUPS_CHANGED, column);
         }
     }
 
     /**
      * Creates the DOM elements for floating resize handles.
+     *
      * @private
      * @returns {void}
      */
@@ -828,6 +873,7 @@ export class PanelGroup {
      * Initializes ResizeControllers for all handles (docked and floating).
      * Uses a composite strategy for the SE handle to allow 2D resizing using
      * the 1D ResizeController.
+     *
      * @private
      * @returns {void}
      */
@@ -848,9 +894,9 @@ export class PanelGroup {
             onEnd: () => me.requestLayoutUpdate()
         });
 
-        me._resizeHandleDocked.addEventListener('pointerdown', e => {
+        me._resizeHandleDocked.addEventListener('pointerdown', event => {
             if (!me._state.isFloating && !me._state.collapsed) {
-                dockedController.start(e);
+                dockedController.start(event);
             }
         });
 
@@ -887,8 +933,8 @@ export class PanelGroup {
             },
             onUpdate: delta => updateFloatingSize(null, delta)
         });
-        me._floatingHandles.s.addEventListener('pointerdown', e => {
-            if (me._state.isFloating) floatS.start(e);
+        me._floatingHandles.s.addEventListener('pointerdown', event => {
+            if (me._state.isFloating) floatS.start(event);
         });
 
         // --- 4. Floating Handle: East (Horizontal) ---
@@ -898,8 +944,8 @@ export class PanelGroup {
             },
             onUpdate: delta => updateFloatingSize(delta, null)
         });
-        me._floatingHandles.e.addEventListener('pointerdown', e => {
-            if (me._state.isFloating) floatE.start(e);
+        me._floatingHandles.e.addEventListener('pointerdown', event => {
+            if (me._state.isFloating) floatE.start(event);
         });
 
         // --- 5. Floating Handle: South-East (2D) ---
@@ -918,17 +964,18 @@ export class PanelGroup {
             onUpdate: delta => updateFloatingSize(delta, null)
         });
 
-        me._floatingHandles.se.addEventListener('pointerdown', e => {
+        me._floatingHandles.se.addEventListener('pointerdown', event => {
             if (me._state.isFloating) {
-                floatSE_V.start(e);
-                floatSE_H.start(e);
+                floatSE_V.start(event);
+                floatSE_H.start(event);
             }
         });
     }
 
     /**
      * Serializes the PanelGroup state (and its child Panels) to JSON.
-     * @returns {object}
+     *
+     * @returns {object} The serialized state object.
      */
     toJSON() {
         const me = this;
@@ -955,6 +1002,7 @@ export class PanelGroup {
 
     /**
      * Deserializes state from JSON data.
+     *
      * @param {object} data - The state object.
      * @returns {void}
      */

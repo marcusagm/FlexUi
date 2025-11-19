@@ -1,12 +1,12 @@
 import { TranslationService } from '../TranslationService.js';
-import { appBus } from '../../utils/EventBus.js'; // (NOVO) Importa o appBus
+import { appBus } from '../../utils/EventBus.js';
+import { EventTypes } from '../../constants/EventTypes.js';
 
 /**
  * Description:
  * Handles the rendering and DOM manipulation of notifications.
- * This class listens to 'show-notification' and 'dismiss-notification' events
- * dispatched on the document (e.g., by NotificationService) and translates
- * them into visible HTML elements. It uses TranslationService for button
+ * This class listens to notification events dispatched on the internal EventBus (appBus)
+ * and translates them into visible HTML elements. It uses TranslationService for button
  * localization and assumes a BEM-style CSS structure for styling.
  *
  * Properties summary:
@@ -16,15 +16,22 @@ import { appBus } from '../../utils/EventBus.js'; // (NOVO) Importa o appBus
  * - _iconMap {object} : A mapping of notification types to their corresponding CSS icon classes.
  *
  * Typical usage:
- * (Usage remains the same as previously defined)
+ * // In main.js
+ * const uiListener = new NotificationUIListener(document.body);
+ * uiListener.listen(appNotifications);
  *
- * Notes / Additional:
- * - This class relies on CSS classes defined in your global stylesheet (e.g., all.css)
- * for all styling, icons, and animations (e.g., .notification, .notification--warning, .is-entering).
+ * Events:
+ * - Listens to (appBus): EventTypes.NOTIFICATION_SHOW, EventTypes.NOTIFICATION_DISMISS
+ *
+ * Dependencies:
+ * - ../TranslationService.js
+ * - ../../utils/EventBus.js
+ * - ../../constants/EventTypes.js
  */
 export class NotificationUIListener {
     /**
      * The main DOM element where notification containers will be appended.
+     *
      * @private
      * @type {HTMLElement}
      */
@@ -32,6 +39,7 @@ export class NotificationUIListener {
 
     /**
      * Stores references to notification containers (e.g., '.notification-container--top-right').
+     *
      * @private
      * @type {Map<string, HTMLElement>}
      */
@@ -39,6 +47,7 @@ export class NotificationUIListener {
 
     /**
      * A reference to the NotificationService, required to call dismiss() from buttons.
+     *
      * @private
      * @type {object|null}
      */
@@ -46,6 +55,7 @@ export class NotificationUIListener {
 
     /**
      * Maps notification types to their CSS icon classes.
+     *
      * @private
      * @type {object}
      */
@@ -53,23 +63,25 @@ export class NotificationUIListener {
 
     /**
      * Initializes the listener.
+     *
      * @param {HTMLElement} [targetElement=document.body] - The element to which notification containers will be attached.
      */
     constructor(targetElement = document.body) {
+        const me = this;
         if (!targetElement || typeof targetElement.appendChild !== 'function') {
             console.error(
                 'NotificationUIListener: Invalid targetElement provided. Defaulting to document.body.'
             );
-            this._targetElement = document.body;
+            me._targetElement = document.body;
         } else {
-            this._targetElement = targetElement;
+            me._targetElement = targetElement;
         }
 
-        this._containerMap = new Map();
-        this._notificationService = null;
+        me._containerMap = new Map();
+        me._notificationService = null;
 
         // Use the setter to initialize
-        this.iconMap = {
+        me.iconMap = {
             info: 'icon-info-circle',
             success: 'icon-check-circle',
             warning: 'icon-warning-triangle',
@@ -79,6 +91,7 @@ export class NotificationUIListener {
 
     /**
      * Gets the icon map object.
+     *
      * @returns {object} The current icon map.
      */
     get iconMap() {
@@ -87,7 +100,9 @@ export class NotificationUIListener {
 
     /**
      * Sets and merges the icon map object.
+     *
      * @param {object} newMap - An object mapping notification types to CSS icon classes.
+     * @returns {void}
      */
     set iconMap(newMap) {
         if (typeof newMap !== 'object' || newMap === null || Array.isArray(newMap)) {
@@ -99,10 +114,13 @@ export class NotificationUIListener {
 
     /**
      * Starts listening for notification events on the document.
+     *
      * @param {object} notificationServiceInstance - The instance of NotificationService.
      * This is needed to allow default buttons to call the dismiss() method.
+     * @returns {void}
      */
     listen(notificationServiceInstance) {
+        const me = this;
         if (
             !notificationServiceInstance ||
             typeof notificationServiceInstance.dismiss !== 'function'
@@ -112,27 +130,22 @@ export class NotificationUIListener {
             );
             return;
         }
-        this._notificationService = notificationServiceInstance;
+        me._notificationService = notificationServiceInstance;
 
-        // (INÍCIO DA MODIFICAÇÃO - Etapa 2)
-        // Bind 'this' context for event handlers
-        // document.addEventListener('show-notification', this._handleShow.bind(this)); (REMOVIDO)
-        // document.addEventListener('dismiss-notification', this._handleDismiss.bind(this)); (REMOVIDO)
-
-        // (NOVO) Ouve o appBus
-        appBus.on('show-notification', this._handleShow.bind(this));
-        appBus.on('dismiss-notification', this._handleDismiss.bind(this));
-        // (FIM DA MODIFICAÇÃO)
+        // Listen to appBus events using constants
+        appBus.on(EventTypes.NOTIFICATION_SHOW, me._handleShow.bind(me));
+        appBus.on(EventTypes.NOTIFICATION_DISMISS, me._handleDismiss.bind(me));
     }
 
     /**
-     * (MODIFICADO) Handles the 'show-notification' event from 'appBus'.
+     * Handles the 'show-notification' event from 'appBus'.
+     *
      * @param {object} options - The event payload (options object).
      * @private
+     * @returns {void}
      */
     _handleShow(options) {
         const me = this;
-        // const options = event.detail; (REMOVIDO)
 
         // 1. Get or create the container for this position
         const container = me._getContainer(options.position);
@@ -193,14 +206,15 @@ export class NotificationUIListener {
     }
 
     /**
-     * (MODIFICADO) Handles the 'dismiss-notification' event from 'appBus'.
+     * Handles the 'dismiss-notification' event from 'appBus'.
+     *
      * @param {object} payload - The event payload ({ id: string }).
      * @private
+     * @returns {void}
      */
     _handleDismiss(payload) {
         const me = this;
-        const { id } = payload; // (MODIFICADO) Lê do payload
-        // const { id } = event.detail; (REMOVIDO)
+        const { id } = payload;
         const element = document.querySelector(`.notification[data-id="${id}"]`);
 
         if (!element) {
@@ -211,14 +225,7 @@ export class NotificationUIListener {
         element.classList.remove('is-entering');
         element.classList.add('is-exiting');
 
-        // =================================================================
-        // == CORREÇÃO APLICADA AQUI ==
-        // =================================================================
-        //
-        // Ouve 'transitionend' (para CSS 'transition')
-        // em vez de 'animationend' (para CSS '@keyframes').
-        // '{ once: true }' garante que o evento só dispare uma vez.
-        //
+        // Ouve 'transitionend' para remover o elemento após a animação de saída.
         element.addEventListener(
             'transitionend',
             () => {
@@ -228,13 +235,11 @@ export class NotificationUIListener {
             },
             { once: true }
         );
-        // =================================================================
-        // == FIM DA CORREÇÃO ==
-        // =================================================================
     }
 
     /**
      * Gets or creates the DOM container for a specific notification position.
+     *
      * @param {string} position - e.g., 'top-right', 'bottom-center'.
      * @returns {HTMLElement} The container element.
      * @private
@@ -255,6 +260,7 @@ export class NotificationUIListener {
 
     /**
      * Builds the CSS class list for the main notification element.
+     *
      * @param {object} options - The notification options.
      * @returns {string} The complete class string.
      * @private
@@ -275,6 +281,7 @@ export class NotificationUIListener {
 
     /**
      * Creates the icon element based on notification type.
+     *
      * @param {object} options - The notification options.
      * @returns {HTMLElement|null} The icon element or null.
      * @private
@@ -299,6 +306,7 @@ export class NotificationUIListener {
 
     /**
      * Creates the close (X) button for sticky notifications.
+     *
      * @param {string} id - The ID of the notification to dismiss.
      * @returns {HTMLElement} The close button element.
      * @private
@@ -320,6 +328,7 @@ export class NotificationUIListener {
 
     /**
      * Creates the button container, including default (OK/Cancel) and custom buttons.
+     *
      * @param {object} options - The notification options.
      * @returns {HTMLElement|null} The buttons container element or null if no buttons.
      * @private
@@ -374,7 +383,9 @@ export class NotificationUIListener {
 
     /**
      * Removes any notification containers that are empty.
+     *
      * @private
+     * @returns {void}
      */
     _cleanupEmptyContainers() {
         const me = this;

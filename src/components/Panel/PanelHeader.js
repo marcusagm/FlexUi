@@ -1,6 +1,7 @@
 import { appBus } from '../../utils/EventBus.js';
 import { ContextMenuService } from '../../services/ContextMenu/ContextMenuService.js';
 import { DragTrigger } from '../../utils/DragTrigger.js';
+import { EventTypes } from '../../constants/EventTypes.js';
 
 /**
  * Description:
@@ -18,22 +19,27 @@ import { DragTrigger } from '../../utils/DragTrigger.js';
  * - _titleEl {HTMLElement} : The <span> element for the title.
  * - _closeBtn {HTMLElement} : The <button> element for the close button.
  * - _dragTrigger {DragTrigger} : Utility to handle drag/click detection.
+ * - _boundOnCloseClick {Function | null} : Bound handler for the close button click.
+ * - _boundOnContextMenu {Function | null} : Bound handler for the context menu event.
  *
  * Typical usage:
  * // Instantiated by Panel.js
  * this._state.header = new PanelHeader(this, panelTitle);
  *
  * Events:
- * - Emits (appBus): 'dragstart'
- * - Emits (appBus): 'panel:group-child-close-request'
+ * - Emits (appBus): EventTypes.DND_DRAG_START
+ * - Emits (appBus): EventTypes.PANEL_GROUP_CHILD_CLOSE
  *
  * Dependencies:
  * - ../../utils/EventBus.js
  * - ../../services/ContextMenu/ContextMenuService.js
  * - ../../utils/DragTrigger.js
+ * - ../../constants/EventTypes.js
  */
 export class PanelHeader {
     /**
+     * Internal state for the PanelHeader.
+     *
      * @type {{
      * title: string | null,
      * panel: import('./Panel.js').Panel | null,
@@ -48,7 +54,8 @@ export class PanelHeader {
     };
 
     /**
-     * The main DOM element (the tab: .panel-group__tab)
+     * The main DOM element (the tab: .panel-group__tab).
+     *
      * @type {HTMLElement}
      * @public
      */
@@ -56,6 +63,7 @@ export class PanelHeader {
 
     /**
      * The <span> element holding the title text.
+     *
      * @type {HTMLElement}
      * @private
      */
@@ -63,6 +71,7 @@ export class PanelHeader {
 
     /**
      * The close <button> element.
+     *
      * @type {HTMLElement}
      * @private
      */
@@ -70,18 +79,23 @@ export class PanelHeader {
 
     /**
      * Utility to handle drag/click detection.
+     *
      * @type {DragTrigger}
      * @private
      */
     _dragTrigger;
 
     /**
+     * Bound handler for the close button click event.
+     *
      * @type {Function | null}
      * @private
      */
     _boundOnCloseClick = null;
 
     /**
+     * Bound handler for the context menu event.
+     *
      * @type {Function | null}
      * @private
      */
@@ -107,13 +121,14 @@ export class PanelHeader {
         // Initialize DragTrigger
         me._dragTrigger = new DragTrigger(me.element, {
             threshold: 5,
-            onDragStart: (e, startCoords) => me._startDrag(e, startCoords),
-            onClick: e => me.onTabClick(e)
+            onDragStart: (event, startCoords) => me._startDrag(event, startCoords),
+            onClick: event => me.onTabClick(event)
         });
     }
 
     /**
      * Builds the DOM for the tab.
+     *
      * @returns {void}
      */
     build() {
@@ -138,7 +153,7 @@ export class PanelHeader {
 
         // Important: Stop propagation on pointerdown to prevent DragTrigger
         // from starting a drag when the user intends to click the close button.
-        me._closeBtn.addEventListener('pointerdown', e => e.stopPropagation());
+        me._closeBtn.addEventListener('pointerdown', event => event.stopPropagation());
 
         me.element.appendChild(me._closeBtn);
     }
@@ -146,6 +161,7 @@ export class PanelHeader {
     /**
      * Initializes context menu and close button listeners.
      * Note: Drag/Click on the main element is handled by DragTrigger.
+     *
      * @returns {void}
      */
     initEventListeners() {
@@ -156,6 +172,7 @@ export class PanelHeader {
 
     /**
      * Removes event listeners to prevent memory leaks.
+     *
      * @returns {void}
      */
     destroy() {
@@ -171,11 +188,13 @@ export class PanelHeader {
 
     /**
      * Actually emits the dragstart event to the DragDropService.
-     * @param {PointerEvent} e - The pointer event.
-     * @param {object} startCoords - { startX, startY } from DragTrigger.
+     *
+     * @param {PointerEvent} event - The pointer event that triggered the drag start.
+     * @param {object} startCoords - { startX, startY } from DragTrigger indicating the pointerdown position.
      * @private
+     * @returns {void}
      */
-    _startDrag(e, startCoords) {
+    _startDrag(event, startCoords) {
         const me = this;
 
         // Calculate offset based on the original pointerdown position (startX/Y)
@@ -184,11 +203,11 @@ export class PanelHeader {
         const offsetX = startCoords.startX - rect.left;
         const offsetY = startCoords.startY - rect.top;
 
-        appBus.emit('dragstart', {
+        appBus.emit(EventTypes.DND_DRAG_START, {
             item: me._state.panel,
             type: 'Panel',
             element: me.element,
-            event: e,
+            event: event,
             offsetX: offsetX,
             offsetY: offsetY
         });
@@ -196,17 +215,18 @@ export class PanelHeader {
 
     /**
      * Handles clicks on the tab's close (X) button.
-     * @param {MouseEvent} e
+     *
+     * @param {MouseEvent} event - The mouse click event.
      * @returns {void}
      */
-    onCloseClick(e) {
-        e.stopPropagation();
+    onCloseClick(event) {
+        event.stopPropagation();
         const me = this;
 
         if (!me._state.panel._state.closable) return;
 
         if (me._state.parentGroup) {
-            appBus.emit('panel:group-child-close-request', {
+            appBus.emit(EventTypes.PANEL_GROUP_CHILD_CLOSE, {
                 panel: me._state.panel,
                 group: me._state.parentGroup
             });
@@ -216,10 +236,11 @@ export class PanelHeader {
     /**
      * Handles clicks on the tab to activate it.
      * Invoked by DragTrigger when the movement is below threshold.
-     * @param {MouseEvent} e
+     *
+     * @param {MouseEvent} event - The mouse click event.
      * @returns {void}
      */
-    onTabClick(e) {
+    onTabClick(event) {
         const me = this;
         if (me._state.parentGroup) {
             me._state.parentGroup.setActive(me._state.panel);
@@ -228,25 +249,26 @@ export class PanelHeader {
 
     /**
      * Handles the context menu (right-click) event on the tab.
-     * @param {MouseEvent} e
+     *
+     * @param {MouseEvent} event - The native contextmenu event.
      * @returns {void}
      */
-    onContextMenu(e) {
-        e.preventDefault();
-        e.stopPropagation();
+    onContextMenu(event) {
+        event.preventDefault();
+        event.stopPropagation();
 
         const me = this;
         const panelState = me._state.panel._state;
         const menuItems = [
             {
                 title: 'Desacoplar Painel',
-                event: 'app:undock-panel-request',
+                event: EventTypes.APP_UNDOCK_PANEL_REQUEST,
                 disabled: !panelState.movable || panelState.parentGroup._state.isFloating
             },
             { isSeparator: true },
             {
                 title: 'Fechar Aba',
-                event: 'app:close-panel-request',
+                event: EventTypes.APP_CLOSE_PANEL_REQUEST,
                 disabled: !panelState.closable
             }
         ];
@@ -254,15 +276,16 @@ export class PanelHeader {
         const contextData = {
             panel: me._state.panel,
             group: me._state.parentGroup,
-            nativeEvent: e
+            nativeEvent: event
         };
 
-        ContextMenuService.getInstance().show(e, menuItems, contextData);
+        ContextMenuService.getInstance().show(event, menuItems, contextData);
     }
 
     /**
-     * <ParentGroup> setter.
-     * @param {import('./PanelGroup.js').PanelGroup} group - The parent PanelGroup.
+     * ParentGroup setter.
+     *
+     * @param {import('./PanelGroup.js').PanelGroup | null} group - The parent PanelGroup instance.
      * @returns {void}
      */
     setParentGroup(group) {
@@ -271,7 +294,8 @@ export class PanelHeader {
 
     /**
      * Updates the title text in the DOM.
-     * @param {string} title
+     *
+     * @param {string} title - The new title string.
      * @returns {void}
      */
     setTitle(title) {
@@ -280,8 +304,9 @@ export class PanelHeader {
     }
 
     /**
-     * Updates the UI based on the Panel's configuration (e.g., from fromJSON).
-     * @param {object} config - { closable, movable }
+     * Updates the UI based on the Panel's configuration (e.g., closable, movable).
+     *
+     * @param {object} config - The panel configuration object ({ closable, movable }).
      * @returns {void}
      */
     updateConfig(config) {
@@ -305,7 +330,8 @@ export class PanelHeader {
     /**
      * Toggles the visual appearance between 'simple' (header) and 'tab' mode.
      * Also manages the draggable state logic via attributes.
-     * @param {boolean} isSimpleMode
+     *
+     * @param {boolean} isSimpleMode - True if rendering in single-panel mode.
      * @returns {void}
      */
     setMode(isSimpleMode) {

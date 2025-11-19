@@ -1,5 +1,6 @@
 import { appBus } from '../../utils/EventBus.js';
 import { throttleRAF } from '../../utils/ThrottleRAF.js';
+import { EventTypes } from '../../constants/EventTypes.js';
 
 /**
  * Description:
@@ -28,14 +29,17 @@ import { throttleRAF } from '../../utils/ThrottleRAF.js';
  * - SUBMENU_HIDE_DELAY {number} : Delay in ms before closing a submenu on mouseleave.
  *
  * Events:
- * - Emits (appBus): 'contextmenu:opened'
+ * - Emits (appBus): EventTypes.CONTEXT_MENU_OPENED
  *
  * Dependencies:
  * - ../../utils/EventBus.js
  * - ../../utils/ThrottleRAF.js
+ * - ../../constants/EventTypes.js
  */
 export class ContextMenuService {
     /**
+     * The private static instance.
+     *
      * @type {ContextMenuService | null}
      * @private
      */
@@ -43,6 +47,7 @@ export class ContextMenuService {
 
     /**
      * The main DOM element (<div class="context-menu">).
+     *
      * @type {HTMLElement}
      * @private
      */
@@ -50,6 +55,7 @@ export class ContextMenuService {
 
     /**
      * The <ul> element that holds the main menu items.
+     *
      * @type {HTMLElement}
      * @private
      */
@@ -57,6 +63,7 @@ export class ContextMenuService {
 
     /**
      * The <div> wrapper for scrolling the main list.
+     *
      * @type {HTMLElement}
      * @private
      */
@@ -64,6 +71,7 @@ export class ContextMenuService {
 
     /**
      * The main menu 'scroll up' button.
+     *
      * @type {HTMLElement}
      * @private
      */
@@ -71,6 +79,7 @@ export class ContextMenuService {
 
     /**
      * The main menu 'scroll down' button.
+     *
      * @type {HTMLElement}
      * @private
      */
@@ -78,6 +87,7 @@ export class ContextMenuService {
 
     /**
      * Tracks open <li> -> <div> (submenu wrapper) mappings.
+     *
      * @type {Map<HTMLElement, HTMLElement>}
      * @private
      */
@@ -85,6 +95,7 @@ export class ContextMenuService {
 
     /**
      * The setTimeout ID for delayed submenu closing.
+     *
      * @type {number | null}
      * @private
      */
@@ -92,6 +103,7 @@ export class ContextMenuService {
 
     /**
      * The bound listener for closing the menu.
+     *
      * @type {Function}
      * @private
      */
@@ -99,6 +111,7 @@ export class ContextMenuService {
 
     /**
      * Tracks active scroll intervals (setInterval IDs) keyed by viewport element.
+     *
      * @type {Map<HTMLElement, number>}
      * @private
      */
@@ -106,6 +119,7 @@ export class ContextMenuService {
 
     /**
      * Height of one scroll button + its border (20px + 1px)
+     *
      * @type {number}
      * @private
      */
@@ -113,6 +127,7 @@ export class ContextMenuService {
 
     /**
      * Vertical padding of the viewport (4px top + 4px bottom)
+     *
      * @type {number}
      * @private
      */
@@ -120,12 +135,17 @@ export class ContextMenuService {
 
     /**
      * Delay in ms before closing a submenu on mouseleave.
+     *
      * @type {number}
      * @private
      */
     SUBMENU_HIDE_DELAY = 200;
 
     /**
+     * Description:
+     * Private constructor for the Singleton.
+     * Initializes the menu DOM structure and listeners.
+     *
      * @private
      */
     constructor() {
@@ -152,8 +172,10 @@ export class ContextMenuService {
     }
 
     /**
+     * Description:
      * Gets the single instance of the service.
-     * @returns {ContextMenuService}
+     *
+     * @returns {ContextMenuService} The singleton instance.
      */
     static getInstance() {
         if (!ContextMenuService._instance) {
@@ -163,14 +185,16 @@ export class ContextMenuService {
     }
 
     /**
+     * Description:
      * Creates a complete, self-contained menu DOM structure.
+     *
      * @returns {{
      * wrapper: HTMLElement,
      * list: HTMLElement,
      * viewport: HTMLElement,
      * upBtn: HTMLElement,
      * downBtn: HTMLElement
-     * }}
+     * }} An object containing the created DOM elements.
      * @private
      */
     _createMenuStructure() {
@@ -200,7 +224,9 @@ export class ContextMenuService {
     }
 
     /**
+     * Description:
      * Initializes global listeners for the service.
+     *
      * @private
      * @returns {void}
      */
@@ -211,10 +237,12 @@ export class ContextMenuService {
     }
 
     /**
+     * Description:
      * Attaches scroll-related listeners to a specific menu structure.
-     * @param {HTMLElement} viewport
-     * @param {HTMLElement} upBtn
-     * @param {HTMLElement} downBtn
+     *
+     * @param {HTMLElement} viewport - The scrollable container element.
+     * @param {HTMLElement} upBtn - The scroll up button element.
+     * @param {HTMLElement} downBtn - The scroll down button element.
      * @private
      * @returns {void}
      */
@@ -232,8 +260,10 @@ export class ContextMenuService {
     }
 
     /**
+     * Description:
      * Handles global clicks to close the menu.
-     * @param {MouseEvent} event
+     *
+     * @param {MouseEvent} event - The native click event.
      * @private
      * @returns {void}
      */
@@ -251,9 +281,11 @@ export class ContextMenuService {
     }
 
     /**
+     * Description:
      * Closes the active context menu if another one is about to be opened,
      * unless the click is inside the currently open menu.
-     * @param {MouseEvent} event
+     *
+     * @param {MouseEvent} event - The native contextmenu event.
      * @private
      * @returns {void}
      */
@@ -270,7 +302,9 @@ export class ContextMenuService {
     }
 
     /**
+     * Description:
      * Clears the DOM items from the main menu list.
+     *
      * @private
      * @returns {void}
      */
@@ -279,7 +313,9 @@ export class ContextMenuService {
     }
 
     /**
+     * Description:
      * Recursively builds the menu item DOM from a JSON structure.
+     *
      * @param {Array<object>} items - The array of menu item objects.
      * @param {HTMLElement} parentElement - The <ul> element to append to.
      * @param {object} contextData - The arbitrary data to pass to actions.
@@ -327,7 +363,9 @@ export class ContextMenuService {
     }
 
     /**
+     * Description:
      * Handles opening a submenu on mouseenter.
+     *
      * @param {MouseEvent} event - The native mouse event.
      * @param {Array<object>} childrenItems - The child items for the new submenu.
      * @param {object} contextData - The context data to pass down.
@@ -370,7 +408,9 @@ export class ContextMenuService {
     }
 
     /**
+     * Description:
      * Handles starting the timer to close submenus on mouseleave.
+     *
      * @private
      * @returns {void}
      */
@@ -383,8 +423,10 @@ export class ContextMenuService {
     }
 
     /**
+     * Description:
      * Closes all submenus, or all submenus that are not ancestors
      * of the currently hovered <li>.
+     *
      * @param {HTMLElement | null} [currentLi=null] - The <li> currently hovered.
      * @private
      * @returns {void}
@@ -420,8 +462,10 @@ export class ContextMenuService {
     }
 
     /**
+     * Description:
      * Handles the click action on a final menu item.
-     * @param {MouseEvent} event
+     *
+     * @param {MouseEvent} event - The native click event.
      * @param {object} item - The item configuration object.
      * @param {object} contextData - The data associated with the context.
      * @private
@@ -446,15 +490,16 @@ export class ContextMenuService {
     }
 
     /**
+     * Description:
      * Updates the disabled state of scroll buttons based on scroll position.
-     * @param {HTMLElement} viewport
-     * @param {HTMLElement} upBtn
-     * @param {HTMLElement} downBtn
+     *
+     * @param {HTMLElement} viewport - The scrollable viewport element.
+     * @param {HTMLElement} upBtn - The scroll up button element.
+     * @param {HTMLElement} downBtn - The scroll down button element.
      * @private
      * @returns {void}
      */
     _updateScrollButtonsState(viewport, upBtn, downBtn) {
-        const me = this;
         if (!viewport) {
             return;
         }
@@ -469,11 +514,13 @@ export class ContextMenuService {
     }
 
     /**
+     * Description:
      * Starts a continuous scroll on hover.
+     *
      * @param {number} direction - -1 for up, 1 for down.
-     * @param {HTMLElement} viewport
-     * @param {HTMLElement} upBtn
-     * @param {HTMLElement} downBtn
+     * @param {HTMLElement} viewport - The scrollable viewport.
+     * @param {HTMLElement} upBtn - The scroll up button.
+     * @param {HTMLElement} downBtn - The scroll down button.
      * @private
      * @returns {void}
      */
@@ -498,8 +545,10 @@ export class ContextMenuService {
     }
 
     /**
+     * Description:
      * Stops the continuous scroll for a specific viewport.
-     * @param {HTMLElement} viewport
+     *
+     * @param {HTMLElement} viewport - The scrollable viewport.
      * @private
      * @returns {void}
      */
@@ -512,9 +561,11 @@ export class ContextMenuService {
     }
 
     /**
+     * Description:
      * Calculates the (x, y) position and max-height for a menu,
      * ensuring it stays within the viewport boundaries and flipping
      * upward or leftward if necessary.
+     *
      * @param {HTMLElement} menuWrapper - The menu element to position.
      * @param {number} x - The initial clientX (for main menu).
      * @param {number} y - The initial clientY (for main menu).
@@ -624,7 +675,9 @@ export class ContextMenuService {
     }
 
     /**
+     * Description:
      * Displays the context menu at a specific position.
+     *
      * @param {MouseEvent} event - The native 'contextmenu' event.
      * @param {Array<object>} items - The array of item config objects.
      * @param {object} [contextData={}] - Arbitrary data (e.g., the target panel).
@@ -641,27 +694,13 @@ export class ContextMenuService {
 
         me._positionAndFitMenu(me._menuElement, event.clientX, event.clientY, false, null);
 
-        appBus.emit('contextmenu:opened');
+        appBus.emit(EventTypes.CONTEXT_MENU_OPENED);
     }
 
     /**
+     * Description:
      * Closes and clears the context menu.
-     * @returns {void}
-     */
-    close() {
-        const me = this;
-        clearTimeout(me._submenuHideTimer);
-        me._closeSubmenus();
-
-        if (me._menuElement.style.display === 'flex') {
-            me._menuElement.style.display = 'none';
-            me._stopScroll(me._viewportElement);
-            me._clearMenu();
-        }
-    }
-
-    /**
-     * Cleans up the service (e.g., during application shutdown).
+     *
      * @returns {void}
      */
     destroy() {
@@ -679,5 +718,23 @@ export class ContextMenuService {
         me._scrollUpBtn = null;
         me._scrollDownBtn = null;
         ContextMenuService._instance = null;
+    }
+
+    /**
+     * Description:
+     * Closes and clears the context menu.
+     *
+     * @returns {void}
+     */
+    close() {
+        const me = this;
+        clearTimeout(me._submenuHideTimer);
+        me._closeSubmenus();
+
+        if (me._menuElement.style.display === 'flex') {
+            me._menuElement.style.display = 'none';
+            me._stopScroll(me._viewportElement);
+            me._clearMenu();
+        }
     }
 }

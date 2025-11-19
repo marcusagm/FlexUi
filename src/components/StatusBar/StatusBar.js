@@ -1,4 +1,5 @@
 import { appBus } from '../../utils/EventBus.js';
+import { EventTypes } from '../../constants/EventTypes.js';
 
 /**
  * Description:
@@ -8,6 +9,12 @@ import { appBus } from '../../utils/EventBus.js';
  * Properties summary:
  * - element {HTMLElement}: The main DOM element (<div class="status-bar">).
  * - _namespace {string} : Unique namespace for appBus listeners.
+ * - _permanentMessageElement {HTMLElement} : The element for the permanent message.
+ * - _tempMessageElement {HTMLElement} : The element for the temporary message.
+ * - _messageTimer {number|null} : Stores the setTimeout ID for clearing temporary messages.
+ * - _boundSetMessage {Function|null} : Bound handler for setting a temporary message.
+ * - _boundSetPermanentMessage {Function|null} : Bound handler for setting a permanent message.
+ * - _boundClearMessage {Function|null} : Bound handler for clearing the temporary message.
  *
  * Typical usage:
  * // In App.js
@@ -15,10 +22,11 @@ import { appBus } from '../../utils/EventBus.js';
  * document.body.appendChild(statusBar.element);
  *
  * Events:
- * - Listens to: 'app:set-status-message', 'app:set-permanent-status', 'app:clear-status'
+ * - Listens to (appBus): EventTypes.STATUSBAR_SET_STATUS, EventTypes.STATUSBAR_SET_PERMANENT_STATUS, EventTypes.STATUSBAR_CLEAR_STATUS
  *
  * Dependencies:
  * - ../../utils/EventBus.js
+ * - ../../constants/EventTypes.js
  */
 export class StatusBar {
     /**
@@ -57,18 +65,21 @@ export class StatusBar {
     _messageTimer = null;
 
     /**
+     * Bound handler for setting a temporary message.
      * @type {Function | null}
      * @private
      */
     _boundSetMessage = null;
 
     /**
+     * Bound handler for setting a permanent message.
      * @type {Function | null}
      * @private
      */
     _boundSetPermanentMessage = null;
 
     /**
+     * Bound handler for clearing the temporary message.
      * @type {Function | null}
      * @private
      */
@@ -108,9 +119,9 @@ export class StatusBar {
         const me = this;
         const options = { namespace: me._namespace };
 
-        appBus.on('app:set-status-message', me._boundSetMessage, options);
-        appBus.on('app:set-permanent-status', me._boundSetPermanentMessage, options);
-        appBus.on('app:clear-status', me._boundClearMessage, options);
+        appBus.on(EventTypes.STATUSBAR_SET_STATUS, me._boundSetMessage, options);
+        appBus.on(EventTypes.STATUSBAR_SET_PERMANENT_STATUS, me._boundSetPermanentMessage, options);
+        appBus.on(EventTypes.STATUSBAR_CLEAR_STATUS, me._boundClearMessage, options);
     }
 
     /**

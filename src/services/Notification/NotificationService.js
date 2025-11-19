@@ -1,10 +1,12 @@
 import { appBus } from '../../utils/EventBus.js';
+import { EventTypes } from '../../constants/EventTypes.js';
+import { generateId } from '../../utils/generateId.js';
 
 /**
  * Description:
  * Provides a decoupled service for dispatching notification events (Toasts and Snackbars).
- * This class does not render the UI itself; it fires CustomEvents on the document.
- * A separate UI layer must listen for 'show-notification' and 'dismiss-notification' events
+ * This class does not render the UI itself; it fires events on the internal EventBus (appBus).
+ * A separate UI layer must listen for EventTypes.NOTIFICATION_SHOW and EventTypes.NOTIFICATION_DISMISS
  * to handle the actual rendering and removal of notification elements.
  *
  * Properties summary:
@@ -46,15 +48,18 @@ import { appBus } from '../../utils/EventBus.js';
  * ]
  * });
  *
- * Notes / Additional:
- * - Event 'show-notification': Dispatched when a notification is requested.
- * The `event.detail` object contains the full INotificationOptions object.
- * - Event 'dismiss-notification': Dispatched when a notification should be closed.
- * The `event.detail` object is { id: string }.
+ * Events:
+ * - Emits: EventTypes.NOTIFICATION_SHOW (when a notification is requested)
+ * - Emits: EventTypes.NOTIFICATION_DISMISS (when a notification should be closed)
+ *
+ * Dependencies:
+ * - ../../utils/EventBus.js
+ * - ../../constants/EventTypes.js
  */
 export class NotificationService {
     /**
      * Default settings for all notifications.
+     *
      * @private
      * @type {object}
      */
@@ -62,6 +67,7 @@ export class NotificationService {
 
     /**
      * Initializes the service and sets the default notification options.
+     *
      * @param {object} [initialOptions={}] - Optional initial default options to override the built-in defaults.
      */
     constructor(initialOptions = {}) {
@@ -80,6 +86,7 @@ export class NotificationService {
 
     /**
      * Gets the default notification options.
+     *
      * @returns {object} The current default options.
      */
     get defaultOptions() {
@@ -89,7 +96,9 @@ export class NotificationService {
     /**
      * Sets and merges the default notification options.
      * Any new options provided will be merged with the existing defaults.
+     *
      * @param {object} options - An object of options to merge with current defaults.
+     * @returns {void}
      */
     set defaultOptions(options) {
         // Validation
@@ -103,16 +112,17 @@ export class NotificationService {
 
     /**
      * Generates a simple unique ID for a notification.
+     *
      * @returns {string} A unique identifier.
      * @private
      */
     _generateId() {
-        return `notification_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        return `notification_${generateId()}`;
     }
 
     /**
      * The core method to dispatch a notification event.
-     * This prepares the notification options and fires the 'show-notification' event.
+     * This prepares the notification options and fires the notification event.
      *
      * @param {object} options - Notification options.
      * @param {string} options.message - The text content of the notification.
@@ -172,27 +182,17 @@ export class NotificationService {
             };
         });
 
-        // (INÍCIO DA MODIFICAÇÃO - Etapa 2)
-        // const event = new CustomEvent('show-notification', { (REMOVIDO)
-        //     detail: finalOptions,
-        //     bubbles: true,
-        //     composed: true
-        // });
-        // document.dispatchEvent(event); (REMOVIDO)
-
-        // (NOVO) Emite no appBus. O payload é o objeto 'finalOptions'.
-        appBus.emit('show-notification', finalOptions);
-        // (FIM DA MODIFICAÇÃO)
+        appBus.emit(EventTypes.NOTIFICATION_SHOW, finalOptions);
 
         return notificationId;
     }
 
     /**
      * Dispatches an event to dismiss a specific notification by its ID.
-     * The UI layer is responsible for listening to 'dismiss-notification'
-     * and removing the corresponding element.
+     * The UI layer is responsible for listening to the event and removing the corresponding element.
      *
      * @param {string} id - The ID of the notification to dismiss.
+     * @returns {void}
      */
     dismiss(id) {
         // Validation
@@ -201,23 +201,12 @@ export class NotificationService {
             return;
         }
 
-        // (INÍCIO DA MODIFICAÇÃO - Etapa 2)
-        // const event = new CustomEvent('dismiss-notification', { (REMOVIDO)
-        //     detail: { id: id },
-        //     bubbles: true,
-        //     composed: true
-        // });
-        // document.dispatchEvent(event); (REMOVIDO)
-
-        // (NOVO) Emite no appBus. O payload é um objeto com o ID.
-        appBus.emit('dismiss-notification', { id: id });
-        // (FIM DA MODIFICAÇÃO)
+        appBus.emit(EventTypes.NOTIFICATION_DISMISS, { id: id });
     }
-
-    // --- Helper Methods for Convenience ---
 
     /**
      * Shows a toast notification (default variant).
+     *
      * @param {object} options - Notification options (see show()). 'variant' is set to 'toast'.
      * @returns {string} The ID of the created notification.
      */
@@ -227,6 +216,7 @@ export class NotificationService {
 
     /**
      * Shows a snackbar notification.
+     *
      * @param {object} options - Notification options (see show()). 'variant' is set to 'snackbar'.
      * @returns {string} The ID of the created notification.
      */
@@ -236,6 +226,7 @@ export class NotificationService {
 
     /**
      * Shows an 'info' or 'normal' type notification.
+     *
      * @param {string} message - The notification message.
      * @param {object} [options={}] - Additional options (see show()).
      * @returns {string} The ID of the created notification.
@@ -246,6 +237,7 @@ export class NotificationService {
 
     /**
      * Shows a 'success' type notification.
+     *
      * @param {string} message - The notification message.
      * @param {object} [options={}] - Additional options (see show()).
      * @returns {string} The ID of the created notification.
@@ -256,6 +248,7 @@ export class NotificationService {
 
     /**
      * Shows a 'warning' type notification.
+     *
      * @param {string} message - The notification message.
      * @param {object} [options={}] - Additional options (see show()).
      * @returns {string} The ID of the created notification.
@@ -266,6 +259,7 @@ export class NotificationService {
 
     /**
      * Shows a 'danger' (or 'error') type notification.
+     *
      * @param {string} message - The notification message.
      * @param {object} [options={}] - Additional options (see show()).
      * @returns {string} The ID of the created notification.

@@ -2,6 +2,7 @@ import { Column } from '../components/Column/Column.js';
 import { Container } from '../components/Container/Container.js';
 import { Row } from '../components/Row/Row.js';
 import { appBus } from '../utils/EventBus.js';
+import { EventTypes } from '../constants/EventTypes.js';
 
 /**
  * Description:
@@ -19,13 +20,13 @@ import { appBus } from '../utils/EventBus.js';
  * LayoutService.getInstance();
  *
  * // Components emit events:
- * appBus.emit('layout:columns-changed', this);
+ * appBus.emit(EventTypes.LAYOUT_COLUMNS_CHANGED, this);
  *
  * Events:
- * - Listens to: 'app:layout-initialized' (to run full check after load)
- * - Listens to: 'layout:panel-groups-changed'
- * - Listens to: 'layout:rows-changed'
- * - Listens to: 'layout:columns-changed'
+ * - Listens to: EventTypes.LAYOUT_INITIALIZED (to run full check after load)
+ * - Listens to: EventTypes.LAYOUT_PANELGROUPS_CHANGED
+ * - Listens to: EventTypes.LAYOUT_ROWS_CHANGED
+ * - Listens to: EventTypes.LAYOUT_COLUMNS_CHANGED
  *
  * Business rules implemented:
  * - Manages 'disabled' *and* 'visibility' state of Row collapse buttons,
@@ -45,9 +46,11 @@ import { appBus } from '../utils/EventBus.js';
  * - ../components/Container/Container.js
  * - ../components/Row/Row.js
  * - ../utils/EventBus.js
+ * - ../constants/EventTypes.js
  */
 export class LayoutService {
     /**
+     * The private static instance for the Singleton.
      * @type {LayoutService | null}
      * @private
      */
@@ -61,24 +64,28 @@ export class LayoutService {
     _namespace = 'layout-service';
 
     /**
+     * Bound handler for the 'layout:panel-groups-changed' event.
      * @type {Function | null}
      * @private
      */
     _boundOnPanelGroupsChanged = null;
 
     /**
+     * Bound handler for the 'layout:rows-changed' event.
      * @type {Function | null}
      * @private
      */
     _boundOnRowsChanged = null;
 
     /**
+     * Bound handler for the 'layout:columns-changed' event.
      * @type {Function | null}
      * @private
      */
     _boundOnColumnsChanged = null;
 
     /**
+     * Bound handler for the 'app:layout-initialized' event.
      * @type {Function | null}
      * @private
      */
@@ -123,10 +130,10 @@ export class LayoutService {
         const me = this;
         const options = { namespace: me._namespace };
 
-        appBus.on('app:layout-initialized', me._boundOnLayoutInitialized, options);
-        appBus.on('layout:panel-groups-changed', me._boundOnPanelGroupsChanged, options);
-        appBus.on('layout:rows-changed', me._boundOnRowsChanged, options);
-        appBus.on('layout:columns-changed', me._boundOnColumnsChanged, options);
+        appBus.on(EventTypes.LAYOUT_INITIALIZED, me._boundOnLayoutInitialized, options);
+        appBus.on(EventTypes.LAYOUT_PANELGROUPS_CHANGED, me._boundOnPanelGroupsChanged, options);
+        appBus.on(EventTypes.LAYOUT_ROWS_CHANGED, me._boundOnRowsChanged, options);
+        appBus.on(EventTypes.LAYOUT_COLUMNS_CHANGED, me._boundOnColumnsChanged, options);
     }
 
     /**
@@ -182,7 +189,7 @@ export class LayoutService {
         }
 
         const totalRows = rows.length;
-        let uncollapsedRows = rows.filter(r => !r._state.collapsed);
+        let uncollapsedRows = rows.filter(row => !row._state.collapsed);
 
         if (uncollapsedRows.length === 0) {
             const lastRow = rows[rows.length - 1];
@@ -227,8 +234,8 @@ export class LayoutService {
         }
 
         const columns = row.getColumns();
-        columns.forEach((column, idx) => {
-            const isLast = idx === columns.length - 1;
+        columns.forEach((column, index) => {
+            const isLast = index === columns.length - 1;
             column.updateWidth(isLast);
             column.addResizeBars(isLast);
 
@@ -261,14 +268,13 @@ export class LayoutService {
      * @returns {void}
      */
     _updatePanelGroupsSizes(column) {
-        const me = this;
         const panelGroups = column.getPanelGroups();
         if (panelGroups.length === 0) {
             column.element.style.minWidth = `${column.getEffectiveMinWidth()}px`;
             return;
         }
 
-        let uncollapsedPanelGroups = panelGroups.filter(p => !p._state.collapsed);
+        let uncollapsedPanelGroups = panelGroups.filter(panelGroup => !panelGroup._state.collapsed);
 
         if (uncollapsedPanelGroups.length === 0) {
             const lastGroup = panelGroups[panelGroups.length - 1];
@@ -279,28 +285,28 @@ export class LayoutService {
         const lastUncollapsedGroup = uncollapsedPanelGroups[uncollapsedPanelGroups.length - 1];
         const isOnlyOneUncollapsed = uncollapsedPanelGroups.length === 1;
 
-        panelGroups.forEach(panel => {
-            const shouldFillSpace = panel === lastUncollapsedGroup;
+        panelGroups.forEach(panelGroup => {
+            const shouldFillSpace = panelGroup === lastUncollapsedGroup;
 
             if (shouldFillSpace) {
-                panel._state.height = null;
-                panel.element.classList.add('panel-group--fills-space');
+                panelGroup._state.height = null;
+                panelGroup.element.classList.add('panel-group--fills-space');
             } else {
-                panel.element.classList.remove('panel-group--fills-space');
+                panelGroup.element.classList.remove('panel-group--fills-space');
             }
 
-            const collapseButton = panel._state.header?.collapseBtn;
+            const collapseButton = panelGroup._state.header?.collapseBtn;
             if (collapseButton) {
                 const isThisPanelTheOnlyUncollapsed = isOnlyOneUncollapsed && shouldFillSpace;
 
-                if (!panel._state.collapsible || isThisPanelTheOnlyUncollapsed) {
+                if (!panelGroup._state.collapsible || isThisPanelTheOnlyUncollapsed) {
                     collapseButton.disabled = true;
                 } else {
                     collapseButton.disabled = false;
                 }
             }
 
-            panel.updateHeight();
+            panelGroup.updateHeight();
         });
 
         column.element.style.minWidth = `${column.getEffectiveMinWidth()}px`;

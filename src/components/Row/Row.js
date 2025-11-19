@@ -4,6 +4,7 @@ import { throttleRAF } from '../../utils/ThrottleRAF.js';
 import { generateId } from '../../utils/generateId.js';
 import { ResizeController } from '../../utils/ResizeController.js';
 import { DropZoneType } from '../../constants/DNDTypes.js';
+import { EventTypes } from '../../constants/EventTypes.js';
 
 /**
  * Description:
@@ -26,30 +27,31 @@ import { DropZoneType } from '../../constants/DNDTypes.js';
  * this.element.appendChild(row.element);
  *
  * Events:
- * - Listens to: 'column:empty' (to clean up empty columns)
- * - Emits: 'layout:columns-changed' (to notify LayoutService)
- * - Emits: 'row:empty' (to notify Container when this row is empty)
+ * - Listens to: EventTypes.COLUMN_EMPTY (to clean up empty columns)
+ * - Emits: EventTypes.LAYOUT_COLUMNS_CHANGED (to notify LayoutService)
+ * - Emits: EventTypes.ROW_EMPTY (to notify Container when this row is empty)
  *
  * Business rules implemented:
  * - Renders 'Column' children horizontally.
  * - Registers as a 'row' type drop zone.
- * - Listens for 'column:empty' and removes the child Column.
- * - If it becomes empty (last Column removed), emits 'row:empty'.
+ * - Listens for EventTypes.COLUMN_EMPTY and removes the child Column.
+ * - If it becomes empty (last Column removed), emits EventTypes.ROW_EMPTY.
  * - Manages its own vertical resize handle via ResizeController.
  * - Collapse state is managed locally but disabled by LayoutService.
  *
  * Dependencies:
  * - components/Column/Column.js
  * - utils/EventBus.js
- * - ../../utils/EventBus.js
  * - ../../utils/ThrottleRAF.js
  * - ../../utils/generateId.js
  * - ../../utils/ResizeController.js
  * - ../../constants/DNDTypes.js
+ * - ../../constants/EventTypes.js
  */
 export class Row {
     /**
      * Internal state holding child Column components and dimensions.
+     *
      * @type {{
      * children: Array<Column>,
      * parentContainer: import('../Container/Container.js').Container | null,
@@ -69,6 +71,7 @@ export class Row {
 
     /**
      * Unique ID for this instance, used for namespacing events.
+     *
      * @type {string}
      * @private
      */
@@ -76,6 +79,7 @@ export class Row {
 
     /**
      * Unique namespace for appBus listeners.
+     *
      * @type {string}
      * @private
      */
@@ -83,6 +87,7 @@ export class Row {
 
     /**
      * Minimum height in pixels for vertical resizing.
+     *
      * @type {number}
      * @private
      */
@@ -90,6 +95,7 @@ export class Row {
 
     /**
      * Stores the throttled update function for resizing.
+     *
      * @type {Function | null}
      * @private
      */
@@ -97,6 +103,7 @@ export class Row {
 
     /**
      * Stores the bound reference for the 'onColumnEmpty' listener.
+     *
      * @type {Function | null}
      * @private
      */
@@ -105,6 +112,7 @@ export class Row {
     /**
      * The button element to toggle collapse state.
      * Stored for access by LayoutService (to disable).
+     *
      * @type {HTMLElement | null}
      * @public
      */
@@ -112,6 +120,7 @@ export class Row {
 
     /**
      * Stores the bound reference for the collapse button listener.
+     *
      * @type {Function | null}
      @private
      */
@@ -149,7 +158,8 @@ export class Row {
     }
 
     /**
-     * <MinHeight> setter with validation.
+     * MinHeight setter with validation.
+     *
      * @param {number} height - The minimum height in pixels.
      * @returns {void}
      */
@@ -163,7 +173,8 @@ export class Row {
     }
 
     /**
-     * <MinHeight> getter.
+     * MinHeight getter.
+     *
      * @returns {number} The minimum height in pixels.
      */
     getMinHeight() {
@@ -171,7 +182,8 @@ export class Row {
     }
 
     /**
-     * <ThrottledUpdate> setter.
+     * ThrottledUpdate setter.
+     *
      * @param {Function} throttledFunction
      * @returns {void}
      */
@@ -180,7 +192,8 @@ export class Row {
     }
 
     /**
-     * <ThrottledUpdate> getter.
+     * ThrottledUpdate getter.
+     *
      * @returns {Function | null}
      */
     getThrottledUpdate() {
@@ -188,7 +201,8 @@ export class Row {
     }
 
     /**
-     * <ParentContainer> setter.
+     * ParentContainer setter.
+     *
      * @param {import('../Container/Container.js').Container} container - The parent container instance.
      * @returns {void}
      */
@@ -198,22 +212,27 @@ export class Row {
 
     /**
      * Initializes appBus event listeners for this component.
+     *
      * @returns {void}
      */
     initEventListeners() {
-        appBus.on('column:empty', this._boundOnColumnEmpty, { namespace: this._namespace });
+        appBus.on(EventTypes.COLUMN_EMPTY, this._boundOnColumnEmpty, {
+            namespace: this._namespace
+        });
     }
 
     /**
      * Notifies the LayoutService that the column layout has changed.
+     *
      * @returns {void}
      */
     requestLayoutUpdate() {
-        appBus.emit('layout:columns-changed', this);
+        appBus.emit(EventTypes.LAYOUT_COLUMNS_CHANGED, this);
     }
 
     /**
      * Cleans up appBus listeners and destroys all child Column components.
+     *
      * @returns {void}
      */
     destroy() {
@@ -230,6 +249,7 @@ export class Row {
 
     /**
      * Event handler for when a child Column reports it is empty.
+     *
      * @param {import('../Column/Column.js').Column} column - The Column instance that emitted the event.
      * @returns {void}
      */
@@ -237,19 +257,20 @@ export class Row {
         this.deleteColumn(column);
 
         if (this.getTotalColumns() === 0 && this._state.parentContainer) {
-            appBus.emit('row:empty', this); // Notifies the Container (parent)
+            appBus.emit(EventTypes.ROW_EMPTY, this); // Notifies the Container (parent)
         }
     }
 
     /**
      * Updates the horizontal resize bars for all child Columns.
      * This is called by LayoutService.
+     *
      * @returns {void}
      */
     updateAllResizeBars() {
         const columns = this.getColumns();
-        columns.forEach((column, idx) => {
-            column.addResizeBars(idx === columns.length - 1);
+        columns.forEach((column, index) => {
+            column.addResizeBars(index === columns.length - 1);
         });
     }
 
@@ -262,8 +283,8 @@ export class Row {
      */
     addResizeBars(isLast) {
         const me = this;
-        me.element.querySelectorAll('.row__resize-handle').forEach(b => b.remove());
-        me.element.querySelectorAll('.row__collapse-btn').forEach(b => b.remove());
+        me.element.querySelectorAll('.row__resize-handle').forEach(button => button.remove());
+        me.element.querySelectorAll('.row__collapse-btn').forEach(button => button.remove());
         me.element.classList.remove('row--resize-bottom');
         me.collapseBtn = null;
 
@@ -309,7 +330,7 @@ export class Row {
             }
         });
 
-        bar.addEventListener('pointerdown', e => {
+        bar.addEventListener('pointerdown', event => {
             // 1. Check collapsed state
             if (me._state.collapsed) return;
 
@@ -319,17 +340,18 @@ export class Row {
 
             // 3. Check if it's the only row or the last row
             const rows = container.getRows();
-            const idx = rows.indexOf(me);
-            if (rows.length === 1 || idx === rows.length - 1) {
+            const index = rows.indexOf(me);
+            if (rows.length === 1 || index === rows.length - 1) {
                 return;
             }
 
-            controller.start(e);
+            controller.start(event);
         });
     }
 
     /**
      * Toggles the collapse state and notifies LayoutService.
+     *
      * @returns {void}
      */
     toggleCollapse() {
@@ -349,6 +371,7 @@ export class Row {
 
     /**
      * Applies the correct visibility state based on the internal state.
+     *
      * @returns {void}
      */
     updateCollapse() {
@@ -362,13 +385,14 @@ export class Row {
 
     /**
      * Hides the content and applies collapsed styles.
+     *
      * @returns {void}
      */
     collapse() {
         const me = this;
         me._state.collapsed = true;
         me.element.classList.add('row--collapsed');
-        me.getColumns().forEach(col => (col.element.style.display = 'none'));
+        me.getColumns().forEach(column => (column.element.style.display = 'none'));
         if (me.collapseBtn) {
             me.collapseBtn.classList.add('row__collapse-btn--collapsed');
         }
@@ -377,13 +401,14 @@ export class Row {
 
     /**
      * Shows the content and removes collapsed styles.
+     *
      * @returns {void}
      */
     unCollapse() {
         const me = this;
         me._state.collapsed = false;
         me.element.classList.remove('row--collapsed');
-        me.getColumns().forEach(col => (col.element.style.display = ''));
+        me.getColumns().forEach(column => (column.element.style.display = ''));
         if (me.collapseBtn) {
             me.collapseBtn.classList.remove('row__collapse-btn--collapsed');
         }
@@ -392,6 +417,7 @@ export class Row {
 
     /**
      * Creates and inserts a new Column component into this Row.
+     *
      * @param {number|null} [width=null] - The initial width of the column.
      * @param {number|null} [index=null] - The exact state array index to insert at.
      * @returns {import('../Column/Column.js').Column} The created Column instance.
@@ -440,6 +466,7 @@ export class Row {
 
     /**
      * Deletes a child Column.
+     *
      * @param {import('../Column/Column.js').Column} column - The Column instance to remove.
      * @returns {void}
      */
@@ -461,7 +488,8 @@ export class Row {
 
     /**
      * Returns all child Column instances.
-     * @returns {Array<import('../Column/Column.js').Column>}
+     *
+     * @returns {Array<import('../Column/Column.js').Column>} All child column instances.
      */
     getColumns() {
         return this._state.children;
@@ -469,7 +497,8 @@ export class Row {
 
     /**
      * Returns the total number of child Columns.
-     * @returns {number}
+     *
+     * @returns {number} The total number of columns.
      */
     getTotalColumns() {
         return this.getColumns().length;
@@ -477,7 +506,8 @@ export class Row {
 
     /**
      * Returns the first child Column. If none exists, creates one.
-     * @returns {import('../Column/Column.js').Column}
+     *
+     * @returns {import('../Column/Column.js').Column} The first column instance.
      */
     getFirstColumn() {
         const columns = this.getColumns();
@@ -486,7 +516,8 @@ export class Row {
 
     /**
      * Returns the last child Column. If none exists, creates one.
-     * @returns {import('../Column/Column.js').Column}
+     *
+     * @returns {import('../Column/Column.js').Column} The last column instance.
      */
     getLastColumn() {
         const columns = this.getColumns();
@@ -495,6 +526,7 @@ export class Row {
 
     /**
      * Updates the CSS flex properties based on the row's state.
+     *
      * @param {boolean} isLast - True if this is the last Row in the Container.
      * @returns {void}
      */
@@ -524,6 +556,7 @@ export class Row {
 
     /**
      * Clears the Row, destroying and removing all child Columns.
+     *
      * @returns {void}
      */
     clear() {
@@ -539,7 +572,8 @@ export class Row {
 
     /**
      * Serializes the Row state (and its child Columns) to JSON.
-     * @returns {object}
+     *
+     * @returns {object} The serialized state object.
      */
     toJSON() {
         return {
@@ -552,6 +586,7 @@ export class Row {
 
     /**
      * Deserializes state from JSON data.
+     *
      * @param {object} data - The state object.
      * @returns {void}
      */

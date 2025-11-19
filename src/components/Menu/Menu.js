@@ -1,6 +1,7 @@
 import { MenuItem } from './MenuItem.js';
 import { TranslationService } from '../../services/TranslationService.js';
 import { appBus } from '../../utils/EventBus.js';
+import { EventTypes } from '../../constants/EventTypes.js';
 
 /**
  * Description:
@@ -12,7 +13,9 @@ import { appBus } from '../../utils/EventBus.js';
  * Properties summary:
  * - element {HTMLElement} : The main DOM element (<div class="menu">).
  * - _namespace {string} : Unique namespace for appBus listeners.
- * - _bound... {Function | null} : Bound event handlers for cleanup.
+ * - _boundOnGlobalClick {Function | null} : Bound handler for global click listener.
+ * - _boundCloseAllMenus {Function | null} : Bound handler for closing all menus.
+ * - _boundCloseSiblings {Function | null} : Bound handler for closing sibling menus.
  *
  * Typical usage:
  * // In App.js
@@ -22,16 +25,18 @@ import { appBus } from '../../utils/EventBus.js';
  *
  * Events:
  * - Listens to (native): 'click' (on document)
- * - Listens to (appBus): 'menu:item-selected', 'menu:close-siblings', 'contextmenu:opened'
+ * - Listens to (appBus): EventTypes.MENU_ITEM_SELECTED, EventTypes.MENU_CLOSE_SIBLINGS, EventTypes.CONTEXT_MENU_OPENED
  *
  * Dependencies:
  * - components/Menu/MenuItem.js
  * - services/TranslationService.js
  * - utils/EventBus.js
+ * - ../../constants/EventTypes.js
  */
 export class Menu {
     /**
      * Unique namespace for appBus listeners.
+     *
      * @type {string}
      * @private
      */
@@ -39,6 +44,7 @@ export class Menu {
 
     /**
      * Stores the bound reference for the global click listener.
+     *
      * @type {Function | null}
      * @private
      */
@@ -46,6 +52,7 @@ export class Menu {
 
     /**
      * Stores the bound reference for the 'closeAllMenus' listener.
+     *
      * @type {Function | null}
      * @private
      */
@@ -53,6 +60,7 @@ export class Menu {
 
     /**
      * Stores the bound reference for the 'closeSiblings' listener.
+     *
      * @type {Function | null}
      * @private
      */
@@ -72,6 +80,7 @@ export class Menu {
 
     /**
      * Handles global clicks on the document to close the menu.
+     *
      * @param {MouseEvent} e
      * @private
      * @returns {void}
@@ -85,6 +94,7 @@ export class Menu {
 
     /**
      * Recursively processes menu data to translate 'titleKey' properties.
+     *
      * @param {Array<object>} items - The raw menu items array.
      * @param {TranslationService} i18n - The translation service instance.
      * @returns {Array<object>} The processed items array.
@@ -113,6 +123,7 @@ export class Menu {
 
     /**
      * Cleans up all global document and appBus event listeners.
+     *
      * @returns {void}
      */
     destroy() {
@@ -124,6 +135,7 @@ export class Menu {
 
     /**
      * Asynchronously loads, processes, and builds the menu from a config file.
+     *
      * @param {string} [url='workspaces/menus/menu.js'] - The path to the menu config module.
      * @returns {Promise<void>}
      */
@@ -145,6 +157,7 @@ export class Menu {
 
     /**
      * Builds the menu DOM from processed menu items.
+     *
      * @param {Array<object>} items - The processed (translated) menu items.
      * @returns {void}
      */
@@ -160,6 +173,7 @@ export class Menu {
 
     /**
      * Initializes all global document and appBus listeners.
+     *
      * @returns {void}
      */
     initGlobalListeners() {
@@ -167,13 +181,14 @@ export class Menu {
         const options = { namespace: me._namespace };
 
         document.addEventListener('click', me._boundOnGlobalClick);
-        appBus.on('menu:item-selected', me._boundCloseAllMenus, options);
-        appBus.on('menu:close-siblings', me._boundCloseSiblings, options);
-        appBus.on('contextmenu:opened', me._boundCloseAllMenus, options);
+        appBus.on(EventTypes.MENU_ITEM_SELECTED, me._boundCloseAllMenus, options);
+        appBus.on(EventTypes.MENU_CLOSE_SIBLINGS, me._boundCloseSiblings, options);
+        appBus.on(EventTypes.CONTEXT_MENU_OPENED, me._boundCloseAllMenus, options);
     }
 
     /**
      * Closes all currently open submenus.
+     *
      * @returns {void}
      */
     closeAllMenus() {
@@ -184,6 +199,7 @@ export class Menu {
 
     /**
      * Closes sibling menus when a new menu item is hovered or clicked.
+     *
      * @param {HTMLElement} target - The target MenuItem element.
      * @returns {void}
      */

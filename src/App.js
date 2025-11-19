@@ -27,6 +27,7 @@ import { ToolbarContainer } from './components/Toolbar/ToolbarContainer.js';
 import { ToolbarGroupFactory } from './components/Toolbar/ToolbarGroupFactory.js';
 import { ApplicationGroup } from './components/Toolbar/ApplicationGroup.js';
 import { DropZoneType } from './constants/DNDTypes.js';
+import { EventTypes } from './constants/EventTypes.js';
 
 /**
  * Description:
@@ -59,9 +60,10 @@ import { DropZoneType } from './constants/DNDTypes.js';
  * await app.init();
  *
  * Events:
- * - Listens to: 'app:add-new-panel', 'app:save-state', 'app:restore-state', 'app:reset-state'
- * - Emits: 'app:set-permanent-status' (on init)
- * - Emits: 'app:layout-initialized' (on init, after load)
+ * - Listens to: EventTypes.APP_ADD_NEW_PANEL, EventTypes.APP_SAVE_STATE, EventTypes.APP_RESTORE_STATE, EventTypes.APP_RESET_STATE
+ * - Emits: EventTypes.STATUSBAR_SET_PERMANENT_STATUS (on init)
+ * - Emits: EventTypes.LAYOUT_INITIALIZED (on init, after load)
+ * - Emits: EventTypes.STATUSBAR_SET_STATUS (on reset)
  *
  * Business rules implemented:
  * - Implements the Singleton pattern to ensure only one App instance.
@@ -86,60 +88,76 @@ import { DropZoneType } from './constants/DNDTypes.js';
  * - utils/EventBus.js
  * - utils/Debounce.js
  * - services/Loader/Loader.js
+ * - constants/EventTypes.js
  */
 export class App {
     /**
-     * Chave de armazenamento principal para o layout.
+     * The main storage key for the layout.
+     *
      * @type {string}
      * @public
      */
     STORAGE_KEY = 'panel_state';
 
     /**
-     * Armazena o objeto de workspace carregado (incluindo nome e layout)
+     * Stores the loaded workspace object (including name and layout).
+     *
      * @type {object | null}
      * @public
      */
     currentWorkspace = null;
 
     /**
-     * Namespace único para os listeners do appBus deste singleton.
+     * Unique namespace for this singleton's appBus listeners.
+     *
      * @type {string}
      * @public
      */
     namespace = 'app_singleton';
 
     /**
+     * Bound handler for adding a new panel.
+     *
      * @type {Function | null}
      * @private
      */
     _boundAddNewPanel = null;
 
     /**
+     * Bound handler for resetting the layout silently.
+     *
      * @type {Function | null}
      * @private
      */
     _boundResetLayoutSilent = null;
 
     /**
+     * Bound handler for saving the layout.
+     *
      * @type {Function | null}
      * @private
      */
     _boundSaveLayout = null;
 
     /**
+     * Bound handler for restoring the layout.
+     *
      * @type {Function | null}
      * @private
      */
     _boundRestoreLayout = null;
 
     /**
+     * Bound handler for resetting the layout.
+     *
      * @type {Function | null}
      * @private
      */
     _boundResetLayout = null;
 
     /**
+     * The debounced window resize handler.
+     *
      * @type {Function | null}
      * @public
      */
@@ -147,6 +165,7 @@ export class App {
 
     /**
      * Loader instance for the workspace (inset).
+     *
      * @type {import('./services/Loader/Loader.js').Loader | null}
      * @private
      */
@@ -154,35 +173,56 @@ export class App {
 
     /**
      * Main DOM wrapper for Menu and Container.
+     *
      * @type {HTMLElement | null}
      * @private
      */
     _mainWrapper = null;
 
     /**
+     * Instance of the top toolbar container.
+     *
      * @type {import('./components/Toolbar/ToolbarContainer.js').ToolbarContainer | null}
      * @private
      */
     _toolbarTop = null;
 
     /**
+     * Instance of the bottom toolbar container.
+     *
      * @type {import('./components/Toolbar/ToolbarContainer.js').ToolbarContainer | null}
      * @private
      */
     _toolbarBottom = null;
 
     /**
+     * Instance of the left toolbar container.
+     *
      * @type {import('./components/Toolbar/ToolbarContainer.js').ToolbarContainer | null}
      * @private
      */
     _toolbarLeft = null;
 
     /**
+     * Instance of the right toolbar container.
+     *
      * @type {import('./components/Toolbar/ToolbarContainer.js').ToolbarContainer | null}
      * @private
      */
     _toolbarRight = null;
 
+    /**
+     * The singleton instance of the ApplicationStateService.
+     *
+     * @type {import('./services/ApplicationStateService.js').ApplicationStateService}
+     * @public
+     */
+    stateService;
+
+    /**
+     * Creates an instance of App.
+     * Implements the Singleton pattern.
+     */
     constructor() {
         if (App.instance) {
             return App.instance;
@@ -268,6 +308,7 @@ export class App {
     /**
      * Initializes the application asynchronously, loading the menu and layout.
      * This must be called after instantiation.
+     *
      * @returns {Promise<void>}
      */
     async init() {
@@ -275,57 +316,59 @@ export class App {
         await me.menu.load();
         await me.loadInitialLayout();
 
-        appBus.emit('app:layout-initialized', me.container);
+        appBus.emit(EventTypes.LAYOUT_INITIALIZED, me.container);
 
-        appBus.emit('app:set-permanent-status', 'Pronto');
+        appBus.emit(EventTypes.STATUSBAR_SET_PERMANENT_STATUS, 'Pronto');
     }
 
     /**
      * Initializes all global appBus event listeners for this singleton.
      * Uses namespaces for easy cleanup.
+     *
      * @returns {void}
      */
     initEventListeners() {
         const me = this;
         const options = { namespace: me.namespace };
 
-        appBus.on('app:add-new-panel', me._boundAddNewPanel, options);
-        appBus.on('app:reinitialize-default-layout', me._boundResetLayoutSilent, options);
-        appBus.on('app:save-state', me._boundSaveLayout, options);
-        appBus.on('app:restore-state', me._boundRestoreLayout, options);
-        appBus.on('app:reset-state', me._boundResetLayout, options);
+        appBus.on(EventTypes.APP_ADD_NEW_PANEL, me._boundAddNewPanel, options);
+        appBus.on(EventTypes.APP_RESET_STATE, me._boundResetLayoutSilent, options);
+        appBus.on(EventTypes.APP_SAVE_STATE, me._boundSaveLayout, options);
+        appBus.on(EventTypes.APP_RESTORE_STATE, me._boundRestoreLayout, options);
+        appBus.on(EventTypes.APP_RESET_STATE, me._boundResetLayout, options);
     }
 
     /**
      * Registers all global application shortcuts.
+     *
      * @private
      * @returns {void}
      */
     _registerGlobalShortcuts() {
         appShortcuts.register({
             keys: 'Ctrl+S',
-            command: 'app:save-state',
+            command: EventTypes.APP_SAVE_STATE,
             scopes: ['global'],
             preventDefault: true
         });
 
         appShortcuts.register({
             keys: 'Ctrl+R',
-            command: 'app:restore-state',
+            command: EventTypes.APP_RESTORE_STATE,
             scopes: ['global'],
             preventDefault: true
         });
 
         appShortcuts.register({
             keys: 'Ctrl+Shift+R',
-            command: 'app:reset-state',
+            command: EventTypes.APP_RESET_STATE,
             scopes: ['global'],
             preventDefault: true
         });
 
         appShortcuts.register({
             keys: 'Ctrl+N',
-            command: 'app:add-new-panel',
+            command: EventTypes.APP_ADD_NEW_PANEL,
             scopes: ['global'],
             preventDefault: true
         });
@@ -333,6 +376,7 @@ export class App {
 
     /**
      * Cleans up all event listeners and child components.
+     *
      * @returns {void}
      */
     destroy() {
@@ -353,6 +397,7 @@ export class App {
 
     /**
      * Loads the initial layout from ApplicationStateService (localStorage or default JSON).
+     *
      * @returns {Promise<void>}
      */
     async loadInitialLayout() {
@@ -384,6 +429,7 @@ export class App {
 
     /**
      * Serializes the current layout from the container and saves it to localStorage.
+     *
      * @returns {Promise<void>}
      */
     async saveLayout() {
@@ -425,6 +471,7 @@ export class App {
 
     /**
      * Restores the layout from the last saved state.
+     *
      * @returns {Promise<void>}
      */
     async restoreLayout() {
@@ -465,7 +512,7 @@ export class App {
             await me.loadInitialLayout();
 
             if (!silent) {
-                appBus.emit('app:set-status-message', i18n.translate('appstate.reset'));
+                appBus.emit(EventTypes.STATUSBAR_SET_STATUS, i18n.translate('appstate.reset'));
             }
         } catch (err) {
             console.error('App.resetLayout: Falha ao redefinir.', err);
@@ -478,6 +525,7 @@ export class App {
     /**
      * Handles the 'app:add-new-panel' event by creating a new default
      * TextPanel in the first available column.
+     *
      * @returns {void}
      */
     addNewPanel() {

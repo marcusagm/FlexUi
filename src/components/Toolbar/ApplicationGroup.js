@@ -1,5 +1,6 @@
 import { ToolbarGroup } from './ToolbarGroup.js';
 import { appBus } from '../../utils/EventBus.js';
+import { EventTypes } from '../../constants/EventTypes.js';
 
 /**
  * Description:
@@ -9,6 +10,7 @@ import { appBus } from '../../utils/EventBus.js';
  * Dependencies:
  * - ./ToolbarGroup.js
  * - ../../utils/EventBus.js
+ * - ../../constants/EventTypes.js
  */
 export class ApplicationGroup extends ToolbarGroup {
     /**
@@ -22,7 +24,8 @@ export class ApplicationGroup extends ToolbarGroup {
     }
 
     /**
-     * <toolbarGroupType> static getter.
+     * toolbarGroupType static getter.
+     *
      * @returns {string}
      */
     static get toolbarGroupType() {
@@ -30,7 +33,8 @@ export class ApplicationGroup extends ToolbarGroup {
     }
 
     /**
-     * <ToolbarGroupType> getter.
+     * ToolbarGroupType getter.
+     *
      * @returns {string}
      */
     getToolbarGroupType() {
@@ -39,6 +43,7 @@ export class ApplicationGroup extends ToolbarGroup {
 
     /**
      * (Overrides ToolbarGroup) Creates the DOM for the buttons.
+     *
      * @returns {void}
      */
     render() {
@@ -46,22 +51,22 @@ export class ApplicationGroup extends ToolbarGroup {
         const contentEl = me.contentElement;
 
         const btnAdd = me._createButton(
-            'app:add-new-panel',
+            EventTypes.APP_ADD_NEW_PANEL,
             'icon-add-panel',
             'Adicionar Novo Painel'
         );
         const btnSave = me._createButton(
-            'app:save-state',
+            EventTypes.APP_SAVE_STATE,
             'icon-save',
             'Salvar Workspace (Ctrl+S)'
         );
         const btnRestore = me._createButton(
-            'app:restore-state',
+            EventTypes.APP_RESTORE_STATE,
             'icon-restore',
             'Restaurar Workspace (Ctrl+R)'
         );
         const btnReset = me._createButton(
-            'app:reset-state',
+            EventTypes.APP_RESET_STATE,
             'icon-reset',
             'Resetar Workspace (Ctrl+Shift+R)'
         );
@@ -74,6 +79,7 @@ export class ApplicationGroup extends ToolbarGroup {
 
     /**
      * Helper to create a standardized toolbar button.
+     *
      * @param {string} eventName - The appBus event to emit on click.
      * @param {string} iconClass - The CSS class for the icon (e.g., 'icon-save').
      * @param {string} title - The tooltip text (aria-label).
@@ -97,6 +103,7 @@ export class ApplicationGroup extends ToolbarGroup {
 
     /**
      * Helper to create a visual divider.
+     *
      * @returns {HTMLDivElement}
      * @private
      */
