@@ -33,9 +33,9 @@ import { throttleRAF } from '../../utils/ThrottleRAF.js';
  * - Uses throttling for scroll updates to optimize performance.
  *
  * Dependencies:
- * - ./ToolbarGroupFactory.js
- * - ../../utils/generateId.js
- * - ../../utils/ThrottleRAF.js
+ * - {import('./ToolbarGroupFactory.js').ToolbarGroupFactory}
+ * - {import('../../utils/generateId.js').generateId}
+ * - {import('../../utils/ThrottleRAF.js').throttleRAF}
  *
  * Notes / Additional:
  * - The dropZoneType is 'toolbar-container'.

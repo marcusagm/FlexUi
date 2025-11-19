@@ -7,13 +7,21 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * A concrete implementation of ToolbarGroup that renders main application
  * action buttons (Add Panel, Save, Restore, Reset).
  *
+ * Properties summary:
+ * - (Inherits properties from ToolbarGroup)
+ *
+ * Typical usage:
+ * const appGroup = new ApplicationGroup('Actions');
+ *
  * Dependencies:
- * - ./ToolbarGroup.js
- * - ../../utils/EventBus.js
- * - ../../constants/EventTypes.js
+ * - {import('./ToolbarGroup.js').ToolbarGroup}
+ * - {import('../../utils/EventBus.js').appBus}
+ * - {import('../../constants/EventTypes.js').EventTypes}
  */
 export class ApplicationGroup extends ToolbarGroup {
     /**
+     * Creates a new ApplicationGroup instance.
+     *
      * @param {string} [title=''] - The title for the group.
      * @param {object} [config={}] - Configuration overrides (e.g., movable).
      */
@@ -24,18 +32,18 @@ export class ApplicationGroup extends ToolbarGroup {
     }
 
     /**
-     * toolbarGroupType static getter.
+     * Returns the unique type identifier for this toolbar group class.
      *
-     * @returns {string}
+     * @returns {string} The type identifier.
      */
     static get toolbarGroupType() {
         return 'ApplicationGroup';
     }
 
     /**
-     * ToolbarGroupType getter.
+     * Returns the type identifier for this instance.
      *
-     * @returns {string}
+     * @returns {string} The type identifier.
      */
     getToolbarGroupType() {
         return 'ApplicationGroup';
@@ -83,7 +91,7 @@ export class ApplicationGroup extends ToolbarGroup {
      * @param {string} eventName - The appBus event to emit on click.
      * @param {string} iconClass - The CSS class for the icon (e.g., 'icon-save').
      * @param {string} title - The tooltip text (aria-label).
-     * @returns {HTMLButtonElement}
+     * @returns {HTMLButtonElement} The created button element.
      * @private
      */
     _createButton(eventName, iconClass, title) {
@@ -104,7 +112,7 @@ export class ApplicationGroup extends ToolbarGroup {
     /**
      * Helper to create a visual divider.
      *
-     * @returns {HTMLDivElement}
+     * @returns {HTMLDivElement} The divider element.
      * @private
      */
     _createDivider() {

@@ -1,6 +1,4 @@
 import { BaseDropStrategy } from './BaseDropStrategy.js';
-import { ToolbarGroup } from '../../components/Toolbar/ToolbarGroup.js';
-import { ToolbarContainer } from '../../components/Toolbar/ToolbarContainer.js';
 import { ItemType } from '../../constants/DNDTypes.js';
 
 /**
@@ -102,7 +100,8 @@ export class ToolbarContainerDropStrategy extends BaseDropStrategy {
 
         me.clearCache();
         const draggedItem = draggedData.item;
-        me._sourceContainer = draggedItem._state.parentContainer;
+
+        me._sourceContainer = draggedItem.parentContainer;
         me._orientation = dropZone._state.orientation;
 
         const groups = dropZone._state.groups;
@@ -143,20 +142,17 @@ export class ToolbarContainerDropStrategy extends BaseDropStrategy {
     onDragOver(point, dropZone, draggedData, dds) {
         const me = this;
 
-        // Validation: Only handle ToolbarGroups
         if (draggedData.type !== ItemType.TOOLBAR_GROUP) {
             dds.hidePlaceholder();
             return false;
         }
 
-        // Recalculate cache if empty (e.g., rapid entry or empty toolbar)
         if (me._dropZoneCache.length === 0 && dropZone._state.groups.length > 0) {
             me.onDragEnter(point, dropZone, draggedData, dds);
         }
 
         const scrollContainer = dropZone._scrollContainer;
 
-        // Containment Check
         if (!dropZone.element.contains(point.target)) {
             dds.hidePlaceholder();
             return false;
@@ -174,7 +170,6 @@ export class ToolbarContainerDropStrategy extends BaseDropStrategy {
             }
         }
 
-        // Ghost Logic: Prevent drop on self or immediate neighbor (no-op)
         const isSameContainer = me._sourceContainer === dropZone;
         const isLeftGap = me._dropIndex === me._originalIndex;
         const isRightGap = me._dropIndex === me._originalIndex + 1;
@@ -189,7 +184,6 @@ export class ToolbarContainerDropStrategy extends BaseDropStrategy {
         const placeholder = dds.getPlaceholder();
         dds.showPlaceholder(placeholderMode);
 
-        // Place placeholder in DOM
         if (gapFound) {
             const targetElement = me._dropZoneCache.find(
                 item => item.index === me._dropIndex
@@ -223,8 +217,7 @@ export class ToolbarContainerDropStrategy extends BaseDropStrategy {
         const targetContainer = dropZone;
         const draggedItem = draggedData.item;
 
-        // Fallback: Try to get source from item if onDragEnter didn't run correctly
-        const sourceContainer = me._sourceContainer || draggedItem._state.parentContainer;
+        const sourceContainer = me._sourceContainer || draggedItem.parentContainer;
 
         if (draggedData.type !== ItemType.TOOLBAR_GROUP || dropIndex === null) {
             return false;
