@@ -44,7 +44,7 @@ export class ViewportDropStrategy extends BaseDropStrategy {
      * @type {number}
      * @private
      */
-    _dockZoneHeight = 40;
+    _dockZoneHeight = 10;
 
     /**
      * Clears internal state.
