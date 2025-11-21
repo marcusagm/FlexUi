@@ -24,6 +24,7 @@ import { ItemType } from '../../constants/DNDTypes.js';
  * - _boundOnMaximizeClick {Function} : Bound handler for maximize click.
  * - _boundOnMinimizeClick {Function} : Bound handler for minimize click.
  * - _boundOnPinClick {Function} : Bound handler for pin click.
+ * - _isTabMode {boolean} : Internal flag indicating if the header is in tab mode.
  *
  * Typical usage:
  * const header = new ApplicationWindowHeader(myWindowInstance, 'My Window Title');
@@ -39,6 +40,7 @@ import { ItemType } from '../../constants/DNDTypes.js';
  * - Emits specific events for window actions (close, maximize, minimize, pin) to be handled by the parent window or service.
  * - Initiates a drag operation specifically typed as APPLICATION_WINDOW.
  * - Handles auto-restore when dragging a maximized window, maintaining relative cursor position.
+ * - Adapts visual state and available controls when in "Tab Mode".
  *
  * Dependencies:
  * - ../../utils/EventBus.js
@@ -153,6 +155,14 @@ export class ApplicationWindowHeader {
      * @private
      */
     _boundOnPinClick;
+
+    /**
+     * Internal flag for current display mode.
+     *
+     * @type {boolean}
+     * @private
+     */
+    _isTabMode = false;
 
     /**
      * Creates an instance of ApplicationWindowHeader.
@@ -291,7 +301,14 @@ export class ApplicationWindowHeader {
         let offsetX = 0;
         let offsetY = 0;
 
-        if (me._window.isMaximized) {
+        // If in Tab Mode, dragging the header represents undocking or reordering.
+        // The visual proxy (ghost) will be handled by DragDropService/GhostManager.
+        // We use the header element as the drag source proxy in this case.
+        if (me._isTabMode) {
+            const rect = me.element.getBoundingClientRect();
+            offsetX = startCoords.startX - rect.left;
+            offsetY = startCoords.startY - rect.top;
+        } else if (me._window.isMaximized) {
             // Calculate relative position of mouse on the maximized header (0.0 to 1.0)
             const rectMax = me._window.element.getBoundingClientRect();
             const ratioX = (event.clientX - rectMax.left) / rectMax.width;
@@ -300,22 +317,13 @@ export class ApplicationWindowHeader {
             me._window.toggleMaximize();
 
             // Calculate new X position to keep mouse relative to the restored header
-            // We center the window under the mouse based on the previous ratio
-            // or essentially update the window's X so the mouse is at the same %
-
             const rectRestored = me._window.element.getBoundingClientRect();
             const newWindowWidth = rectRestored.width;
 
-            // Calculate correct offset for the ghost
             offsetX = newWindowWidth * ratioX;
-
-            // Update window position immediately so it jumps to the cursor
             const newX = event.clientX - offsetX;
-
-            // We update the window's state (and style via setter)
             me._window.x = newX;
-            // Keep Y at top or slightly below mouse, usually just keep offset
-            offsetY = event.clientY - rectMax.top; // usually close to 0/header height
+            offsetY = event.clientY - rectMax.top;
             me._window.y = event.clientY - offsetY;
         } else {
             const rect = me._window.element.getBoundingClientRect();
@@ -323,13 +331,18 @@ export class ApplicationWindowHeader {
             offsetY = startCoords.startY - rect.top;
         }
 
+        // In Tab Mode, we drag the header element itself (the tab).
+        // In Window Mode, we drag the whole window element.
+        const elementToDrag = me._isTabMode ? me.element : me._window.element;
+
         appBus.emit(EventTypes.DND_DRAG_START, {
             item: me._window,
             type: ItemType.APPLICATION_WINDOW,
-            element: me._window.element,
+            element: elementToDrag,
             event: event,
             offsetX: offsetX,
-            offsetY: offsetY
+            offsetY: offsetY,
+            isTabDrag: me._isTabMode
         });
     }
 
@@ -404,6 +417,28 @@ export class ApplicationWindowHeader {
     setTitle(title) {
         if (this._titleElement) {
             this._titleElement.textContent = title;
+        }
+    }
+
+    /**
+     * Toggles the header between Window mode and Tab mode.
+     * In Tab mode, hides unnecessary controls (Pin, Min, Max) and updates style.
+     *
+     * @param {boolean} isTab - True for tab mode, false for window mode.
+     * @returns {void}
+     */
+    setTabMode(isTab) {
+        this._isTabMode = isTab;
+        if (isTab) {
+            this.element.classList.add('window-header--tab');
+            this._pinButton.style.display = 'none';
+            this._minimizeButton.style.display = 'none';
+            this._maximizeButton.style.display = 'none';
+        } else {
+            this.element.classList.remove('window-header--tab');
+            this._pinButton.style.display = '';
+            this._minimizeButton.style.display = '';
+            this._maximizeButton.style.display = '';
         }
     }
 }

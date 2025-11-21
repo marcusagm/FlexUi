@@ -3,11 +3,12 @@
 /*
  * Viewport Container
  * Acts as the "desktop" boundary for floating ApplicationWindows.
- * It consumes the full available space of its parent column/row.
+ * Modified to Flex column to support the Tab Bar at the top.
  */
 .viewport {
     position: relative;
-    display: block;
+    display: flex;
+    flex-direction: column;
     width: 100%;
     height: 100%;
     flex-grow: 1;
@@ -17,4 +18,80 @@
 
     /* Ensures that clicks on the empty background don't select text elsewhere */
     user-select: none;
+}
+
+/*
+ * Tab Bar Area
+ * Container for docked window headers (tabs).
+ */
+.viewport__tab-bar {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-end;
+    height: var(--window-header-height);
+    background-color: var(--color-bg-header);
+    border-bottom: 1px solid var(--color-border-default);
+    flex-shrink: 0;
+    padding-left: 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.viewport__tab-bar::-webkit-scrollbar {
+    display: none;
+}
+
+/* Estado Oculto (sem abas) */
+.viewport__tab-bar--hidden {
+    display: none;
+}
+
+/* Drop target visual feedback standard */
+.viewport__tab-bar--droptarget {
+    background-color: var(--color-bg-hover);
+    box-shadow: inset 0 0 4px var(--color-accent-hover);
+}
+
+/*
+ * Tabbed Window Behavior
+ * When a window is docked, it fills the remaining viewport space.
+ * Increased specificity (.viewport ...) to win over base display:flex.
+ */
+.viewport .application-window--tabbed {
+    position: relative !important; /* Override absolute */
+    flex: 1 1 auto;
+    width: 100% !important;
+    height: auto !important;
+    border-radius: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    z-index: auto !important;
+    display: none; /* Oculto por padrão se for aba */
+}
+
+/* Exibir apenas a aba ativa */
+.viewport .application-window--tabbed.application-window--active-tab {
+    display: flex;
+}
+
+.viewport__tab-bar .window-header {
+    border-bottom: none;
+    border-top: var(--panel-tab-border-top-width) solid var(--color-bg-tab-inactive);
+    border-top-left-radius: var(--border-radius-base);
+    border-top-right-radius: var(--border-radius-base);
+    margin-right: 2px;
+    max-width: 200px;
+    flex: 1 1 auto;
+    cursor: pointer;
+}
+.viewport__tab-bar .window-header:hover {
+    background-color: var(--color-bg-hover);
+    border-top: var(--panel-tab-border-top-width) solid var(--color-accent-inactive);
+    color: var(--color-text-primary);
+}
+
+.viewport__tab-bar .window-header--active {
+    background-color: var(--color-bg-tab-active);
+    color: var(--color-text-primary);
+    border-top: var(--panel-tab-border-top-width) solid var(--color-accent-hover);
 }

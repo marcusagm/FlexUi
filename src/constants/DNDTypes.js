@@ -41,7 +41,8 @@
  * CONTAINER: 'container',
  * TAB_CONTAINER: 'tab-container',
  * TOOLBAR_CONTAINER: 'toolbar-container',
- * VIEWPORT: 'viewport'
+ * VIEWPORT: 'viewport',
+ * VIEWPORT_TAB_BAR: 'viewport-tab-bar'
  * }>}
  */
 export const DropZoneType = Object.freeze({
@@ -50,7 +51,8 @@ export const DropZoneType = Object.freeze({
     CONTAINER: 'container',
     TAB_CONTAINER: 'tab-container',
     TOOLBAR_CONTAINER: 'toolbar-container',
-    VIEWPORT: 'viewport'
+    VIEWPORT: 'viewport',
+    VIEWPORT_TAB_BAR: 'viewport-tab-bar'
 });
 
 /**

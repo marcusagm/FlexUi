@@ -9,25 +9,21 @@
     border-radius: var(--border-radius-base);
     box-shadow: var(--window-shadow);
     border: var(--window-border-inactive);
-    overflow: hidden; /* Conteúdo extra recortado (respeita border-radius) */
+    overflow: hidden; /* Conteúdo extra recortado */
 
-    /* Valores padrão de dimensão mínima */
     min-width: 200px;
     min-height: 100px;
 
-    /* Transições suaves para foco e borda */
     transition:
         border-color 0.2s ease-out,
         box-shadow 0.2s ease-out;
 
-    /* Z-index base (gerenciado dinamicamente pelo manager, mas bom ter um default) */
     z-index: var(--viewport-z-floating);
 }
 
 /* Estado Ativo / Focado */
 .application-window--focused {
     border: var(--window-border-active);
-    /* Z-index é manipulado via JS para trazer para frente */
 }
 
 /* Estado Maximizado */
@@ -37,8 +33,10 @@
     box-shadow: none;
 }
 
-/* Ocultar alças de redimensionamento quando maximizado */
-.application-window--maximized .window-resize-handle {
+/* * [CORREÇÃO] Ocultar alças de redimensionamento quando maximizado OU em modo aba
+ */
+.application-window--maximized .window-resize-handle,
+.application-window--tabbed .window-resize-handle {
     display: none !important;
 }
 
@@ -46,19 +44,19 @@
 .application-window--minimized {
     height: var(--window-header-height) !important;
     min-height: var(--window-header-height) !important;
-    resize: none; /* Desabilita resize nativo se houver */
+    resize: none;
 }
 .application-window--minimized .application-window__content {
     display: none;
 }
 .application-window--minimized .window-resize-handle {
-    display: none; /* Esconde alças de resize */
+    display: none;
 }
 
 /* Estado "Always on Top" (Pin) */
 .application-window--pinned {
     z-index: var(--viewport-z-always-on-top) !important;
-    border-color: var(--color-accent-primary); /* Feedback visual extra */
+    border-color: var(--color-accent-primary);
 }
 
 /* --- Header da Janela --- */
@@ -72,13 +70,18 @@
     user-select: none;
     flex-shrink: 0;
     border-bottom: 1px solid var(--color-border-default);
-    /* O cursor de arraste é gerenciado pelo DragTrigger, mas o visual ajuda */
     cursor: default;
 }
 
 .application-window--focused .window-header {
     background-color: var(--window-header-bg-active);
     color: var(--window-header-color-active);
+}
+
+/* [CORREÇÃO] Estilo para quando o header é uma aba */
+.window-header--tab {
+    border-bottom: none;
+    /* Outros estilos gerenciados pelo viewport.css */
 }
 
 .window-header__title {
@@ -119,26 +122,24 @@
 }
 
 .window-header__btn:hover {
-    background-color: rgba(255, 255, 255, 0.2); /* Overlay sutil */
+    background-color: rgba(255, 255, 255, 0.2);
     opacity: 1;
 }
 
-/* Botão fechar com destaque no hover */
 .window-header__btn--close:hover {
     background-color: var(--color-feedback-danger);
     color: var(--color-text-on-danger);
 }
 
-/* Indicador visual para o botão PIN quando ativo */
 .application-window--pinned .window-header__btn--pin {
     opacity: 1;
-    transform: rotate(45deg); /* Exemplo visual */
+    transform: rotate(45deg);
 }
 
 /* --- Conteúdo Interno --- */
 .application-window__content {
-    flex: 1; /* Ocupa o espaço restante */
-    overflow: auto; /* Scroll interno */
+    flex: 1;
+    overflow: auto;
     position: relative;
     background-color: var(--color-bg-panel-content);
     color: var(--color-text-primary);
@@ -146,8 +147,6 @@
     flex-direction: column;
 }
 
-/* Sobrescrita para alças de resize específicas da janela (se necessário além do padrão) */
 .window-resize-handle {
-    /* Garante que fiquem acima do conteúdo */
     z-index: 10;
 }

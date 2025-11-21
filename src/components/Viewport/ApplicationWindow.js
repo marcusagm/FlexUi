@@ -4,6 +4,7 @@ import { appBus } from '../../utils/EventBus.js';
 import { generateId } from '../../utils/generateId.js';
 import { EventTypes } from '../../constants/EventTypes.js';
 import { ItemType } from '../../constants/DNDTypes.js';
+import { FloatingPanelManagerService } from '../../services/DND/FloatingPanelManagerService.js';
 
 /**
  * Description:
@@ -30,6 +31,7 @@ import { ItemType } from '../../constants/DNDTypes.js';
  * - _isMaximized {boolean} : Maximized state flag.
  * - _isMinimized {boolean} : Minimized state flag.
  * - _isPinned {boolean} : Pinned (always on top) state flag.
+ * - _isTabbed {boolean} : Tabbed (docked) state flag.
  * - _preMaximizeState {object|null} : Geometry snapshot before maximization.
  * - _resizeHandleManager {ResizeHandleManager} : Handles 8-way resizing.
  * - _canCloseHandler {Function|null} : Callback to validate closing.
@@ -49,7 +51,8 @@ import { ItemType } from '../../constants/DNDTypes.js';
  * - Intercepts close requests via `preventClose` (async support).
  * - Identifies as `ItemType.APPLICATION_WINDOW` for DND.
  * - Automatically constrains itself to parent bounds on mount and un-minimize.
- * - If minimized while maximized, it restores to normal state first.
+ * - Prevents minimization when maximized.
+ * - Supports "Tabbed" mode where it acts as a content panel filling available space, disabling resize and absolute positioning.
  *
  * Dependencies:
  * - ./ApplicationWindowHeader.js
@@ -182,6 +185,14 @@ export class ApplicationWindow {
      * @private
      */
     _isPinned = false;
+
+    /**
+     * Tabbed (docked) state flag.
+     *
+     * @type {boolean}
+     * @private
+     */
+    _isTabbed = false;
 
     /**
      * Geometry snapshot before maximization.
@@ -388,7 +399,16 @@ export class ApplicationWindow {
     }
 
     /**
-     * Collapsed property for compatibility with other components checking 'collapsed'.
+     * Tabbed state getter.
+     *
+     * @returns {boolean}
+     */
+    get isTabbed() {
+        return this._isTabbed;
+    }
+
+    /**
+     * Collapsed property for compatibility.
      * Proxies to minimized state.
      *
      * @returns {boolean}
@@ -453,7 +473,6 @@ export class ApplicationWindow {
             handles: ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'],
             customClass: 'window-resize-handle', // Theme hook
             getConstraints: () => {
-                // Use dynamic offsetParent to respect the actual container (Viewport)
                 const parent = me.element.offsetParent || document.body;
                 return {
                     minimumWidth: me.minWidth,
@@ -484,10 +503,13 @@ export class ApplicationWindow {
     _updateGeometryStyles() {
         const me = this;
         if (me.element) {
-            me.element.style.left = `${me._x}px`;
-            me.element.style.top = `${me._y}px`;
-            me.element.style.width = `${me._width}px`;
-            me.element.style.height = `${me._height}px`;
+            // Only apply geometry styles if NOT tabbed
+            if (!me._isTabbed) {
+                me.element.style.left = `${me._x}px`;
+                me.element.style.top = `${me._y}px`;
+                me.element.style.width = `${me._width}px`;
+                me.element.style.height = `${me._height}px`;
+            }
         }
     }
 
@@ -519,7 +541,6 @@ export class ApplicationWindow {
      * @returns {void}
      */
     renderContent(container) {
-        // Designed for override
         container;
     }
 
@@ -561,22 +582,21 @@ export class ApplicationWindow {
      * @returns {void}
      */
     constrainToParent() {
+        // Do not constrain if tabbed
+        if (this._isTabbed) return;
+
         const parent = this.element.offsetParent;
         if (!parent) return;
 
         const parentWidth = parent.clientWidth;
         const parentHeight = parent.clientHeight;
 
-        // Use current dimensions (visual) or stored dimensions (logical)
-        // When un-minimizing, we use stored width/height
         const w = this._width;
         const h = this._height;
 
-        // Constrain Size
         if (w > parentWidth) this._width = Math.max(this.minWidth, parentWidth);
         if (h > parentHeight) this._height = Math.max(this.minHeight, parentHeight);
 
-        // Constrain Position
         if (this._x < 0) this._x = 0;
         if (this._y < 0) this._y = 0;
 
@@ -646,18 +666,15 @@ export class ApplicationWindow {
                 me._updateGeometryStyles();
             }
         } else {
-            // Fix: Un-minimize if minimized/collapsed before maximizing
             if (me._isMinimized) {
                 me._isMinimized = false;
                 me.element.classList.remove('application-window--minimized');
             }
-
             // Maximize
             me._isMaximized = true;
             me._preMaximizeState = { x: me._x, y: me._y, width: me._width, height: me._height };
             me.element.classList.add('application-window--maximized');
 
-            // Override styles for maximization (100%)
             me.element.style.top = '0';
             me.element.style.left = '0';
             me.element.style.width = '100%';
@@ -667,12 +684,10 @@ export class ApplicationWindow {
 
     /**
      * Minimizes the window.
-     * Automatically restores maximization state if active before minimizing.
      *
      * @returns {void}
      */
     minimize() {
-        // New Rule: If maximized, exit maximized state first, then minimize
         if (this._isMaximized) {
             this.toggleMaximize();
         }
@@ -680,7 +695,6 @@ export class ApplicationWindow {
         this._isMinimized = !this._isMinimized;
         this.element.classList.toggle('application-window--minimized', this._isMinimized);
 
-        // If restoring (un-minimizing), ensure it pops back into view if it was dragged out
         if (!this._isMinimized) {
             this.constrainToParent();
         }
@@ -694,7 +708,46 @@ export class ApplicationWindow {
     togglePin() {
         this._isPinned = !this._isPinned;
         this.element.classList.toggle('application-window--pinned', this._isPinned);
-        // Z-Index boost handled by manager or CSS
+    }
+
+    /**
+     * Sets the window to Tabbed mode (docked) or Floating mode.
+     *
+     * @param {boolean} isTabbed
+     * @returns {void}
+     */
+    setTabbed(isTabbed) {
+        const me = this;
+        if (me._isTabbed === isTabbed) return;
+
+        me._isTabbed = isTabbed;
+        me.header.setTabMode(isTabbed);
+
+        if (isTabbed) {
+            // Enter Tab Mode
+            me.element.classList.add('application-window--tabbed');
+
+            // Reset absolute positioning styles
+            me.element.style.position = '';
+            me.element.style.left = '';
+            me.element.style.top = '';
+            me.element.style.width = '';
+            me.element.style.height = '';
+            me.element.style.zIndex = '';
+
+            // Ensure flags are reset
+            if (me._isMaximized) me.toggleMaximize();
+            if (me._isMinimized) me.minimize();
+        } else {
+            // Exit Tab Mode (Restore Floating)
+            me.element.classList.remove('application-window--tabbed');
+            me.element.style.position = 'absolute';
+
+            // Restore geometry
+            me._updateGeometryStyles();
+            // Ensure it is visible
+            me.constrainToParent();
+        }
     }
 
     /**
@@ -710,7 +763,8 @@ export class ApplicationWindow {
             state: {
                 maximized: this._isMaximized,
                 minimized: this._isMinimized,
-                pinned: this._isPinned
+                pinned: this._isPinned,
+                tabbed: this._isTabbed
             }
         };
     }
@@ -734,6 +788,7 @@ export class ApplicationWindow {
             if (data.state.pinned) this.togglePin();
             if (data.state.minimized) this.minimize();
             if (data.state.maximized) this.toggleMaximize();
+            if (data.state.tabbed) this.setTabbed(true);
         }
     }
 }

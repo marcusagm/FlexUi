@@ -17,6 +17,7 @@ import { ContainerDropStrategy } from './services/DND/ContainerDropStrategy.js';
 import { TabContainerDropStrategy } from './services/DND/TabContainerDropStrategy.js';
 import { ToolbarContainerDropStrategy } from './services/DND/ToolbarContainerDropStrategy.js';
 import { ViewportDropStrategy } from './services/DND/ViewportDropStrategy.js';
+import { ViewportTabDropStrategy } from './services/DND/ViewportTabDropStrategy.js';
 import { LayoutService } from './services/LayoutService.js';
 import { appBus } from './utils/EventBus.js';
 import { FloatingPanelManagerService } from './services/DND/FloatingPanelManagerService.js';
@@ -327,6 +328,7 @@ export class App {
         dds.registerStrategy(DropZoneType.CONTAINER, new ContainerDropStrategy());
         dds.registerStrategy(DropZoneType.TOOLBAR_CONTAINER, new ToolbarContainerDropStrategy());
         dds.registerStrategy(DropZoneType.VIEWPORT, new ViewportDropStrategy());
+        dds.registerStrategy(DropZoneType.VIEWPORT_TAB_BAR, new ViewportTabDropStrategy());
 
         const panelFactory = PanelFactory.getInstance();
         panelFactory.registerPanelClasses([Panel, TextPanel, ToolbarPanel, CounterPanel]);
