@@ -12,6 +12,7 @@
     height: 100%;
     flex-grow: 1;
     overflow: hidden;
+    border-radius: var(--border-radius-base);
     background-color: var(--color-bg-viewport);
 
     /* Ensures that clicks on the empty background don't select text elsewhere */

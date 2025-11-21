@@ -38,6 +38,7 @@ import { ItemType } from '../../constants/DNDTypes.js';
  * - Stops propagation on control buttons to prevent drag initiation.
  * - Emits specific events for window actions (close, maximize, minimize, pin) to be handled by the parent window or service.
  * - Initiates a drag operation specifically typed as APPLICATION_WINDOW.
+ * - Handles auto-restore when dragging a maximized window, maintaining relative cursor position.
  *
  * Dependencies:
  * - ../../utils/EventBus.js
@@ -276,6 +277,7 @@ export class ApplicationWindowHeader {
 
     /**
      * Initiates the drag operation via the DragDropService.
+     * Handles auto-restore if the window is maximized.
      *
      * @param {PointerEvent} event - The original pointer event.
      * @param {object} startCoords - The starting coordinates from DragTrigger.
@@ -284,12 +286,42 @@ export class ApplicationWindowHeader {
      */
     _startDrag(event, startCoords) {
         const me = this;
-        // Notify that this window should be focused before dragging starts
         appBus.emit(EventTypes.WINDOW_FOCUS, me._window);
 
-        const rect = me._window.element.getBoundingClientRect();
-        const offsetX = startCoords.startX - rect.left;
-        const offsetY = startCoords.startY - rect.top;
+        let offsetX = 0;
+        let offsetY = 0;
+
+        if (me._window.isMaximized) {
+            // Calculate relative position of mouse on the maximized header (0.0 to 1.0)
+            const rectMax = me._window.element.getBoundingClientRect();
+            const ratioX = (event.clientX - rectMax.left) / rectMax.width;
+
+            // Restore window
+            me._window.toggleMaximize();
+
+            // Calculate new X position to keep mouse relative to the restored header
+            // We center the window under the mouse based on the previous ratio
+            // or essentially update the window's X so the mouse is at the same %
+
+            const rectRestored = me._window.element.getBoundingClientRect();
+            const newWindowWidth = rectRestored.width;
+
+            // Calculate correct offset for the ghost
+            offsetX = newWindowWidth * ratioX;
+
+            // Update window position immediately so it jumps to the cursor
+            const newX = event.clientX - offsetX;
+
+            // We update the window's state (and style via setter)
+            me._window.x = newX;
+            // Keep Y at top or slightly below mouse, usually just keep offset
+            offsetY = event.clientY - rectMax.top; // usually close to 0/header height
+            me._window.y = event.clientY - offsetY;
+        } else {
+            const rect = me._window.element.getBoundingClientRect();
+            offsetX = startCoords.startX - rect.left;
+            offsetY = startCoords.startY - rect.top;
+        }
 
         appBus.emit(EventTypes.DND_DRAG_START, {
             item: me._window,
@@ -359,7 +391,6 @@ export class ApplicationWindowHeader {
         event.stopPropagation();
         if (this._window && typeof this._window.togglePin === 'function') {
             this._window.togglePin();
-            // Update visual state if needed, or rely on window state update
             this._pinButton.classList.toggle('active');
         }
     }

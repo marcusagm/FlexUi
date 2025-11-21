@@ -13,8 +13,9 @@ import { ItemType } from '../../constants/DNDTypes.js';
  * - Validates that the dragged item is strictly an ApplicationWindow.
  * - On DragOver: Hides placeholder (free movement logic).
  * - On Drop: Updates the x/y coordinates of the ApplicationWindow.
- * - Enforces boundaries: Keeps the window fully contained within the Viewport to match Ghost behavior.
- * - Does NOT handle creation of new windows from Panels/Groups (delegated to Undock logic).
+ * - Enforces boundaries: Keeps the window fully contained within the Viewport.
+ * - Adapts boundary calculations based on window state (minimized vs normal) to allow
+ * minimized windows to reach the bottom of the viewport.
  *
  * Dependencies:
  * - {import('./BaseDropStrategy.js').BaseDropStrategy}
@@ -33,7 +34,6 @@ export class ViewportDropStrategy extends BaseDropStrategy {
      * @returns {boolean}
      */
     onDragEnter(point, dropZone, draggedData, dds) {
-        // Strictly allow only ApplicationWindow
         return draggedData.type === ItemType.APPLICATION_WINDOW;
     }
 
@@ -48,15 +48,13 @@ export class ViewportDropStrategy extends BaseDropStrategy {
      * @returns {boolean}
      */
     onDragOver(point, dropZone, draggedData, dds) {
-        // We don't need a placeholder for floating drops, the ghost element is enough.
         dds.hidePlaceholder();
         return true;
     }
 
     /**
      * Template method for handling Drop.
-     * Overridden to bypass the placeholder check from BaseDropStrategy,
-     * as Viewport drops don't use the placeholder element.
+     * Overridden to bypass the placeholder check from BaseDropStrategy.
      *
      * @param {{x: number, y: number, target: HTMLElement}} point
      * @param {object} dropZone
@@ -66,7 +64,6 @@ export class ViewportDropStrategy extends BaseDropStrategy {
      */
     handleDrop(point, dropZone, draggedData, dds) {
         const me = this;
-        // Bypass placeholder check
         dds.hidePlaceholder();
 
         const result = me.onDrop(point, dropZone, draggedData, dds);
@@ -77,7 +74,7 @@ export class ViewportDropStrategy extends BaseDropStrategy {
 
     /**
      * Hook called when the item is dropped.
-     * Executes the move logic.
+     * Executes the move logic with boundary constraints.
      *
      * @param {{x: number, y: number, target: HTMLElement}} point
      * @param {import('../../components/Viewport/Viewport.js').Viewport} dropZone
@@ -93,20 +90,23 @@ export class ViewportDropStrategy extends BaseDropStrategy {
         const viewportRect = dropZone.element.getBoundingClientRect();
         const windowInstance = draggedData.item;
 
-        // Calculate relative coordinates
+        // Calculate relative coordinates based on drag offset
         let newX = point.x - viewportRect.left - (draggedData.offsetX || 0);
         let newY = point.y - viewportRect.top - (draggedData.offsetY || 0);
 
-        // Get window dimensions (fallback to element size if property missing)
+        // Determine effective dimensions for constraint calculation
+        // If minimized, use the current DOM height (header height) instead of logical height
+        const isMinimized = windowInstance.isMinimized;
+
         const winWidth =
             windowInstance.width ||
             (windowInstance.element ? windowInstance.element.offsetWidth : 200);
         const winHeight =
-            windowInstance.height ||
-            (windowInstance.element ? windowInstance.element.offsetHeight : 150);
+            isMinimized && windowInstance.element
+                ? windowInstance.element.offsetHeight
+                : windowInstance.height || windowInstance.minHeight;
 
         // Clamp constraints: Keep the window FULLY inside the viewport
-        // This matches the behavior of GhostManager when bounds are provided.
         const maxX = Math.max(0, viewportRect.width - winWidth);
         const maxY = Math.max(0, viewportRect.height - winHeight);
 
@@ -114,11 +114,10 @@ export class ViewportDropStrategy extends BaseDropStrategy {
         newY = Math.max(0, Math.min(newY, maxY));
 
         // Update position directly on the instance
-        // ApplicationWindow is expected to update its DOM/Styles via these setters
         if ('x' in windowInstance) windowInstance.x = newX;
         if ('y' in windowInstance) windowInstance.y = newY;
 
-        // Fallback if setters don't auto-update styles immediately
+        // Fallback visual update
         if (windowInstance.element) {
             windowInstance.element.style.left = `${newX}px`;
             windowInstance.element.style.top = `${newY}px`;

@@ -48,7 +48,8 @@ import { ItemType } from '../../constants/DNDTypes.js';
  * - Geometry state persistence (maximize/restore).
  * - Intercepts close requests via `preventClose` (async support).
  * - Identifies as `ItemType.APPLICATION_WINDOW` for DND.
- * - Automatically constrains itself to parent bounds on mount.
+ * - Automatically constrains itself to parent bounds on mount and un-minimize.
+ * - If minimized while maximized, it restores to normal state first.
  *
  * Dependencies:
  * - ./ApplicationWindowHeader.js
@@ -431,6 +432,7 @@ export class ApplicationWindow {
 
         me.contentElement = document.createElement('div');
         me.contentElement.classList.add('application-window__content');
+        // Default styles for content area
         me.contentElement.style.overflow = 'auto';
         me.contentElement.style.flex = '1';
         me.contentElement.style.position = 'relative';
@@ -449,7 +451,7 @@ export class ApplicationWindow {
 
         me._resizeHandleManager = new ResizeHandleManager(me.element, {
             handles: ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'],
-            customClass: 'window-resize-handle',
+            customClass: 'window-resize-handle', // Theme hook
             getConstraints: () => {
                 // Use dynamic offsetParent to respect the actual container (Viewport)
                 const parent = me.element.offsetParent || document.body;
@@ -462,7 +464,7 @@ export class ApplicationWindow {
                 };
             },
             onResize: ({ xCoordinate, yCoordinate, width, height }) => {
-                if (me._isMaximized) return;
+                if (me._isMaximized) return; // Block resize if maximized
 
                 me._x = xCoordinate;
                 me._y = yCoordinate;
@@ -517,6 +519,7 @@ export class ApplicationWindow {
      * @returns {void}
      */
     renderContent(container) {
+        // Designed for override
         container;
     }
 
@@ -553,7 +556,7 @@ export class ApplicationWindow {
 
     /**
      * Constrains the window to fit within its parent container (Viewport).
-     * This ensures the window is not created or moved completely outside the visible area.
+     * Ensures valid placement on mount or un-minimize.
      *
      * @returns {void}
      */
@@ -564,13 +567,16 @@ export class ApplicationWindow {
         const parentWidth = parent.clientWidth;
         const parentHeight = parent.clientHeight;
 
-        // Constrain Size (if larger than parent, shrink to fit)
-        if (this._width > parentWidth) this._width = Math.max(this.minWidth, parentWidth);
-        if (this._height > parentHeight) this._height = Math.max(this.minHeight, parentHeight);
+        // Use current dimensions (visual) or stored dimensions (logical)
+        // When un-minimizing, we use stored width/height
+        const w = this._width;
+        const h = this._height;
+
+        // Constrain Size
+        if (w > parentWidth) this._width = Math.max(this.minWidth, parentWidth);
+        if (h > parentHeight) this._height = Math.max(this.minHeight, parentHeight);
 
         // Constrain Position
-        // Ensure at least some part of the window header is visible or keep it fully inside?
-        // Usually keeping fully inside is better for initial spawn.
         if (this._x < 0) this._x = 0;
         if (this._y < 0) this._y = 0;
 
@@ -592,7 +598,6 @@ export class ApplicationWindow {
     mount() {
         appBus.emit(EventTypes.WINDOW_MOUNT, this);
         this.renderContent(this.contentElement);
-        // Apply constraints after mounting to ensure parent is available
         this.constrainToParent();
     }
 
@@ -641,7 +646,7 @@ export class ApplicationWindow {
                 me._updateGeometryStyles();
             }
         } else {
-            // Fix: Un-minimize if minimized/collapsed
+            // Fix: Un-minimize if minimized/collapsed before maximizing
             if (me._isMinimized) {
                 me._isMinimized = false;
                 me.element.classList.remove('application-window--minimized');
@@ -652,7 +657,7 @@ export class ApplicationWindow {
             me._preMaximizeState = { x: me._x, y: me._y, width: me._width, height: me._height };
             me.element.classList.add('application-window--maximized');
 
-            // Override styles for maximization
+            // Override styles for maximization (100%)
             me.element.style.top = '0';
             me.element.style.left = '0';
             me.element.style.width = '100%';
@@ -662,12 +667,23 @@ export class ApplicationWindow {
 
     /**
      * Minimizes the window.
+     * Automatically restores maximization state if active before minimizing.
      *
      * @returns {void}
      */
     minimize() {
+        // New Rule: If maximized, exit maximized state first, then minimize
+        if (this._isMaximized) {
+            this.toggleMaximize();
+        }
+
         this._isMinimized = !this._isMinimized;
         this.element.classList.toggle('application-window--minimized', this._isMinimized);
+
+        // If restoring (un-minimizing), ensure it pops back into view if it was dragged out
+        if (!this._isMinimized) {
+            this.constrainToParent();
+        }
     }
 
     /**
@@ -678,6 +694,7 @@ export class ApplicationWindow {
     togglePin() {
         this._isPinned = !this._isPinned;
         this.element.classList.toggle('application-window--pinned', this._isPinned);
+        // Z-Index boost handled by manager or CSS
     }
 
     /**

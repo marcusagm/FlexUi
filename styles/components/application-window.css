@@ -37,6 +37,11 @@
     box-shadow: none;
 }
 
+/* Ocultar alças de redimensionamento quando maximizado */
+.application-window--maximized .window-resize-handle {
+    display: none !important;
+}
+
 /* Estado Minimizado (apenas header visível) */
 .application-window--minimized {
     height: var(--window-header-height) !important;
