@@ -91,9 +91,7 @@ config.json
 notes.txt
 old/
 others.js
-review.md
-plans.md
-tasks.md
+/notes
 
 
 #Google Drive
