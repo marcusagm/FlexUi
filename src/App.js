@@ -1,3 +1,5 @@
+// Arquivo: src/App.js
+
 import { Menu } from './components/Menu/Menu.js';
 import { Container } from './components/Container/Container.js';
 import { Panel } from './components/Panel/Panel.js';
@@ -33,7 +35,7 @@ import { EventTypes } from './constants/EventTypes.js';
 import { ViewportFactory } from './components/Viewport/ViewportFactory.js';
 import { ApplicationWindow } from './components/Viewport/ApplicationWindow.js';
 import { NotepadWindow } from './components/Viewport/ConcreteWindows/NotepadWindow.js';
-import { Viewport } from './components/Viewport/Viewport.js'; // Added import
+import { Viewport } from './components/Viewport/Viewport.js';
 
 /**
  * Description:
@@ -320,6 +322,7 @@ export class App {
      * @returns {void}
      */
     _registerStrategies() {
+        const me = this; // Adicionar const me = this
         const dds = DragDropService.getInstance();
 
         dds.registerStrategy(DropZoneType.COLUMN, new ColumnDropStrategy());
@@ -337,6 +340,11 @@ export class App {
         toolbarFactory.registerToolbarGroupClasses([ApplicationGroup]);
 
         const viewportFactory = ViewportFactory.getInstance();
+
+        // Registrar a classe base Viewport (DropZoneType.VIEWPORT)
+        viewportFactory.registerWindowType(DropZoneType.VIEWPORT, Viewport);
+
+        // Registrar janelas específicas
         viewportFactory.registerWindowType(ItemType.APPLICATION_WINDOW, ApplicationWindow);
         viewportFactory.registerWindowType('NotepadWindow', NotepadWindow);
     }
@@ -617,7 +625,9 @@ export class App {
         const me = this;
         const column = me.container.getFirstRow().getFirstColumn();
         const title = `Novo Painel (${new Date().toLocaleTimeString()})`;
-        const panel = new TextPanel(title, 'Conteúdo do novo painel.');
+
+        // Usar novo construtor: (title, config, renderer)
+        const panel = new TextPanel(title, { content: 'Conteúdo do novo painel.' });
 
         const panelGroup = new PanelGroup(panel);
 
@@ -657,7 +667,13 @@ export class App {
         traverse(me.container);
 
         if (targetViewport) {
-            const note = new NotepadWindow({ x: 10, y: 10, width: 200, height: 150 });
+            // Usar novo construtor: (titleOrConfig, contentOrNull, config, renderer)
+            const note = new NotepadWindow('Documento Novo', 'Digite seu texto aqui.', {
+                x: 10,
+                y: 10,
+                width: 200,
+                height: 150
+            });
             targetViewport.addWindow(note);
             appNotifications.success('Nova janela criada.');
         } else {

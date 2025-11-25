@@ -49,10 +49,10 @@ export class ViewportTabDropStrategy extends BaseDropStrategy {
      * @returns {boolean}
      */
     onDragEnter(point, dropZone, draggedData, dds) {
-        // Force visibility stability if it's a window
+        // Force visibility stability by adding drag-target class to the container
         if (draggedData.type === ItemType.APPLICATION_WINDOW) {
-            if (dropZone.tabBar) {
-                dropZone.tabBar.classList.add('viewport__tab-bar--drag-target');
+            if (dropZone.tabBar && dropZone.tabBar.parentElement) {
+                dropZone.tabBar.parentElement.classList.add('viewport__tab-bar--drag-target');
             }
         }
         return true;
@@ -72,18 +72,28 @@ export class ViewportTabDropStrategy extends BaseDropStrategy {
         // [FIX] Prevent visual feedback for non-windows (Panels/Groups)
         if (draggedData.type !== ItemType.APPLICATION_WINDOW) {
             dds.hidePlaceholder();
-            // Remove forced visibility class if present
-            if (dropZone.tabBar) {
-                dropZone.tabBar.classList.remove('viewport__tab-bar--drag-target');
-            }
             return false;
         }
 
-        const tabBar = dropZone.tabBar;
+        const stripElement = dropZone.tabBar;
+        if (!stripElement) {
+            dds.hidePlaceholder();
+            return false;
+        }
+
+        // Find the inner scrollable container (Viewport of the Strip)
+        const scrollContainer = stripElement.querySelector('.ui-strip__viewport');
         const placeholder = dds.getPlaceholder();
 
-        const tabs = Array.from(tabBar.children).filter(
-            child => child !== placeholder && child.classList.contains('window-header')
+        if (!scrollContainer) {
+            dds.hidePlaceholder();
+            return false;
+        }
+
+        // Filter all children (tabs) inside the scroll container
+        const tabs = Array.from(scrollContainer.children).filter(
+            // Tabs are the direct children elements, and we filter out the placeholder itself
+            child => child !== placeholder
         );
 
         let targetElement = null;
@@ -104,16 +114,12 @@ export class ViewportTabDropStrategy extends BaseDropStrategy {
             }
         }
 
-        if (!tabBar.classList.contains('viewport__tab-bar--drag-target')) {
-            tabBar.classList.add('viewport__tab-bar--drag-target');
-        }
-
         dds.showPlaceholder('vertical');
 
         if (placed && targetElement) {
-            tabBar.insertBefore(placeholder, targetElement);
+            scrollContainer.insertBefore(placeholder, targetElement);
         } else {
-            tabBar.appendChild(placeholder);
+            scrollContainer.appendChild(placeholder);
         }
 
         return true;
@@ -123,8 +129,8 @@ export class ViewportTabDropStrategy extends BaseDropStrategy {
      * Cleanup on leave.
      */
     onDragLeave(point, dropZone, draggedData, dds) {
-        if (dropZone.tabBar) {
-            dropZone.tabBar.classList.remove('viewport__tab-bar--drag-target');
+        if (dropZone.tabBar && dropZone.tabBar.parentElement) {
+            dropZone.tabBar.parentElement.classList.remove('viewport__tab-bar--drag-target');
         }
     }
 
@@ -139,8 +145,8 @@ export class ViewportTabDropStrategy extends BaseDropStrategy {
      * @returns {boolean}
      */
     onDrop(point, dropZone, draggedData, dds) {
-        if (dropZone.tabBar) {
-            dropZone.tabBar.classList.remove('viewport__tab-bar--drag-target');
+        if (dropZone.tabBar && dropZone.tabBar.parentElement) {
+            dropZone.tabBar.parentElement.classList.remove('viewport__tab-bar--drag-target');
         }
 
         if (draggedData.type !== ItemType.APPLICATION_WINDOW || this._dropIndex === null) {

@@ -1,8 +1,10 @@
 import { ApplicationWindow } from './ApplicationWindow.js';
+import { Viewport } from './Viewport.js'; // Novo import
+import { DropZoneType, ItemType } from '../../constants/DNDTypes.js';
 
 /**
  * Description:
- * A Singleton factory and registry for creating ApplicationWindow instances.
+ * A Singleton factory and registry for creating ApplicationWindow instances and Viewport components.
  * This class uses the Abstract Factory and Registry patterns.
  * Window types must be registered by the application before they can be created
  * from serialized data (e.g., during workspace restoration).
@@ -18,26 +20,14 @@ import { ApplicationWindow } from './ApplicationWindow.js';
  * // In App.js (on init):
  * const factory = ViewportFactory.getInstance();
  * factory.registerWindowType('MyCustomWindow', MyCustomWindow);
- * factory.setDefaultRendererFactory(() => new ReactWindowAdapter());
  *
- * // In Viewport.fromJSON:
- * const window = ViewportFactory.getInstance().createWindow(windowData);
- *
- * Events:
- * - None
- *
- * Business rules implemented:
- * - Implements Singleton pattern to ensure a single registry instance.
- * - Validates that registered classes are valid constructors.
- * - Registers the base ApplicationWindow class by default.
- * - Hydrates created windows with saved state (maximized, minimized, pinned) if available.
- * - Injects the configured renderer into new window instances.
+ * // In Column.js fromJSON:
+ * const viewport = ViewportFactory.getInstance().createViewport(viewportData);
  *
  * Dependencies:
  * - ./ApplicationWindow.js
- *
- * Notes / Additional:
- * - None
+ * - ./Viewport.js
+ * - {import('../../constants/DNDTypes.js').DropZoneType}
  */
 export class ViewportFactory {
     /**
@@ -57,7 +47,7 @@ export class ViewportFactory {
     _registry;
 
     /**
-     * A factory function that returns a default renderer instance for new windows.
+     * A factory function that returns a default renderer instance for new components.
      *
      * @type {Function | null}
      * @private
@@ -73,8 +63,9 @@ export class ViewportFactory {
             return ViewportFactory._instance;
         }
         this.setRegistry(new Map());
-        // Register the base class by default
+        // Register classes
         this.registerWindowType('ApplicationWindow', ApplicationWindow);
+        this.registerWindowType(DropZoneType.VIEWPORT, Viewport); // NEW: Register Viewport type
         ViewportFactory._instance = this;
     }
 
@@ -116,7 +107,6 @@ export class ViewportFactory {
 
     /**
      * Sets the default renderer factory function.
-     * This function will be called to create a renderer instance for each new window.
      *
      * @param {Function} factoryFunction - A function returning an IRenderer instance.
      * @returns {void}
@@ -133,10 +123,10 @@ export class ViewportFactory {
     }
 
     /**
-     * Registers a Window class constructor against a string identifier.
+     * Registers a Window or Viewport class constructor against a string identifier.
      *
      * @param {string} typeName - The string identifier.
-     * @param {typeof ApplicationWindow} windowClass - The class constructor.
+     * @param {typeof ApplicationWindow | typeof Viewport} windowClass - The class constructor.
      * @returns {void}
      */
     registerWindowType(typeName, windowClass) {
@@ -148,6 +138,49 @@ export class ViewportFactory {
             return;
         }
         me.getRegistry().set(typeName, windowClass);
+    }
+
+    /**
+     * Creates and hydrates a Viewport instance.
+     *
+     * @param {object} viewportData - The serialized data object for the viewport.
+     * @returns {Viewport | null} An instantiated and hydrated Viewport, or null.
+     */
+    createViewport(viewportData) {
+        const me = this;
+        if (!viewportData || !viewportData.type) {
+            console.warn(
+                'ViewportFactory: createViewport failed, invalid data or missing type.',
+                viewportData
+            );
+            return null;
+        }
+
+        // Ensure type is correct, defaulting if legacy Viewport dropzone is used
+        const type =
+            viewportData.type === ItemType.VIEWPORT ? DropZoneType.VIEWPORT : viewportData.type;
+
+        const ViewportClass = me.getRegistry().get(type);
+
+        if (!ViewportClass) {
+            console.warn(`ViewportFactory: No class registered for type "${type}".`);
+            return null;
+        }
+
+        let renderer = null;
+        if (typeof me._defaultRendererFactory === 'function') {
+            renderer = me._defaultRendererFactory();
+        }
+
+        // Viewport constructor is: constructor(id = null, renderer = null)
+        const viewportInstance = new ViewportClass(viewportData.id, renderer);
+
+        // Hydrate state (windows, config, etc.)
+        if (typeof viewportInstance.fromJSON === 'function') {
+            viewportInstance.fromJSON(viewportData);
+        }
+
+        return viewportInstance;
     }
 
     /**
@@ -187,7 +220,7 @@ export class ViewportFactory {
             renderer = me._defaultRendererFactory();
         }
 
-        // Instantiate with basic title/config from data and injected renderer (4th arg)
+        // Instantiate with basic title/config from data and injected renderer
         const windowInstance = new WindowClass(windowData.title, null, config, renderer);
 
         // Hydrate full state (maximized, minimized, pinned, etc.)
