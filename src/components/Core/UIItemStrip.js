@@ -96,6 +96,9 @@ export class UIItemStrip extends UIElement {
         super(id, renderer || new VanillaStripAdapter());
         const me = this;
 
+        me._boundUpdateScrollButtons = throttleRAF(me._updateScrollButtons.bind(me));
+        me._boundOnOverflowClick = me.onOverflowClick.bind(me);
+
         if (config.orientation) {
             me.orientation = config.orientation;
         }
@@ -103,9 +106,6 @@ export class UIItemStrip extends UIElement {
         if (config.enableOverflowMenu !== undefined) {
             me.enableOverflowMenu = config.enableOverflowMenu;
         }
-
-        me._boundUpdateScrollButtons = throttleRAF(me._updateScrollButtons.bind(me));
-        me._boundOnOverflowClick = me.onOverflowClick.bind(me);
     }
 
     /**
@@ -165,7 +165,10 @@ export class UIItemStrip extends UIElement {
     set enableOverflowMenu(value) {
         const me = this;
         me._enableOverflowMenu = Boolean(value);
-        me._boundUpdateScrollButtons();
+
+        if (me._boundUpdateScrollButtons) {
+            me._boundUpdateScrollButtons();
+        }
     }
 
     /**
