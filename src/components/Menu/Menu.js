@@ -33,7 +33,8 @@ import { generateId } from '../../utils/generateId.js';
  * - Delegates DOM rendering to VanillaMenuAdapter.
  * - Uses Event Delegation to handle clicks and hovers for arbitrary depth.
  * - Manages "Active/Open" states for submenus.
- * - Closes submenus when clicking outside.
+ * - Closes submenus when clicking outside (left or right click).
+ * - Implements "Click-to-Open" behavior for top-level items.
  *
  * Dependencies:
  * - {import('../../core/UIElement.js').UIElement}
@@ -57,7 +58,7 @@ export class Menu extends UIElement {
      * @type {string}
      * @private
      */
-    _dataUrl = './workspaces/menus/menu.js'; // Default location
+    _dataUrl = './workspaces/menus/menu.js';
 
     /**
      * Bound handler for global document clicks (to close menu).
@@ -96,7 +97,6 @@ export class Menu extends UIElement {
         me._boundOnClick = me._onMenuClick.bind(me);
         me._boundOnMouseOver = me._onMenuMouseOver.bind(me);
 
-        // Initialize DOM structure
         me.render();
     }
 
@@ -113,23 +113,19 @@ export class Menu extends UIElement {
         }
 
         try {
-            // In a real scenario, this might be a fetch().
-            // For local files in this architecture, we might use dynamic import.
-            // Assuming the file exports 'menuData'.
             const module = await import(`../../../../${me._dataUrl}`);
-            const rawData = module.menuData || [];
+            const rawData = module.default || module.menuData || [];
 
             const processedData = me._processMenuData(rawData);
 
             if (me.element) {
+                me.element.innerHTML = '';
                 me.renderer.buildMenuStructure(me.element, processedData);
             }
         } catch (error) {
             console.error('[Menu] Failed to load menu data:', error);
         }
     }
-
-    // --- UIElement Overrides ---
 
     /**
      * Implementation of the rendering logic.
@@ -142,7 +138,6 @@ export class Menu extends UIElement {
         const me = this;
         const element = me.renderer.createMenuElement(me.id);
 
-        // Attach Delegated Events
         me.renderer.on(element, 'click', me._boundOnClick);
         me.renderer.on(element, 'mouseover', me._boundOnMouseOver);
 
@@ -160,6 +155,7 @@ export class Menu extends UIElement {
         const me = this;
         super._doMount(container);
         document.addEventListener('click', me._boundGlobalClick);
+        document.addEventListener('contextmenu', me._boundGlobalClick);
     }
 
     /**
@@ -171,15 +167,15 @@ export class Menu extends UIElement {
     _doUnmount() {
         const me = this;
         document.removeEventListener('click', me._boundGlobalClick);
+        document.removeEventListener('contextmenu', me._boundGlobalClick);
         super._doUnmount();
     }
 
-    // --- Logic & Helpers ---
-
     /**
      * Recursively processes raw menu data.
-     * - Translates labels.
+     * - Translates labels using titleKey or label.
      * - Generates IDs.
+     * - Normalizes 'children' to 'submenu'.
      * - Populates _menuItemsMap.
      *
      * @param {Array<object>} items - Raw items.
@@ -192,7 +188,15 @@ export class Menu extends UIElement {
 
         return items.map(item => {
             const id = item.id || generateId();
-            const label = item.label ? i18n.translate(item.label) : '';
+            let label = '';
+
+            if (item.titleKey) {
+                label = i18n.translate(item.titleKey);
+            } else if (item.label) {
+                label = i18n.translate(item.label);
+            } else if (item.title) {
+                label = item.title;
+            }
 
             const processedItem = {
                 ...item,
@@ -200,11 +204,11 @@ export class Menu extends UIElement {
                 label: label
             };
 
-            // Store reference in map for O(1) lookup during events
             me._menuItemsMap.set(id, processedItem);
 
-            if (item.submenu && Array.isArray(item.submenu)) {
-                processedItem.submenu = me._processMenuData(item.submenu);
+            const childrenSource = item.children || item.submenu;
+            if (childrenSource && Array.isArray(childrenSource)) {
+                processedItem.submenu = me._processMenuData(childrenSource);
             }
 
             return processedItem;
@@ -213,6 +217,7 @@ export class Menu extends UIElement {
 
     /**
      * Handles clicks delegated from the root menu element.
+     * Implements toggle logic for top-level items.
      *
      * @param {MouseEvent} event
      * @private
@@ -229,24 +234,33 @@ export class Menu extends UIElement {
 
         if (!itemConfig || itemConfig.disabled) return;
 
-        // If it has a submenu, toggle visibility handled by CSS usually (hover),
-        // but for click/touch or persistent open, we might toggle a class.
-        // Here, we handle Actions.
-        if (itemConfig.action) {
-            // Execute Action
-            appBus.emit(itemConfig.action, itemConfig.payload);
+        if (itemConfig.submenu) {
+            const isOpen = targetItem.classList.contains('menu__item--open');
 
-            // Close menus
+            if (isOpen) {
+                me.renderer.setItemActive(targetItem, false);
+            } else {
+                const parentList = targetItem.parentNode;
+                if (parentList && parentList.classList.contains('menu__list')) {
+                    me.renderer.closeAllSubmenus(me.element);
+                }
+                me.renderer.setItemActive(targetItem, true);
+            }
+        }
+
+        const eventName = itemConfig.event || itemConfig.action;
+        if (eventName) {
+            appBus.emit(eventName, itemConfig.payload);
             me.renderer.closeAllSubmenus(me.element);
         }
 
-        // Prevent bubbling to document which would close the menu immediately
         event.stopPropagation();
     }
 
     /**
      * Handles mouseover delegated from the root menu element.
-     * Manages the "opening" of submenus and closing siblings.
+     * Implements "Click-to-Open" logic: Top-level items only open on hover
+     * if the menu is already "active" (another top-level item is open).
      *
      * @param {MouseEvent} event
      * @private
@@ -258,8 +272,18 @@ export class Menu extends UIElement {
 
         if (!targetItem) return;
 
-        // When hovering an item, close all other open items at the SAME level
-        const parentList = targetItem.parentNode; // The <ul>
+        const parentList = targetItem.parentNode;
+
+        const isTopLevel = parentList && parentList.classList.contains('menu__list');
+
+        if (isTopLevel) {
+            const activeItem = me.element.querySelector('.menu__list > .menu__item--open');
+
+            if (!activeItem) {
+                return;
+            }
+        }
+
         if (parentList) {
             const siblings = Array.from(parentList.children);
             siblings.forEach(sibling => {
@@ -269,7 +293,6 @@ export class Menu extends UIElement {
             });
         }
 
-        // Open the current item if it has a submenu
         const id = targetItem.dataset.id;
         const itemConfig = me._menuItemsMap.get(id);
 
@@ -289,7 +312,6 @@ export class Menu extends UIElement {
         const me = this;
         if (!me.element) return;
 
-        // If click is outside the menu, close all
         if (!me.element.contains(event.target)) {
             me.renderer.closeAllSubmenus(me.element);
         }

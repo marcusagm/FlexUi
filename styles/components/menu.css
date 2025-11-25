@@ -1,124 +1,97 @@
-/* * Menu Component Styles
- * Aligned with VanillaMenuAdapter structure
- */
+/* styles/components/menu.css */
+@import '../theme.css';
 
-/* Root Container */
 .menu {
-    background-color: var(--bg-color-secondary);
-    border-bottom: 1px solid var(--border-color);
-    font-family: var(--font-family-base);
-    font-size: var(--font-size-sm);
-    user-select: none;
-    height: 30px; /* Fixed height for the menu bar */
+    display: flex;
+    height: var(--menu-height);
+    background-color: var(--color-bg-header);
+    box-shadow: 0 0 5px 0 #00000099;
+    z-index: var(--menu-z-index);
 }
 
-/* Top Level List */
+/* [NOVO] Estilização explícita para a lista UL interna */
 .menu__list {
-    list-style: none;
-    margin: 0;
-    padding: 0 8px;
     display: flex;
     align-items: center;
+    list-style: none;
+    margin: 0;
+    padding: 0;
     height: 100%;
+    width: 100%;
 }
 
-/* Menu Item (Shared) */
 .menu__item {
     position: relative;
     cursor: pointer;
-    padding: 4px 8px;
-    border-radius: var(--border-radius-sm);
-    transition: background-color 0.2s ease;
-    white-space: nowrap;
+    color: var(--color-text-primary);
+    font-size: var(--menu-item-font-size);
+    line-height: var(--menu-item-line-height);
+    list-style: none;
+    display: flex;
+    align-items: center;
+    user-select: none;
 }
 
-.menu__item:hover,
-.menu__item--open {
-    background-color: var(--hover-color);
-    color: var(--text-color-primary);
-}
-
-/* Disabled State */
-.menu__item--disabled {
-    opacity: 0.5;
-    cursor: default;
-    pointer-events: none;
-}
-
-/* Item Content Wrapper (Title + Icon) */
 .menu__title {
+    flex-grow: 1;
+    /* [NOVO] Garante alinhamento de ícone e texto */
     display: flex;
     align-items: center;
     gap: 6px;
 }
 
-.menu__title .icon {
-    font-size: 14px;
-    width: 14px;
-    text-align: center;
+/* [CORREÇÃO] Seletor ajustado para a estrutura nav > ul > li */
+.menu__list > .menu__item {
+    padding: var(--menu-item-padding);
+    justify-content: flex-start;
+    height: 100%; /* Ocupa toda a altura da barra */
 }
 
-/* Submenu Container */
+.menu__submenu .menu__item {
+    padding: var(--menu-submenu-item-padding);
+    justify-content: space-between;
+}
+
+.menu__arrow {
+    flex-shrink: 0;
+    margin-left: var(--menu-arrow-margin-left);
+    font-size: var(--menu-arrow-font-size);
+    color: var(--color-text-primary);
+    display: none;
+}
+
+.menu__submenu .menu__item--has-submenu .menu__arrow {
+    display: inline;
+}
+
+.menu__item:hover,
+.menu__item--open {
+    background-color: var(--color-bg-hover);
+    color: var(--color-text-primary);
+}
+
 .menu__submenu {
-    display: none; /* Hidden by default */
+    display: none;
     position: absolute;
+    background-color: var(--color-bg-panel);
+    border-radius: var(--border-radius-base);
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.7);
+    list-style: none;
+    min-width: var(--menu-submenu-min-width);
+    z-index: 1000;
+    padding: var(--menu-submenu-padding);
+}
+
+/* [CORREÇÃO] Seletor ajustado para abrir submenu de nível 1 */
+.menu__list > .menu__item--open > .menu__submenu {
+    display: block;
     top: 100%;
     left: 0;
-    min-width: 200px;
-    background-color: var(--bg-color-secondary);
-    border: 1px solid var(--border-color);
-    box-shadow: var(--shadow-md);
-    border-radius: var(--border-radius-sm);
-    padding: 4px 0;
-    z-index: 1000;
-    list-style: none;
-    margin: 0;
 }
 
-/* Nested Submenu Positioning */
-.menu__submenu .menu__submenu {
-    top: -4px; /* Align with parent item top */
-    left: 100%; /* Push to the right */
-    margin-left: 2px;
-}
-
-/* Show Submenu when active/open */
-.menu__item--open > .menu__submenu {
+.menu__submenu .menu__item--open > .menu__submenu {
     display: block;
-}
-
-/* Submenu Items Styling */
-.menu__submenu .menu__item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 6px 12px;
-    border-radius: 0;
-}
-
-/* Shortcut Text */
-.menu__shortcut {
-    font-size: 10px;
-    color: var(--text-color-secondary);
-    margin-left: 16px;
-}
-
-/* Arrow Indicator */
-.menu__arrow {
-    margin-left: 10px;
-    font-size: 10px;
-    color: var(--text-color-secondary);
-}
-
-/* Separator */
-.menu__separator {
-    height: 1px;
-    background-color: var(--border-color);
-    margin: 4px 0;
-    padding: 0;
-    cursor: default;
-}
-
-.menu__separator:hover {
-    background-color: var(--border-color); /* No hover effect */
+    top: var(--menu-submenu-nested-top);
+    left: 100%;
+    border-top-left-radius: var(--menu-submenu-nested-border-radius);
 }
