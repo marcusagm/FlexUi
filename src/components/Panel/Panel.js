@@ -1,93 +1,48 @@
+import { IPanel } from './IPanel.js';
+import { VanillaPanelAdapter } from '../../renderers/vanilla/VanillaPanelAdapter.js';
 import { PanelHeader } from './PanelHeader.js';
 import { appBus } from '../../utils/EventBus.js';
-import { generateId } from '../../utils/generateId.js';
 import { globalState } from '../../services/GlobalStateService.js';
+import { EventTypes } from '../../constants/EventTypes.js';
 
 /**
  * Description:
- * The base class for a content Panel.
- * This class is an abstract controller and not a direct DOM element.
- * It manages its two child UI components:
- * 1. this.header (PanelHeader instance - the "tab" or "header")
- * 2. this.contentElement (HTMLElement - the "content area")
- *
- * The parent PanelGroup is responsible for orchestrating *where* these
- * two elements are attached in the final DOM.
- *
- * This class now implements a reactive lifecycle, automatically
- * subscribing/unsubscribing to keys from the GlobalStateService
- * via the 'mount' and 'unmount' hooks.
+ * The concrete base class for content panels.
+ * It acts as a controller, delegating DOM rendering to an adapter (renderer)
+ * and managing the panel's state, header, and lifecycle events.
  *
  * Properties summary:
- * - id {string} : A unique ID for this panel instance.
- * - parentGroup {PanelGroup} : The parent group containing this panel.
- * - header {PanelHeader} : The header component.
- * - contentElement {HTMLElement} : The DOM element for the panel's content.
+ * - title {string} : The panel title.
+ * - header {PanelHeader} : The header component associated with this panel.
+ * - contentElement {HTMLElement} : The main content DOM element.
  * - minHeight {number} : Minimum height constraint.
  * - minWidth {number} : Minimum width constraint.
  * - closable {boolean} : Whether the panel can be closed.
  * - collapsible {boolean} : Whether the panel can be collapsed.
- * - movable {boolean} : Whether the panel can be dragged.
- * - title {string} : The title of the panel.
+ * - movable {boolean} : Whether the panel can be moved.
  *
  * Typical usage:
- * ```javascript
- * // This is an abstract class; typically you would extend it.
- * class MyPanel extends Panel {
- *
- *     constructor(...) {
- *         super(...);
- *         // Bind listeners FIRST
- *         this._myCallback = this._myCallback.bind(this);
- *         // Call render LAST
- *         this.render();
- *     }
- *
- *     render() {
- *         // Called once on init
- *         this.contentElement.innerHTML = 'Hello World';
- *     }
- *
- *     getObservedStateKeys() {
- *         // Define which keys to listen to
- *         return ['activeTool'];
- *     }
- *
- *     onStateUpdate(key, value) {
- *         // Called when 'activeTool' changes
- *         if (key === 'activeTool') {
- *         this.contentElement.textContent = `Tool is: ${value}`;
- *     }
- * }
- * ```
+ * const panel = new Panel('My Panel');
+ * panel.setContent('<p>Hello World</p>');
+ * panel.mount(document.body);
  *
  * Events:
- * - Emits: 'panel:group-child-close-request' (via 'close()' method)
+ * - Emits: EventTypes.PANEL_GROUP_CHILD_CLOSE_REQUEST
  *
  * Business rules implemented:
- * - Validates inputs for dimensions (must be positive numbers).
- * - Propagates configuration changes (title, closable, movable) to the Header component.
- * - Manages lifecycle hooks (mount/unmount) for global state subscriptions.
- * - Enforces encapsulation using private properties and public accessors.
+ * - Extends IPanel -> UIElement -> Disposable.
+ * - Delegates visual operations to VanillaPanelAdapter by default.
+ * - Automatically manages global state subscriptions upon mounting/unmounting.
+ * - Validates all configuration inputs.
  *
  * Dependencies:
- * - {import('./PanelHeader.js').PanelHeader}
- * - {import('../../utils/EventBus.js').appBus}
- * - {import('../../utils/generateId.js').generateId}
- * - {import('../../services/GlobalStateService.js').globalState}
- *
- * Notes / Additional:
- * - This class is intended to be extended, not instantiated directly.
+ * - IPanel
+ * - VanillaPanelAdapter
+ * - PanelHeader
+ * - EventBus
+ * - GlobalStateService
  */
-export class Panel {
-    /**
-     * The parent PanelGroup.
-     *
-     * @type {import('./PanelGroup.js').PanelGroup | null}
-     * @private
-     */
-    _parentGroup = null;
-
+export class Panel extends IPanel {
     /**
      * The header component instance.
      *
@@ -95,14 +50,6 @@ export class Panel {
      * @private
      */
     _header = null;
-
-    /**
-     * The DOM element for the panel's content.
-     *
-     * @type {HTMLElement | null}
-     * @private
-     */
-    _contentElement = null;
 
     /**
      * Minimum height in pixels.
@@ -147,10 +94,18 @@ export class Panel {
     /**
      * The title text.
      *
-     * @type {string | null}
+     * @type {string}
      * @private
      */
-    _title = null;
+    _title = '';
+
+    /**
+     * The parent PanelGroup.
+     *
+     * @type {import('./PanelGroup.js').PanelGroup | null}
+     * @private
+     */
+    _parentGroup = null;
 
     /**
      * Stores the actual listener functions for automatic unsubscribing.
@@ -158,43 +113,35 @@ export class Panel {
      * @type {Map<string, Function>}
      * @private
      */
-    _boundStateListeners = null;
-
-    /**
-     * Unique ID for the Panel, used by PanelGroup to manage tabs.
-     *
-     * @type {string}
-     * @public
-     */
-    id = generateId();
+    _boundStateListeners = new Map();
 
     /**
      * Creates a new Panel instance.
      *
-     * @param {string} title - The initial title for the panel header/tab.
-     * @param {number|null} [height=null] - (Ignored) Kept for API compatibility.
-     * @param {object} [config={}] - Configuration overrides (closable, movable, etc.).
+     * @param {string} title - The initial title for the panel.
+     * @param {number|null} [height=null] - Initial height (kept for API compatibility, generally ignored in favor of flex).
+     * @param {object} [config={}] - Configuration options.
+     * @param {import('../../core/IRenderer.js').IRenderer} [renderer=null] - Optional renderer adapter.
      */
-    constructor(title, height = null, config = {}) {
+    constructor(title, height = null, config = {}, renderer = null) {
+        super(null, renderer || new VanillaPanelAdapter());
         const me = this;
 
-        me._contentElement = document.createElement('div');
-        me._contentElement.classList.add('panel__content');
-        me._boundStateListeners = new Map();
+        // Initialize Title
+        me._title = typeof title === 'string' ? title : '';
 
-        // Initialize Header
-        const initialTitle = title !== undefined && title !== null ? String(title) : '';
-        me._title = initialTitle;
-        me._header = new PanelHeader(me, initialTitle);
+        // Initialize Header (Legacy coupling maintained as per plan)
+        me._header = new PanelHeader(me, me._title);
 
-        // Apply configuration via setters to ensure validation and side effects
+        // Apply configuration via setters to ensure validation
         if (config.minHeight !== undefined) me.minHeight = config.minHeight;
         if (config.minWidth !== undefined) me.minWidth = config.minWidth;
         if (config.closable !== undefined) me.closable = config.closable;
         if (config.collapsible !== undefined) me.collapsible = config.collapsible;
         if (config.movable !== undefined) me.movable = config.movable;
 
-        me.build();
+        // Ensure element is created immediately for compatibility with legacy code that expects .contentElement
+        me.render();
     }
 
     /**
@@ -212,22 +159,21 @@ export class Panel {
      * @returns {import('./PanelGroup.js').PanelGroup | null} The parent group.
      */
     get parentGroup() {
-        const me = this;
-        return me._parentGroup;
+        return this._parentGroup;
     }
 
     /**
      * Sets the parent PanelGroup.
-     * Updates the header's parent group reference as well.
      *
      * @param {import('./PanelGroup.js').PanelGroup | null} value - The new parent group.
      * @returns {void}
      */
     set parentGroup(value) {
         const me = this;
-        // Basic validation to check if it's an object or null
         if (value !== null && typeof value !== 'object') {
-            console.warn(`[Panel] invalid parentGroup assignment. Must be an object or null.`);
+            console.warn(
+                `[Panel] invalid parentGroup assignment (${value}). Must be an object or null.`
+            );
             return;
         }
         me._parentGroup = value;
@@ -242,41 +188,40 @@ export class Panel {
      * @returns {PanelHeader | null} The header instance.
      */
     get header() {
-        const me = this;
-        return me._header;
+        return this._header;
     }
 
     /**
      * Retrieves the content DOM element.
+     * Alias for 'element' from UIElement, maintained for compatibility.
      *
      * @returns {HTMLElement | null} The content element.
      */
     get contentElement() {
-        const me = this;
-        return me._contentElement;
+        return this.element;
     }
 
     /**
      * Retrieves the panel title.
      *
-     * @returns {string | null} The title.
+     * @returns {string} The title.
      */
     get title() {
-        const me = this;
-        return me._title;
+        return this._title;
     }
 
     /**
      * Sets the panel title.
-     * Updates the header title.
      *
-     * @param {string | null} value - The new title.
+     * @param {string} value - The new title.
      * @returns {void}
      */
     set title(value) {
         const me = this;
-        if (value !== null && typeof value !== 'string') {
-            console.warn(`[Panel] invalid title assignment (${value}). Must be a string or null.`);
+        if (typeof value !== 'string') {
+            console.warn(
+                `[Panel] invalid title assignment (${value}). Must be a string. Keeping previous value: ${me._title}`
+            );
             return;
         }
         me._title = value;
@@ -291,8 +236,7 @@ export class Panel {
      * @returns {number} The minimum height.
      */
     get minHeight() {
-        const me = this;
-        return me._minHeight;
+        return this._minHeight;
     }
 
     /**
@@ -306,11 +250,12 @@ export class Panel {
         const num = Number(value);
         if (!Number.isFinite(num) || num < 0) {
             console.warn(
-                `[Panel] invalid minHeight assignment (${value}). Must be a positive number.`
+                `[Panel] invalid minHeight assignment (${value}). Must be a positive number. Keeping previous value: ${me._minHeight}`
             );
             return;
         }
         me._minHeight = num;
+        me.updateHeight();
     }
 
     /**
@@ -319,8 +264,7 @@ export class Panel {
      * @returns {number} The minimum width.
      */
     get minWidth() {
-        const me = this;
-        return me._minWidth;
+        return this._minWidth;
     }
 
     /**
@@ -334,11 +278,12 @@ export class Panel {
         const num = Number(value);
         if (!Number.isFinite(num) || num < 0) {
             console.warn(
-                `[Panel] invalid minWidth assignment (${value}). Must be a positive number.`
+                `[Panel] invalid minWidth assignment (${value}). Must be a positive number. Keeping previous value: ${me._minWidth}`
             );
             return;
         }
         me._minWidth = num;
+        me.updateHeight(); // Assuming updateHeight also handles width/constraints update
     }
 
     /**
@@ -347,13 +292,11 @@ export class Panel {
      * @returns {boolean} True if closable.
      */
     get closable() {
-        const me = this;
-        return me._closable;
+        return this._closable;
     }
 
     /**
      * Sets whether the panel is closable.
-     * Propagates configuration to the header.
      *
      * @param {boolean} value - True to allow closing.
      * @returns {void}
@@ -361,7 +304,9 @@ export class Panel {
     set closable(value) {
         const me = this;
         if (typeof value !== 'boolean') {
-            console.warn(`[Panel] invalid closable assignment (${value}). Must be boolean.`);
+            console.warn(
+                `[Panel] invalid closable assignment (${value}). Must be boolean. Keeping previous value: ${me._closable}`
+            );
             return;
         }
         me._closable = value;
@@ -376,8 +321,7 @@ export class Panel {
      * @returns {boolean} True if collapsible.
      */
     get collapsible() {
-        const me = this;
-        return me._collapsible;
+        return this._collapsible;
     }
 
     /**
@@ -389,7 +333,9 @@ export class Panel {
     set collapsible(value) {
         const me = this;
         if (typeof value !== 'boolean') {
-            console.warn(`[Panel] invalid collapsible assignment (${value}). Must be boolean.`);
+            console.warn(
+                `[Panel] invalid collapsible assignment (${value}). Must be boolean. Keeping previous value: ${me._collapsible}`
+            );
             return;
         }
         me._collapsible = value;
@@ -401,13 +347,11 @@ export class Panel {
      * @returns {boolean} True if movable.
      */
     get movable() {
-        const me = this;
-        return me._movable;
+        return this._movable;
     }
 
     /**
      * Sets whether the panel is movable.
-     * Propagates configuration to the header.
      *
      * @param {boolean} value - True to allow moving.
      * @returns {void}
@@ -415,7 +359,9 @@ export class Panel {
     set movable(value) {
         const me = this;
         if (typeof value !== 'boolean') {
-            console.warn(`[Panel] invalid movable assignment (${value}). Must be boolean.`);
+            console.warn(
+                `[Panel] invalid movable assignment (${value}). Must be boolean. Keeping previous value: ${me._movable}`
+            );
             return;
         }
         me._movable = value;
@@ -425,22 +371,127 @@ export class Panel {
     }
 
     /**
-     * Returns the instance type identifier.
+     * Sets the title (Alias for title setter).
      *
-     * @returns {string} The type identifier string.
+     * @param {string} title - The new title.
+     * @returns {void}
      */
-    getPanelType() {
-        return 'Panel';
+    setTitle(title) {
+        this.title = title;
     }
 
     /**
-     * Wrapper for parentGroup setter to maintain compatibility.
+     * Gets the title (Alias for title getter).
      *
-     * @param {import('./PanelGroup.js').PanelGroup | null} group - The parent group.
+     * @returns {string} The title.
+     */
+    getTitle() {
+        return this.title;
+    }
+
+    /**
+     * Sets the inner content of the panel.
+     * Delegates to the renderer adapter.
+     *
+     * @param {string|HTMLElement|object} content - The content to display.
      * @returns {void}
      */
-    setParentGroup(group) {
-        this.parentGroup = group;
+    setContent(content) {
+        const me = this;
+        if (me.element) {
+            me.renderer.updateContent(me.element, content);
+        }
+    }
+
+    /**
+     * Requests the panel to close itself.
+     * Emits an event to the parent group.
+     *
+     * @returns {void}
+     */
+    close() {
+        const me = this;
+        if (!me._closable) return;
+
+        if (me._parentGroup) {
+            appBus.emit(EventTypes.PANEL_GROUP_CHILD_CLOSE, {
+                panel: me,
+                group: me._parentGroup
+            });
+        }
+    }
+
+    /**
+     * Returns the minimum height.
+     *
+     * @returns {number}
+     */
+    getMinHeight() {
+        return Math.max(0, this._minHeight);
+    }
+
+    /**
+     * Returns the minimum width.
+     *
+     * @returns {number}
+     */
+    getMinWidth() {
+        return Math.max(0, this._minWidth);
+    }
+
+    /**
+     * Implementation of the rendering logic.
+     * Uses the VanillaPanelAdapter to create the specific panel DOM structure.
+     *
+     * @returns {HTMLElement} The created content element.
+     * @protected
+     */
+    _doRender() {
+        const me = this;
+        const element = me.renderer.createContentElement(me.id);
+        me.renderer.updateMinSize(element, me._minWidth, me._minHeight);
+        return element;
+    }
+
+    /**
+     * Implementation of the mounting logic.
+     * Inserts the element into the container and sets up state listeners.
+     *
+     * @param {HTMLElement} container - The parent container.
+     * @protected
+     */
+    _doMount(container) {
+        const me = this;
+        if (me.element) {
+            me.renderer.mount(container, me.element);
+        }
+        me._setupStateListeners();
+    }
+
+    /**
+     * Implementation of the unmounting logic.
+     * Removes the element from the DOM and tears down state listeners.
+     *
+     * @protected
+     */
+    _doUnmount() {
+        const me = this;
+        if (me.element && me.element.parentNode) {
+            me.renderer.unmount(me.element.parentNode, me.element);
+        }
+        me._teardownStateListeners();
+    }
+
+    /**
+     * Applies height and width constraints to the DOM element.
+     *
+     * @returns {void}
+     */
+    updateHeight() {
+        const me = this;
+        if (me.element) {
+            me.renderer.updateMinSize(me.element, me._minWidth, me._minHeight);
+        }
     }
 
     /**
@@ -454,9 +505,9 @@ export class Panel {
     }
 
     /**
-     * Calculates the minimum panel height.
+     * Calculates the total minimum height including header.
      *
-     * @returns {number} The minimum height.
+     * @returns {number} Total minimum height.
      */
     getMinPanelHeight() {
         const me = this;
@@ -464,9 +515,9 @@ export class Panel {
     }
 
     /**
-     * Calculates the minimum panel width.
+     * Calculates the total minimum width.
      *
-     * @returns {number} The minimum width.
+     * @returns {number} Total minimum width.
      */
     getMinPanelWidth() {
         const me = this;
@@ -474,73 +525,39 @@ export class Panel {
     }
 
     /**
-     * Cleans up child components and internal listeners.
+     * Returns the instance type identifier.
+     *
+     * @returns {string} The type identifier string.
+     */
+    getPanelType() {
+        return 'Panel';
+    }
+
+    /**
+     * Wrapper for parentGroup setter compatibility.
+     *
+     * @param {import('./PanelGroup.js').PanelGroup | null} group
+     * @returns {void}
+     */
+    setParentGroup(group) {
+        this.parentGroup = group;
+    }
+
+    /**
+     * Disposes the panel and its children (header).
      *
      * @returns {void}
      */
-    destroy() {
+    dispose() {
         const me = this;
-        me.unmount();
         if (me._header && typeof me._header.destroy === 'function') {
             me._header.destroy();
         }
+        super.dispose();
     }
 
     /**
-     * Builds the panel's internal structure.
-     *
-     * @returns {void}
-     */
-    build() {
-        const me = this;
-        me.updateHeight();
-    }
-
-    /**
-     * Sets the inner HTML of the content element.
-     *
-     * @param {string} htmlString - The HTML string to set.
-     * @returns {void}
-     */
-    setContent(htmlString) {
-        const me = this;
-        me.contentElement.innerHTML = htmlString;
-    }
-
-    /**
-     * Requests to be closed by its parent group.
-     *
-     * @returns {void}
-     */
-    close() {
-        const me = this;
-        if (!me._closable) return;
-
-        if (me._parentGroup) {
-            appBus.emit('panel:group-child-close-request', {
-                panel: me,
-                group: me._parentGroup
-            });
-        }
-    }
-
-    /**
-     * Applies height and min-height styles to the content element.
-     *
-     * @returns {void}
-     */
-    updateHeight() {
-        const me = this;
-        const contentEl = me.contentElement;
-        if (!contentEl) return;
-
-        contentEl.style.minHeight = `${me.getMinPanelHeight()}px`;
-        contentEl.style.height = 'auto';
-        contentEl.style.flex = '1 1 auto';
-    }
-
-    /**
-     * Serializes the Panel's state to a JSON-friendly object.
+     * Serializes the Panel's state.
      *
      * @returns {object} The serialized data.
      */
@@ -553,7 +570,7 @@ export class Panel {
     }
 
     /**
-     * Deserializes state from a JSON object.
+     * Deserializes state.
      *
      * @param {object} data - The state object.
      * @returns {void}
@@ -566,23 +583,17 @@ export class Panel {
     }
 
     /**
-     * Initial render method. Subclasses should override this
-     * to populate the panel's content element.
+     * Subscribes to keys in GlobalStateService.
+     * Called automatically on mount.
      *
+     * @private
      * @returns {void}
      */
-    render() {
-        // This is intentionally left empty. Subclasses can override.
-    }
-
-    /**
-     * (Lifecycle Hook) Called by PanelGroup when this panel becomes visible (active tab).
-     * Subscribes to all keys specified in 'getObservedStateKeys'.
-     *
-     * @returns {void}
-     */
-    mount() {
+    _setupStateListeners() {
         const me = this;
+        // Clear existing to be safe
+        me._teardownStateListeners();
+
         const boundOnStateUpdate = me.onStateUpdate.bind(me);
 
         me.getObservedStateKeys().forEach(key => {
@@ -595,13 +606,13 @@ export class Panel {
     }
 
     /**
-     * (Lifecycle Hook) Called by PanelGroup when this panel becomes hidden
-     * (another tab selected) or before it is destroyed.
-     * Unsubscribes from all observed keys.
+     * Unsubscribes from keys in GlobalStateService.
+     * Called automatically on unmount.
      *
+     * @private
      * @returns {void}
      */
-    unmount() {
+    _teardownStateListeners() {
         const me = this;
         if (me._boundStateListeners) {
             me._boundStateListeners.forEach((listener, key) => {
@@ -612,25 +623,24 @@ export class Panel {
     }
 
     /**
-     * (Reactive Hook) Called when any observed state key (from 'getObservedStateKeys') changes.
+     * Hook called when an observed state key changes.
+     * Subclasses should override this.
      *
-     * @param {string} key - The state key that changed.
+     * @param {string} key - The state key.
      * @param {*} value - The new value.
      * @returns {void}
      */
     onStateUpdate(key, value) {
-        key;
-        value;
-        // Subclasses must implement this to react to state changes.
+        // Intentionally empty for subclasses
     }
 
     /**
-     * (Reactive Hook) Specifies which GlobalStateService keys this panel listens to.
+     * Defines which keys to observe.
+     * Subclasses should override this.
      *
-     * @returns {Array<string>} An array of state keys (e.g., ['activeTool', 'activeColor']).
+     * @returns {Array<string>} Array of keys.
      */
     getObservedStateKeys() {
-        // Subclasses must implement this to define subscriptions.
         return [];
     }
 }

@@ -7,36 +7,56 @@ import { Panel } from './Panel.js';
  * Panel types (like TextPanel, ToolbarPanel) must be registered
  * by the application (e.g., in App.js) before they can be created.
  *
+ * It now supports dependency injection for the rendering engine, allowing
+ * the application to define a default renderer factory (e.g., for React/Vue adapters).
+ *
  * Properties summary:
  * - _instance {PanelFactory | null} : The private static instance for the Singleton.
- * - _registry {Map<string, Panel>} : The registry mapping typeName strings to Panel classes.
+ * - _registry {Map<string, typeof Panel>} : The registry mapping typeName strings to Panel classes.
+ * - _defaultRendererFactory {Function | null} : A factory function returning an IRenderer instance.
  *
  * Typical usage:
  * // In App.js (on init):
  * const factory = PanelFactory.getInstance();
  * factory.registerPanelClasses([Panel, TextPanel, ToolbarPanel]);
  *
+ * // Inject custom renderer (optional)
+ * factory.setDefaultRendererFactory(() => new ReactPanelAdapter());
+ *
  * // In PanelGroup.fromJSON (during hydration):
  * const panel = PanelFactory.getInstance().createPanel(panelData);
  *
  * Dependencies:
- * - ./Panel.js
+ * - {import('./Panel.js').Panel}
  */
 export class PanelFactory {
     /**
+     * The private static instance for the Singleton.
+     *
      * @type {PanelFactory | null}
      * @private
      */
     static _instance = null;
 
     /**
+     * The registry mapping typeName strings to Panel classes.
+     *
      * @type {Map<string, typeof Panel>}
      * @private
      */
     _registry;
 
     /**
+     * A factory function that returns a default renderer instance for new panels.
+     *
+     * @type {Function | null}
      * @private
+     */
+    _defaultRendererFactory = null;
+
+    /**
+     * Creates an instance of PanelFactory.
+     * Private constructor for Singleton pattern.
      */
     constructor() {
         if (PanelFactory._instance) {
@@ -48,7 +68,8 @@ export class PanelFactory {
     }
 
     /**
-     * <Registry> getter.
+     * Gets the internal class registry.
+     *
      * @returns {Map<string, typeof Panel>} The internal class registry.
      */
     getRegistry() {
@@ -56,8 +77,9 @@ export class PanelFactory {
     }
 
     /**
-     * <Registry> setter with validation.
-     * @param {Map<string, typeof Panel>} map
+     * Sets the internal registry map.
+     *
+     * @param {Map<string, typeof Panel>} map - The new registry map.
      * @returns {void}
      */
     setRegistry(map) {
@@ -70,8 +92,27 @@ export class PanelFactory {
     }
 
     /**
+     * Sets the default renderer factory function.
+     * This function will be called to create a renderer instance for each new panel.
+     *
+     * @param {Function} factoryFunction - A function returning an IRenderer instance.
+     * @returns {void}
+     */
+    setDefaultRendererFactory(factoryFunction) {
+        const me = this;
+        if (typeof factoryFunction !== 'function') {
+            console.warn(
+                `[PanelFactory] invalid factoryFunction assignment (${factoryFunction}). Must be a function.`
+            );
+            return;
+        }
+        me._defaultRendererFactory = factoryFunction;
+    }
+
+    /**
      * Gets the single instance of the PanelFactory.
-     * @returns {PanelFactory}
+     *
+     * @returns {PanelFactory} The singleton instance.
      */
     static getInstance() {
         if (!PanelFactory._instance) {
@@ -82,6 +123,7 @@ export class PanelFactory {
 
     /**
      * Registers a Panel class constructor against a string identifier.
+     *
      * @param {string} typeName - The string identifier (e.g., 'TextPanel').
      * @param {typeof Panel} panelClass - The class constructor (e.g., TextPanel).
      * @returns {void}
@@ -97,6 +139,7 @@ export class PanelFactory {
 
     /**
      * Registers multiple Panel classes at once using their static 'panelType' property.
+     *
      * @param {Array<typeof Panel>} classList - An array of Panel classes.
      * @returns {void}
      */
@@ -122,6 +165,9 @@ export class PanelFactory {
 
     /**
      * Creates and hydrates a Panel instance based on its type and saved data.
+     * Uses the default renderer factory if configured.
+     * Handles specific constructor signatures for known subclasses (e.g., TextPanel).
+     *
      * @param {object} panelData - The serialized data object for the panel.
      * @returns {Panel | null} An instantiated and hydrated Panel, or null if invalid.
      */
@@ -136,7 +182,33 @@ export class PanelFactory {
         }
 
         const PanelClass = me.getRegistry().get(panelData.type) || Panel;
-        const panel = new PanelClass(panelData.title, panelData.height, panelData.config || {});
+
+        let renderer = null;
+        if (typeof me._defaultRendererFactory === 'function') {
+            renderer = me._defaultRendererFactory();
+        }
+
+        let panel;
+
+        // Handle constructor signature mismatch for TextPanel
+        if (panelData.type === 'TextPanel') {
+            panel = new PanelClass(
+                panelData.title,
+                panelData.content || '',
+                panelData.height,
+                panelData.config || {},
+                renderer
+            );
+        } else {
+            // Generic constructor signature for Panel and other standard subclasses
+            panel = new PanelClass(
+                panelData.title,
+                panelData.height,
+                panelData.config || {},
+                renderer
+            );
+        }
+
         panel.fromJSON(panelData);
 
         return panel;

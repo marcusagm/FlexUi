@@ -13,6 +13,9 @@ import { Modal } from '../../services/Modal/Modal.js';
  * Typical usage:
  * const toolbarPanel = new ToolbarPanel('Tools');
  *
+ * Events:
+ * - None
+ *
  * Business rules implemented:
  * - Identifies itself as 'ToolbarPanel' to the factory.
  * - Overrides default config to be non-collapsible and non-movable via constructor.
@@ -23,6 +26,7 @@ import { Modal } from '../../services/Modal/Modal.js';
  * - {import('./Panel.js').Panel}
  * - {import('../../services/Notification/Notification.js').appNotifications}
  * - {import('../../services/Modal/Modal.js').Modal}
+ * - {import('../../core/IRenderer.js').IRenderer}
  */
 export class ToolbarPanel extends Panel {
     /**
@@ -31,14 +35,20 @@ export class ToolbarPanel extends Panel {
      * @param {string} title - The panel title.
      * @param {number|null} [height=null] - The initial height.
      * @param {object} [config={}] - Configuration overrides.
+     * @param {import('../../core/IRenderer.js').IRenderer} [renderer=null] - Optional renderer adapter.
      */
-    constructor(title, height = null, config = {}) {
-        super(title, height, {
-            ...config,
-            collapsible: false,
-            movable: false,
-            minHeight: 75
-        });
+    constructor(title, height = null, config = {}, renderer = null) {
+        super(
+            title,
+            height,
+            {
+                ...config,
+                collapsible: false,
+                movable: false,
+                minHeight: 75
+            },
+            renderer
+        );
 
         this.render();
     }
@@ -53,30 +63,39 @@ export class ToolbarPanel extends Panel {
     }
 
     /**
+     * Returns the instance type identifier.
+     *
+     * @returns {string} The type identifier string.
+     */
+    getPanelType() {
+        return 'ToolbarPanel';
+    }
+
+    /**
      * (Overrides Panel) Populates the content element with demo buttons.
      *
      * @returns {void}
      */
     render() {
         const me = this;
-        const contentEl = me.contentElement;
-        contentEl.classList.add('panel__content--toolbar');
+        const contentElement = me.contentElement;
+        contentElement.classList.add('panel__content--toolbar');
 
-        const btn1 = document.createElement('button');
-        btn1.textContent = 'Info';
-        btn1.onclick = () => appNotifications.info('Clicou na info!');
+        const infoButton = document.createElement('button');
+        infoButton.textContent = 'Info';
+        infoButton.onclick = () => appNotifications.info('Clicou na info!');
 
-        const btn2 = document.createElement('button');
-        btn2.textContent = 'Success';
-        btn2.onclick = () => appNotifications.success('Clicou em Success');
+        const successButton = document.createElement('button');
+        successButton.textContent = 'Success';
+        successButton.onclick = () => appNotifications.success('Clicou em Success');
 
-        const btn3 = document.createElement('button');
-        btn3.textContent = 'Warning';
-        btn3.onclick = () => appNotifications.warning('Clicou em Warning');
+        const warningButton = document.createElement('button');
+        warningButton.textContent = 'Warning';
+        warningButton.onclick = () => appNotifications.warning('Clicou em Warning');
 
-        const btn4 = document.createElement('button');
-        btn4.textContent = 'Danger';
-        btn4.onclick = () => {
+        const dangerButton = document.createElement('button');
+        dangerButton.textContent = 'Danger';
+        dangerButton.onclick = () => {
             appNotifications.danger('Connection lost. Cannot save data.', {
                 sticky: true,
                 buttons: [
@@ -97,41 +116,44 @@ export class ToolbarPanel extends Panel {
             });
         };
 
-        const btn5 = document.createElement('button');
-        btn5.textContent = 'Modal';
-        btn5.onclick = () => {
+        const modalButton = document.createElement('button');
+        modalButton.textContent = 'Modal';
+        modalButton.onclick = () => {
             Modal.open({
                 title: 'Modal',
                 content: 'Teste de janela modal comum.',
                 footerText: 'Texto de rodapé'
             });
         };
-        const btn6 = document.createElement('button');
-        btn6.textContent = 'Alert';
-        btn6.onclick = () => {
+
+        const alertButton = document.createElement('button');
+        alertButton.textContent = 'Alert';
+        alertButton.onclick = () => {
             Modal.alert('Exemplo de alerta', 'Alerta');
         };
-        const btn7 = document.createElement('button');
-        btn7.textContent = 'Confirm';
-        btn7.onclick = () => {
+
+        const confirmButton = document.createElement('button');
+        confirmButton.textContent = 'Confirm';
+        confirmButton.onclick = () => {
             Modal.confirm('Are you sure you want to continue?', 'Confirmation');
         };
-        const btn8 = document.createElement('button');
-        btn8.textContent = 'Prompt';
-        btn8.onclick = () => {
+
+        const promptButton = document.createElement('button');
+        promptButton.textContent = 'Prompt';
+        promptButton.onclick = () => {
             Modal.prompt('What is your name?', 'Prompt', 'Anonymous');
         };
 
-        contentEl.append(btn1, btn2, btn3, btn4, btn5, btn6, btn7, btn8);
-    }
-
-    /**
-     * Returns the instance type identifier.
-     *
-     * @returns {string} The type identifier string.
-     */
-    getPanelType() {
-        return 'ToolbarPanel';
+        contentElement.append(
+            infoButton,
+            successButton,
+            warningButton,
+            dangerButton,
+            modalButton,
+            alertButton,
+            confirmButton,
+            promptButton
+        );
     }
 
     /**
@@ -141,8 +163,8 @@ export class ToolbarPanel extends Panel {
      * @returns {void}
      */
     setContent(htmlString) {
-        htmlString;
-        // Does nothing. Content is populated by render().
+        // Does nothing to prevent overwriting the toolbar buttons.
+        // Content is populated exclusively by render().
     }
 
     /**

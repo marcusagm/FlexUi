@@ -10,6 +10,9 @@ import { Panel } from './Panel.js';
  * Typical usage:
  * const textPanel = new TextPanel('My Title', 'Hello world');
  *
+ * Events:
+ * - None
+ *
  * Business rules implemented:
  * - Identifies itself as 'TextPanel' to the factory.
  * - Extends toJSON() to save its 'textContent'.
@@ -17,6 +20,10 @@ import { Panel } from './Panel.js';
  *
  * Dependencies:
  * - {import('./Panel.js').Panel}
+ * - {import('../../core/IRenderer.js').IRenderer}
+ *
+ * Notes / Additional:
+ * - Inherits visual behavior from Panel.
  */
 export class TextPanel extends Panel {
     /**
@@ -26,10 +33,15 @@ export class TextPanel extends Panel {
      * @param {string} initialText - The text to display.
      * @param {number|null} [height=null] - (Ignored) Kept for API compatibility.
      * @param {object} [config={}] - Configuration overrides.
+     * @param {import('../../core/IRenderer.js').IRenderer} [renderer=null] - Optional renderer adapter.
      */
-    constructor(title, initialText, height = null, config = {}) {
-        super(title, height, config);
-        this.contentElement.textContent = initialText;
+    constructor(title, initialText, height = null, config = {}, renderer = null) {
+        super(title, height, config, renderer);
+        const me = this;
+
+        if (me.contentElement) {
+            me.contentElement.textContent = initialText || '';
+        }
     }
 
     /**
@@ -60,7 +72,7 @@ export class TextPanel extends Panel {
         const panelData = super.toJSON();
         const newData = {
             ...panelData,
-            content: me.contentElement.textContent
+            content: me.contentElement ? me.contentElement.textContent : ''
         };
         return newData;
     }
@@ -74,7 +86,7 @@ export class TextPanel extends Panel {
     fromJSON(data) {
         const me = this;
         super.fromJSON(data); // Restore base properties first
-        if (data.content) {
+        if (data.content && me.contentElement) {
             me.contentElement.textContent = data.content;
         }
     }

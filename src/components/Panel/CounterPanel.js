@@ -7,18 +7,27 @@ import { globalState } from '../../services/GlobalStateService.js';
  * All instances of this panel are synchronized using the GlobalStateService.
  *
  * Properties summary:
- * - _valueEl {HTMLElement|null} : The DOM element that displays the counter value.
+ * - _valueElement {HTMLElement|null} : The DOM element that displays the counter value.
  * - _boundOnIncrease {Function|null} : Bound listener for the increase button.
  * - _boundOnDecrease {Function|null} : Bound listener for the decrease button.
  * - _boundOnReset {Function|null} : Bound listener for the reset button.
+ *
+ * Typical usage:
+ * const counter = new CounterPanel('My Counter');
  *
  * Events:
  * - Listens to (globalState): 'counterValue'
  * - Emits to (globalState): 'counterValue'
  *
+ * Business rules implemented:
+ * - Updates UI immediately upon global state change.
+ * - Cleans up event listeners on destroy to prevent memory leaks.
+ * - Enforces minimum dimensions to fit the controls.
+ *
  * Dependencies:
  * - {import('./Panel.js').Panel}
  * - {import('../../services/GlobalStateService.js').globalState}
+ * - {import('../../core/IRenderer.js').IRenderer}
  */
 export class CounterPanel extends Panel {
     /**
@@ -27,7 +36,7 @@ export class CounterPanel extends Panel {
      * @type {HTMLElement | null}
      * @private
      */
-    _valueEl = null;
+    _valueElement = null;
 
     /**
      * Bound listener for the increase button.
@@ -59,14 +68,20 @@ export class CounterPanel extends Panel {
      * @param {string} title - The panel title.
      * @param {number|null} [height=null] - The initial height.
      * @param {object} [config={}] - Configuration overrides.
+     * @param {import('../../core/IRenderer.js').IRenderer} [renderer=null] - Optional renderer adapter.
      */
-    constructor(title, height = null, config = {}) {
-        super(title, height, {
-            ...config,
-            collapsible: false,
-            minHeight: 130,
-            minWidth: 260
-        });
+    constructor(title, height = null, config = {}, renderer = null) {
+        super(
+            title,
+            height,
+            {
+                ...config,
+                collapsible: false,
+                minHeight: 130,
+                minWidth: 260
+            },
+            renderer
+        );
         const me = this;
 
         me._boundOnIncrease = me._onIncrease.bind(me);
@@ -101,43 +116,43 @@ export class CounterPanel extends Panel {
      */
     render() {
         const me = this;
-        const contentEl = me.contentElement;
+        const contentElement = me.contentElement;
 
-        me._valueEl = document.createElement('h2');
-        me._valueEl.style.fontSize = '2.5rem';
-        me._valueEl.style.textAlign = 'center';
-        me._valueEl.style.margin = '1rem 0';
-        me._valueEl.textContent = globalState.get('counterValue') ?? 0;
+        me._valueElement = document.createElement('h2');
+        me._valueElement.style.fontSize = '2.5rem';
+        me._valueElement.style.textAlign = 'center';
+        me._valueElement.style.margin = '1rem 0';
+        me._valueElement.textContent = globalState.get('counterValue') ?? 0;
 
-        const increaseBtn = document.createElement('button');
-        increaseBtn.type = 'button';
-        increaseBtn.className = 'btn btn--primary btn--sm';
-        increaseBtn.textContent = 'Aumentar';
-        increaseBtn.dataset.action = 'increase';
-        increaseBtn.addEventListener('click', me._boundOnIncrease);
+        const increaseButton = document.createElement('button');
+        increaseButton.type = 'button';
+        increaseButton.className = 'btn btn--primary btn--sm';
+        increaseButton.textContent = 'Aumentar';
+        increaseButton.dataset.action = 'increase';
+        increaseButton.addEventListener('click', me._boundOnIncrease);
 
-        const decreaseBtn = document.createElement('button');
-        decreaseBtn.type = 'button';
-        decreaseBtn.className = 'btn btn--secondary btn--sm';
-        decreaseBtn.textContent = 'Diminuir';
-        decreaseBtn.dataset.action = 'decrease';
-        decreaseBtn.addEventListener('click', me._boundOnDecrease);
+        const decreaseButton = document.createElement('button');
+        decreaseButton.type = 'button';
+        decreaseButton.className = 'btn btn--secondary btn--sm';
+        decreaseButton.textContent = 'Diminuir';
+        decreaseButton.dataset.action = 'decrease';
+        decreaseButton.addEventListener('click', me._boundOnDecrease);
 
-        const resetBtn = document.createElement('button');
-        resetBtn.type = 'button';
-        resetBtn.className = 'btn btn--sm';
-        resetBtn.textContent = 'Resetar';
-        resetBtn.dataset.action = 'reset';
-        resetBtn.addEventListener('click', me._boundOnReset);
+        const resetButton = document.createElement('button');
+        resetButton.type = 'button';
+        resetButton.className = 'btn btn--sm';
+        resetButton.textContent = 'Resetar';
+        resetButton.dataset.action = 'reset';
+        resetButton.addEventListener('click', me._boundOnReset);
 
         const buttonGroup = document.createElement('div');
         buttonGroup.className = 'button-group';
         buttonGroup.style.justifyContent = 'center';
         buttonGroup.style.display = 'flex';
         buttonGroup.style.width = '100%';
-        buttonGroup.append(decreaseBtn, resetBtn, increaseBtn);
+        buttonGroup.append(decreaseButton, resetButton, increaseButton);
 
-        contentEl.append(me._valueEl, buttonGroup);
+        contentElement.append(me._valueElement, buttonGroup);
     }
 
     /**
@@ -160,8 +175,8 @@ export class CounterPanel extends Panel {
         const me = this;
         if (key === 'counterValue') {
             const currentValue = value ?? 0;
-            if (me._valueEl) {
-                me._valueEl.textContent = currentValue;
+            if (me._valueElement) {
+                me._valueElement.textContent = currentValue;
             }
         }
     }
@@ -173,16 +188,22 @@ export class CounterPanel extends Panel {
      */
     destroy() {
         const me = this;
-        const contentEl = me.contentElement;
+        const contentElement = me.contentElement;
 
-        if (contentEl) {
-            const increaseBtn = contentEl.querySelector('[data-action="increase"]');
-            const decreaseBtn = contentEl.querySelector('[data-action="decrease"]');
-            const resetBtn = contentEl.querySelector('[data-action="reset"]');
+        if (contentElement) {
+            const increaseButton = contentElement.querySelector('[data-action="increase"]');
+            const decreaseButton = contentElement.querySelector('[data-action="decrease"]');
+            const resetButton = contentElement.querySelector('[data-action="reset"]');
 
-            increaseBtn?.removeEventListener('click', me._boundOnIncrease);
-            decreaseBtn?.removeEventListener('click', me._boundOnDecrease);
-            resetBtn?.removeEventListener('click', me._boundOnReset);
+            if (increaseButton) {
+                increaseButton.removeEventListener('click', me._boundOnIncrease);
+            }
+            if (decreaseButton) {
+                decreaseButton.removeEventListener('click', me._boundOnDecrease);
+            }
+            if (resetButton) {
+                resetButton.removeEventListener('click', me._boundOnReset);
+            }
         }
         super.destroy();
     }
