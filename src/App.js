@@ -3,9 +3,18 @@ import { Container } from './components/Container/Container.js';
 import { Panel } from './components/Panel/Panel.js';
 import { TextPanel } from './components/Panel/TextPanel.js';
 import { ToolbarPanel } from './components/Panel/ToolbarPanel.js';
+import { CounterPanel } from './components/Panel/CounterPanel.js';
 import { PanelGroup } from './components/Panel/PanelGroup.js';
 import { PanelFactory } from './components/Panel/PanelFactory.js';
 import { StatusBar } from './components/StatusBar/StatusBar.js';
+import { ToolbarContainer } from './components/Toolbar/ToolbarContainer.js';
+import { ToolbarGroupFactory } from './components/Toolbar/ToolbarGroupFactory.js';
+import { ApplicationGroup } from './components/Toolbar/ApplicationGroup.js';
+import { ViewportFactory } from './components/Viewport/ViewportFactory.js';
+import { ApplicationWindow } from './components/Viewport/ApplicationWindow.js';
+import { NotepadWindow } from './components/Viewport/ConcreteWindows/NotepadWindow.js';
+import { Viewport } from './components/Viewport/Viewport.js';
+
 import { ApplicationStateService } from './services/ApplicationStateService.js';
 import { appNotifications } from './services/Notification/Notification.js';
 import { NotificationUIListener } from './services/Notification/NotificationUIListener.js';
@@ -19,27 +28,19 @@ import { ToolbarContainerDropStrategy } from './services/DND/ToolbarContainerDro
 import { ViewportDropStrategy } from './services/DND/ViewportDropStrategy.js';
 import { ViewportTabDropStrategy } from './services/DND/ViewportTabDropStrategy.js';
 import { LayoutService } from './services/LayoutService.js';
-import { appBus } from './utils/EventBus.js';
 import { FloatingPanelManagerService } from './services/DND/FloatingPanelManagerService.js';
-import { globalState } from './services/GlobalStateService.js';
-import { CounterPanel } from './components/Panel/CounterPanel.js';
 import { appShortcuts } from './services/Shortcuts/Shortcuts.js';
 import { Loader } from './services/Loader/Loader.js';
-import { ToolbarContainer } from './components/Toolbar/ToolbarContainer.js';
-import { ToolbarGroupFactory } from './components/Toolbar/ToolbarGroupFactory.js';
-import { ApplicationGroup } from './components/Toolbar/ApplicationGroup.js';
+import { appBus } from './utils/EventBus.js';
+import { globalState } from './services/GlobalStateService.js';
 import { DropZoneType, ItemType } from './constants/DNDTypes.js';
 import { EventTypes } from './constants/EventTypes.js';
-import { ViewportFactory } from './components/Viewport/ViewportFactory.js';
-import { ApplicationWindow } from './components/Viewport/ApplicationWindow.js';
-import { NotepadWindow } from './components/Viewport/ConcreteWindows/NotepadWindow.js';
-import { Viewport } from './components/Viewport/Viewport.js';
 
 /**
  * Description:
  * Orchestrates the entire FlexUI application. It is a Singleton responsible
  * for initializing all core services (DND, Layout, State, PanelFactory),
- * instantiating the main UI components (Menu, Container, StatusBar),
+ * instantiating the main UI components (Menu, Container, StatusBar, Toolbars),
  * and handling global application events (like saving, loading, or adding
  * new panels).
  *
@@ -50,14 +51,7 @@ import { Viewport } from './components/Viewport/Viewport.js';
  * - menu {Menu} : The instance of the main application menu.
  * - container {Container} : The instance of the root layout container component.
  * - statusBar {StatusBar} : The instance of the application status bar.
- * - _toolbarTop {ToolbarContainer} : Instance of the top toolbar container.
- * - _toolbarBottom {ToolbarContainer} : Instance of the bottom toolbar container.
- * - _toolbarLeft {ToolbarContainer} : Instance of the left toolbar container.
- * - _toolbarRight {ToolbarContainer} : Instance of the right toolbar container.
  * - stateService {ApplicationStateService} : The singleton instance of the ApplicationStateService.
- * - _workspaceLoader {Loader} : The loader instance for the main container.
- * - _mainWrapper {HTMLElement} : The DOM wrapper for Menu and Container.
- * - _bound... {Function | null} : Bound event handlers for robust cleanup.
  * - debouncedResize {Function | null} : The debounced window resize handler.
  *
  * Typical usage:
@@ -66,7 +60,11 @@ import { Viewport } from './components/Viewport/Viewport.js';
  * await app.init();
  *
  * Events:
- * - Listens to: EventTypes.APP_ADD_NEW_PANEL, EventTypes.APP_SAVE_STATE, EventTypes.APP_RESTORE_STATE, EventTypes.APP_RESET_STATE, EventTypes.APP_ADD_NEW_WINDOW
+ * - Listens to: EventTypes.APP_ADD_NEW_PANEL
+ * - Listens to: EventTypes.APP_SAVE_STATE
+ * - Listens to: EventTypes.APP_RESTORE_STATE
+ * - Listens to: EventTypes.APP_RESET_STATE
+ * - Listens to: EventTypes.APP_ADD_NEW_WINDOW
  * - Emits: EventTypes.STATUSBAR_SET_PERMANENT_STATUS (on init)
  * - Emits: EventTypes.LAYOUT_INITIALIZED (on init, after load)
  * - Emits: EventTypes.STATUSBAR_SET_STATUS (on reset)
@@ -77,27 +75,45 @@ import { Viewport } from './components/Viewport/Viewport.js';
  * - Manages the top-level application lifecycle (init, destroy).
  * - Orchestrates layout persistence (save, restore, reset) by coordinating
  * ApplicationStateService and the root Container.
+ * - Ensures UI components are mounted using the UIElement lifecycle (mount).
  *
  * Dependencies:
- * - components/Menu/Menu.js
- * - components/Container/Container.js
- * - components/StatusBar/StatusBar.js
- * - components/Toolbar/ToolbarContainer.js
- * - components/Toolbar/ToolbarGroupFactory.js
- * - components/Toolbar/ApplicationGroup.js
- * - components/Viewport/ViewportFactory.js
- * - components/Viewport/ApplicationWindow.js
- * - components/Viewport/ConcreteWindows/NotepadWindow.js
- * - services/ApplicationStateService.js
- * - services/LayoutService.js
- * - services/DND/DragDropService.js (and all strategies)
- * - components/Panel/PanelFactory.js (and all Panel types)
- * - services/Notification/NotificationUIListener.js
- * - services/Shortcuts/Shortcuts.js
- * - utils/EventBus.js
- * - utils/Debounce.js
- * - services/Loader/Loader.js
- * - constants/EventTypes.js
+ * - {import('./components/Menu/Menu.js').Menu}
+ * - {import('./components/Container/Container.js').Container}
+ * - {import('./components/Panel/Panel.js').Panel}
+ * - {import('./components/Panel/TextPanel.js').TextPanel}
+ * - {import('./components/Panel/ToolbarPanel.js').ToolbarPanel}
+ * - {import('./components/Panel/CounterPanel.js').CounterPanel}
+ * - {import('./components/Panel/PanelGroup.js').PanelGroup}
+ * - {import('./components/Panel/PanelFactory.js').PanelFactory}
+ * - {import('./components/StatusBar/StatusBar.js').StatusBar}
+ * - {import('./components/Toolbar/ToolbarContainer.js').ToolbarContainer}
+ * - {import('./components/Toolbar/ToolbarGroupFactory.js').ToolbarGroupFactory}
+ * - {import('./components/Toolbar/ApplicationGroup.js').ApplicationGroup}
+ * - {import('./components/Viewport/ViewportFactory.js').ViewportFactory}
+ * - {import('./components/Viewport/ApplicationWindow.js').ApplicationWindow}
+ * - {import('./components/Viewport/ConcreteWindows/NotepadWindow.js').NotepadWindow}
+ * - {import('./components/Viewport/Viewport.js').Viewport}
+ * - {import('./services/ApplicationStateService.js').ApplicationStateService}
+ * - {import('./services/Notification/Notification.js').appNotifications}
+ * - {import('./services/Notification/NotificationUIListener.js').NotificationUIListener}
+ * - {import('./services/TranslationService.js').TranslationService}
+ * - {import('./services/DND/DragDropService.js').DragDropService}
+ * - {import('./services/DND/ColumnDropStrategy.js').ColumnDropStrategy}
+ * - {import('./services/DND/RowDropStrategy.js').RowDropStrategy}
+ * - {import('./services/DND/ContainerDropStrategy.js').ContainerDropStrategy}
+ * - {import('./services/DND/TabContainerDropStrategy.js').TabContainerDropStrategy}
+ * - {import('./services/DND/ToolbarContainerDropStrategy.js').ToolbarContainerDropStrategy}
+ * - {import('./services/DND/ViewportDropStrategy.js').ViewportDropStrategy}
+ * - {import('./services/DND/ViewportTabDropStrategy.js').ViewportTabDropStrategy}
+ * - {import('./services/LayoutService.js').LayoutService}
+ * - {import('./utils/EventBus.js').appBus}
+ * - {import('./services/DND/FloatingPanelManagerService.js').FloatingPanelManagerService}
+ * - {import('./services/GlobalStateService.js').globalState}
+ * - {import('./services/Shortcuts/Shortcuts.js').appShortcuts}
+ * - {import('./services/Loader/Loader.js').Loader}
+ * - {import('./constants/DNDTypes.js').DropZoneType}
+ * - {import('./constants/EventTypes.js').EventTypes}
  */
 export class App {
     /**
@@ -344,6 +360,7 @@ export class App {
 
     /**
      * Instantiates all main UI components (Menu, Container, Toolbars) and mounts them to the DOM Grid.
+     * This method replaces the manual append approach with the UIElement mount lifecycle.
      *
      * @private
      * @returns {void}
@@ -380,6 +397,7 @@ export class App {
         document.body.append(me._mainWrapper);
 
         // 2. Mount UIElement components in order
+        // This ensures ResizeObservers and other lifecycle events fire correctly
         me.menu.mount(me._mainWrapper);
         me._toolbarTop.mount(me._mainWrapper);
         me._toolbarLeft.mount(me._mainWrapper);
@@ -471,13 +489,18 @@ export class App {
         window.removeEventListener('resize', me.debouncedResize);
         me.debouncedResize?.cancel();
 
-        me.menu?.destroy();
-        me.container?.destroy();
-        me.statusBar?.destroy();
-        me._toolbarTop?.destroy();
-        me._toolbarBottom?.destroy();
-        me._toolbarLeft?.destroy();
-        me._toolbarRight?.destroy();
+        // Unmount/Destroy UI Elements via their dispose methods (which call unmount)
+        me.menu?.dispose();
+        me.container?.dispose();
+        me.statusBar?.dispose();
+        me._toolbarTop?.dispose();
+        me._toolbarBottom?.dispose();
+        me._toolbarLeft?.dispose();
+        me._toolbarRight?.dispose();
+
+        if (me._mainWrapper) {
+            me._mainWrapper.remove();
+        }
     }
 
     /**
@@ -618,6 +641,7 @@ export class App {
         const column = me.container.getFirstRow().getFirstColumn();
         const title = `Novo Painel (${new Date().toLocaleTimeString()})`;
 
+        // Uses standardized constructor signature: (title, config, renderer)
         const panel = new TextPanel(title, { content: 'Conteúdo do novo painel.' });
 
         const panelGroup = new PanelGroup(panel);
@@ -658,6 +682,7 @@ export class App {
         traverse(me.container);
 
         if (targetViewport) {
+            // Uses polymorphic constructor compatible with Factory: (title, content, config, renderer)
             const note = new NotepadWindow('Documento Novo', 'Digite seu texto aqui.', {
                 x: 10,
                 y: 10,
