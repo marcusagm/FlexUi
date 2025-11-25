@@ -1014,6 +1014,20 @@ export class PanelGroup extends UIElement {
     }
 
     /**
+     * Sets whether the group should fill the available space in the column.
+     * Used by LayoutService.
+     *
+     * @param {boolean} fillsSpace
+     * @returns {void}
+     */
+    setFillSpace(fillsSpace) {
+        const me = this;
+        if (me.element) {
+            me.renderer.setFillSpace(me.element, fillsSpace);
+        }
+    }
+
+    /**
      * Adds a panel to the group.
      *
      * @param {Panel} panel

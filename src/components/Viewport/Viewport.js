@@ -596,6 +596,20 @@ export class Viewport extends UIElement {
     }
 
     /**
+     * Sets whether the viewport should fill the available space.
+     * Used by LayoutService.
+     *
+     * @param {boolean} fillsSpace
+     * @returns {void}
+     */
+    setFillSpace(fillsSpace) {
+        const me = this;
+        if (me.element) {
+            me.renderer.setFillSpace(me.element, fillsSpace);
+        }
+    }
+
+    /**
      * Cleans up listeners and removes the viewport.
      *
      * @returns {void}

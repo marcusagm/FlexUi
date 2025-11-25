@@ -5,7 +5,7 @@ import { VanillaRenderer } from './VanillaRenderer.js';
  * A specialized adapter for rendering PanelGroup components in a Vanilla JS environment.
  * It extends the generic VanillaRenderer to encapsulate the creation and manipulation
  * of the panel group structure, including content containers and layout states
- * (floating, collapsed, geometry).
+ * (floating, collapsed, geometry, fill-space).
  *
  * Properties summary:
  * - None
@@ -14,7 +14,7 @@ import { VanillaRenderer } from './VanillaRenderer.js';
  * const adapter = new VanillaPanelGroupAdapter();
  * const groupElement = adapter.createGroupElement('group-1');
  * adapter.setFloatingMode(groupElement, true);
- * adapter.updateGeometry(groupElement, 100, 100, 300, 200);
+ * adapter.setFillSpace(groupElement, true);
  *
  * Events:
  * - None
@@ -23,6 +23,7 @@ import { VanillaRenderer } from './VanillaRenderer.js';
  * - Enforces BEM structure for panel groups (.panel-group, .panel-group__content).
  * - Manages visual transitions between floating and docked states.
  * - Handles collapse state visuals (hiding content, adjusting height).
+ * - Manages 'fills-space' class for flex layout logic.
  *
  * Dependencies:
  * - {import('./VanillaRenderer.js').VanillaRenderer}
@@ -133,11 +134,9 @@ export class VanillaPanelGroupAdapter extends VanillaRenderer {
         if (isFloating) {
             element.classList.add('panel-group--floating');
             element.classList.remove('panel-group--fills-space');
-            // Floating panels need absolute positioning handled by updateGeometry
             me.updateStyles(element, { position: 'absolute' });
         } else {
             element.classList.remove('panel-group--floating');
-            // Reset geometry styles that might interfere with flex layout
             me.updateStyles(element, {
                 position: '',
                 left: '',
@@ -167,7 +166,6 @@ export class VanillaPanelGroupAdapter extends VanillaRenderer {
             if (contentContainer) {
                 me.updateStyles(contentContainer, { display: 'none' });
             }
-            // Force auto height for collapsed state to respect CSS min-height rules
             me.updateStyles(element, {
                 height: 'auto',
                 minHeight: 'auto',
@@ -178,10 +176,26 @@ export class VanillaPanelGroupAdapter extends VanillaRenderer {
             if (contentContainer) {
                 me.updateStyles(contentContainer, { display: '' });
             }
-            // Remove overrides to let layout engine or updateHeight control dimensions
             me.updateStyles(element, {
-                minHeight: '' // Will be set by controller logic later
+                minHeight: ''
             });
+        }
+    }
+
+    /**
+     * Sets whether the group should expand to fill available space (flex-grow).
+     *
+     * @param {HTMLElement} element - The group element.
+     * @param {boolean} fillsSpace - True to fill space.
+     * @returns {void}
+     */
+    setFillSpace(element, fillsSpace) {
+        if (!element) return;
+
+        if (fillsSpace) {
+            element.classList.add('panel-group--fills-space');
+        } else {
+            element.classList.remove('panel-group--fills-space');
         }
     }
 

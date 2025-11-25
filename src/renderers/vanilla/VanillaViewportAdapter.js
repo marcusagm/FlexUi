@@ -15,6 +15,7 @@ import { VanillaRenderer } from './VanillaRenderer.js';
  * const viewportEl = adapter.createViewportElement('main-viewport');
  * const tabSlot = adapter.getTabContainerSlot(viewportEl);
  * adapter.setTabBarVisible(viewportEl, true);
+ * adapter.setFillSpace(viewportEl, true);
  *
  * Events:
  * - None
@@ -23,6 +24,7 @@ import { VanillaRenderer } from './VanillaRenderer.js';
  * - Enforces a flex column layout to stack tabs above content.
  * - Manages visibility of the tab bar slot.
  * - Provides utility for batch z-index updates on window elements.
+ * - Manages 'fills-space' modifier.
  *
  * Dependencies:
  * - {import('./VanillaRenderer.js').VanillaRenderer}
@@ -37,9 +39,6 @@ export class VanillaViewportAdapter extends VanillaRenderer {
 
     /**
      * Creates the main DOM structure for the Viewport.
-     * Structure:
-     * <div class="viewport">
-     * <div class="viewport__tab-bar-slot"></div> * <div class="viewport__content"></div>      * </div>
      *
      * @param {string} id - The unique ID of the viewport.
      * @returns {HTMLElement} The root viewport element.
@@ -62,18 +61,16 @@ export class VanillaViewportAdapter extends VanillaRenderer {
         const tabBarSlot = me.createElement('div', {
             className: 'viewport__tab-bar-slot'
         });
-        // Base styles for the slot (layout managed by CSS generally, but ensuring flex behavior here)
         me.updateStyles(tabBarSlot, {
             flexShrink: '0',
             display: 'flex',
-            flexDirection: 'column' // To hold the TabStrip
+            flexDirection: 'column'
         });
 
         // 2. Content Area (Floating Windows Context)
         const contentElement = me.createElement('div', {
             className: 'viewport__content'
         });
-        // Ensure it takes remaining space and acts as positioning context
         me.updateStyles(contentElement, {
             flexGrow: '1',
             position: 'relative',
@@ -130,8 +127,24 @@ export class VanillaViewportAdapter extends VanillaRenderer {
     }
 
     /**
+     * Sets whether the viewport should fill the available space.
+     *
+     * @param {HTMLElement} element - The viewport element.
+     * @param {boolean} fillsSpace - True to fill space.
+     * @returns {void}
+     */
+    setFillSpace(element, fillsSpace) {
+        if (!element) return;
+
+        if (fillsSpace) {
+            element.classList.add('viewport--fills-space');
+        } else {
+            element.classList.remove('viewport--fills-space');
+        }
+    }
+
+    /**
      * Updates the z-index of a list of window elements sequentially.
-     * This is used to apply layering logic (e.g., active window on top).
      *
      * @param {Array<HTMLElement>} windowElements - Array of DOM elements representing windows.
      * @param {number} baseIndex - The starting z-index value.
