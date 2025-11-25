@@ -3,11 +3,12 @@ import { PanelFactory } from './PanelFactory.js';
 import { Panel } from './Panel.js';
 import { appBus } from '../../utils/EventBus.js';
 import { throttleRAF } from '../../utils/ThrottleRAF.js';
-import { generateId } from '../../utils/generateId.js';
 import { FloatingPanelManagerService } from '../../services/DND/FloatingPanelManagerService.js';
 import { ResizeHandleManager } from '../../utils/ResizeHandleManager.js';
 import { ItemType, DropZoneType } from '../../constants/DNDTypes.js';
 import { EventTypes } from '../../constants/EventTypes.js';
+import { UIElement } from '../../core/UIElement.js';
+import { VanillaPanelGroupAdapter } from '../../renderers/vanilla/VanillaPanelGroupAdapter.js';
 
 /**
  * Description:
@@ -15,76 +16,49 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * "Orchestrator" for its child Panel components. It manages the active tab state,
  * collapse state, and its own dimensions.
  *
- * This component implements **hybrid resizing**:
- * 1. **Docked**: Uses ResizeHandleManager with handles: ['s'] for vertical resizing only.
- * 2. **Floating**: Uses ResizeHandleManager with handles: ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']
- * for full 8-directional resizing, applying strict container clamping via the FloatingPanelManagerService.
+ * It extends UIElement and delegates DOM rendering to VanillaPanelGroupAdapter.
  *
  * Properties summary:
- * - id {string} : Unique ID for this instance (also used as namespace).
- * - _namespace {string} : Unique namespace for appBus listeners.
- * - _throttledUpdate {Function | null} : The throttled function for height updates (docked only).
- * - element {HTMLElement} : The main DOM element (<div class="panel-group">).
+ * - header {PanelGroupHeader} : The header component instance.
  * - panels {Array<Panel>} : The list of child panels.
  * - activePanel {Panel|null} : The currently visible panel.
  * - collapsed {boolean} : Whether the group is collapsed.
  * - height {number|null} : The height of the group.
  * - width {number|null} : The width of the group.
  * - isFloating {boolean} : Whether the group is floating.
- * - _resizeHandleManager {ResizeHandleManager | null} : Manages all resize handles (docked or floating).
+ * - x {number|null} : X coordinate (if floating).
+ * - y {number|null} : Y coordinate (if floating).
+ * - minHeight {number} : Minimum height constraint.
+ * - minWidth {number} : Minimum width constraint.
+ * - closable {boolean} : Whether the group is closable.
+ * - collapsible {boolean} : Whether the group is collapsible.
+ * - movable {boolean} : Whether the group is movable.
  *
  * Typical usage:
- * // In Column.js
- * const panel = new TextPanel(...);
- * const panelGroup = new PanelGroup(panel);
- * column.addPanelGroup(panelGroup);
+ * const panel = new TextPanel('Title', 'Content');
+ * const group = new PanelGroup(panel);
+ * column.addChild(group);
  *
  * Events:
  * - Listens to: EventTypes.PANEL_GROUP_CHILD_CLOSE, EventTypes.APP_CLOSE_PANEL_REQUEST, EventTypes.PANEL_CLOSE_REQUEST, EventTypes.PANEL_TOGGLE_COLLAPSE
- * - Emits: EventTypes.PANEL_GROUP_REMOVED (when closed or empty)
- * - Emits: EventTypes.LAYOUT_PANELGROUPS_CHANGED (to notify LayoutService)
+ * - Emits: EventTypes.PANEL_GROUP_REMOVED
+ * - Emits: EventTypes.LAYOUT_PANELGROUPS_CHANGED
  *
  * Business rules implemented:
  * - Orchestrates Panel DOM (header vs. content).
- * - Manages active tab state ('setActive').
- * - Renders in "simple mode" (no tabs) if only one child Panel exists.
- * - Manages its own vertical resize (docked) and 2D resize (floating) via ResizeController.
- * - If last Panel is removed, destroys itself ('removePanel' -> 'close').
- * - Calculates minHeight dynamically based on panel content and resize handle visibility.
+ * - Manages active tab state via TabStrip in Header.
+ * - Manages hybrid resizing (Docked vs Floating).
+ * - Coordinates lifecycle of children (Panel and Header).
  *
  * Dependencies:
- * - {import('./PanelGroupHeader.js').PanelGroupHeader}
- * - {import('./PanelFactory.js').PanelFactory}
- * - {import('./Panel.js').Panel}
- * - {import('../../utils/EventBus.js').appBus}
- * - {import('../../utils/ThrottleRAF.js').throttleRAF}
- * - {import('../../utils/generateId.js').generateId}
- * - {import('../../services/DND/FloatingPanelManagerService.js').FloatingPanelManagerService}
- * - {import('../../utils/ResizeHandleManager.js').ResizeHandleManager}
- * - {import('../../constants/DNDTypes.js').ItemType}
- * - {import('../../constants/DNDTypes.js').DropZoneType}
- * - {import('../../constants/EventTypes.js').EventTypes}
- *
- * Notes / Additional:
- * - The group acts as a Tab Container.
+ * - UIElement
+ * - VanillaPanelGroupAdapter
+ * - PanelGroupHeader
+ * - PanelFactory
+ * - ResizeHandleManager
+ * - EventBus
  */
-export class PanelGroup {
-    /**
-     * Unique ID for this PanelGroup instance.
-     *
-     * @type {string}
-     * @public
-     */
-    _id = generateId();
-
-    /**
-     * Unique namespace for appBus listeners.
-     *
-     * @type {string}
-     * @private
-     */
-    _namespace = this.id;
-
+export class PanelGroup extends UIElement {
     /**
      * The throttled (rAF) update function for resizing (used in docked mode only).
      *
@@ -108,14 +82,6 @@ export class PanelGroup {
      * @private
      */
     _header = null;
-
-    /**
-     * The container element for panels content.
-     *
-     * @type {HTMLElement | null}
-     * @private
-     */
-    _contentContainer = null;
 
     /**
      * List of child panels.
@@ -270,12 +236,30 @@ export class PanelGroup {
     _boundOnToggleCollapseRequest = null;
 
     /**
+     * The drop zone type identifier.
+     *
+     * @type {string}
+     * @public
+     */
+    dropZoneType = DropZoneType.TAB_CONTAINER;
+
+    /**
+     * Creates a new PanelGroup instance.
+     *
      * @param {Panel | null} [initialPanel=null] - The optional first panel.
      * @param {number|null} [height=null] - The initial height of the group.
      * @param {boolean} [collapsed=false] - The initial collapsed state.
      * @param {object} [config={}] - Configuration overrides for the group.
+     * @param {import('../../core/IRenderer.js').IRenderer} [renderer=null] - Optional renderer.
      */
-    constructor(initialPanel = null, height = null, collapsed = false, config = {}) {
+    constructor(
+        initialPanel = null,
+        height = null,
+        collapsed = false,
+        config = {},
+        renderer = null
+    ) {
+        super(null, renderer || new VanillaPanelGroupAdapter());
         const me = this;
 
         if (config.minHeight !== undefined) me._minHeight = config.minHeight;
@@ -284,21 +268,7 @@ export class PanelGroup {
         if (config.collapsible !== undefined) me._collapsible = config.collapsible;
         if (config.movable !== undefined) me._movable = config.movable;
 
-        me.dropZoneType = DropZoneType.TAB_CONTAINER;
-
-        me._contentContainer = document.createElement('div');
-        me._contentContainer.classList.add('panel-group__content');
-
-        me.element = document.createElement('div');
-        me.element.classList.add('panel-group');
-        me.element.classList.add('panel');
-
-        me.element.addEventListener('pointerdown', () => {
-            if (me.isFloating) {
-                FloatingPanelManagerService.getInstance().bringToFront(me);
-            }
-        });
-
+        // Initialize Header (It is a UIElement now)
         me._header = new PanelGroupHeader(me);
 
         if (height !== null) {
@@ -310,7 +280,8 @@ export class PanelGroup {
         me._boundOnCloseRequest = me.onCloseRequest.bind(me);
         me._boundOnToggleCollapseRequest = me.onToggleCollapseRequest.bind(me);
 
-        me.build();
+        // Ensure element is created via lifecycle
+        me.render();
 
         if (config.isFloating) {
             me.setFloatingState(true, config.x, config.y);
@@ -334,15 +305,6 @@ export class PanelGroup {
     }
 
     /**
-     * Id getter.
-     *
-     * @returns {string}
-     */
-    get id() {
-        return this._id;
-    }
-
-    /**
      * Header getter.
      *
      * @returns {PanelGroupHeader}
@@ -352,12 +314,16 @@ export class PanelGroup {
     }
 
     /**
-     * ContentContainer getter.
+     * ContentContainer getter (delegated to renderer).
      *
-     * @returns {HTMLElement}
+     * @returns {HTMLElement | null}
      */
     get contentContainer() {
-        return this._contentContainer;
+        const me = this;
+        if (me.element) {
+            return me.renderer.getContentContainer(me.element);
+        }
+        return null;
     }
 
     /**
@@ -380,7 +346,7 @@ export class PanelGroup {
 
     /**
      * Collapsed setter.
-     * Updates DOM classes, visibility of content, and resize handles.
+     * Updates DOM classes via adapter and resizes.
      *
      * @param {boolean} value
      * @returns {void}
@@ -390,26 +356,20 @@ export class PanelGroup {
         if (typeof value !== 'boolean') return;
         me._collapsed = value;
 
-        const handles = me.element.querySelectorAll('.resize-handle');
-
-        if (value) {
-            me.element.classList.add('panel--collapsed');
-            me._contentContainer.style.display = 'none';
-            handles.forEach(h => (h.style.display = 'none'));
-        } else {
-            me.element.classList.remove('panel--collapsed');
-            me._contentContainer.style.display = '';
-            handles.forEach(h => (h.style.display = ''));
+        if (me.element) {
+            me.renderer.setCollapsed(me.element, value);
         }
+
+        // Hide/Show resize handles based on collapse state
+        const handles = me.element ? me.element.querySelectorAll('.resize-handle') : [];
+        handles.forEach(h => {
+            h.style.display = value ? 'none' : '';
+        });
 
         me.updateHeight();
 
-        if (me._header && me._header.collapseBtn) {
-            if (value) {
-                me._header.collapseBtn.classList.add('panel-group__collapse-btn--collapsed');
-            } else {
-                me._header.collapseBtn.classList.remove('panel-group__collapse-btn--collapsed');
-            }
+        if (me._header) {
+            me._header.updateCollapsedState(value);
         }
     }
 
@@ -432,33 +392,33 @@ export class PanelGroup {
     set activePanel(panel) {
         const me = this;
 
-        const isSimpleMode = me._panels.length === 1;
-
+        // 1. Validation
         if (!panel) return;
-        if (panel === me._activePanel && !isSimpleMode) return;
+        if (panel === me._activePanel && me._panels.length > 1) return; // Allow re-set if single panel (simple mode init)
 
+        // 2. Unmount current active panel
         if (me._activePanel) {
             me._activePanel.unmount();
         }
 
-        me._panels.forEach(p => {
-            p.header.element.classList.remove('panel-group__tab--active');
-            p.contentElement.style.display = 'none';
-        });
-
-        if (!isSimpleMode) {
-            panel.header.element.classList.add('panel-group__tab--active');
-        }
-        panel.contentElement.style.display = '';
-
+        // 3. Update internal state
         me._activePanel = panel;
         me.title = panel.title;
+
+        // 4. Update visual state (Tabs)
+        if (me._header && me._header.tabStrip) {
+            me._header.tabStrip.setActiveItem(panel.header);
+        }
+
+        // 5. Mount new active panel content
+        if (me.isMounted && me.contentContainer) {
+            panel.mount(me.contentContainer);
+        }
 
         if (me._header) {
             me._header.updateAriaLabels();
         }
 
-        panel.mount();
         me.updateHeight();
     }
 
@@ -485,6 +445,9 @@ export class PanelGroup {
             return;
         }
         me._title = value;
+        if (me._header) {
+            me._header.title = value;
+        }
     }
 
     /**
@@ -521,14 +484,19 @@ export class PanelGroup {
      */
     set height(value) {
         const me = this;
-        const num = Number(value);
-        if (!Number.isFinite(num) || num < 0) {
-            console.warn(
-                `[PanelGroup] invalid height assignment (${value}). Must be a positive number.`
-            );
-            return;
+        if (value !== null) {
+            const num = Number(value);
+            if (!Number.isFinite(num) || num < 0) {
+                console.warn(
+                    `[PanelGroup] invalid height assignment (${value}). Must be a positive number.`
+                );
+                return;
+            }
+            me._height = num;
+        } else {
+            me._height = null;
         }
-        me._height = value;
+        me.updateHeight();
     }
 
     /**
@@ -547,14 +515,18 @@ export class PanelGroup {
      */
     set width(value) {
         const me = this;
-        const num = Number(value);
-        if (!Number.isFinite(num) || num < 0) {
-            console.warn(
-                `[PanelGroup] invalid width assignment (${value}). Must be a positive number.`
-            );
-            return;
+        if (value !== null) {
+            const num = Number(value);
+            if (!Number.isFinite(num) || num < 0) {
+                console.warn(
+                    `[PanelGroup] invalid width assignment (${value}). Must be a positive number.`
+                );
+                return;
+            }
+            me._width = num;
+        } else {
+            me._width = null;
         }
-        me._width = value;
     }
 
     /**
@@ -656,13 +628,103 @@ export class PanelGroup {
         return this._column;
     }
 
+    // --- UIElement Overrides ---
+
+    /**
+     * Implementation of the rendering logic.
+     * Uses the adapter to create the group DOM structure.
+     *
+     * @returns {HTMLElement} The root group element.
+     * @protected
+     */
+    _doRender() {
+        const me = this;
+        const element = me.renderer.createGroupElement(me.id);
+
+        // Configure drop zone attributes
+        element.dataset.dropzone = me.dropZoneType;
+        element.dropZoneInstance = me;
+
+        // Attach listener for BringToFront if floating
+        element.addEventListener('pointerdown', () => {
+            if (me.isFloating) {
+                FloatingPanelManagerService.getInstance().bringToFront(me);
+            }
+        });
+
+        return element;
+    }
+
+    /**
+     * Implementation of the mounting logic.
+     * Mounts header and active panel content.
+     *
+     * @param {HTMLElement} container - The parent container.
+     * @protected
+     */
+    _doMount(container) {
+        const me = this;
+        if (me.element) {
+            me.renderer.mount(container, me.element);
+
+            // Mount Header
+            if (me.header) {
+                me.header.mount(me.element);
+                // Ensure it's visualy at the top using adapter logic
+                if (me.header.element) {
+                    me.renderer.mountHeader(me.element, me.header.element);
+                }
+            }
+
+            // Mount Active Panel Content
+            if (me._activePanel && me.contentContainer) {
+                me._activePanel.mount(me.contentContainer);
+            }
+
+            // Apply initial states
+            me.collapsed = me._collapsed;
+            if (me._isFloating) {
+                me.setFloatingState(true, me._x, me._y);
+            } else {
+                me.setFloatingState(false, null, null);
+            }
+        }
+    }
+
+    /**
+     * Implementation of the unmounting logic.
+     *
+     * @protected
+     */
+    _doUnmount() {
+        const me = this;
+
+        if (me._resizeHandleManager) {
+            me._resizeHandleManager.destroy();
+            me._resizeHandleManager = null;
+        }
+
+        if (me.header && me.header.isMounted) {
+            me.header.unmount();
+        }
+
+        if (me._activePanel && me._activePanel.isMounted) {
+            me._activePanel.unmount();
+        }
+
+        if (me.element && me.element.parentNode) {
+            me.renderer.unmount(me.element.parentNode, me.element);
+        }
+    }
+
+    // --- Methods ---
+
     /**
      * Sets the floating state and updates the DOM, managing the correct resize handles.
-     * This method acts as a coordinator for floating state properties.
      *
      * @param {boolean} isFloating - Whether the panel should be floating.
-     * @param {number|null} x - The initial X coordinate (relative to container).
-     * @param {number|null} y - The initial Y coordinate (relative to container).
+     * @param {number|null} x - The initial X coordinate.
+     * @param {number|null} y - The initial Y coordinate.
      * @returns {void}
      */
     setFloatingState(isFloating, x, y) {
@@ -675,57 +737,46 @@ export class PanelGroup {
         me._x = x;
         me._y = y;
 
-        if (me._header && me._header.collapseBtn) {
-            me._header.collapseBtn.disabled = !me._collapsible;
+        if (me.header && me.header.collapseBtn) {
+            me.header.collapseBtn.disabled = !me._collapsible;
+        }
+
+        if (me.element) {
+            me.renderer.setFloatingMode(me.element, isFloating);
+            me.renderer.updateGeometry(me.element, x, y, me._width, me._height);
         }
 
         if (isFloating) {
-            me.element.classList.add('panel-group--floating');
-            me.element.classList.remove('panel-group--fills-space');
-
-            me.element.style.left = `${x}px`;
-            me.element.style.top = `${y}px`;
-            if (me._width !== null) {
-                me.element.style.width = `${me._width}px`;
-            }
-            if (me._height !== null) {
-                me.element.style.height = `${me._height}px`;
-            }
-
             const fpms = FloatingPanelManagerService.getInstance();
-
-            me._resizeHandleManager = new ResizeHandleManager(me.element, {
-                handles: ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'],
-                customClass: 'panel-group__resize-handle--floating',
-                getConstraints: () => ({
-                    minimumWidth: me.getMinPanelWidth(),
-                    maximumWidth: Infinity,
-                    minimumHeight: me.getMinPanelHeight(),
-                    maximumHeight: Infinity,
-                    containerRectangle: fpms.getContainerBounds()
-                }),
-                onResize: ({ xCoordinate, yCoordinate, width, height }) => {
-                    me.element.style.left = `${xCoordinate}px`;
-                    me.element.style.top = `${yCoordinate}px`;
-                    me.element.style.width = `${width}px`;
-                    me.element.style.height = `${height}px`;
-
-                    me._x = xCoordinate;
-                    me._y = yCoordinate;
-                    me._width = width;
-                    me._height = height;
-
-                    me.updateHeight();
-                }
-            });
+            if (me.element) {
+                me._resizeHandleManager = new ResizeHandleManager(me.element, {
+                    handles: ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'],
+                    customClass: 'panel-group__resize-handle--floating',
+                    getConstraints: () => ({
+                        minimumWidth: me.getMinPanelWidth(),
+                        maximumWidth: Infinity,
+                        minimumHeight: me.getMinPanelHeight(),
+                        maximumHeight: Infinity,
+                        containerRectangle: fpms.getContainerBounds()
+                    }),
+                    onResize: ({ xCoordinate, yCoordinate, width, height }) => {
+                        me._x = xCoordinate;
+                        me._y = yCoordinate;
+                        me._width = width;
+                        me._height = height;
+                        me.renderer.updateGeometry(
+                            me.element,
+                            xCoordinate,
+                            yCoordinate,
+                            width,
+                            height
+                        );
+                        me.updateHeight();
+                    }
+                });
+            }
         } else {
-            me.element.classList.remove('panel-group--floating');
-            me.element.style.left = '';
-            me.element.style.top = '';
-            me.element.style.width = '';
-            me.element.style.height = '';
-
-            if (me._collapsible) {
+            if (me._collapsible && me.element) {
                 me._resizeHandleManager = new ResizeHandleManager(me.element, {
                     handles: ['s'],
                     customClass: 'panel-group__resize-handle',
@@ -744,7 +795,14 @@ export class PanelGroup {
                 });
             }
         }
-        me._updateHeaderMode();
+        // TabStrip logic handles Simple Mode updates internally if items change,
+        // but header mode might need specific updates if styling changes.
+        if (me.header) {
+            me.header.updateConfig({
+                closable: me._closable,
+                movable: me._movable
+            });
+        }
     }
 
     /**
@@ -818,7 +876,7 @@ export class PanelGroup {
      * @returns {number}
      */
     getHeaderHeight() {
-        return this._header ? this._header.element.offsetHeight : 0;
+        return this._header && this._header.element ? this._header.element.offsetHeight : 0;
     }
 
     /**
@@ -853,28 +911,18 @@ export class PanelGroup {
         const me = this;
         appBus.offByNamespace(me._namespace);
 
-        me._header?.destroy();
-        me._panels.forEach(panel => panel.destroy());
+        me.unmount();
+
+        if (me._header) {
+            me._header.dispose();
+        }
+        me._panels.forEach(panel => panel.dispose());
         me.getThrottledUpdate()?.cancel();
 
-        me._resizeHandleManager?.destroy();
-
-        me.element.remove();
-    }
-
-    /**
-     * Builds the DOM structure.
-     *
-     * @returns {void}
-     */
-    build() {
-        const me = this;
-        me.element.append(me._header.element, me._contentContainer);
-
-        if (!me._movable) {
-            me.element.classList.add('panel--not-movable');
+        if (me.element) {
+            me.element.remove();
         }
-        me.collapsed = me._collapsed;
+        super.dispose();
     }
 
     /**
@@ -943,60 +991,30 @@ export class PanelGroup {
      */
     updateHeight() {
         const me = this;
-        if (me._collapsed) {
-            me.element.style.height = 'auto';
-            me.element.style.flex = '0 0 auto';
-            me.element.classList.add('panel--collapsed');
-            me.element.style.minHeight = 'auto';
+        if (!me.element) return;
 
-            if (me._header) {
-                me._header.updateScrollButtons();
-            }
+        if (me._collapsed) {
+            // Collapsed visuals handled by setter and adapter
             return;
         }
 
-        me.element.classList.remove('panel--collapsed');
-
-        const minPanelHeight = me.getMinPanelHeight();
-        me.element.style.minHeight = `${minPanelHeight}px`;
-
         if (me._height !== null && !me._isFloating) {
-            me.element.style.height = `${me._height}px`;
-            me.element.style.flex = '0 0 auto';
+            me.renderer.updateStyles(me.element, {
+                height: `${me._height}px`,
+                flex: '0 0 auto'
+            });
         } else if (!me._isFloating) {
-            me.element.style.height = 'auto';
-            me.element.style.flex = '0 0 auto';
-        }
-
-        if (me._header) {
-            me._header.updateScrollButtons();
-        }
-    }
-
-    /**
-     * Updates the header mode (tabs vs simple).
-     *
-     * @private
-     * @returns {void}
-     */
-    _updateHeaderMode() {
-        const me = this;
-        if (!me._header) return;
-
-        const isSimpleMode = me._panels.length === 1;
-        me._header.element.classList.toggle('panel-group__header--simple', isSimpleMode);
-
-        if (isSimpleMode && me._panels.length === 1) {
-            const panel = me._panels[0];
-            me._header.collapseBtn.style.display =
-                panel.collapsible && me._collapsible ? '' : 'none';
-            me._header.closeBtn.style.display = panel.closable && me._closable ? '' : 'none';
-            me._header.moveHandle.style.display = panel.movable && me._movable ? '' : 'none';
+            me.renderer.updateStyles(me.element, {
+                height: 'auto',
+                flex: '0 0 auto'
+            });
         } else {
-            me._header.collapseBtn.style.display = me._collapsible ? '' : 'none';
-            me._header.closeBtn.style.display = me._closable ? '' : 'none';
-            me._header.moveHandle.style.display = me._movable ? '' : 'none';
+            // Floating geometry handles its own height
         }
+
+        // Ensure Min Height is applied
+        const minH = me.getMinPanelHeight();
+        me.renderer.updateStyles(me.element, { minHeight: `${minH}px` });
     }
 
     /**
@@ -1009,49 +1027,34 @@ export class PanelGroup {
      */
     addPanel(panel, index = null, makeActive = false) {
         const me = this;
-        if (!panel || !(panel instanceof Panel)) {
-            console.warn('PanelGroup.addPanel: item is not an instance of Panel.', panel);
-            return;
-        }
+        if (!panel) return;
         if (me._panels.includes(panel)) {
             if (makeActive) me.activePanel = panel;
             return;
         }
 
-        const currentCount = me._panels.length;
-        if (currentCount === 0) {
-            panel.header.setMode(true);
-        } else if (currentCount === 1) {
-            me._panels[0].header.setMode(false);
-            panel.header.setMode(false);
-        } else {
-            panel.header.setMode(false);
-        }
-
         panel.parentGroup = me;
-        me._contentContainer.appendChild(panel.contentElement);
 
-        const tabContainer = me._header.tabContainer;
-        const tabElement = panel.header.element;
+        // Insert into panels array
         const safeIndex = index === null ? me._panels.length : index;
-
         if (safeIndex >= me._panels.length) {
             me._panels.push(panel);
-            tabContainer.appendChild(tabElement);
         } else {
             me._panels.splice(safeIndex, 0, panel);
-            const nextSiblingPanel = me._panels[safeIndex + 1];
-            const nextSiblingTabElement = nextSiblingPanel ? nextSiblingPanel.header.element : null;
-            tabContainer.insertBefore(tabElement, nextSiblingTabElement);
         }
 
-        me._updateHeaderMode();
-        me._header.updateScrollButtons();
+        // Add to TabStrip
+        if (me.header && me.header.tabStrip) {
+            me.header.tabStrip.addItem(panel.header, safeIndex);
+        }
 
         if (makeActive || me._panels.length === 1) {
             me.activePanel = panel;
         } else {
-            panel.contentElement.style.display = 'none';
+            // Ensure new panel content is hidden if not active
+            if (panel.contentElement) {
+                panel.contentElement.style.display = 'none';
+            }
             me.requestLayoutUpdate();
         }
     }
@@ -1067,13 +1070,8 @@ export class PanelGroup {
         if (!panels || panels.length === 0) return;
 
         panels.forEach(panel => {
-            panel.header.setMode(false);
-            panel.parentGroup = me;
-            me._header.tabContainer.appendChild(panel.header.element);
-            me._contentContainer.appendChild(panel.contentElement);
-            panel.contentElement.style.display = 'none';
+            me.addPanel(panel, null, false);
         });
-        me._panels.push(...panels);
     }
 
     /**
@@ -1088,26 +1086,22 @@ export class PanelGroup {
         const index = me._panels.indexOf(panel);
         if (index === -1) return;
 
-        if (!isMoving) {
-            panel.destroy();
+        // Remove from TabStrip
+        if (me.header && me.header.tabStrip) {
+            me.header.tabStrip.removeItem(panel.header);
         }
 
-        panel.header.element.classList.remove('panel-group__tab--active');
-        panel.header.element.remove();
-        panel.contentElement.remove();
+        // Unmount content
+        if (panel.isMounted) {
+            panel.unmount();
+        }
+
+        if (!isMoving) {
+            panel.dispose();
+        }
 
         me._panels.splice(index, 1);
         panel.parentGroup = null;
-
-        const newCount = me._panels.length;
-        if (newCount === 1) {
-            const remaining = me._panels[0];
-            remaining.header.setMode(true);
-            me.activePanel = remaining;
-        }
-
-        me._updateHeaderMode();
-        me._header.updateScrollButtons();
 
         if (me._panels.length === 0) {
             me.close();
@@ -1118,7 +1112,7 @@ export class PanelGroup {
             const newActive = me._panels[index] || me._panels[index - 1];
             me.activePanel = newActive;
         } else {
-            if (newCount > 1) me.requestLayoutUpdate();
+            me.requestLayoutUpdate();
         }
     }
 
@@ -1134,23 +1128,18 @@ export class PanelGroup {
         if (!panel || newIndex < 0) return;
 
         const oldIndex = me._panels.indexOf(panel);
-        if (oldIndex === -1) {
-            console.warn('PanelGroup.movePanel: Panel not found in this group.');
-            return;
-        }
+        if (oldIndex === -1) return;
         if (oldIndex === newIndex) return;
 
         me._panels.splice(oldIndex, 1);
         const adjustedIndex = oldIndex < newIndex ? newIndex - 1 : newIndex;
         me._panels.splice(adjustedIndex, 0, panel);
 
-        const tabContainer = me._header.tabContainer;
-        const tabElement = panel.header.element;
-        const nextSiblingPanel = me._panels[adjustedIndex + 1];
-        const nextSiblingTabElement = nextSiblingPanel ? nextSiblingPanel.header.element : null;
-
-        tabContainer.insertBefore(tabElement, nextSiblingTabElement);
-        me._header.updateScrollButtons();
+        // Move in TabStrip (removeItem + addItem)
+        if (me.header && me.header.tabStrip) {
+            me.header.tabStrip.removeItem(panel.header);
+            me.header.tabStrip.addItem(panel.header, adjustedIndex);
+        }
     }
 
     /**
@@ -1235,12 +1224,10 @@ export class PanelGroup {
             });
         }
 
-        if (panelInstances.length === 1) {
-            me.addPanel(panelInstances[0], null, true);
-        } else if (panelInstances.length > 1) {
+        if (panelInstances.length > 0) {
             me.addPanelsBulk(panelInstances);
             if (!activePanelInstance) activePanelInstance = panelInstances[0];
-            if (activePanelInstance) me.activePanel = activePanelInstance;
+            me.activePanel = activePanelInstance;
         }
 
         if (data.collapsed !== undefined) me.collapsed = data.collapsed;

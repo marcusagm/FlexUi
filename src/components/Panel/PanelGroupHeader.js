@@ -1,57 +1,41 @@
+import { UIElement } from '../../core/UIElement.js';
+import { VanillaPanelGroupHeaderAdapter } from '../../renderers/vanilla/VanillaPanelGroupHeaderAdapter.js';
+import { TabStrip } from '../Core/TabStrip.js';
 import { appBus } from '../../utils/EventBus.js';
 import { EventTypes } from '../../constants/EventTypes.js';
-import { TabStrip } from '../Core/TabStrip.js';
-import { UIElement } from '../../core/UIElement.js';
-
-/**
- * Description:
- * A wrapper class to adapt the legacy PanelHeader (which is not a UIElement)
- * to the UIElement interface required by TabStrip.
- * This ensures compatibility without refactoring PanelHeader immediately.
- *
- * @internal
- */
-class PanelHeaderWrapper extends UIElement {
-    constructor(panelHeader) {
-        super();
-        this.panelHeader = panelHeader;
-    }
-
-    _doRender() {
-        return this.panelHeader.element;
-    }
-
-    get element() {
-        return this.panelHeader.element;
-    }
-}
 
 /**
  * Description:
  * Manages the header element of a PanelGroup.
- * This class provides the group-level controls (Move, Collapse, Close)
- * and integrates the TabStrip component to manage the tabs.
+ * This class acts as a controller that inherits from UIElement. It delegates
+ * DOM creation to VanillaPanelGroupHeaderAdapter and composes a TabStrip
+ * component to manage the list of tabs.
  *
  * Properties summary:
  * - panelGroup {PanelGroup} : Reference to the parent PanelGroup.
  * - title {string} : The title used for ARIA labels.
- * - element {HTMLElement} : The main header element.
- * - moveHandle {HTMLElement} : The drag handle element.
- * - collapseBtn {HTMLElement} : Button to toggle collapse state.
- * - closeBtn {HTMLElement} : Button to close the group.
  * - tabStrip {TabStrip} : The component managing the list of tabs.
- * - _tabsWrapper {HTMLElement} : The DOM container for the TabStrip.
+ * - moveHandle {HTMLElement|null} : The drag handle element (accessed via adapter).
+ * - collapseBtn {HTMLElement|null} : Button to toggle collapse state (accessed via adapter).
+ * - closeBtn {HTMLElement|null} : Button to close the group (accessed via adapter).
  *
  * Events:
- * - Emits (appBus): EventTypes.PANEL_TOGGLE_COLLAPSE, EventTypes.PANEL_CLOSE_REQUEST
- * - Emits (appBus): EventTypes.DND_DRAG_START (for the *entire group* via Pointer)
+ * - Emits (appBus): EventTypes.PANEL_TOGGLE_COLLAPSE
+ * - Emits (appBus): EventTypes.PANEL_CLOSE_REQUEST
+ * - Emits (appBus): EventTypes.DND_DRAG_START
+ *
+ * Business rules implemented:
+ * - Composes TabStrip via the 'mount' lifecycle.
+ * - Delegates DOM events to internal handlers.
+ * - Updates visual state via adapter methods.
  *
  * Dependencies:
- * - {import('../../utils/EventBus.js').appBus}
- * - {import('../../constants/EventTypes.js').EventTypes}
+ * - {import('../../core/UIElement.js').UIElement}
+ * - {import('../../renderers/vanilla/VanillaPanelGroupHeaderAdapter.js').VanillaPanelGroupHeaderAdapter}
  * - {import('../Core/TabStrip.js').TabStrip}
+ * - {import('../../utils/EventBus.js').appBus}
  */
-export class PanelGroupHeader {
+export class PanelGroupHeader extends UIElement {
     /**
      * Reference to the parent PanelGroup.
      *
@@ -69,38 +53,6 @@ export class PanelGroupHeader {
     _title = null;
 
     /**
-     * The main header element.
-     *
-     * @type {HTMLElement}
-     * @public
-     */
-    element;
-
-    /**
-     * The drag handle element.
-     *
-     * @type {HTMLElement}
-     * @public
-     */
-    moveHandle;
-
-    /**
-     * Button to toggle collapse state.
-     *
-     * @type {HTMLElement}
-     * @public
-     */
-    collapseBtn;
-
-    /**
-     * Button to close the group.
-     *
-     * @type {HTMLElement}
-     * @public
-     */
-    closeBtn;
-
-    /**
      * The TabStrip component instance.
      *
      * @type {TabStrip}
@@ -109,32 +61,57 @@ export class PanelGroupHeader {
     tabStrip;
 
     /**
-     * The DOM wrapper for the TabStrip.
+     * Bound handler for collapse button click.
      *
-     * @type {HTMLElement}
+     * @type {Function | null}
      * @private
      */
-    _tabsWrapper;
+    _boundOnCollapse = null;
+
+    /**
+     * Bound handler for close button click.
+     *
+     * @type {Function | null}
+     * @private
+     */
+    _boundOnClose = null;
+
+    /**
+     * Bound handler for pointer down on the move handle.
+     *
+     * @type {Function | null}
+     * @private
+     */
+    _boundOnGroupPointerDown = null;
 
     /**
      * Creates a new PanelGroupHeader instance.
      *
      * @param {import('./PanelGroup.js').PanelGroup} panelGroup - The parent PanelGroup instance.
+     * @param {import('../../core/IRenderer.js').IRenderer} [renderer=null] - Optional renderer adapter.
      */
-    constructor(panelGroup) {
+    constructor(panelGroup, renderer = null) {
+        super(null, renderer || new VanillaPanelGroupHeaderAdapter());
         const me = this;
-        me.element = document.createElement('div');
-        me.element.classList.add('panel-group__header');
 
         me.panelGroup = panelGroup;
 
         // Initialize TabStrip with Simple Mode enabled
-        me.tabStrip = new TabStrip(panelGroup.id + '-tabs', {
-            orientation: 'horizontal',
-            simpleMode: true
-        });
+        me.tabStrip = new TabStrip(
+            `${panelGroup.id}-tabs`,
+            {
+                orientation: 'horizontal',
+                simpleMode: true
+            },
+            renderer
+        ); // Pass renderer to TabStrip if needed or let it default
 
-        me.build();
+        me._boundOnCollapse = me._onCollapse.bind(me);
+        me._boundOnClose = me._onClose.bind(me);
+        me._boundOnGroupPointerDown = me._onGroupPointerDown.bind(me);
+
+        // Initialize DOM via UIElement lifecycle
+        me.render();
     }
 
     /**
@@ -143,7 +120,8 @@ export class PanelGroupHeader {
      * @returns {import('./PanelGroup.js').PanelGroup | null} The parent group.
      */
     get panelGroup() {
-        return this._panelGroup;
+        const me = this;
+        return me._panelGroup;
     }
 
     /**
@@ -169,7 +147,8 @@ export class PanelGroupHeader {
      * @returns {string | null} The title.
      */
     get title() {
-        return this._title;
+        const me = this;
+        return me._title;
     }
 
     /**
@@ -187,119 +166,175 @@ export class PanelGroupHeader {
             return;
         }
         me._title = value;
+        me.updateAriaLabels();
     }
 
     /**
-     * Builds the DOM elements for the header.
+     * Accessor for the Move Handle element (via renderer).
      *
-     * @returns {void}
+     * @returns {HTMLElement | null}
      */
-    build() {
+    get moveHandle() {
         const me = this;
+        if (me.element) {
+            return me.renderer.getMoveHandle(me.element);
+        }
+        return null;
+    }
 
-        // Link DND properties from the parent group
+    /**
+     * Accessor for the Collapse Button element (via renderer).
+     *
+     * @returns {HTMLElement | null}
+     */
+    get collapseBtn() {
+        const me = this;
+        if (me.element) {
+            return me.renderer.getCollapseButton(me.element);
+        }
+        return null;
+    }
+
+    /**
+     * Accessor for the Close Button element (via renderer).
+     *
+     * @returns {HTMLElement | null}
+     */
+    get closeBtn() {
+        const me = this;
+        if (me.element) {
+            return me.renderer.getCloseButton(me.element);
+        }
+        return null;
+    }
+
+    /**
+     * Implementation of the rendering logic.
+     * Uses the adapter to create the header structure.
+     *
+     * @returns {HTMLElement} The root header element.
+     * @protected
+     */
+    _doRender() {
+        const me = this;
+        const element = me.renderer.createHeaderElement(me.id);
+
+        // Link DND properties from the parent group if available
         if (me.panelGroup) {
-            me.element.dropZoneInstance = me.panelGroup;
-            me.element.dataset.dropzone = me.panelGroup.dropZoneType;
+            element.dropZoneInstance = me.panelGroup;
+            element.dataset.dropzone = me.panelGroup.dropZoneType;
         }
 
-        // 1. Move Handle
-        me.moveHandle = document.createElement('div');
-        me.moveHandle.classList.add('panel-group__move-handle', 'panel__move-handle');
-        me.moveHandle.style.touchAction = 'none';
-        me.moveHandle.addEventListener('pointerdown', me.onGroupPointerDown.bind(me));
-        me.moveHandle.setAttribute('role', 'button');
+        // Attach listeners
+        const moveHandle = me.renderer.getMoveHandle(element);
+        const collapseBtn = me.renderer.getCollapseButton(element);
+        const closeBtn = me.renderer.getCloseButton(element);
 
-        const iconElement = document.createElement('span');
-        iconElement.className = 'icon icon-handle';
-        me.moveHandle.appendChild(iconElement);
+        if (moveHandle) {
+            me.renderer.on(moveHandle, 'pointerdown', me._boundOnGroupPointerDown);
+        }
+        if (collapseBtn) {
+            me.renderer.on(collapseBtn, 'click', me._boundOnCollapse);
+        }
+        if (closeBtn) {
+            me.renderer.on(closeBtn, 'click', me._boundOnClose);
+        }
 
-        // 2. Tabs Wrapper (Container for TabStrip)
-        me._tabsWrapper = document.createElement('div');
-        // Mimic old tab container styles for layout
-        me._tabsWrapper.className = 'panel-group__tab-container';
-        me._tabsWrapper.style.overflow = 'hidden'; // Let TabStrip handle overflow internally
-
-        // Mount TabStrip into wrapper
-        me.tabStrip.mount(me._tabsWrapper);
-
-        // 3. Controls (Collapse, Close)
-        me.collapseBtn = document.createElement('button');
-        me.collapseBtn.type = 'button';
-        me.collapseBtn.classList.add('panel-group__collapse-btn', 'panel__collapse-btn');
-        me.collapseBtn.addEventListener('click', () => {
-            if (me.panelGroup) {
-                appBus.emit(EventTypes.PANEL_TOGGLE_COLLAPSE, me.panelGroup);
-            }
-        });
-
-        me.closeBtn = document.createElement('button');
-        me.closeBtn.type = 'button';
-        me.closeBtn.classList.add('panel-group__close-btn', 'panel__close-btn');
-        me.closeBtn.addEventListener('click', () => {
-            if (me.panelGroup) {
-                appBus.emit(EventTypes.PANEL_CLOSE_REQUEST, me.panelGroup);
-            }
-        });
-
-        // Append in order
-        me.element.append(me.moveHandle, me._tabsWrapper, me.collapseBtn, me.closeBtn);
+        return element;
     }
 
     /**
-     * Creates a UIElement wrapper for a PanelHeader to be added to the TabStrip.
+     * Implementation of mount logic.
+     * Mounts the TabStrip into the designated slot.
      *
-     * @param {object} panelHeader - The legacy PanelHeader instance.
-     * @returns {UIElement} The wrapped element.
+     * @param {HTMLElement} container - The parent container.
+     * @protected
      */
-    createTabWrapper(panelHeader) {
-        return new PanelHeaderWrapper(panelHeader);
+    _doMount(container) {
+        const me = this;
+        super._doMount(container);
+
+        const tabSlot = me.renderer.getTabContainerSlot(me.element);
+        if (tabSlot) {
+            me.tabStrip.mount(tabSlot);
+        }
     }
 
     /**
-     * Cleans up the component and destroys the TabStrip.
+     * Implementation of unmount logic.
+     * Cleans up listeners and sub-components.
+     *
+     * @protected
+     */
+    _doUnmount() {
+        const me = this;
+
+        // Remove listeners
+        if (me.element) {
+            const moveHandle = me.renderer.getMoveHandle(me.element);
+            const collapseBtn = me.renderer.getCollapseButton(me.element);
+            const closeBtn = me.renderer.getCloseButton(me.element);
+
+            if (moveHandle) me.renderer.off(moveHandle, 'pointerdown', me._boundOnGroupPointerDown);
+            if (collapseBtn) me.renderer.off(collapseBtn, 'click', me._boundOnCollapse);
+            if (closeBtn) me.renderer.off(closeBtn, 'click', me._boundOnClose);
+        }
+
+        // Unmount TabStrip
+        if (me.tabStrip && me.tabStrip.isMounted) {
+            me.tabStrip.unmount();
+        }
+
+        super._doUnmount();
+    }
+
+    /**
+     * Disposes the component and its children.
      *
      * @returns {void}
      */
-    destroy() {
+    dispose() {
         const me = this;
         if (me.tabStrip) {
             me.tabStrip.dispose();
         }
-        me.element.remove();
+        super.dispose();
     }
 
     /**
-     * Proxy method to update scroll buttons (handled by TabStrip now).
-     * Kept for potential API compatibility if external calls exist, though likely unused.
+     * Handler for collapse button click.
      *
+     * @private
      * @returns {void}
      */
-    updateScrollButtons() {
-        // No-op: TabStrip handles this internally via ResizeObserver
-    }
-
-    /**
-     * Updates ARIA labels for group control buttons.
-     *
-     * @returns {void}
-     */
-    updateAriaLabels() {
+    _onCollapse() {
         const me = this;
-        const title = me.panelGroup && me.panelGroup.title ? me.panelGroup.title : 'Grupo';
+        if (me.panelGroup) {
+            appBus.emit(EventTypes.PANEL_TOGGLE_COLLAPSE, me.panelGroup);
+        }
+    }
 
-        me.moveHandle.setAttribute('aria-label', `Mover grupo ${title}`);
-        me.collapseBtn.setAttribute('aria-label', `Recolher grupo ${title}`);
-        me.closeBtn.setAttribute('aria-label', `Fechar grupo ${title}`);
+    /**
+     * Handler for close button click.
+     *
+     * @private
+     * @returns {void}
+     */
+    _onClose() {
+        const me = this;
+        if (me.panelGroup) {
+            appBus.emit(EventTypes.PANEL_CLOSE_REQUEST, me.panelGroup);
+        }
     }
 
     /**
      * Handles drag start for the *entire group*.
      *
      * @param {PointerEvent} event - The pointerdown event.
+     * @private
      * @returns {void}
      */
-    onGroupPointerDown(event) {
+    _onGroupPointerDown(event) {
         const me = this;
         if (event.button !== 0) return;
 
@@ -309,7 +344,9 @@ export class PanelGroupHeader {
         event.stopPropagation();
 
         const target = event.target;
-        target.setPointerCapture(event.pointerId);
+        if (target && typeof target.setPointerCapture === 'function') {
+            target.setPointerCapture(event.pointerId);
+        }
 
         const dragElement = me.panelGroup.element;
         const rect = dragElement.getBoundingClientRect();
@@ -324,5 +361,43 @@ export class PanelGroupHeader {
             offsetX: offsetX,
             offsetY: offsetY
         });
+    }
+
+    /**
+     * Updates ARIA labels for group control buttons.
+     *
+     * @returns {void}
+     */
+    updateAriaLabels() {
+        const me = this;
+        const title = me.panelGroup && me.panelGroup.title ? me.panelGroup.title : 'Grupo';
+        if (me.element) {
+            me.renderer.updateAriaLabels(me.element, title);
+        }
+    }
+
+    /**
+     * Updates the visual state of the collapse button.
+     *
+     * @param {boolean} isCollapsed - Whether the group is collapsed.
+     * @returns {void}
+     */
+    updateCollapsedState(isCollapsed) {
+        const me = this;
+        if (me.element) {
+            me.renderer.setCollapsedState(me.element, isCollapsed);
+        }
+    }
+
+    /**
+     * Compatibility method used by DND strategies.
+     * Returns the DOM element where tabs are effectively dropped.
+     *
+     * @returns {HTMLElement|null} The tab container slot.
+     */
+    get tabContainer() {
+        const me = this;
+        // The TabStrip root element is the effective drop target logic
+        return me.tabStrip.element;
     }
 }

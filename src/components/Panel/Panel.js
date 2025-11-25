@@ -33,14 +33,14 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * - Extends IPanel -> UIElement -> Disposable.
  * - Delegates visual operations to VanillaPanelAdapter by default.
  * - Automatically manages global state subscriptions upon mounting/unmounting.
- * - Validates all configuration inputs.
+ * - Owns the PanelHeader instance but delegates its visual placement to the parent group.
  *
  * Dependencies:
- * - IPanel
- * - VanillaPanelAdapter
- * - PanelHeader
- * - EventBus
- * - GlobalStateService
+ * - {import('./IPanel.js').IPanel}
+ * - {import('../../renderers/vanilla/VanillaPanelAdapter.js').VanillaPanelAdapter}
+ * - {import('./PanelHeader.js').PanelHeader}
+ * - {import('../../utils/EventBus.js').appBus}
+ * - {import('../../services/GlobalStateService.js').globalState}
  */
 export class Panel extends IPanel {
     /**
@@ -119,7 +119,7 @@ export class Panel extends IPanel {
      * Creates a new Panel instance.
      *
      * @param {string} title - The initial title for the panel.
-     * @param {number|null} [height=null] - Initial height (kept for API compatibility, generally ignored in favor of flex).
+     * @param {number|null} [height=null] - Initial height (kept for API compatibility).
      * @param {object} [config={}] - Configuration options.
      * @param {import('../../core/IRenderer.js').IRenderer} [renderer=null] - Optional renderer adapter.
      */
@@ -130,18 +130,17 @@ export class Panel extends IPanel {
         // Initialize Title
         me._title = typeof title === 'string' ? title : '';
 
-        // Initialize Header (Legacy coupling maintained as per plan)
+        // Initialize Header (Owned by Panel, managed by Group)
         me._header = new PanelHeader(me, me._title);
 
-        // Apply configuration via setters to ensure validation
+        // Apply configuration via setters to ensure validation and sync
         if (config.minHeight !== undefined) me.minHeight = config.minHeight;
         if (config.minWidth !== undefined) me.minWidth = config.minWidth;
         if (config.closable !== undefined) me.closable = config.closable;
         if (config.collapsible !== undefined) me.collapsible = config.collapsible;
         if (config.movable !== undefined) me.movable = config.movable;
 
-        // Ensure element is created immediately via the standard lifecycle.
-        // This calls UIElement.render(), which calls _doRender() and then populate().
+        // Ensure element is created immediately via standard lifecycle
         me.render();
     }
 
@@ -165,6 +164,7 @@ export class Panel extends IPanel {
 
     /**
      * Sets the parent PanelGroup.
+     * Updates the header's parent group reference as well.
      *
      * @param {import('./PanelGroup.js').PanelGroup | null} value - The new parent group.
      * @returns {void}
@@ -194,7 +194,7 @@ export class Panel extends IPanel {
 
     /**
      * Retrieves the content DOM element.
-     * Alias for 'element' from UIElement, maintained for compatibility.
+     * Alias for 'element' from UIElement.
      *
      * @returns {HTMLElement | null} The content element.
      */
@@ -213,6 +213,7 @@ export class Panel extends IPanel {
 
     /**
      * Sets the panel title.
+     * Updates the header title automatically.
      *
      * @param {string} value - The new title.
      * @returns {void}
@@ -251,7 +252,7 @@ export class Panel extends IPanel {
         const num = Number(value);
         if (!Number.isFinite(num) || num < 0) {
             console.warn(
-                `[Panel] invalid minHeight assignment (${value}). Must be a positive number. Keeping previous value: ${me._minHeight}`
+                `[Panel] invalid minHeight assignment (${value}). Must be a positive number.`
             );
             return;
         }
@@ -279,7 +280,7 @@ export class Panel extends IPanel {
         const num = Number(value);
         if (!Number.isFinite(num) || num < 0) {
             console.warn(
-                `[Panel] invalid minWidth assignment (${value}). Must be a positive number. Keeping previous value: ${me._minWidth}`
+                `[Panel] invalid minWidth assignment (${value}). Must be a positive number.`
             );
             return;
         }
@@ -298,6 +299,7 @@ export class Panel extends IPanel {
 
     /**
      * Sets whether the panel is closable.
+     * Propagates configuration to the header.
      *
      * @param {boolean} value - True to allow closing.
      * @returns {void}
@@ -305,9 +307,7 @@ export class Panel extends IPanel {
     set closable(value) {
         const me = this;
         if (typeof value !== 'boolean') {
-            console.warn(
-                `[Panel] invalid closable assignment (${value}). Must be boolean. Keeping previous value: ${me._closable}`
-            );
+            console.warn(`[Panel] invalid closable assignment (${value}). Must be boolean.`);
             return;
         }
         me._closable = value;
@@ -334,9 +334,7 @@ export class Panel extends IPanel {
     set collapsible(value) {
         const me = this;
         if (typeof value !== 'boolean') {
-            console.warn(
-                `[Panel] invalid collapsible assignment (${value}). Must be boolean. Keeping previous value: ${me._collapsible}`
-            );
+            console.warn(`[Panel] invalid collapsible assignment (${value}). Must be boolean.`);
             return;
         }
         me._collapsible = value;
@@ -353,6 +351,7 @@ export class Panel extends IPanel {
 
     /**
      * Sets whether the panel is movable.
+     * Propagates configuration to the header.
      *
      * @param {boolean} value - True to allow moving.
      * @returns {void}
@@ -360,9 +359,7 @@ export class Panel extends IPanel {
     set movable(value) {
         const me = this;
         if (typeof value !== 'boolean') {
-            console.warn(
-                `[Panel] invalid movable assignment (${value}). Must be boolean. Keeping previous value: ${me._movable}`
-            );
+            console.warn(`[Panel] invalid movable assignment (${value}). Must be boolean.`);
             return;
         }
         me._movable = value;
@@ -406,7 +403,7 @@ export class Panel extends IPanel {
 
     /**
      * Requests the panel to close itself.
-     * Emits an event to the parent group.
+     * Emits an event to the parent group via appBus.
      *
      * @returns {void}
      */
@@ -440,12 +437,9 @@ export class Panel extends IPanel {
         return Math.max(0, this._minWidth);
     }
 
-    // --- UIElement Overrides ---
-
     /**
      * Extended render method.
-     * Calls super.render() to create the DOM via _doRender,
-     * then calls populate() to let subclasses fill the content.
+     * Calls super.render() (creates DOM), then populate().
      *
      * @returns {void}
      */
@@ -455,7 +449,7 @@ export class Panel extends IPanel {
     }
 
     /**
-     * Hook for subclasses to populate content without overriding render.
+     * Hook for subclasses to populate content.
      *
      * @returns {void}
      */
@@ -465,7 +459,7 @@ export class Panel extends IPanel {
 
     /**
      * Implementation of the rendering logic.
-     * Uses the VanillaPanelAdapter to create the specific panel DOM structure.
+     * Uses the VanillaPanelAdapter to create the panel DOM structure.
      *
      * @returns {HTMLElement} The created content element.
      * @protected
@@ -479,7 +473,8 @@ export class Panel extends IPanel {
 
     /**
      * Implementation of the mounting logic.
-     * Inserts the element into the container and sets up state listeners.
+     * Inserts the panel content into the container (PanelGroup content area).
+     * Note: This does NOT mount the header. That is handled by the Group/TabStrip.
      *
      * @param {HTMLElement} container - The parent container.
      * @protected
@@ -494,7 +489,6 @@ export class Panel extends IPanel {
 
     /**
      * Implementation of the unmounting logic.
-     * Removes the element from the DOM and tears down state listeners.
      *
      * @protected
      */
@@ -608,7 +602,6 @@ export class Panel extends IPanel {
 
     /**
      * Subscribes to keys in GlobalStateService.
-     * Called automatically on mount.
      *
      * @private
      * @returns {void}
@@ -631,7 +624,6 @@ export class Panel extends IPanel {
 
     /**
      * Unsubscribes from keys in GlobalStateService.
-     * Called automatically on unmount.
      *
      * @private
      * @returns {void}
@@ -648,19 +640,17 @@ export class Panel extends IPanel {
 
     /**
      * Hook called when an observed state key changes.
-     * Subclasses should override this.
      *
      * @param {string} key - The state key.
      * @param {*} value - The new value.
      * @returns {void}
      */
     onStateUpdate(key, value) {
-        // Intentionally empty for subclasses
+        // Intentionally empty
     }
 
     /**
      * Defines which keys to observe.
-     * Subclasses should override this.
      *
      * @returns {Array<string>} Array of keys.
      */
