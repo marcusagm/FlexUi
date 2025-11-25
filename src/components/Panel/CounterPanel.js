@@ -66,22 +66,17 @@ export class CounterPanel extends Panel {
      * Creates a new CounterPanel instance.
      *
      * @param {string} title - The panel title.
-     * @param {number|null} [height=null] - The initial height.
      * @param {object} [config={}] - Configuration overrides.
      * @param {import('../../core/IRenderer.js').IRenderer} [renderer=null] - Optional renderer adapter.
      */
-    constructor(title, height = null, config = {}, renderer = null) {
-        super(
-            title,
-            height,
-            {
-                ...config,
-                collapsible: false,
-                minHeight: 130,
-                minWidth: 260
-            },
-            renderer
-        );
+    constructor(title, config = {}, renderer = null) {
+        const defaults = {
+            collapsible: false,
+            minHeight: 130,
+            minWidth: 260
+        };
+
+        super(title, { ...defaults, ...config }, renderer);
         const me = this;
 
         me._boundOnIncrease = me._onIncrease.bind(me);

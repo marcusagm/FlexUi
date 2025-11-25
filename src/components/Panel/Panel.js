@@ -22,7 +22,7 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * - movable {boolean} : Whether the panel can be moved.
  *
  * Typical usage:
- * const panel = new Panel('My Panel');
+ * const panel = new Panel('My Panel', { minHeight: 200 });
  * panel.setContent('<p>Hello World</p>');
  * panel.mount(document.body);
  *
@@ -33,7 +33,8 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * - Extends IPanel -> UIElement -> Disposable.
  * - Delegates visual operations to VanillaPanelAdapter by default.
  * - Automatically manages global state subscriptions upon mounting/unmounting.
- * - Owns the PanelHeader instance but delegates its visual placement to the parent group.
+ * - Validates all configuration inputs.
+ * - Constructor accepts a config object for all settings.
  *
  * Dependencies:
  * - {import('./IPanel.js').IPanel}
@@ -119,11 +120,10 @@ export class Panel extends IPanel {
      * Creates a new Panel instance.
      *
      * @param {string} title - The initial title for the panel.
-     * @param {number|null} [height=null] - Initial height (kept for API compatibility).
-     * @param {object} [config={}] - Configuration options.
+     * @param {object} [config={}] - Configuration options (minHeight, minWidth, closable, etc.).
      * @param {import('../../core/IRenderer.js').IRenderer} [renderer=null] - Optional renderer adapter.
      */
-    constructor(title, height = null, config = {}, renderer = null) {
+    constructor(title, config = {}, renderer = null) {
         super(null, renderer || new VanillaPanelAdapter());
         const me = this;
 
@@ -133,12 +133,16 @@ export class Panel extends IPanel {
         // Initialize Header (Owned by Panel, managed by Group)
         me._header = new PanelHeader(me, me._title);
 
-        // Apply configuration via setters to ensure validation and sync
+        // Apply configuration via setters to ensure validation
         if (config.minHeight !== undefined) me.minHeight = config.minHeight;
         if (config.minWidth !== undefined) me.minWidth = config.minWidth;
         if (config.closable !== undefined) me.closable = config.closable;
         if (config.collapsible !== undefined) me.collapsible = config.collapsible;
         if (config.movable !== undefined) me.movable = config.movable;
+
+        // Note: 'height' from config is typically ignored by basic Panels in flex layout,
+        // but if we had a setter for it, we would apply it here:
+        // if (config.height !== undefined) me.height = config.height;
 
         // Ensure element is created immediately via standard lifecycle
         me.render();
@@ -194,7 +198,7 @@ export class Panel extends IPanel {
 
     /**
      * Retrieves the content DOM element.
-     * Alias for 'element' from UIElement.
+     * Alias for 'element' from UIElement, maintained for compatibility.
      *
      * @returns {HTMLElement | null} The content element.
      */
@@ -252,7 +256,7 @@ export class Panel extends IPanel {
         const num = Number(value);
         if (!Number.isFinite(num) || num < 0) {
             console.warn(
-                `[Panel] invalid minHeight assignment (${value}). Must be a positive number.`
+                `[Panel] invalid minHeight assignment (${value}). Must be a positive number. Keeping previous value: ${me._minHeight}`
             );
             return;
         }
@@ -280,7 +284,7 @@ export class Panel extends IPanel {
         const num = Number(value);
         if (!Number.isFinite(num) || num < 0) {
             console.warn(
-                `[Panel] invalid minWidth assignment (${value}). Must be a positive number.`
+                `[Panel] invalid minWidth assignment (${value}). Must be a positive number. Keeping previous value: ${me._minWidth}`
             );
             return;
         }
@@ -307,7 +311,9 @@ export class Panel extends IPanel {
     set closable(value) {
         const me = this;
         if (typeof value !== 'boolean') {
-            console.warn(`[Panel] invalid closable assignment (${value}). Must be boolean.`);
+            console.warn(
+                `[Panel] invalid closable assignment (${value}). Must be boolean. Keeping previous value: ${me._closable}`
+            );
             return;
         }
         me._closable = value;
@@ -334,7 +340,9 @@ export class Panel extends IPanel {
     set collapsible(value) {
         const me = this;
         if (typeof value !== 'boolean') {
-            console.warn(`[Panel] invalid collapsible assignment (${value}). Must be boolean.`);
+            console.warn(
+                `[Panel] invalid collapsible assignment (${value}). Must be boolean. Keeping previous value: ${me._collapsible}`
+            );
             return;
         }
         me._collapsible = value;
@@ -359,7 +367,9 @@ export class Panel extends IPanel {
     set movable(value) {
         const me = this;
         if (typeof value !== 'boolean') {
-            console.warn(`[Panel] invalid movable assignment (${value}). Must be boolean.`);
+            console.warn(
+                `[Panel] invalid movable assignment (${value}). Must be boolean. Keeping previous value: ${me._movable}`
+            );
             return;
         }
         me._movable = value;
@@ -489,6 +499,7 @@ export class Panel extends IPanel {
 
     /**
      * Implementation of the unmounting logic.
+     * Removes the element from the DOM and tears down state listeners.
      *
      * @protected
      */
@@ -600,8 +611,11 @@ export class Panel extends IPanel {
         }
     }
 
+    // --- Reactive State Management ---
+
     /**
      * Subscribes to keys in GlobalStateService.
+     * Called automatically on mount.
      *
      * @private
      * @returns {void}
@@ -624,6 +638,7 @@ export class Panel extends IPanel {
 
     /**
      * Unsubscribes from keys in GlobalStateService.
+     * Called automatically on unmount.
      *
      * @private
      * @returns {void}
@@ -640,17 +655,19 @@ export class Panel extends IPanel {
 
     /**
      * Hook called when an observed state key changes.
+     * Subclasses should override this.
      *
      * @param {string} key - The state key.
      * @param {*} value - The new value.
      * @returns {void}
      */
     onStateUpdate(key, value) {
-        // Intentionally empty
+        // Intentionally empty for subclasses
     }
 
     /**
      * Defines which keys to observe.
+     * Subclasses should override this.
      *
      * @returns {Array<string>} Array of keys.
      */

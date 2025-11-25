@@ -3,20 +3,22 @@ import { Panel } from './Panel.js';
 /**
  * Description:
  * A concrete implementation of Panel that renders simple text content.
+ * It standardizes the constructor signature by accepting text content via the configuration object.
  *
  * Properties summary:
  * - (Inherits from Panel)
  *
  * Typical usage:
- * const textPanel = new TextPanel('My Title', 'Hello world');
+ * const textPanel = new TextPanel('My Title', { content: 'Hello world' });
  *
  * Events:
  * - None
  *
  * Business rules implemented:
  * - Identifies itself as 'TextPanel' to the factory.
- * - Extends toJSON() to save its 'textContent'.
- * - Extends fromJSON() to restore its 'textContent'.
+ * - Reads initial content from `config.content`.
+ * - Persists content property in `toJSON` for serialization.
+ * - Restores content property in `fromJSON`.
  *
  * Dependencies:
  * - {import('./Panel.js').Panel}
@@ -30,17 +32,17 @@ export class TextPanel extends Panel {
      * Creates a new TextPanel instance.
      *
      * @param {string} title - The panel title.
-     * @param {string} initialText - The text to display.
-     * @param {number|null} [height=null] - (Ignored) Kept for API compatibility.
-     * @param {object} [config={}] - Configuration overrides.
+     * @param {object} [config={}] - Configuration options (including 'content').
      * @param {import('../../core/IRenderer.js').IRenderer} [renderer=null] - Optional renderer adapter.
      */
-    constructor(title, initialText, height = null, config = {}, renderer = null) {
-        super(title, height, config, renderer);
+    constructor(title, config = {}, renderer = null) {
+        super(title, config, renderer);
         const me = this;
 
         if (me.contentElement) {
-            me.contentElement.textContent = initialText || '';
+            // Access content from config object, defaulting to empty string
+            const textContent = config.content || '';
+            me.contentElement.textContent = textContent;
         }
     }
 
@@ -85,7 +87,7 @@ export class TextPanel extends Panel {
      */
     fromJSON(data) {
         const me = this;
-        super.fromJSON(data); // Restore base properties first
+        super.fromJSON(data);
         if (data.content && me.contentElement) {
             me.contentElement.textContent = data.content;
         }

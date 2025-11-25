@@ -7,8 +7,9 @@ import { Panel } from './Panel.js';
  * Panel types (like TextPanel, ToolbarPanel) must be registered
  * by the application (e.g., in App.js) before they can be created.
  *
- * It now supports dependency injection for the rendering engine, allowing
- * the application to define a default renderer factory (e.g., for React/Vue adapters).
+ * It acts as a data adapter, normalizing legacy JSON structures into the
+ * standardized configuration object expected by the unified Panel constructors.
+ * It also handles dependency injection for the rendering engine.
  *
  * Properties summary:
  * - _instance {PanelFactory | null} : The private static instance for the Singleton.
@@ -166,7 +167,7 @@ export class PanelFactory {
     /**
      * Creates and hydrates a Panel instance based on its type and saved data.
      * Uses the default renderer factory if configured.
-     * Handles specific constructor signatures for known subclasses (e.g., TextPanel).
+     * Handles adaptation of legacy JSON structures to the new unified constructor signature.
      *
      * @param {object} panelData - The serialized data object for the panel.
      * @returns {Panel | null} An instantiated and hydrated Panel, or null if invalid.
@@ -188,28 +189,23 @@ export class PanelFactory {
             renderer = me._defaultRendererFactory();
         }
 
-        let panel;
+        // Data Adapter Logic:
+        // Prepare a unified config object by merging existing configs
+        // with root-level properties that were previously passed positionally (height, content).
+        const config = {
+            ...(panelData.config || {}),
+            height: panelData.height, // Move root height to config
+            width: panelData.width, // Move root width to config (if exists)
+            content: panelData.content // Move root content to config (critical for TextPanel)
+        };
 
-        // Handle constructor signature mismatch for TextPanel
-        if (panelData.type === 'TextPanel') {
-            panel = new PanelClass(
-                panelData.title,
-                panelData.content || '',
-                panelData.height,
-                panelData.config || {},
-                renderer
-            );
-        } else {
-            // Generic constructor signature for Panel and other standard subclasses
-            panel = new PanelClass(
-                panelData.title,
-                panelData.height,
-                panelData.config || {},
-                renderer
-            );
+        // Instantiate using the standardized signature: (title, config, renderer)
+        const panel = new PanelClass(panelData.title, config, renderer);
+
+        // Hydrate any remaining state (e.g., collapsed status, complex properties)
+        if (typeof panel.fromJSON === 'function') {
+            panel.fromJSON(panelData);
         }
-
-        panel.fromJSON(panelData);
 
         return panel;
     }

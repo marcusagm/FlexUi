@@ -33,22 +33,17 @@ export class ToolbarPanel extends Panel {
      * Creates a new ToolbarPanel instance.
      *
      * @param {string} title - The panel title.
-     * @param {number|null} [height=null] - The initial height.
      * @param {object} [config={}] - Configuration overrides.
      * @param {import('../../core/IRenderer.js').IRenderer} [renderer=null] - Optional renderer adapter.
      */
-    constructor(title, height = null, config = {}, renderer = null) {
-        super(
-            title,
-            height,
-            {
-                ...config,
-                collapsible: false,
-                movable: false,
-                minHeight: 75
-            },
-            renderer
-        );
+    constructor(title, config = {}, renderer = null) {
+        const defaults = {
+            collapsible: false,
+            movable: false,
+            minHeight: 75
+        };
+
+        super(title, { ...defaults, ...config }, renderer);
         // super() calls render() -> populate()
     }
 
