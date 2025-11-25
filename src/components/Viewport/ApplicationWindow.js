@@ -5,6 +5,7 @@ import { EventTypes } from '../../constants/EventTypes.js';
 import { ItemType } from '../../constants/DNDTypes.js';
 import { UIElement } from '../../core/UIElement.js';
 import { VanillaWindowAdapter } from '../../renderers/vanilla/VanillaWindowAdapter.js';
+import { WindowApi } from '../../api/WindowApi.js';
 
 /**
  * Description:
@@ -27,6 +28,7 @@ import { VanillaWindowAdapter } from '../../renderers/vanilla/VanillaWindowAdapt
  * - isTabbed {boolean} : Tabbed (docked) state flag.
  * - header {ApplicationWindowHeader} : The window header component.
  * - contentElement {HTMLElement|null} : The container for window content.
+ * - api {WindowApi} : The public API facade.
  *
  * Typical usage:
  * const win = new ApplicationWindow('My Window', contentNode, { x: 100, y: 100 });
@@ -41,6 +43,7 @@ import { VanillaWindowAdapter } from '../../renderers/vanilla/VanillaWindowAdapt
  * - Manages 8-direction resizing via ResizeHandleManager.
  * - Intercepts close requests via `preventClose` (async support).
  * - Identifies as `ItemType.APPLICATION_WINDOW` for DND.
+ * - Exposes a WindowApi facade.
  *
  * Dependencies:
  * - UIElement
@@ -48,8 +51,17 @@ import { VanillaWindowAdapter } from '../../renderers/vanilla/VanillaWindowAdapt
  * - ApplicationWindowHeader
  * - ResizeHandleManager
  * - EventBus
+ * - WindowApi
  */
 export class ApplicationWindow extends UIElement {
+    /**
+     * The public API facade.
+     *
+     * @type {WindowApi}
+     * @private
+     */
+    _api;
+
     /**
      * The window header component.
      *
@@ -190,6 +202,8 @@ export class ApplicationWindow extends UIElement {
         super(null, renderer || new VanillaWindowAdapter());
         const me = this;
 
+        me._api = new WindowApi(me);
+
         me._title = title;
 
         if (config.x !== undefined) me._x = config.x;
@@ -211,6 +225,15 @@ export class ApplicationWindow extends UIElement {
 
         // Apply initial styles to the rendered element
         me._updateGeometryStyles();
+    }
+
+    /**
+     * Retrieves the public API facade.
+     *
+     * @returns {WindowApi} The API instance.
+     */
+    get api() {
+        return this._api;
     }
 
     /**
@@ -417,6 +440,17 @@ export class ApplicationWindow extends UIElement {
     }
 
     /**
+     * Overrides UIElement.focus to ensure the window is brought to front.
+     * Emits the WINDOW_FOCUS event for the Viewport to handle.
+     *
+     * @returns {void}
+     */
+    focus() {
+        super.focus(); // Set DOM focus
+        appBus.emit(EventTypes.WINDOW_FOCUS, this); // Request logical focus (Z-Index)
+    }
+
+    /**
      * Implementation of render logic.
      * Uses the adapter to create the window structure.
      *
@@ -429,7 +463,7 @@ export class ApplicationWindow extends UIElement {
 
         // Bind click for focus
         element.addEventListener('pointerdown', () => {
-            appBus.emit(EventTypes.WINDOW_FOCUS, me);
+            me.focus();
         });
 
         return element;

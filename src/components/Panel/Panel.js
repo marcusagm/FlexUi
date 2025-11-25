@@ -4,6 +4,7 @@ import { PanelHeader } from './PanelHeader.js';
 import { appBus } from '../../utils/EventBus.js';
 import { globalState } from '../../services/GlobalStateService.js';
 import { EventTypes } from '../../constants/EventTypes.js';
+import { PanelApi } from '../../api/PanelApi.js';
 
 /**
  * Description:
@@ -20,6 +21,7 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * - closable {boolean} : Whether the panel can be closed.
  * - collapsible {boolean} : Whether the panel can be collapsed.
  * - movable {boolean} : Whether the panel can be moved.
+ * - api {PanelApi} : The safe public API facade for this panel.
  *
  * Typical usage:
  * const panel = new Panel('My Panel', { minHeight: 200 });
@@ -35,6 +37,7 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * - Automatically manages global state subscriptions upon mounting/unmounting.
  * - Validates all configuration inputs.
  * - Constructor accepts a config object for all settings.
+ * - Exposes a Facade API via the .api property.
  *
  * Dependencies:
  * - {import('./IPanel.js').IPanel}
@@ -42,8 +45,17 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * - {import('./PanelHeader.js').PanelHeader}
  * - {import('../../utils/EventBus.js').appBus}
  * - {import('../../services/GlobalStateService.js').globalState}
+ * - {import('../../api/PanelApi.js').PanelApi}
  */
 export class Panel extends IPanel {
+    /**
+     * The public API facade for this panel.
+     *
+     * @type {PanelApi}
+     * @private
+     */
+    _api;
+
     /**
      * The header component instance.
      *
@@ -127,24 +139,18 @@ export class Panel extends IPanel {
         super(null, renderer || new VanillaPanelAdapter());
         const me = this;
 
-        // Initialize Title
+        me._api = new PanelApi(me);
+
         me._title = typeof title === 'string' ? title : '';
 
-        // Initialize Header (Owned by Panel, managed by Group)
         me._header = new PanelHeader(me, me._title);
 
-        // Apply configuration via setters to ensure validation
         if (config.minHeight !== undefined) me.minHeight = config.minHeight;
         if (config.minWidth !== undefined) me.minWidth = config.minWidth;
         if (config.closable !== undefined) me.closable = config.closable;
         if (config.collapsible !== undefined) me.collapsible = config.collapsible;
         if (config.movable !== undefined) me.movable = config.movable;
 
-        // Note: 'height' from config is typically ignored by basic Panels in flex layout,
-        // but if we had a setter for it, we would apply it here:
-        // if (config.height !== undefined) me.height = config.height;
-
-        // Ensure element is created immediately via standard lifecycle
         me.render();
     }
 
@@ -155,6 +161,15 @@ export class Panel extends IPanel {
      */
     static get panelType() {
         return 'Panel';
+    }
+
+    /**
+     * Retrieves the public API facade.
+     *
+     * @returns {PanelApi} The API instance.
+     */
+    get api() {
+        return this._api;
     }
 
     /**
@@ -620,7 +635,6 @@ export class Panel extends IPanel {
      */
     _setupStateListeners() {
         const me = this;
-        // Clear existing to be safe
         me._teardownStateListeners();
 
         const boundOnStateUpdate = me.onStateUpdate.bind(me);

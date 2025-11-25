@@ -1,4 +1,5 @@
 import { Disposable, toDisposable } from './Disposable.js';
+import { LeakageMonitor } from './LeakageMonitor.js';
 
 /**
  * Description:
@@ -24,9 +25,11 @@ import { Disposable, toDisposable } from './Disposable.js';
  * - Listeners are unique (Set-based).
  * - Firing an event executes all listeners safely (errors are caught).
  * - Disposing the emitter clears all listeners.
+ * - Integrates with LeakageMonitor for debug diagnostics.
  *
  * Dependencies:
  * - ./Disposable.js
+ * - ./LeakageMonitor.js
  */
 export class Emitter extends Disposable {
     /**
@@ -69,9 +72,20 @@ export class Emitter extends Disposable {
 
             me._listeners.add(listener);
 
+            // Debug: Monitor Leakage
+            if (typeof window !== 'undefined' && window.FLEXUI_DEBUG) {
+                const trace = new Error('[LeakageMonitor] Emitter subscription').stack;
+                LeakageMonitor.getInstance().add(listener, trace);
+            }
+
             return toDisposable(() => {
                 if (!me.isDisposed) {
                     me._listeners.delete(listener);
+
+                    // Debug: Remove from Monitor
+                    if (typeof window !== 'undefined' && window.FLEXUI_DEBUG) {
+                        LeakageMonitor.getInstance().delete(listener);
+                    }
                 }
             });
         };
@@ -107,6 +121,12 @@ export class Emitter extends Disposable {
     dispose() {
         const me = this;
         if (!me.isDisposed) {
+            // Debug: Batch cleanup for Monitor
+            if (typeof window !== 'undefined' && window.FLEXUI_DEBUG) {
+                const monitor = LeakageMonitor.getInstance();
+                me._listeners.forEach(listener => monitor.delete(listener));
+            }
+
             me._listeners.clear();
             super.dispose();
         }

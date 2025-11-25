@@ -2,6 +2,8 @@ import { App } from './src/App.js';
 import { TranslationService } from './src/services/TranslationService.js';
 import { Loader } from './src/services/Loader/Loader.js';
 
+window.FLEXUI_DEBUG = true;
+
 /**
  * Description:
  * Handles fatal unhandled errors or promise rejections globally.

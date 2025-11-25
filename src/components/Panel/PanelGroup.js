@@ -9,6 +9,7 @@ import { ItemType, DropZoneType } from '../../constants/DNDTypes.js';
 import { EventTypes } from '../../constants/EventTypes.js';
 import { UIElement } from '../../core/UIElement.js';
 import { VanillaPanelGroupAdapter } from '../../renderers/vanilla/VanillaPanelGroupAdapter.js';
+import { GroupApi } from '../../api/GroupApi.js';
 
 /**
  * Description:
@@ -26,6 +27,7 @@ import { VanillaPanelGroupAdapter } from '../../renderers/vanilla/VanillaPanelGr
  * - height {number|null} : The height of the group.
  * - width {number|null} : The width of the group.
  * - isFloating {boolean} : Whether the group is floating.
+ * - isMaximized {boolean} : Whether the group is maximized.
  * - x {number|null} : X coordinate (if floating).
  * - y {number|null} : Y coordinate (if floating).
  * - minHeight {number} : Minimum height constraint.
@@ -33,6 +35,7 @@ import { VanillaPanelGroupAdapter } from '../../renderers/vanilla/VanillaPanelGr
  * - closable {boolean} : Whether the group is closable.
  * - collapsible {boolean} : Whether the group is collapsible.
  * - movable {boolean} : Whether the group is movable.
+ * - api {GroupApi} : The public API facade.
  *
  * Typical usage:
  * const panel = new TextPanel('Title', 'Content');
@@ -49,6 +52,7 @@ import { VanillaPanelGroupAdapter } from '../../renderers/vanilla/VanillaPanelGr
  * - Manages active tab state via TabStrip in Header.
  * - Manages hybrid resizing (Docked vs Floating).
  * - Coordinates lifecycle of children (Panel and Header).
+ * - Exposes a GroupApi facade.
  *
  * Dependencies:
  * - {import('../../core/UIElement.js').UIElement}
@@ -57,8 +61,17 @@ import { VanillaPanelGroupAdapter } from '../../renderers/vanilla/VanillaPanelGr
  * - {import('./PanelFactory.js').PanelFactory}
  * - {import('../../utils/ResizeHandleManager.js').ResizeHandleManager}
  * - {import('../../utils/EventBus.js').appBus}
+ * - {import('../../api/GroupApi.js').GroupApi}
  */
 export class PanelGroup extends UIElement {
+    /**
+     * The public API facade.
+     *
+     * @type {GroupApi}
+     * @private
+     */
+    _api;
+
     /**
      * The throttled (rAF) update function for resizing (used in docked mode only).
      *
@@ -106,6 +119,14 @@ export class PanelGroup extends UIElement {
      * @private
      */
     _collapsed = false;
+
+    /**
+     * Whether the group is maximized (primarily for floating state).
+     *
+     * @type {boolean}
+     * @private
+     */
+    _isMaximized = false;
 
     /**
      * Height of the group.
@@ -262,6 +283,8 @@ export class PanelGroup extends UIElement {
         super(null, renderer || new VanillaPanelGroupAdapter());
         const me = this;
 
+        me._api = new GroupApi(me);
+
         if (config.minHeight !== undefined) me._minHeight = config.minHeight;
         if (config.minWidth !== undefined) me._minWidth = config.minWidth;
         if (config.closable !== undefined) me._closable = config.closable;
@@ -302,6 +325,15 @@ export class PanelGroup extends UIElement {
                 me.updateHeight();
             })
         );
+    }
+
+    /**
+     * Retrieves the public API facade.
+     *
+     * @returns {GroupApi} The API instance.
+     */
+    get api() {
+        return this._api;
     }
 
     /**
@@ -457,6 +489,15 @@ export class PanelGroup extends UIElement {
      */
     get isFloating() {
         return this._isFloating;
+    }
+
+    /**
+     * IsMaximized getter.
+     *
+     * @returns {boolean}
+     */
+    get isMaximized() {
+        return this._isMaximized;
     }
 
     /**
@@ -733,10 +774,7 @@ export class PanelGroup extends UIElement {
         me._x = x;
         me._y = y;
 
-        if (me.header && me.header.collapseBtn) {
-            // TODO: Refactor to use updateConfig or setCollapseButtonDisabled properly
-            // me.header.collapseBtn.disabled = !me._collapsible;
-            // Using the new API:
+        if (me.header) {
             me.header.setCollapseButtonDisabled(!me._collapsible);
         }
 
@@ -759,6 +797,8 @@ export class PanelGroup extends UIElement {
                         containerRectangle: fpms.getContainerBounds()
                     }),
                     onResize: ({ xCoordinate, yCoordinate, width, height }) => {
+                        if (me._isMaximized) return; // Disable resize when maximized
+
                         me._x = xCoordinate;
                         me._y = yCoordinate;
                         me._width = width;
@@ -775,6 +815,9 @@ export class PanelGroup extends UIElement {
                 });
             }
         } else {
+            // Reset maximized state when docking
+            if (me._isMaximized) me.toggleMaximize();
+
             if (me._collapsible && me.element) {
                 me._resizeHandleManager = new ResizeHandleManager(me.element, {
                     handles: ['s'],
@@ -800,6 +843,29 @@ export class PanelGroup extends UIElement {
                 closable: me._closable,
                 movable: me._movable
             });
+        }
+    }
+
+    /**
+     * Toggles the maximized state of the group (if floating).
+     *
+     * @returns {void}
+     */
+    toggleMaximize() {
+        const me = this;
+        if (!me._isFloating || !me.element) return;
+
+        me._isMaximized = !me._isMaximized;
+
+        if (me._isMaximized) {
+            me.element.classList.add('panel-group--maximized');
+            // Apply full size logic or class based sizing
+            // Assuming CSS handles the dimensions for .panel-group--maximized
+            // e.g. top:0, left:0, width:100%, height:100% relative to container
+        } else {
+            me.element.classList.remove('panel-group--maximized');
+            // Restore geometry
+            me.renderer.updateGeometry(me.element, me._x, me._y, me._width, me._height);
         }
     }
 
@@ -1191,6 +1257,7 @@ export class PanelGroup extends UIElement {
             height: me.height,
             width: me.width,
             collapsed: me.collapsed,
+            maximized: me._isMaximized, // Persist maximized state
             activePanelId: me.activePanel ? me.activePanel.id : null,
             isFloating: me.isFloating,
             x: me.x,
@@ -1229,6 +1296,7 @@ export class PanelGroup extends UIElement {
 
         if (me.isFloating) {
             me.setFloatingState(true, me.x, me.y);
+            if (data.maximized) me.toggleMaximize(); // Restore maximized state
         } else {
             me.setFloatingState(false, null, null);
         }
