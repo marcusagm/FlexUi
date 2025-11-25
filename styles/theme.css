@@ -163,8 +163,11 @@
     --toolbar-background: var(--surface-level-1);
     --toolbar-border-color: var(--color-border-default);
     --toolbar-btn-size: 20px;
+    --tollbar-btn-gap: 2px;
     --toolbar-btn-padding: 2px;
     --toolbar-btn-hover-bg: var(--color-bg-hover);
+    --toolgroup-padding-horizontal: 0 6px;
+    --toolgroup-padding-vertical: 6px 0;
 
     /* Animação */
     --transition-speed: 200ms ease-in-out;

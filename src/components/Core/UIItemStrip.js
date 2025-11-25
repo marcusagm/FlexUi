@@ -12,6 +12,7 @@ import { throttleRAF } from '../../utils/ThrottleRAF.js';
  * - orientation {string} : The orientation of the strip ('horizontal' | 'vertical').
  * - items {Array<UIElement>} : The list of child elements managed by this strip.
  * - scrollAmount {number} : The distance in pixels to scroll when triggered.
+ * - enableOverflowMenu {boolean} : Whether to show the overflow menu button when content overflows.
  *
  * Typical usage:
  * class MyStrip extends UIItemStrip {
@@ -24,7 +25,7 @@ import { throttleRAF } from '../../utils/ThrottleRAF.js';
  * Business rules implemented:
  * - Manages a list of UIElements.
  * - Automatically calculates scroll button visibility based on content overflow.
- * - Calculates overflow menu visibility.
+ * - Calculates overflow menu visibility based on overflow and configuration.
  * - Observes resize events to update UI state using throttled execution.
  * - Delegates DOM operations to VanillaStripAdapter.
  *
@@ -59,6 +60,14 @@ export class UIItemStrip extends UIElement {
     _scrollAmount = 100;
 
     /**
+     * Whether to show the overflow menu button when there is overflow.
+     *
+     * @type {boolean}
+     * @private
+     */
+    _enableOverflowMenu = true;
+
+    /**
      * Throttled function to update scroll buttons.
      *
      * @type {Function | null}
@@ -80,6 +89,7 @@ export class UIItemStrip extends UIElement {
      * @param {string} [id=null] - Optional unique ID.
      * @param {object} [config={}] - Configuration options.
      * @param {string} [config.orientation='horizontal'] - Initial orientation.
+     * @param {boolean} [config.enableOverflowMenu=true] - Whether to enable the overflow menu button.
      * @param {import('../../core/IRenderer.js').IRenderer} [renderer=null] - Optional renderer adapter.
      */
     constructor(id = null, config = {}, renderer = null) {
@@ -88,6 +98,10 @@ export class UIItemStrip extends UIElement {
 
         if (config.orientation) {
             me.orientation = config.orientation;
+        }
+
+        if (config.enableOverflowMenu !== undefined) {
+            me._enableOverflowMenu = Boolean(config.enableOverflowMenu);
         }
 
         me._boundUpdateScrollButtons = throttleRAF(me._updateScrollButtons.bind(me));
@@ -131,6 +145,27 @@ export class UIItemStrip extends UIElement {
             me.renderer.updateOrientation(me.element, value);
             me._boundUpdateScrollButtons();
         }
+    }
+
+    /**
+     * Retrieves the overflow menu enabled state.
+     *
+     * @returns {boolean}
+     */
+    get enableOverflowMenu() {
+        return this._enableOverflowMenu;
+    }
+
+    /**
+     * Sets whether the overflow menu button should be enabled.
+     *
+     * @param {boolean} value
+     * @returns {void}
+     */
+    set enableOverflowMenu(value) {
+        const me = this;
+        me._enableOverflowMenu = Boolean(value);
+        me._boundUpdateScrollButtons();
     }
 
     /**
@@ -358,7 +393,11 @@ export class UIItemStrip extends UIElement {
         me.renderer.setScrollButtonsVisibility(me.element, hasPrevious, hasNext);
 
         if (typeof me.renderer.setOverflowButtonVisibility === 'function') {
-            me.renderer.setOverflowButtonVisibility(me.element, hasOverflow);
+            // [CORREÇÃO] Show overflow button only if overflow exists AND it is enabled in config
+            me.renderer.setOverflowButtonVisibility(
+                me.element,
+                hasOverflow && me._enableOverflowMenu
+            );
         }
     }
 }

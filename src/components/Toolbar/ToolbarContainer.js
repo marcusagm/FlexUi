@@ -96,8 +96,10 @@ export class ToolbarContainer extends UIElement {
         }
 
         // Initialize the inner strip for item management
+        // [CORREÇÃO] Disable overflow menu for toolbars, as they only use scroll buttons
         me._strip = new UIItemStrip(me.id + '-strip', {
-            orientation: me._orientation
+            orientation: me._orientation,
+            enableOverflowMenu: false
         });
 
         // Initialize DOM via UIElement lifecycle
@@ -174,11 +176,15 @@ export class ToolbarContainer extends UIElement {
      * Retrieves the effective scroll container element.
      * Used by DropStrategies to locate where items are physically mounted.
      *
-     * @returns {HTMLElement | null} The strip's root element (or viewport if accessible).
+     * @returns {HTMLElement | null} The strip's viewport element.
      */
     get scrollContainer() {
-        // Expose the strip's root element so DND can find the items within it
-        return this._strip.element;
+        if (this._strip && this._strip.element) {
+            return (
+                this._strip.renderer.getScrollContainer(this._strip.element) || this._strip.element
+            );
+        }
+        return null;
     }
 
     // --- UIElement Overrides ---

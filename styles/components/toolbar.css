@@ -4,22 +4,19 @@
 .toolbar-container {
     display: flex;
     background-color: var(--toolbar-background);
-    /* Padding opcional se quisermos afastar o conteúdo das bordas */
     padding: 0;
     overflow: hidden;
     position: relative;
     user-select: none;
-
-    /* Assegura que o container tenha o tamanho correto para conter o strip */
     box-sizing: border-box;
 }
 
-/* Toolbars vazias são ocultas (Zero Footprint) */
+/* Toolbars vazias são ocultas */
 .toolbar-container.is-empty {
     display: none;
 }
 
-/* Bordas Semânticas */
+/* Bordas Semânticas e Dimensões */
 .toolbar-container--top:not(.is-empty) {
     border-bottom: 1px solid var(--toolbar-border-color);
     width: 100%;
@@ -44,16 +41,13 @@
 }
 
 /* --- Integração com UIItemStrip --- */
-/* * O ToolbarContainer compõe um UIItemStrip.
- * Aqui sobrescrevemos as variáveis do tab-strip.css para o contexto de Toolbar.
- */
 .toolbar-container .ui-strip {
     --tab-strip-bg: transparent;
     --tab-strip-height: 100%;
     --tab-scroll-btn-bg: var(--toolbar-background);
     --tab-scroll-btn-hover-bg: var(--color-bg-hover);
     --tab-scroll-btn-border: transparent;
-    --tab-scroll-btn-width: 16px; /* Botões de scroll menores na toolbar */
+    --tab-scroll-btn-width: 16px;
 
     flex: 1;
 }
@@ -62,71 +56,101 @@
 .toolbar-group {
     display: flex;
     align-items: center;
-    padding: 2px;
-    border: 1px solid transparent;
-    border-radius: var(--border-radius-sm);
-    gap: 2px;
+    padding: var(--toolgroup-padding-horizontal);
+    border-right: 1px solid var(--color-border-default); /* Separador entre grupos */
+    gap: var(--tollbar-btn-gap);
     flex-shrink: 0;
     position: relative;
+    height: 100%;
+    flex-direction: row;
 }
 
-/* Adaptação à Orientação da Toolbar */
+/* Remove borda do último item */
+.toolbar-group:last-child {
+    border-right: none;
+}
+
+/* Adaptação à Orientação Vertical */
 .toolbar-container--left .toolbar-group,
 .toolbar-container--right .toolbar-group {
     flex-direction: column;
     width: 100%;
-    padding: 4px 0;
+    padding: var(--toolgroup-padding-vertical);
+    border-right: none;
+    border-bottom: 1px solid var(--color-border-default);
+    height: auto;
 }
 
-/* Handle de Arraste */
+/* --- Handle de Arraste --- */
 .toolbar-group__handle {
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: grab;
-    opacity: 0.5;
+    opacity: 0.6;
     color: var(--color-text-secondary);
-    transition: opacity 0.2s;
+    transition:
+        opacity 0.2s,
+        color 0.2s;
 }
+
 .toolbar-group__handle:hover {
     opacity: 1;
     color: var(--color-text-primary);
 }
+
 .toolbar-group__handle:active {
     cursor: grabbing;
-}
-
-/* Handle Geometry */
-.toolbar-container--top .toolbar-group__handle,
-.toolbar-container--bottom .toolbar-group__handle {
-    width: 8px;
-    height: 100%;
-    margin-right: 2px;
-}
-.toolbar-container--left .toolbar-group__handle,
-.toolbar-container--right .toolbar-group__handle {
-    width: 100%;
-    height: 8px;
-    margin-bottom: 2px;
 }
 
 /* Ícone do Handle */
 .toolbar-group__handle .icon {
     width: 100%;
     height: 100%;
-    /* O SVG mask cuida da aparência */
+    background-color: currentColor;
 }
 
-/* Título (Geralmente oculto para economizar espaço, ou tooltip) */
+/* Geometria Específica por Orientação */
+.toolbar-container--top .toolbar-group__handle,
+.toolbar-container--bottom .toolbar-group__handle {
+    margin-right: 2px;
+    width: 10px; /* [CORREÇÃO] Aumentado para exibir ícone */
+    height: 16px;
+    /* [CORREÇÃO] Borda removida */
+}
+
+.toolbar-container--left .toolbar-group__handle,
+.toolbar-container--right .toolbar-group__handle {
+    margin-bottom: 2px;
+    height: 10px; /* [CORREÇÃO] Aumentado para exibir ícone */
+    width: 16px;
+    /* [CORREÇÃO] Borda removida */
+}
+
+/* --- Título do Grupo --- */
 .toolbar-group__title {
+    display: block;
+    font-size: 0.7rem;
+    line-height: 1;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    margin-right: 6px;
+    white-space: nowrap;
+    user-select: none;
+    pointer-events: none;
+}
+
+.toolbar-container--left .toolbar-group__title,
+.toolbar-container--right .toolbar-group__title {
     display: none;
 }
 
-/* Conteúdo do Grupo */
+/* --- Conteúdo do Grupo --- */
 .toolbar-group__content {
     display: flex;
     align-items: center;
     gap: 2px;
+    flex-direction: row;
 }
 .toolbar-container--left .toolbar-group__content,
 .toolbar-container--right .toolbar-group__content {
@@ -142,15 +166,19 @@
     align-items: center;
     justify-content: center;
     background: transparent;
-    border: none;
+    border: 1px solid transparent;
     border-radius: var(--border-radius-sm);
-    color: var(--color-text-primary);
+    color: var(--color-text-secondary);
     cursor: pointer;
-    transition: background-color 0.2s;
+    transition:
+        background-color 0.2s,
+        border-color 0.2s;
 }
 
 .toolbar-button:hover:not([disabled]) {
     background-color: var(--toolbar-btn-hover-bg);
+    border-color: var(--color-border-default);
+    color: var(--color-text-primary);
 }
 
 .toolbar-button:active:not([disabled]) {
@@ -163,32 +191,31 @@
 }
 
 .toolbar-button .icon {
-    width: 100%;
-    height: 100%;
+    width: 16px;
+    height: 16px;
 }
 
-/* Divisor */
+/* --- [CORREÇÃO] Divisor Restaurado --- */
 .toolbar-divider {
     background-color: var(--color-border-default);
+    flex-shrink: 0;
 }
 
 .toolbar-container--top .toolbar-divider,
 .toolbar-container--bottom .toolbar-divider {
     width: 1px;
-    height: 14px;
+    height: 16px;
     margin: 0 4px;
 }
 
 .toolbar-container--left .toolbar-divider,
 .toolbar-container--right .toolbar-divider {
-    width: 14px;
+    width: 16px;
     height: 1px;
     margin: 4px 0;
 }
 
 /* --- Comportamento Drag & Drop --- */
-
-/* Placeholder visível durante o arrasto sobre a toolbar */
 .toolbar-container .container__placeholder--vertical {
     width: 4px;
     background-color: var(--color-accent-primary);
@@ -204,9 +231,11 @@
     border-radius: 2px;
 }
 
-/* Forçar visibilidade de toolbars vazias durante DND compatível */
+/* [CORREÇÃO] Fundo Azul na Dropzone Vazia */
 body.dnd-active.dnd-type-toolbargroup .toolbar-container.is-empty {
     display: flex;
-    background-color: var(--color-bg-hover);
+    background-color: var(--color-placeholder-bg); /* Azul translúcido do tema */
     border: 1px dashed var(--color-border-focus);
+    min-height: 30px;
+    min-width: 30px;
 }
