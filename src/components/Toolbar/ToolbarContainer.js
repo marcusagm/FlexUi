@@ -88,21 +88,20 @@ export class ToolbarContainer extends UIElement {
         if (['top', 'bottom', 'left', 'right'].includes(position)) {
             me._position = position;
         } else {
-            console.warn(`[ToolbarContainer] Invalid position: ${position}. Defaulting to 'top'.`);
+            console.warn(
+                `[ToolbarContainer] invalid position assignment (${position}). Defaulting to 'top'.`
+            );
         }
 
         if (['horizontal', 'vertical'].includes(orientation)) {
             me._orientation = orientation;
         }
 
-        // Initialize the inner strip for item management
-        // [CORREÇÃO] Disable overflow menu for toolbars, as they only use scroll buttons
         me._strip = new UIItemStrip(me.id + '-strip', {
             orientation: me._orientation,
             enableOverflowMenu: false
         });
 
-        // Initialize DOM via UIElement lifecycle
         me.render();
         me._updateEmptyState();
     }
@@ -125,7 +124,9 @@ export class ToolbarContainer extends UIElement {
     set position(value) {
         const me = this;
         if (!['top', 'bottom', 'left', 'right'].includes(value)) {
-            console.warn(`[ToolbarContainer] Invalid position assignment: ${value}`);
+            console.warn(
+                `[ToolbarContainer] invalid position assignment (${value}). Must be 'top', 'bottom', 'left', or 'right'. Keeping previous value: ${me._position}`
+            );
             return;
         }
         if (me._position === value) return;
@@ -152,13 +153,17 @@ export class ToolbarContainer extends UIElement {
     set orientation(value) {
         const me = this;
         if (value !== 'horizontal' && value !== 'vertical') {
-            console.warn(`[ToolbarContainer] Invalid orientation assignment: ${value}`);
+            console.warn(
+                `[ToolbarContainer] invalid orientation assignment (${value}). Must be 'horizontal' or 'vertical'. Keeping previous value: ${me._orientation}`
+            );
             return;
         }
         if (me._orientation === value) return;
 
         me._orientation = value;
-        me._strip.orientation = value; // Propagate to strip
+        if (me._strip) {
+            me._strip.orientation = value;
+        }
         me._updateConfiguration();
     }
 
@@ -168,8 +173,10 @@ export class ToolbarContainer extends UIElement {
      * @returns {Array<ToolbarGroup>} The list of groups.
      */
     get groups() {
-        // Safe cast assuming only ToolbarGroups are added
-        return this._strip.items;
+        if (this._strip) {
+            return this._strip.items;
+        }
+        return [];
     }
 
     /**
@@ -180,75 +187,14 @@ export class ToolbarContainer extends UIElement {
      */
     get scrollContainer() {
         if (this._strip && this._strip.element) {
+            // Access the strip's renderer to get the internal viewport element.
+            // This ensures that insertBefore calls in DropStrategies target the direct parent of the items.
             return (
                 this._strip.renderer.getScrollContainer(this._strip.element) || this._strip.element
             );
         }
         return null;
     }
-
-    // --- UIElement Overrides ---
-
-    /**
-     * Implementation of the rendering logic.
-     * Uses the adapter to create the container structure.
-     *
-     * @returns {HTMLElement} The root element.
-     * @protected
-     */
-    _doRender() {
-        const me = this;
-        const element = me.renderer.createContainerElement(me.id);
-
-        // Apply initial configuration
-        me.renderer.updateConfiguration(element, me._position, me._orientation);
-
-        // Configure DropZone
-        element.dataset.dropzone = me.dropZoneType;
-        element.dropZoneInstance = me;
-
-        return element;
-    }
-
-    /**
-     * Implementation of the mounting logic.
-     * Mounts the inner strip into the container.
-     *
-     * @param {HTMLElement} container - The parent container.
-     * @protected
-     */
-    _doMount(container) {
-        const me = this;
-        // Mount self to parent
-        if (me.element) {
-            me.renderer.mount(container, me.element);
-
-            // Mount inner strip to self
-            const stripContainer = me.renderer.getStripContainer(me.element);
-            if (stripContainer) {
-                me._strip.mount(stripContainer);
-            }
-        }
-    }
-
-    /**
-     * Implementation of the unmounting logic.
-     * Unmounts the inner strip and self.
-     *
-     * @protected
-     */
-    _doUnmount() {
-        const me = this;
-        if (me._strip.isMounted) {
-            me._strip.unmount();
-        }
-
-        if (me.element && me.element.parentNode) {
-            me.renderer.unmount(me.element.parentNode, me.element);
-        }
-    }
-
-    // --- Group Management ---
 
     /**
      * Adds a ToolbarGroup to this container.
@@ -261,7 +207,9 @@ export class ToolbarContainer extends UIElement {
     addGroup(group, index = null) {
         const me = this;
         if (!(group instanceof ToolbarGroup)) {
-            console.warn(`[ToolbarContainer] addGroup expects a ToolbarGroup instance.`, group);
+            console.warn(
+                `[ToolbarContainer] invalid group assignment (${group}). Must be a ToolbarGroup instance.`
+            );
             return;
         }
 
@@ -296,8 +244,9 @@ export class ToolbarContainer extends UIElement {
      */
     moveGroup(group, newIndex) {
         const me = this;
-        // Use strip's logic to move (remove + add)
-        const oldIndex = me.groups.indexOf(group);
+        const groups = me.groups;
+        const oldIndex = groups.indexOf(group);
+
         if (oldIndex === -1) return;
         if (oldIndex === newIndex) return;
 
@@ -332,14 +281,12 @@ export class ToolbarContainer extends UIElement {
      */
     fromJSON(data) {
         const me = this;
-        // Clear existing groups
         [...me.groups].forEach(group => me.removeGroup(group));
 
         if (!Array.isArray(data)) {
             return;
         }
 
-        // Use dynamic import for factory to avoid circular dependencies
         import('./ToolbarGroupFactory.js').then(({ ToolbarGroupFactory }) => {
             const factory = ToolbarGroupFactory.getInstance();
             data.forEach(groupData => {
@@ -361,13 +308,69 @@ export class ToolbarContainer extends UIElement {
         if (me._strip) {
             me._strip.dispose();
         }
-        // Groups are often managed by factory or app state, but if we own them:
-        [...me.groups].forEach(group => group.dispose());
+        [...me.groups].forEach(group => {
+            if (typeof group.dispose === 'function') {
+                group.dispose();
+            }
+        });
 
         super.dispose();
     }
 
-    // --- Private Helpers ---
+    /**
+     * Implementation of the rendering logic.
+     * Uses the adapter to create the container structure.
+     *
+     * @returns {HTMLElement} The root element.
+     * @protected
+     */
+    _doRender() {
+        const me = this;
+        const element = me.renderer.createContainerElement(me.id);
+
+        me.renderer.updateConfiguration(element, me._position, me._orientation);
+
+        element.dataset.dropzone = me.dropZoneType;
+        element.dropZoneInstance = me;
+
+        return element;
+    }
+
+    /**
+     * Implementation of the mounting logic.
+     * Mounts the inner strip into the container.
+     *
+     * @param {HTMLElement} container - The parent container.
+     * @protected
+     */
+    _doMount(container) {
+        const me = this;
+        if (me.element) {
+            me.renderer.mount(container, me.element);
+
+            const stripContainer = me.renderer.getStripContainer(me.element);
+            if (stripContainer) {
+                me._strip.mount(stripContainer);
+            }
+        }
+    }
+
+    /**
+     * Implementation of the unmounting logic.
+     * Unmounts the inner strip and self.
+     *
+     * @protected
+     */
+    _doUnmount() {
+        const me = this;
+        if (me._strip && me._strip.isMounted) {
+            me._strip.unmount();
+        }
+
+        if (me.element && me.element.parentNode) {
+            me.renderer.unmount(me.element.parentNode, me.element);
+        }
+    }
 
     /**
      * Updates the adapter configuration based on current properties.

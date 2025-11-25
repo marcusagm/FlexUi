@@ -38,7 +38,7 @@ export class UIItemStrip extends UIElement {
     /**
      * The list of child elements managed by this strip.
      *
-     * @type {Array<UIElement>}
+     * @type {Array<import('../../core/UIElement.js').UIElement>}
      * @private
      */
     _items = [];
@@ -101,7 +101,7 @@ export class UIItemStrip extends UIElement {
         }
 
         if (config.enableOverflowMenu !== undefined) {
-            me._enableOverflowMenu = Boolean(config.enableOverflowMenu);
+            me.enableOverflowMenu = config.enableOverflowMenu;
         }
 
         me._boundUpdateScrollButtons = throttleRAF(me._updateScrollButtons.bind(me));
@@ -111,7 +111,7 @@ export class UIItemStrip extends UIElement {
     /**
      * Retrieves the list of items.
      *
-     * @returns {Array<UIElement>} The items array.
+     * @returns {Array<import('../../core/UIElement.js').UIElement>} The items array.
      */
     get items() {
         return this._items;
@@ -136,7 +136,7 @@ export class UIItemStrip extends UIElement {
         const me = this;
         if (value !== 'horizontal' && value !== 'vertical') {
             console.warn(
-                `[UIItemStrip] invalid orientation assignment (${value}). Must be 'horizontal' or 'vertical'.`
+                `[UIItemStrip] invalid orientation assignment (${value}). Must be 'horizontal' or 'vertical'. Keeping previous value: ${me._orientation}`
             );
             return;
         }
@@ -159,7 +159,7 @@ export class UIItemStrip extends UIElement {
     /**
      * Sets whether the overflow menu button should be enabled.
      *
-     * @param {boolean} value
+     * @param {boolean} value - True to enable, false to disable.
      * @returns {void}
      */
     set enableOverflowMenu(value) {
@@ -171,13 +171,13 @@ export class UIItemStrip extends UIElement {
     /**
      * Adds an item to the strip.
      *
-     * @param {UIElement} item - The item to add.
+     * @param {import('../../core/UIElement.js').UIElement} item - The item to add.
      * @param {number|null} [index=null] - The index to insert at.
      * @returns {void}
      */
     addItem(item, index = null) {
         const me = this;
-        if (!(item instanceof UIElement)) {
+        if (!item || typeof item !== 'object') {
             console.warn(`[UIItemStrip] invalid item assignment (${item}). Must be a UIElement.`);
             return;
         }
@@ -199,7 +199,7 @@ export class UIItemStrip extends UIElement {
     /**
      * Removes an item from the strip.
      *
-     * @param {UIElement} item - The item to remove.
+     * @param {import('../../core/UIElement.js').UIElement} item - The item to remove.
      * @returns {void}
      */
     removeItem(item) {
@@ -251,7 +251,6 @@ export class UIItemStrip extends UIElement {
         const me = this;
         const element = me.renderer.createStripElement(me.id, me._orientation);
 
-        // Setup scroll listeners on the buttons created by the adapter
         const prevBtn = me.renderer.getScrollButton(element, 'prev');
         const nextBtn = me.renderer.getScrollButton(element, 'next');
         const overflowBtn = me.renderer.getOverflowButton(element);
@@ -288,17 +287,14 @@ export class UIItemStrip extends UIElement {
             me.renderer.mount(container, me.element);
         }
 
-        // Mount all items
         me._items.forEach((item, index) => {
             me._mountItemDOM(item, index);
         });
 
-        // Start observing resize
         if (me.element) {
             me.renderer.observeResize(me.element, me._boundUpdateScrollButtons);
         }
 
-        // Initial check
         me._boundUpdateScrollButtons();
     }
 
@@ -309,18 +305,15 @@ export class UIItemStrip extends UIElement {
      */
     _doUnmount() {
         const me = this;
-        // Stop observing resize
         if (me.element) {
             me.renderer.unobserveResize(me.element);
 
-            // Explicitly remove overflow listener (good practice, though element removal often suffices)
             const overflowBtn = me.renderer.getOverflowButton(me.element);
             if (overflowBtn) {
                 me.renderer.off(overflowBtn, 'click', me._boundOnOverflowClick);
             }
         }
 
-        // Unmount items (but do not dispose them here, logic ownership may vary)
         me._items.forEach(item => {
             me._unmountItemDOM(item);
         });
@@ -333,7 +326,7 @@ export class UIItemStrip extends UIElement {
     /**
      * Mounts an item's DOM element into the strip.
      *
-     * @param {UIElement} item - The item.
+     * @param {import('../../core/UIElement.js').UIElement} item - The item.
      * @param {number} index - The index.
      * @private
      */
@@ -342,14 +335,13 @@ export class UIItemStrip extends UIElement {
         if (!item.element) {
             item.render();
         }
-        // Delegate insertion to adapter to handle correct container placement (inside scroll wrapper)
         me.renderer.mountItem(me.element, item.element, index);
     }
 
     /**
      * Unmounts an item's DOM element from the strip.
      *
-     * @param {UIElement} item - The item.
+     * @param {import('../../core/UIElement.js').UIElement} item - The item.
      * @private
      */
     _unmountItemDOM(item) {
@@ -393,7 +385,6 @@ export class UIItemStrip extends UIElement {
         me.renderer.setScrollButtonsVisibility(me.element, hasPrevious, hasNext);
 
         if (typeof me.renderer.setOverflowButtonVisibility === 'function') {
-            // [CORREÇÃO] Show overflow button only if overflow exists AND it is enabled in config
             me.renderer.setOverflowButtonVisibility(
                 me.element,
                 hasOverflow && me._enableOverflowMenu
