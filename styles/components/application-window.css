@@ -4,13 +4,15 @@
 .application-window {
     display: flex;
     flex-direction: column;
-    position: absolute; /* Flutuante por padrão */
+    /* Position (absolute/relative) é gerenciado pelo Adapter/Controller */
     background-color: var(--color-bg-panel);
     border-radius: var(--border-radius-base);
+
+    /* Theme Tokens */
     box-shadow: var(--window-shadow);
     border: var(--window-border-inactive);
-    overflow: hidden; /* Conteúdo extra recortado */
 
+    overflow: hidden;
     min-width: 200px;
     min-height: 100px;
 
@@ -18,7 +20,8 @@
         border-color 0.2s ease-out,
         box-shadow 0.2s ease-out;
 
-    z-index: var(--viewport-z-floating);
+    /* Fallback Z-Index (Gerenciamento de pilha feito via JS) */
+    z-index: var(--window-z-index-base);
 }
 
 /* Estado Ativo / Focado */
@@ -31,10 +34,11 @@
     border-radius: 0;
     border: none;
     box-shadow: none;
+    /* Garante que fique acima de janelas flutuantes normais se necessário via CSS */
+    z-index: var(--window-z-index-maximized);
 }
 
-/* * [CORREÇÃO] Ocultar alças de redimensionamento quando maximizado OU em modo aba
- */
+/* Ocultar alças de redimensionamento quando maximizado OU em modo aba */
 .application-window--maximized .window-resize-handle,
 .application-window--tabbed .window-resize-handle {
     display: none !important;
@@ -64,24 +68,29 @@
     display: flex;
     align-items: center;
     height: var(--window-header-height);
+
+    /* Inactive State Tokens */
     background-color: var(--window-header-bg-inactive);
     color: var(--window-header-color-inactive);
+
     padding: 0 8px;
     user-select: none;
     flex-shrink: 0;
     border-bottom: 1px solid var(--color-border-default);
     cursor: default;
+    gap: 8px;
 }
 
 .application-window--focused .window-header {
+    /* Active State Tokens */
     background-color: var(--window-header-bg-active);
     color: var(--window-header-color-active);
 }
 
-/* [CORREÇÃO] Estilo para quando o header é uma aba */
+/* Estilo para quando o header é renderizado dentro de um TabStrip (modo docked) */
 .window-header--tab {
     border-bottom: none;
-    /* Outros estilos gerenciados pelo viewport.css */
+    background-color: transparent; /* Deixa o TabStrip controlar o fundo */
 }
 
 .window-header__title {
@@ -91,7 +100,6 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    margin-right: 8px;
 }
 
 .window-header__controls {
@@ -107,7 +115,7 @@
     color: inherit;
     cursor: pointer;
     padding: 0;
-    border-radius: 4px;
+    border-radius: var(--border-radius-sm);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -126,14 +134,16 @@
     opacity: 1;
 }
 
+/* Close Button: Red Danger Hover */
 .window-header__btn--close:hover {
     background-color: var(--color-feedback-danger);
     color: var(--color-text-on-danger);
 }
 
+/* Pinned Button State */
 .application-window--pinned .window-header__btn--pin {
     opacity: 1;
-    transform: rotate(45deg);
+    background-color: rgba(255, 255, 255, 0.15);
 }
 
 /* --- Conteúdo Interno --- */
@@ -148,5 +158,5 @@
 }
 
 .window-resize-handle {
-    z-index: 10;
+    z-index: var(--resize-handle-z-index);
 }

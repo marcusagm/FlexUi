@@ -1,4 +1,3 @@
-/* styles/theme.css */
 @import 'variables.css';
 
 :root {
@@ -7,11 +6,11 @@
    * 1. PALETA DE ELEVAÇÃO (SURFACE TONES)
    * =========================================
    */
-    --surface-level-0: var(--neutral-10); /* Nível 0 (App) */
-    --surface-level-1: var(--neutral-20); /* Nível 1 (Panel Content) */
-    --surface-level-2: var(--neutral-30); /* Nível 2 (Panel Shell, Menu, Modal Content) */
-    --surface-level-3: var(--neutral-40); /* Nível 3 (Modal Shell, Hover) */
-    --surface-level-4: var(--neutral-50); /* Nível 4 (Active) */
+    --surface-level-0: var(--neutral-10);
+    --surface-level-1: var(--neutral-20);
+    --surface-level-2: var(--neutral-30);
+    --surface-level-3: var(--neutral-40);
+    --surface-level-4: var(--neutral-50);
     --surface-level-disabled: var(--neutral-10);
 
     /*
@@ -22,16 +21,16 @@
 
     /* Backgrounds (Componentes) */
     --color-bg-app: var(--surface-level-0);
-    --color-bg-panel: var(--surface-level-1); /* Shell do Painel */
-    --color-bg-panel-content: var(--surface-level-2); /* Conteúdo do Painel */
+    --color-bg-panel: var(--surface-level-1);
+    --color-bg-panel-content: var(--surface-level-2);
     --color-bg-panel-header: var(--surface-level-1);
     --color-bg-tab-active: var(--surface-level-2);
     --color-bg-tab-inactive: var(--surface-level-1);
     --color-bg-menu: var(--surface-level-2);
     --color-bg-status-bar: var(--surface-level-0);
-    --color-bg-modal: var(--surface-level-2); /* Shell do Modal */
-    --color-bg-modal-content: var(--surface-level-1); /* Conteúdo do Modal */
-    --color-bg-modal-footer: var(--surface-level-2); /* Rodapé do Modal */
+    --color-bg-modal: var(--surface-level-2);
+    --color-bg-modal-content: var(--surface-level-1);
+    --color-bg-modal-footer: var(--surface-level-2);
 
     /* Backgrounds (Estados de Interação) */
     --color-bg-hover: var(--surface-level-3);
@@ -100,9 +99,9 @@
     --spacing-5: 1.5rem;
 
     /* Bordas (Consolidado) */
-    --border-radius-sm: 4px; /* Pequenos elementos (inputs, scrollbar) */
-    --border-radius-base: 6px; /* Padrão (botões, painéis, tabs) */
-    --border-radius-md: 8px; /* Containers maiores (modais) */
+    --border-radius-sm: 4px;
+    --border-radius-base: 6px;
+    --border-radius-md: 8px;
 
     /* Layout App */
     --menu-height: 26px;
@@ -147,11 +146,25 @@
     /* Layout App */
     --menu-height: 26px;
     --statusbar-height: 24px;
-    --toolbar-height-horizontal: 30px; /* Altura da T/B Toolbar */
-    --toolbar-width-vertical: 30px; /* Largura da L/R Toolbar */
+
+    /* Component: TabStrip */
+    --tab-strip-height: 100%;
+    --tab-scroll-btn-width: 20px;
+    --tab-scroll-btn-bg: var(--color-bg-panel);
+    --tab-scroll-btn-color: var(--color-text-secondary);
+    --tab-scroll-btn-hover-bg: var(--color-bg-hover);
+    --tab-scroll-btn-hover-color: var(--color-text-primary);
+    --tab-scroll-btn-border: var(--color-border-default);
+
+    /* Component: Toolbar */
+    --toolbar-height-horizontal: 30px;
+    --toolbar-width-vertical: 30px;
     --toolbar-padding: 0;
     --toolbar-background: var(--surface-level-1);
     --toolbar-border-color: var(--color-border-default);
+    --toolbar-btn-size: 20px;
+    --toolbar-btn-padding: 2px;
+    --toolbar-btn-hover-bg: var(--color-bg-hover);
 
     /* Animação */
     --transition-speed: 200ms ease-in-out;
@@ -232,7 +245,7 @@
     --panel-simple-header-title-min-width: 10px;
     --panel-simple-header-title-padding: 0 5px;
     --panel-content-flex-grow: 1;
-    --panel-content-min-height: 20px; /* (Esta duplicata foi de panel-group, não panel.css) */
+    --panel-content-min-height: 20px;
     --panel-floating-shadow: 0 5px 5px rgba(0, 0, 0, 0.2);
 
     /* Component: Panel (Content) */
@@ -478,7 +491,7 @@
     /* Component: Notification */
     --notification-container-z-index: 9999;
     --notification-container-max-width: 350px;
-    --notification-container-offset: 20px; /* (top/right/bottom/left) */
+    --notification-container-offset: 20px;
     --notification-margin-bottom: 10px;
     --notification-padding: 15px;
     --notification-min-width: 280px;
@@ -532,4 +545,8 @@
     --viewport-z-floating: 100;
     --viewport-z-internal-modal: 200;
     --viewport-z-always-on-top: 300;
+
+    /* Window Z-Index Aliases */
+    --window-z-index-base: var(--viewport-z-floating);
+    --window-z-index-maximized: var(--viewport-z-floating);
 }

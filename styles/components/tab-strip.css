@@ -1,0 +1,123 @@
+@import '../theme.css';
+
+.ui-strip {
+    --tab-strip-bg: var(--color-bg-panel-header);
+    --tab-strip-height: 100%;
+    --tab-scroll-btn-width: 20px;
+    --tab-scroll-btn-bg: var(--color-bg-panel);
+    --tab-scroll-btn-color: var(--color-text-secondary);
+    --tab-scroll-btn-hover-bg: var(--color-bg-hover);
+    --tab-scroll-btn-hover-color: var(--color-text-primary);
+    --tab-scroll-btn-border: var(--color-border-default);
+
+    display: flex;
+    position: relative;
+    background-color: var(--tab-strip-bg);
+    height: var(--tab-strip-height);
+    overflow: hidden;
+    user-select: none;
+}
+
+.ui-strip--horizontal {
+    flex-direction: row;
+    width: 100%;
+}
+
+.ui-strip--vertical {
+    flex-direction: column;
+    height: 100%;
+    width: auto;
+}
+
+.ui-strip__viewport {
+    flex: 1;
+    display: flex;
+    overflow: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.ui-strip__viewport::-webkit-scrollbar {
+    display: none;
+}
+
+.ui-strip--horizontal .ui-strip__viewport {
+    flex-direction: row;
+    align-items: center;
+}
+
+.ui-strip--vertical .ui-strip__viewport {
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.ui-strip__scroll-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--tab-scroll-btn-bg);
+    color: var(--tab-scroll-btn-color);
+    border: none;
+    cursor: pointer;
+    z-index: 10;
+    transition:
+        background-color 0.2s,
+        color 0.2s;
+    padding: 0;
+    font-size: 1.2em;
+    line-height: 1;
+}
+
+.ui-strip__scroll-btn:hover {
+    background-color: var(--tab-scroll-btn-hover-bg);
+    color: var(--tab-scroll-btn-hover-color);
+}
+
+.ui-strip--horizontal .ui-strip__scroll-btn {
+    width: var(--tab-scroll-btn-width);
+    height: 100%;
+    flex-shrink: 0;
+    border-left: 1px solid var(--tab-scroll-btn-border);
+}
+
+.ui-strip--horizontal .ui-strip__scroll-btn:first-child {
+    border-left: none;
+    border-right: 1px solid var(--tab-scroll-btn-border);
+}
+
+.ui-strip--vertical .ui-strip__scroll-btn {
+    width: 100%;
+    height: var(--tab-scroll-btn-width);
+    flex-shrink: 0;
+    border-top: 1px solid var(--tab-scroll-btn-border);
+}
+
+.ui-strip--vertical .ui-strip__scroll-btn:first-child {
+    border-top: none;
+    border-bottom: 1px solid var(--tab-scroll-btn-border);
+}
+
+/* Generic Tab Item Style */
+.tab-item {
+    display: flex;
+    align-items: center;
+    padding: var(--panel-tab-padding, 0 8px);
+    cursor: pointer;
+    white-space: nowrap;
+    background-color: transparent;
+    color: var(--color-text-secondary);
+    transition:
+        background-color 0.2s,
+        color 0.2s;
+    height: 100%;
+}
+
+.tab-item:hover {
+    background-color: var(--color-bg-hover);
+    color: var(--color-text-primary);
+}
+
+.tab-item--active {
+    background-color: var(--color-bg-tab-active);
+    color: var(--color-text-primary);
+}

@@ -3,7 +3,7 @@
 /*
  * Viewport Container
  * Acts as the "desktop" boundary for floating ApplicationWindows.
- * Modified to Flex column to support the Tab Bar at the top.
+ * Stacks the TabBar slot and Content area vertically.
  */
 .viewport {
     position: relative;
@@ -21,77 +21,108 @@
 }
 
 /*
- * Tab Bar Area
- * Container for docked window headers (tabs).
+ * Tab Bar Slot
+ * Hosts the TabStrip component. We override generic strip variables here
+ * to give document tabs a distinct look (e.g., larger headers).
  */
-.viewport__tab-bar {
+.viewport__tab-bar-slot {
+    flex-shrink: 0;
     display: flex;
-    flex-direction: row;
-    align-items: flex-end;
-    height: var(--window-header-height);
+    flex-direction: column;
     background-color: var(--color-bg-header);
     border-bottom: 1px solid var(--color-border-default);
-    flex-shrink: 0;
-    padding-left: 4px;
-    overflow-x: auto;
-    scrollbar-width: none;
+
+    /* Override TabStrip variables for Viewport context */
+    --tab-strip-bg: transparent;
+    --tab-strip-height: var(--window-header-height);
+    --tab-scroll-btn-width: 24px;
+    --tab-scroll-btn-bg: transparent;
+    --tab-scroll-btn-hover-bg: rgba(255, 255, 255, 0.1);
 }
 
-.viewport__tab-bar::-webkit-scrollbar {
+/* State to hide tabs when no windows are docked */
+.viewport--tabs-hidden .viewport__tab-bar-slot {
     display: none;
 }
 
-/* Estado Oculto (sem abas) */
-.viewport__tab-bar--hidden {
-    display: none;
+/* Drop target visual feedback */
+.viewport__tab-bar-slot[data-dropzone] {
+    transition: background-color 0.2s;
 }
 
-/* Drop target visual feedback standard */
-.viewport__tab-bar--droptarget {
+.viewport__tab-bar--drag-target {
     background-color: var(--color-bg-hover);
     box-shadow: inset 0 0 4px var(--color-accent-hover);
 }
 
+/* * Content Area
+ * Where floating windows live, and where docked windows fill space.
+ */
+.viewport__content {
+    flex-grow: 1;
+    position: relative;
+    overflow: hidden;
+    /* Establishes a stacking context for windows */
+    z-index: var(--viewport-z-base);
+}
+
+/* Utility: Fill Space */
+.viewport--fills-space {
+    flex: 1 1 auto !important;
+    height: auto !important;
+}
+
 /*
- * Tabbed Window Behavior
- * When a window is docked, it fills the remaining viewport space.
- * Increased specificity (.viewport ...) to win over base display:flex.
+ * Tabbed Window Behavior (Docked)
+ * When a window is docked, it must stop floating and fill the viewport content.
+ * These styles override the default floating styles of ApplicationWindow.
  */
 .viewport .application-window--tabbed {
     position: relative !important; /* Override absolute */
     flex: 1 1 auto;
     width: 100% !important;
-    height: auto !important;
+    height: 100% !important;
+
+    top: auto !important;
+    left: auto !important;
+    transform: none !important;
+
     border-radius: 0 !important;
     border: none !important;
     box-shadow: none !important;
     z-index: auto !important;
-    display: none; /* Oculto por padrão se for aba */
+
+    display: none; /* Hidden by default, shown if active */
 }
 
-/* Exibir apenas a aba ativa */
+/* Only the active tabbed window is visible */
 .viewport .application-window--tabbed.application-window--active-tab {
     display: flex;
 }
 
-.viewport__tab-bar .window-header {
+/* * Custom Styling for Tab Items inside Viewport
+ * These leverage the generic classes added by WindowHeaderWrapper or TabStrip logic
+ * if we want specific styling for window headers inside the strip.
+ * Currently, WindowHeaderWrapper renders the ApplicationWindowHeader element directly.
+ */
+.viewport__tab-bar-slot .window-header {
     border-bottom: none;
-    border-top: var(--panel-tab-border-top-width) solid var(--color-bg-tab-inactive);
-    border-top-left-radius: var(--border-radius-base);
-    border-top-right-radius: var(--border-radius-base);
-    margin-right: 2px;
-    max-width: 200px;
-    flex: 1 1 auto;
+    border-top: 2px solid transparent; /* Indicator line */
+    background-color: transparent;
     cursor: pointer;
-}
-.viewport__tab-bar .window-header:hover {
-    background-color: var(--color-bg-hover);
-    border-top: var(--panel-tab-border-top-width) solid var(--color-accent-inactive);
-    color: var(--color-text-primary);
+    height: 100%;
+    border-radius: 0;
+    min-width: 120px;
+    max-width: 200px;
 }
 
-.viewport__tab-bar .window-header--active {
+.viewport__tab-bar-slot .window-header:hover {
+    background-color: var(--color-bg-hover);
+}
+
+/* Active state managed by TabStrip adding classes or us relying on Wrapper logic */
+.ui-strip__item--active .window-header {
     background-color: var(--color-bg-tab-active);
     color: var(--color-text-primary);
-    border-top: var(--panel-tab-border-top-width) solid var(--color-accent-hover);
+    border-top-color: var(--color-accent-primary);
 }

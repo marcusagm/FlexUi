@@ -3,312 +3,210 @@
 /* --- Estrutura Base do Container --- */
 .toolbar-container {
     display: flex;
-    align-items: center;
     background-color: var(--toolbar-background);
-    gap: var(--spacing-2);
-    position: relative;
+    /* Padding opcional se quisermos afastar o conteúdo das bordas */
+    padding: 0;
     overflow: hidden;
+    position: relative;
     user-select: none;
+
+    /* Assegura que o container tenha o tamanho correto para conter o strip */
+    box-sizing: border-box;
 }
 
-/* Toolbars vazias são removidas do fluxo de layout (Zero Footprint) */
+/* Toolbars vazias são ocultas (Zero Footprint) */
 .toolbar-container.is-empty {
     display: none;
 }
 
-/* Aplica padding e bordas APENAS se houver conteúdo */
-.toolbar-container:not(.is-empty) {
-    padding: var(--toolbar-padding);
-}
-
-/* Bordas Semânticas: Aplicadas apenas na direção necessária */
+/* Bordas Semânticas */
 .toolbar-container--top:not(.is-empty) {
     border-bottom: 1px solid var(--toolbar-border-color);
+    width: 100%;
+    height: var(--toolbar-height-horizontal);
 }
 .toolbar-container--bottom:not(.is-empty) {
     border-top: 1px solid var(--toolbar-border-color);
+    width: 100%;
+    height: var(--toolbar-height-horizontal);
 }
 .toolbar-container--left:not(.is-empty) {
     border-right: 1px solid var(--toolbar-border-color);
+    height: 100%;
+    width: var(--toolbar-width-vertical);
+    flex-direction: column;
 }
 .toolbar-container--right:not(.is-empty) {
     border-left: 1px solid var(--toolbar-border-color);
-}
-
-/* --- Comportamento durante Drag & Drop --- */
-/* Quando o D&D está ativo e o item é compatível (ToolbarGroup),
-   forçamos a toolbar vazia a aparecer (display: flex) e definimos
-   estilos explícitos de placeholder.
-*/
-body.dnd-active.dnd-type-toolbargroup .toolbar-container--top.is-empty,
-body.dnd-active.dnd-type-toolbargroup .toolbar-container--bottom.is-empty {
-    display: flex; /* Restaura visibilidade */
-    min-height: var(--toolbar-height-horizontal);
-    background: var(--color-placeholder-bg);
-    border: 1px solid var(--color-placeholder-border-active); /* Borda explícita para dropzone */
-    outline: 5px solid var(--color-placeholder-border-active);
-    padding: 0;
-}
-
-body.dnd-active.dnd-type-toolbargroup .toolbar-container--left.is-empty,
-body.dnd-active.dnd-type-toolbargroup .toolbar-container--right.is-empty {
-    display: flex; /* Restaura visibilidade */
-    min-width: var(--toolbar-width-vertical);
-    background: var(--color-placeholder-bg);
-    border: 1px solid var(--color-placeholder-border-active); /* Borda explícita para dropzone */
-    padding: 0;
-    outline: 5px solid var(--color-placeholder-border-active);
-}
-
-/* Orientação dos Containers */
-.toolbar-container--top {
-    flex-direction: row;
-}
-.toolbar-container--bottom {
-    flex-direction: row;
-}
-.toolbar-container--left {
-    flex-direction: column;
-}
-.toolbar-container--right {
+    height: 100%;
+    width: var(--toolbar-width-vertical);
     flex-direction: column;
 }
 
-/* --- Scroll Container --- */
-.toolbar__scroll-container {
+/* --- Integração com UIItemStrip --- */
+/* * O ToolbarContainer compõe um UIItemStrip.
+ * Aqui sobrescrevemos as variáveis do tab-strip.css para o contexto de Toolbar.
+ */
+.toolbar-container .ui-strip {
+    --tab-strip-bg: transparent;
+    --tab-strip-height: 100%;
+    --tab-scroll-btn-bg: var(--toolbar-background);
+    --tab-scroll-btn-hover-bg: var(--color-bg-hover);
+    --tab-scroll-btn-border: transparent;
+    --tab-scroll-btn-width: 16px; /* Botões de scroll menores na toolbar */
+
     flex: 1;
-    display: flex;
-    gap: var(--spacing-2);
-    overflow: hidden;
-    height: 100%;
-    width: 100%;
-}
-.toolbar-container--top .toolbar__scroll-container,
-.toolbar-container--bottom .toolbar__scroll-container {
-    flex-direction: row;
-}
-.toolbar-container--left .toolbar__scroll-container,
-.toolbar-container--right .toolbar__scroll-container {
-    flex-direction: column;
-}
-
-/* --- Botões de Scroll --- */
-.toolbar__scroll-btn {
-    display: flex;
-    flex-shrink: 0;
-    background: var(--color-bg-hover);
-    border: 1px solid var(--color-border-default);
-    color: var(--color-text-primary);
-    cursor: pointer;
-    padding: 0;
-    align-items: center;
-    justify-content: center;
-
-    /* Estado Oculto (Default) com suporte a animação */
-    opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
-    border-width: 0;
-    margin: 0;
-    transform: scale(0.8);
-
-    transition:
-        width 0.2s ease,
-        height 0.2s ease,
-        opacity 0.2s ease,
-        transform 0.2s ease,
-        border-width 0.2s ease;
-}
-
-/* Ajustes para Horizontal (Top/Bottom) */
-.toolbar-container--top .toolbar__scroll-btn,
-.toolbar-container--bottom .toolbar__scroll-btn {
-    height: 100%;
-    width: 0;
-    min-width: 0;
-}
-
-/* Ajustes para Vertical (Left/Right) */
-.toolbar-container--left .toolbar__scroll-btn,
-.toolbar-container--right .toolbar__scroll-btn {
-    width: 100%;
-    height: 0;
-    min-height: 0;
-}
-
-/* Estado Visível (acionado via JS class) */
-.toolbar__scroll-btn--visible {
-    opacity: 1;
-    visibility: visible;
-    pointer-events: auto;
-    transform: scale(1);
-    border-width: 1px;
-}
-
-/* Dimensões quando visível - Horizontal */
-.toolbar-container--top .toolbar__scroll-btn--visible,
-.toolbar-container--bottom .toolbar__scroll-btn--visible {
-    width: 16px;
-}
-
-/* Dimensões quando visível - Vertical */
-.toolbar-container--left .toolbar__scroll-btn--visible,
-.toolbar-container--right .toolbar__scroll-btn--visible {
-    height: 16px;
-}
-
-.toolbar__scroll-btn:hover {
-    background-color: var(--color-accent-hover);
-}
-.toolbar__scroll-btn:focus-visible {
-    outline: 2px solid var(--color-accent-primary);
-    outline-offset: -2px;
-    z-index: 10;
 }
 
 /* --- Grupos de Toolbar --- */
 .toolbar-group {
     display: flex;
-    flex-shrink: 0;
-    /* Borda placeholder mantida no item filho para alinhamento interno */
+    align-items: center;
+    padding: 2px;
     border: 1px solid transparent;
     border-radius: var(--border-radius-sm);
-    background-color: var(--toolbar-background);
-    padding: 4px;
-    transition:
-        background-color 0.2s,
-        border-color 0.2s;
+    gap: 2px;
+    flex-shrink: 0;
+    position: relative;
 }
-.toolbar-container--top .toolbar-group,
-.toolbar-container--bottom .toolbar-group {
-    flex-direction: row;
-    align-items: center;
-}
+
+/* Adaptação à Orientação da Toolbar */
 .toolbar-container--left .toolbar-group,
 .toolbar-container--right .toolbar-group {
     flex-direction: column;
-    align-items: center;
+    width: 100%;
+    padding: 4px 0;
 }
 
 /* Handle de Arraste */
 .toolbar-group__handle {
-    width: 10px;
-    cursor: grab;
-    opacity: 0.6;
-    color: var(--color-text-secondary);
-    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
+    cursor: grab;
+    opacity: 0.5;
+    color: var(--color-text-secondary);
+    transition: opacity 0.2s;
 }
 .toolbar-group__handle:hover {
     opacity: 1;
     color: var(--color-text-primary);
 }
-.toolbar-group__handle:focus-visible {
-    outline: 2px solid var(--color-accent-primary);
-    outline-offset: -2px;
-    border-radius: 2px;
-    opacity: 1;
-    color: var(--color-text-primary);
+.toolbar-group__handle:active {
+    cursor: grabbing;
 }
-.toolbar-group__handle .icon {
-    width: 10px;
-    height: 10px;
-}
+
+/* Handle Geometry */
 .toolbar-container--top .toolbar-group__handle,
 .toolbar-container--bottom .toolbar-group__handle {
+    width: 8px;
     height: 100%;
+    margin-right: 2px;
 }
 .toolbar-container--left .toolbar-group__handle,
 .toolbar-container--right .toolbar-group__handle {
     width: 100%;
-    height: 10px;
-    margin-bottom: 5px;
+    height: 8px;
+    margin-bottom: 2px;
 }
 
-/* Título do Grupo */
-.toolbar-group__title {
-    font-size: 0.9em;
-    font-weight: 600;
-    padding: 0 var(--spacing-2);
-    white-space: nowrap;
+/* Ícone do Handle */
+.toolbar-group__handle .icon {
+    width: 100%;
+    height: 100%;
+    /* O SVG mask cuida da aparência */
 }
-.toolbar-container--left .toolbar-group__title,
-.toolbar-container--right .toolbar-group__title {
+
+/* Título (Geralmente oculto para economizar espaço, ou tooltip) */
+.toolbar-group__title {
     display: none;
 }
 
 /* Conteúdo do Grupo */
 .toolbar-group__content {
     display: flex;
-    gap: var(--spacing-1);
-    padding: 0 var(--spacing-1);
+    align-items: center;
+    gap: 2px;
 }
 .toolbar-container--left .toolbar-group__content,
 .toolbar-container--right .toolbar-group__content {
     flex-direction: column;
 }
 
-/* Botões Internos */
+/* --- Botões Internos --- */
 .toolbar-button {
-    width: var(--panel-button-size);
-    height: var(--panel-button-size);
-    flex-shrink: 0;
+    width: var(--toolbar-btn-size);
+    height: var(--toolbar-btn-size);
+    padding: var(--toolbar-btn-padding);
     display: flex;
     align-items: center;
     justify-content: center;
-    cursor: pointer;
-    color: var(--color-text-secondary);
-    user-select: none;
-    border-radius: var(--border-radius-base);
-    background: none;
+    background: transparent;
     border: none;
-    padding: var(--panel-button-padding);
-}
-.toolbar-button .icon {
-    width: 14px;
-    height: 14px;
-}
-.toolbar-button:hover:not([disabled]) {
-    background: var(--color-bg-hover);
+    border-radius: var(--border-radius-sm);
     color: var(--color-text-primary);
+    cursor: pointer;
+    transition: background-color 0.2s;
 }
+
+.toolbar-button:hover:not([disabled]) {
+    background-color: var(--toolbar-btn-hover-bg);
+}
+
 .toolbar-button:active:not([disabled]) {
-    background: var(--color-bg-active);
-    color: var(--color-text-bright);
+    background-color: var(--color-bg-active);
 }
+
 .toolbar-button[disabled] {
-    opacity: var(--panel-button-disabled-opacity);
+    opacity: 0.5;
     cursor: not-allowed;
-    color: var(--color-text-disabled);
+}
+
+.toolbar-button .icon {
+    width: 100%;
+    height: 100%;
 }
 
 /* Divisor */
 .toolbar-divider {
-    width: 1px;
-    height: 16px;
     background-color: var(--color-border-default);
-    margin: 0 var(--spacing-1);
 }
+
+.toolbar-container--top .toolbar-divider,
+.toolbar-container--bottom .toolbar-divider {
+    width: 1px;
+    height: 14px;
+    margin: 0 4px;
+}
+
 .toolbar-container--left .toolbar-divider,
 .toolbar-container--right .toolbar-divider {
+    width: 14px;
     height: 1px;
-    width: 16px;
-    margin: var(--spacing-1) 0;
+    margin: 4px 0;
 }
 
-/* --- Animações de Drop --- */
+/* --- Comportamento Drag & Drop --- */
+
+/* Placeholder visível durante o arrasto sobre a toolbar */
 .toolbar-container .container__placeholder--vertical {
-    transform-origin: left center;
-    width: 5px;
-    opacity: 1;
-    min-width: 0;
+    width: 4px;
+    background-color: var(--color-accent-primary);
+    align-self: stretch;
+    margin: 0 2px;
+    border-radius: 2px;
+}
+.toolbar-container .container__placeholder--horizontal {
+    height: 4px;
+    background-color: var(--color-accent-primary);
+    align-self: stretch;
+    margin: 2px 0;
+    border-radius: 2px;
 }
 
-.toolbar-container .container__placeholder--horizontal {
-    transform-origin: top center;
-    height: 5px;
-    opacity: 1;
-    min-height: 0;
+/* Forçar visibilidade de toolbars vazias durante DND compatível */
+body.dnd-active.dnd-type-toolbargroup .toolbar-container.is-empty {
+    display: flex;
+    background-color: var(--color-bg-hover);
+    border: 1px dashed var(--color-border-focus);
 }
