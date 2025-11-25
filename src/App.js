@@ -376,17 +376,22 @@ export class App {
         me._toolbarBottom.element.style.gridArea = 'toolbar-bottom';
         me.statusBar.element.style.gridArea = 'statusbar';
 
-        // Append non-UIElement components manually to the grid wrapper
-        me._mainWrapper.append(me.menu.element, me.container.element, me.statusBar.element);
-
-        // Append wrapper to body
+        // 1. Append wrapper to body first to ensure mounts trigger lifecycle on live DOM
         document.body.append(me._mainWrapper);
 
-        // Mount UIElement components (Toolbars) to trigger lifecycle (ResizeObserver, etc.)
+        // 2. Mount UIElement components in order
+        me.menu.mount(me._mainWrapper);
         me._toolbarTop.mount(me._mainWrapper);
-        me._toolbarBottom.mount(me._mainWrapper);
         me._toolbarLeft.mount(me._mainWrapper);
+        me.container.mount(me._mainWrapper);
         me._toolbarRight.mount(me._mainWrapper);
+        me._toolbarBottom.mount(me._mainWrapper);
+
+        // 3. Append Legacy components (if any)
+        // StatusBar is assumed legacy/simple for now, appending element directly
+        if (me.statusBar && me.statusBar.element) {
+            me._mainWrapper.appendChild(me.statusBar.element);
+        }
     }
 
     /**

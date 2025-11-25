@@ -1,120 +1,210 @@
-import { MenuItem } from './MenuItem.js';
+import { UIElement } from '../../core/UIElement.js';
+import { VanillaMenuAdapter } from '../../renderers/vanilla/VanillaMenuAdapter.js';
 import { TranslationService } from '../../services/TranslationService.js';
 import { appBus } from '../../utils/EventBus.js';
-import { EventTypes } from '../../constants/EventTypes.js';
+import { generateId } from '../../utils/generateId.js';
 
 /**
  * Description:
- * Manages the main application menu bar at the top of the UI.
- * It dynamically loads the menu structure from a configuration file,
- * processes it (e.g., translation), and builds the DOM using MenuItem
- * components. It also handles global click logic to close open menus.
+ * The main Menu controller for the application.
+ * It acts as a centralized manager for the application menu bar, handling
+ * data loading, internationalization, rendering via adapter, and event delegation
+ * for all menu items and submenus.
  *
  * Properties summary:
- * - element {HTMLElement} : The main DOM element (<div class="menu">).
- * - _namespace {string} : Unique namespace for appBus listeners.
- * - _boundOnGlobalClick {Function | null} : Bound handler for global click listener.
- * - _boundCloseAllMenus {Function | null} : Bound handler for closing all menus.
- * - _boundCloseSiblings {Function | null} : Bound handler for closing sibling menus.
+ * - _menuItemsMap {Map<string, object>} : A lookup map for menu item configurations by ID.
+ * - _dataUrl {string} : The URL to load menu configuration from.
+ * - _boundGlobalClick {Function} : Bound handler for outside clicks.
+ * - _boundOnMouseOver {Function} : Bound handler for hover interactions.
+ * - _boundOnClick {Function} : Bound handler for click interactions.
  *
  * Typical usage:
- * // In App.js
- * this.menu = new Menu();
- * document.body.append(this.menu.element);
- * await this.menu.load();
+ * const menu = new Menu();
+ * await menu.load();
+ * document.body.appendChild(menu.element);
  *
  * Events:
- * - Listens to (native): 'click' (on document)
- * - Listens to (appBus): EventTypes.MENU_ITEM_SELECTED, EventTypes.MENU_CLOSE_SIBLINGS, EventTypes.CONTEXT_MENU_OPENED
+ * - Emits events specified in the menu JSON configuration via appBus.
+ *
+ * Business rules implemented:
+ * - Inherits from UIElement -> Disposable.
+ * - Loads menu structure from a JSON source.
+ * - Translates menu labels using TranslationService.
+ * - Delegates DOM rendering to VanillaMenuAdapter.
+ * - Uses Event Delegation to handle clicks and hovers for arbitrary depth.
+ * - Manages "Active/Open" states for submenus.
+ * - Closes submenus when clicking outside.
  *
  * Dependencies:
- * - components/Menu/MenuItem.js
- * - services/TranslationService.js
- * - utils/EventBus.js
- * - ../../constants/EventTypes.js
+ * - {import('../../core/UIElement.js').UIElement}
+ * - {import('../../renderers/vanilla/VanillaMenuAdapter.js').VanillaMenuAdapter}
+ * - {import('../../services/TranslationService.js').TranslationService}
+ * - {import('../../utils/EventBus.js').appBus}
+ * - {import('../../utils/generateId.js').generateId}
  */
-export class Menu {
+export class Menu extends UIElement {
     /**
-     * Unique namespace for appBus listeners.
+     * Map to store menu item data by ID for quick access during event handling.
+     *
+     * @type {Map<string, object>}
+     * @private
+     */
+    _menuItemsMap = new Map();
+
+    /**
+     * The URL source for the menu data.
      *
      * @type {string}
      * @private
      */
-    _namespace = 'app-menu';
+    _dataUrl = './workspaces/menus/menu.js'; // Default location
 
     /**
-     * Stores the bound reference for the global click listener.
+     * Bound handler for global document clicks (to close menu).
      *
      * @type {Function | null}
      * @private
      */
-    _boundOnGlobalClick = null;
+    _boundGlobalClick = null;
 
     /**
-     * Stores the bound reference for the 'closeAllMenus' listener.
+     * Bound handler for menu clicks (delegated).
      *
      * @type {Function | null}
      * @private
      */
-    _boundCloseAllMenus = null;
+    _boundOnClick = null;
 
     /**
-     * Stores the bound reference for the 'closeSiblings' listener.
+     * Bound handler for menu hover (delegated).
      *
      * @type {Function | null}
      * @private
      */
-    _boundCloseSiblings = null;
+    _boundOnMouseOver = null;
 
-    constructor() {
+    /**
+     * Creates an instance of Menu.
+     *
+     * @param {import('../../core/IRenderer.js').IRenderer} [renderer=null] - Optional renderer adapter.
+     */
+    constructor(renderer = null) {
+        super(generateId(), renderer || new VanillaMenuAdapter());
         const me = this;
-        me.element = document.createElement('div');
-        me.element.classList.add('menu');
 
-        me._boundOnGlobalClick = me._onGlobalClick.bind(me);
-        me._boundCloseAllMenus = me.closeAllMenus.bind(me);
-        me._boundCloseSiblings = me.closeSiblings.bind(me);
+        me._boundGlobalClick = me._onGlobalClick.bind(me);
+        me._boundOnClick = me._onMenuClick.bind(me);
+        me._boundOnMouseOver = me._onMenuMouseOver.bind(me);
 
-        me.initGlobalListeners();
+        // Initialize DOM structure
+        me.render();
     }
 
     /**
-     * Handles global clicks on the document to close the menu.
+     * Loads the menu configuration from the source URL.
      *
-     * @param {MouseEvent} e
-     * @private
-     * @returns {void}
+     * @param {string} [url] - Optional URL to override default.
+     * @returns {Promise<void>}
      */
-    _onGlobalClick(e) {
+    async load(url) {
         const me = this;
-        if (!me.element.contains(e.target)) {
-            me.closeAllMenus();
+        if (url) {
+            me._dataUrl = url;
+        }
+
+        try {
+            // In a real scenario, this might be a fetch().
+            // For local files in this architecture, we might use dynamic import.
+            // Assuming the file exports 'menuData'.
+            const module = await import(`../../../../${me._dataUrl}`);
+            const rawData = module.menuData || [];
+
+            const processedData = me._processMenuData(rawData);
+
+            if (me.element) {
+                me.renderer.buildMenuStructure(me.element, processedData);
+            }
+        } catch (error) {
+            console.error('[Menu] Failed to load menu data:', error);
         }
     }
 
+    // --- UIElement Overrides ---
+
     /**
-     * Recursively processes menu data to translate 'titleKey' properties.
+     * Implementation of the rendering logic.
+     * Creates the root menu element and attaches delegated listeners.
      *
-     * @param {Array<object>} items - The raw menu items array.
-     * @param {TranslationService} i18n - The translation service instance.
-     * @returns {Array<object>} The processed items array.
+     * @returns {HTMLElement} The root menu element.
+     * @protected
+     */
+    _doRender() {
+        const me = this;
+        const element = me.renderer.createMenuElement(me.id);
+
+        // Attach Delegated Events
+        me.renderer.on(element, 'click', me._boundOnClick);
+        me.renderer.on(element, 'mouseover', me._boundOnMouseOver);
+
+        return element;
+    }
+
+    /**
+     * Implementation of mount logic.
+     * Sets up global listeners.
+     *
+     * @param {HTMLElement} container
+     * @protected
+     */
+    _doMount(container) {
+        const me = this;
+        super._doMount(container);
+        document.addEventListener('click', me._boundGlobalClick);
+    }
+
+    /**
+     * Implementation of unmount logic.
+     * Cleans up global listeners.
+     *
+     * @protected
+     */
+    _doUnmount() {
+        const me = this;
+        document.removeEventListener('click', me._boundGlobalClick);
+        super._doUnmount();
+    }
+
+    // --- Logic & Helpers ---
+
+    /**
+     * Recursively processes raw menu data.
+     * - Translates labels.
+     * - Generates IDs.
+     * - Populates _menuItemsMap.
+     *
+     * @param {Array<object>} items - Raw items.
+     * @returns {Array<object>} Processed items ready for renderer.
      * @private
      */
-    _processMenuData(items, i18n) {
+    _processMenuData(items) {
         const me = this;
-        if (!items || !Array.isArray(items)) {
-            return [];
-        }
+        const i18n = TranslationService.getInstance();
 
         return items.map(item => {
-            const processedItem = { ...item };
+            const id = item.id || generateId();
+            const label = item.label ? i18n.translate(item.label) : '';
 
-            if (item.titleKey) {
-                processedItem.title = i18n.translate(item.titleKey);
-            }
+            const processedItem = {
+                ...item,
+                id: id,
+                label: label
+            };
 
-            if (item.children && item.children.length > 0) {
-                processedItem.children = me._processMenuData(item.children, i18n);
+            // Store reference in map for O(1) lookup during events
+            me._menuItemsMap.set(id, processedItem);
+
+            if (item.submenu && Array.isArray(item.submenu)) {
+                processedItem.submenu = me._processMenuData(item.submenu);
             }
 
             return processedItem;
@@ -122,95 +212,86 @@ export class Menu {
     }
 
     /**
-     * Cleans up all global document and appBus event listeners.
+     * Handles clicks delegated from the root menu element.
      *
+     * @param {MouseEvent} event
+     * @private
      * @returns {void}
      */
-    destroy() {
+    _onMenuClick(event) {
         const me = this;
-        document.removeEventListener('click', me._boundOnGlobalClick);
-        appBus.offByNamespace(me._namespace);
-        me.element.remove();
+        const targetItem = me.renderer.getItemFromEvent(event);
+
+        if (!targetItem) return;
+
+        const id = targetItem.dataset.id;
+        const itemConfig = me._menuItemsMap.get(id);
+
+        if (!itemConfig || itemConfig.disabled) return;
+
+        // If it has a submenu, toggle visibility handled by CSS usually (hover),
+        // but for click/touch or persistent open, we might toggle a class.
+        // Here, we handle Actions.
+        if (itemConfig.action) {
+            // Execute Action
+            appBus.emit(itemConfig.action, itemConfig.payload);
+
+            // Close menus
+            me.renderer.closeAllSubmenus(me.element);
+        }
+
+        // Prevent bubbling to document which would close the menu immediately
+        event.stopPropagation();
     }
 
     /**
-     * Asynchronously loads, processes, and builds the menu from a config file.
+     * Handles mouseover delegated from the root menu element.
+     * Manages the "opening" of submenus and closing siblings.
      *
-     * @param {string} [url='workspaces/menus/menu.js'] - The path to the menu config module.
-     * @returns {Promise<void>}
+     * @param {MouseEvent} event
+     * @private
+     * @returns {void}
      */
-    async load(url = 'workspaces/menus/menu.js') {
+    _onMenuMouseOver(event) {
         const me = this;
-        try {
-            const menuModule = await import(`../../../${url}`);
-            const rawMenuData = menuModule.default;
+        const targetItem = me.renderer.getItemFromEvent(event);
 
-            const i18n = TranslationService.getInstance();
-            const processedItems = me._processMenuData(rawMenuData, i18n);
+        if (!targetItem) return;
 
-            me.build(processedItems);
-        } catch (error) {
-            console.error(`Failed to load menu module: ${url}`, error);
-            me.element.innerHTML = '<div class="menu__item">Error loading menu.</div>';
+        // When hovering an item, close all other open items at the SAME level
+        const parentList = targetItem.parentNode; // The <ul>
+        if (parentList) {
+            const siblings = Array.from(parentList.children);
+            siblings.forEach(sibling => {
+                if (sibling !== targetItem) {
+                    me.renderer.setItemActive(sibling, false);
+                }
+            });
+        }
+
+        // Open the current item if it has a submenu
+        const id = targetItem.dataset.id;
+        const itemConfig = me._menuItemsMap.get(id);
+
+        if (itemConfig && itemConfig.submenu) {
+            me.renderer.setItemActive(targetItem, true);
         }
     }
 
     /**
-     * Builds the menu DOM from processed menu items.
+     * Handles clicks anywhere in the document to close open menus.
      *
-     * @param {Array<object>} items - The processed (translated) menu items.
+     * @param {MouseEvent} event
+     * @private
      * @returns {void}
      */
-    build(items) {
+    _onGlobalClick(event) {
         const me = this;
-        me.element.innerHTML = '';
+        if (!me.element) return;
 
-        items.forEach(itemData => {
-            const mi = new MenuItem(itemData, 1);
-            me.element.appendChild(mi.element);
-        });
-    }
-
-    /**
-     * Initializes all global document and appBus listeners.
-     *
-     * @returns {void}
-     */
-    initGlobalListeners() {
-        const me = this;
-        const options = { namespace: me._namespace };
-
-        document.addEventListener('click', me._boundOnGlobalClick);
-        appBus.on(EventTypes.MENU_ITEM_SELECTED, me._boundCloseAllMenus, options);
-        appBus.on(EventTypes.MENU_CLOSE_SIBLINGS, me._boundCloseSiblings, options);
-        appBus.on(EventTypes.CONTEXT_MENU_OPENED, me._boundCloseAllMenus, options);
-    }
-
-    /**
-     * Closes all currently open submenus.
-     *
-     * @returns {void}
-     */
-    closeAllMenus() {
-        this.element.querySelectorAll('.menu__item--open').forEach(item => {
-            item.classList.remove('menu__item--open');
-        });
-    }
-
-    /**
-     * Closes sibling menus when a new menu item is hovered or clicked.
-     *
-     * @param {HTMLElement} target - The target MenuItem element.
-     * @returns {void}
-     */
-    closeSiblings(target) {
-        target.parentElement.querySelectorAll('.menu__item--open').forEach(sibling => {
-            if (sibling !== target) {
-                sibling.classList.remove('menu__item--open');
-                sibling.querySelectorAll('.menu__item--open').forEach(descendant => {
-                    descendant.classList.remove('menu__item--open');
-                });
-            }
-        });
+        // If click is outside the menu, close all
+        if (!me.element.contains(event.target)) {
+            me.renderer.closeAllSubmenus(me.element);
+        }
     }
 }
