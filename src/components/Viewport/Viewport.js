@@ -3,37 +3,58 @@ import { generateId } from '../../utils/generateId.js';
 import { EventTypes } from '../../constants/EventTypes.js';
 import { DropZoneType } from '../../constants/DNDTypes.js';
 import { ViewportFactory } from './ViewportFactory.js';
+import { TabStrip } from '../Core/TabStrip.js';
+import { UIElement } from '../../core/UIElement.js';
+
+/**
+ * Description:
+ * A wrapper class to adapt the ApplicationWindowHeader to the UIElement interface
+ * required by TabStrip. This acts as the "Tab Item" within the strip.
+ *
+ * @internal
+ */
+class WindowHeaderWrapper extends UIElement {
+    /**
+     * @param {import('./ApplicationWindowHeader.js').ApplicationWindowHeader} header - The window header component.
+     */
+    constructor(header) {
+        super();
+        this.header = header;
+    }
+
+    _doRender() {
+        return this.header.element;
+    }
+
+    get element() {
+        return this.header.element;
+    }
+}
 
 /**
  * Description:
  * A container component that acts as a manager for ApplicationWindow instances.
  * It provides a bounded area (relative positioning context) where windows can float,
- * overlap, or be docked into tabs.
+ * overlap, or be docked into tabs using a TabStrip.
  *
- * It manages the stacking order (Z-Index) of windows, ensuring that "Always on Top"
- * windows remain above standard windows, and that the currently focused window
- * is brought to the front of its respective layer.
+ * It manages the stacking order (Z-Index) of windows and coordinates with
+ * the TabStrip to handle docked (tabbed) windows.
  *
  * Properties summary:
  * - id {string} : Unique identifier for the viewport.
  * - element {HTMLElement} : The main DOM element (.viewport).
  * - dropZoneType {string} : The identifier for the DragDropService.
- * - _tabBar {HTMLElement} : Container for window headers when they are docked as tabs.
- * - _windows {Array<ApplicationWindow>} : List of managed windows.
+ * - tabBar {HTMLElement} : The DOM element representing the tab strip container.
+ * - windows {Array<ApplicationWindow>} : List of managed windows.
+ * - _tabStrip {TabStrip} : The component managing the list of docked window tabs.
+ * - _windowWrappers {Map<ApplicationWindow, WindowHeaderWrapper>} : Maps windows to their tab wrappers.
  * - _activeWindow {ApplicationWindow|null} : The currently focused window.
- * - _namespace {string} : Namespace for event listeners.
- * - _baseZIndex {number} : Starting z-index for standard windows.
- * - _alwaysOnTopZIndex {number} : Starting z-index for pinned windows.
- * - _boundOnWindowFocus {Function} : Bound handler for focus events.
- * - _boundOnWindowClose {Function} : Bound handler for close events.
- * - _boundOnArrangeCascade {Function} : Bound handler for cascade commands.
- * - _boundOnArrangeTile {Function} : Bound handler for tile commands.
  *
  * Typical usage:
  * const viewport = new Viewport();
  * document.body.appendChild(viewport.element);
  * viewport.addWindow(new ApplicationWindow(...));
- * viewport.dockWindow(newWindow); // Convert to tab
+ * viewport.dockWindow(newWindow);
  *
  * Events:
  * - Listens to (appBus): EventTypes.WINDOW_FOCUS
@@ -43,23 +64,16 @@ import { ViewportFactory } from './ViewportFactory.js';
  *
  * Business rules implemented:
  * - Acts as a 'viewport' drop zone type.
- * - Maintains two distinct Z-Index layers: Standard and Pinned.
- * - Automatically brings focused windows to the top of their layer.
- * - Provides algorithmic layout strategies (Cascade, Tile) for open windows.
- * - Removes a window automatically focuses the next available window.
- * - Supports serialization via toJSON/fromJSON using ViewportFactory.
- * - Manages window lifecycle (mount) when adding windows.
- * - Allows docking windows into a tab bar, changing their state and visual representation.
- * - Dynamically hides the tab bar if no windows are docked.
- * - Ensures a background tab is always visible if tabs exist, even when focusing floating windows.
+ * - Manages Z-Index layering (Standard vs Pinned).
+ * - Integrates TabStrip for docking functionality.
+ * - Automatically hides the TabStrip when no windows are docked.
+ * - Synchronizes Window focus with Tab selection.
  *
  * Dependencies:
- * - ../../utils/EventBus.js
- * - ../../utils/generateId.js
- * - ../../constants/EventTypes.js
- * - ../../constants/DNDTypes.js
- * - ./ApplicationWindow.js
- * - ./ViewportFactory.js
+ * - TabStrip
+ * - UIElement (via Wrapper)
+ * - EventBus
+ * - ViewportFactory
  */
 export class Viewport {
     /**
@@ -87,12 +101,12 @@ export class Viewport {
     dropZoneType;
 
     /**
-     * Container for window headers when they are docked as tabs.
+     * Container for the TabStrip.
      *
      * @type {HTMLElement}
      * @private
      */
-    _tabBar;
+    _tabBarContainer;
 
     /**
      * List of managed windows.
@@ -167,6 +181,22 @@ export class Viewport {
     _boundOnArrangeTile;
 
     /**
+     * The TabStrip component instance.
+     *
+     * @type {TabStrip}
+     * @private
+     */
+    _tabStrip;
+
+    /**
+     * Maps windows to their UIElement wrappers for the TabStrip.
+     *
+     * @type {Map<import('./ApplicationWindow.js').ApplicationWindow, WindowHeaderWrapper>}
+     * @private
+     */
+    _windowWrappers = new Map();
+
+    /**
      * Creates an instance of Viewport.
      */
     constructor() {
@@ -180,21 +210,33 @@ export class Viewport {
         me.element.dataset.dropzone = me.dropZoneType;
         me.element.dropZoneInstance = me;
 
-        // Create Tab Bar
-        me._tabBar = document.createElement('div');
-        me._tabBar.classList.add('viewport__tab-bar');
-        me._tabBar.dataset.dropzone = DropZoneType.VIEWPORT_TAB_BAR;
+        // Create Tab Bar Container (visual wrapper)
+        me._tabBarContainer = document.createElement('div');
+        me._tabBarContainer.classList.add('viewport__tab-bar');
+
+        // Initialize TabStrip
+        me._tabStrip = new TabStrip(me.id + '-tabs', {
+            orientation: 'horizontal',
+            simpleMode: false // Viewport tabs usually stay visible or follow specific logic
+        });
+
+        // Mount TabStrip into the container
+        me._tabStrip.mount(me._tabBarContainer);
 
         // Proxy for Tab Bar Drop Zone
-        me._tabBar.dropZoneInstance = {
+        // Note: We attach the dropzone data to the container, but the strategy might look at children.
+        // With TabStrip, children are inside the strip's viewport.
+        me._tabBarContainer.dataset.dropzone = DropZoneType.VIEWPORT_TAB_BAR;
+        me._tabBarContainer.dropZoneInstance = {
             dropZoneType: DropZoneType.VIEWPORT_TAB_BAR,
             dockWindow: me.dockWindow.bind(me),
             get tabBar() {
-                return me._tabBar;
+                // Expose the Strip's root element to the strategy so it can find items
+                return me._tabStrip.element;
             }
         };
 
-        me.element.appendChild(me._tabBar);
+        me.element.appendChild(me._tabBarContainer);
 
         me._boundOnWindowFocus = me._onWindowFocus.bind(me);
         me._boundOnWindowClose = me._onWindowClose.bind(me);
@@ -215,13 +257,13 @@ export class Viewport {
     }
 
     /**
-     * The DOM element representing the tab bar.
-     * Exposed for DND strategies to detect drop targets.
+     * The DOM element representing the tab bar (Strip Root).
+     * Exposed for DND strategies.
      *
      * @returns {HTMLElement}
      */
     get tabBar() {
-        return this._tabBar;
+        return this._tabStrip.element;
     }
 
     /**
@@ -247,11 +289,11 @@ export class Viewport {
      * @returns {void}
      */
     _updateTabBarVisibility() {
-        const hasTabs = this._windows.some(w => w.isTabbed);
+        const hasTabs = this._tabStrip.items.length > 0;
         if (hasTabs) {
-            this._tabBar.classList.remove('viewport__tab-bar--hidden');
+            this._tabBarContainer.classList.remove('viewport__tab-bar--hidden');
         } else {
-            this._tabBar.classList.add('viewport__tab-bar--hidden');
+            this._tabBarContainer.classList.add('viewport__tab-bar--hidden');
         }
     }
 
@@ -294,6 +336,11 @@ export class Viewport {
             return;
         }
 
+        // Undock if docked
+        if (windowInstance.isTabbed) {
+            me.undockWindow(windowInstance); // Handles strip removal
+        }
+
         me._windows.splice(index, 1);
 
         if (typeof windowInstance.destroy === 'function') {
@@ -320,8 +367,7 @@ export class Viewport {
     /**
      * Focuses a specific window.
      * If floating: Brings to front (Z-Index).
-     * If tabbed: Shows content, hides other tabs' content, highlights tab.
-     * Also ensures that if we focus a floating window, we still keep a background tab active (if any exists).
+     * If tabbed: Shows content, hides other tabs' content, highlights tab via TabStrip.
      *
      * @param {import('./ApplicationWindow.js').ApplicationWindow} windowInstance - The window to focus.
      * @returns {void}
@@ -347,31 +393,36 @@ export class Viewport {
         }
 
         if (windowInstance.isTabbed) {
-            // Exclusive Tab Mode Visibility
+            // Tab Mode: Use TabStrip to set active visual state
+            const wrapper = me._windowWrappers.get(windowInstance);
+            if (wrapper) {
+                me._tabStrip.setActiveItem(wrapper);
+            }
+
+            // Manage content visibility for tabbed windows
             me._windows.forEach(win => {
                 if (win.isTabbed) {
                     const isActive = win === windowInstance;
                     win.element.classList.toggle('application-window--active-tab', isActive);
-                    if (win.header)
-                        win.header.element.classList.toggle('window-header--active', isActive);
                 }
             });
         } else {
             // Floating Mode
             me._updateZIndices();
 
-            // Fallback: Ensure background tab layer is not empty if tabs exist
+            // Ensure background tab layer is not empty if tabs exist
             const hasActiveTab = me._windows.some(
                 w => w.isTabbed && w.element.classList.contains('application-window--active-tab')
             );
 
-            if (!hasActiveTab) {
+            if (!hasActiveTab && me._tabStrip.items.length > 0) {
                 // Find the last tabbed window to activate as background
                 for (let i = me._windows.length - 1; i >= 0; i--) {
                     const win = me._windows[i];
                     if (win.isTabbed) {
                         win.element.classList.add('application-window--active-tab');
-                        if (win.header) win.header.element.classList.add('window-header--active');
+                        const wrapper = me._windowWrappers.get(win);
+                        if (wrapper) me._tabStrip.setActiveItem(wrapper);
                         break;
                     }
                 }
@@ -390,42 +441,24 @@ export class Viewport {
         const me = this;
         if (!me._windows.includes(windowInstance)) return;
 
-        const headerEl = windowInstance.header.element;
-
-        const getReferenceNode = idx => {
-            const headers = Array.from(me._tabBar.children).filter(c =>
-                c.classList.contains('window-header')
-            );
-            if (idx >= headers.length) return null;
-            return headers[idx];
-        };
-
-        if (windowInstance.isTabbed) {
+        // Prevent duplicate docking
+        if (windowInstance.isTabbed && me._windowWrappers.has(windowInstance)) {
+            // If index provided, move it
             if (index !== null) {
-                const reference = getReferenceNode(index);
-                if (reference === headerEl) return;
-
-                if (reference) {
-                    me._tabBar.insertBefore(headerEl, reference);
-                } else {
-                    me._tabBar.appendChild(headerEl);
-                }
+                const wrapper = me._windowWrappers.get(windowInstance);
+                me._tabStrip.removeItem(wrapper);
+                me._tabStrip.addItem(wrapper, index);
             }
             return;
         }
 
         windowInstance.setTabbed(true);
 
-        if (index !== null) {
-            const reference = getReferenceNode(index);
-            if (reference) {
-                me._tabBar.insertBefore(headerEl, reference);
-            } else {
-                me._tabBar.appendChild(headerEl);
-            }
-        } else {
-            me._tabBar.appendChild(headerEl);
-        }
+        // Create Wrapper and Add to Strip
+        const wrapper = new WindowHeaderWrapper(windowInstance.header);
+        me._windowWrappers.set(windowInstance, wrapper);
+
+        me._tabStrip.addItem(wrapper, index);
 
         me._updateTabBarVisibility();
         me.focusWindow(windowInstance);
@@ -446,16 +479,30 @@ export class Viewport {
 
         windowInstance.setTabbed(false);
 
-        // Cleanup active classes manually to ensure state is clean before focusWindow logic
+        // Cleanup active classes manually
         windowInstance.element.classList.remove('application-window--active-tab');
-        if (windowInstance.header)
-            windowInstance.header.element.classList.remove('window-header--active');
 
-        const headerEl = windowInstance.header.element;
-        if (windowInstance.element.firstChild) {
-            windowInstance.element.insertBefore(headerEl, windowInstance.element.firstChild);
-        } else {
-            windowInstance.element.appendChild(headerEl);
+        // Remove from TabStrip
+        const wrapper = me._windowWrappers.get(windowInstance);
+        if (wrapper) {
+            me._tabStrip.removeItem(wrapper);
+            me._windowWrappers.delete(windowInstance);
+        }
+
+        // Restore header to window structure if it was moved (DOM-wise TabStrip creates specific structure)
+        // Note: VanillaStripAdapter moves elements. ApplicationWindowHeader.js handles "isTabMode" styles.
+        // We need to ensure the header element is back in the window element if the strip moved it.
+        // The VanillaStripAdapter uses mountItem, which appends to viewport.
+        // So yes, we must move it back.
+        if (windowInstance.element && windowInstance.header.element) {
+            // VanillaWindowAdapter.mountHeader logic
+            const winEl = windowInstance.element;
+            const headEl = windowInstance.header.element;
+            if (winEl.firstChild && winEl.firstChild !== headEl) {
+                winEl.insertBefore(headEl, winEl.firstChild);
+            } else if (!winEl.contains(headEl)) {
+                winEl.appendChild(headEl);
+            }
         }
 
         windowInstance.x = x;
@@ -535,7 +582,7 @@ export class Viewport {
         if (count === 0) return;
 
         const viewportRect = me.element.getBoundingClientRect();
-        const tabBarHeight = me._tabBar.offsetHeight;
+        const tabBarHeight = me._tabBarContainer.offsetHeight;
         const areaWidth = viewportRect.width;
         const areaHeight = viewportRect.height - tabBarHeight;
 
@@ -590,7 +637,11 @@ export class Viewport {
         const me = this;
         if (me._windows.includes(windowInstance)) {
             windowInstance.close().then(() => {
-                if (!document.body.contains(windowInstance.element)) {
+                // Verify removal in case logic was handled asynchronously
+                if (
+                    !document.body.contains(windowInstance.element) &&
+                    !me.element.contains(windowInstance.element)
+                ) {
                     me.removeWindow(windowInstance);
                 }
             });
@@ -608,6 +659,8 @@ export class Viewport {
 
         [...me._windows].forEach(win => win.destroy());
         me._windows = [];
+
+        me._tabStrip.dispose();
 
         me.element.remove();
     }

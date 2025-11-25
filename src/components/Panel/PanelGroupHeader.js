@@ -1,23 +1,46 @@
 import { appBus } from '../../utils/EventBus.js';
 import { EventTypes } from '../../constants/EventTypes.js';
+import { TabStrip } from '../Core/TabStrip.js';
+import { UIElement } from '../../core/UIElement.js';
+
+/**
+ * Description:
+ * A wrapper class to adapt the legacy PanelHeader (which is not a UIElement)
+ * to the UIElement interface required by TabStrip.
+ * This ensures compatibility without refactoring PanelHeader immediately.
+ *
+ * @internal
+ */
+class PanelHeaderWrapper extends UIElement {
+    constructor(panelHeader) {
+        super();
+        this.panelHeader = panelHeader;
+    }
+
+    _doRender() {
+        return this.panelHeader.element;
+    }
+
+    get element() {
+        return this.panelHeader.element;
+    }
+}
 
 /**
  * Description:
  * Manages the header element of a PanelGroup.
  * This class provides the group-level controls (Move, Collapse, Close)
- * and the 'tabContainer' where child PanelHeaders (tabs) are inserted
- * by the parent PanelGroup. It also handles tab scrolling logic.
+ * and integrates the TabStrip component to manage the tabs.
  *
  * Properties summary:
  * - panelGroup {PanelGroup} : Reference to the parent PanelGroup.
  * - title {string} : The title used for ARIA labels.
  * - element {HTMLElement} : The main header element.
- * - tabContainer {HTMLElement} : The DOM node where tabs are injected.
  * - moveHandle {HTMLElement} : The drag handle element.
- * - scrollLeftBtn {HTMLElement} : Button to scroll tabs left.
- * - scrollRightBtn {HTMLElement} : Button to scroll tabs right.
  * - collapseBtn {HTMLElement} : Button to toggle collapse state.
  * - closeBtn {HTMLElement} : Button to close the group.
+ * - tabStrip {TabStrip} : The component managing the list of tabs.
+ * - _tabsWrapper {HTMLElement} : The DOM container for the TabStrip.
  *
  * Events:
  * - Emits (appBus): EventTypes.PANEL_TOGGLE_COLLAPSE, EventTypes.PANEL_CLOSE_REQUEST
@@ -26,6 +49,7 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * Dependencies:
  * - {import('../../utils/EventBus.js').appBus}
  * - {import('../../constants/EventTypes.js').EventTypes}
+ * - {import('../Core/TabStrip.js').TabStrip}
  */
 export class PanelGroupHeader {
     /**
@@ -45,14 +69,6 @@ export class PanelGroupHeader {
     _title = null;
 
     /**
-     * Observes the tabContainer to show/hide scroll buttons.
-     *
-     * @type {ResizeObserver | null}
-     * @private
-     */
-    _resizeObserver = null;
-
-    /**
      * The main header element.
      *
      * @type {HTMLElement}
@@ -67,30 +83,6 @@ export class PanelGroupHeader {
      * @public
      */
     moveHandle;
-
-    /**
-     * Button to scroll tabs left.
-     *
-     * @type {HTMLElement}
-     * @public
-     */
-    scrollLeftBtn;
-
-    /**
-     * The DOM node where tabs are injected.
-     *
-     * @type {HTMLElement}
-     * @public
-     */
-    tabContainer;
-
-    /**
-     * Button to scroll tabs right.
-     *
-     * @type {HTMLElement}
-     * @public
-     */
-    scrollRightBtn;
 
     /**
      * Button to toggle collapse state.
@@ -109,6 +101,22 @@ export class PanelGroupHeader {
     closeBtn;
 
     /**
+     * The TabStrip component instance.
+     *
+     * @type {TabStrip}
+     * @public
+     */
+    tabStrip;
+
+    /**
+     * The DOM wrapper for the TabStrip.
+     *
+     * @type {HTMLElement}
+     * @private
+     */
+    _tabsWrapper;
+
+    /**
      * Creates a new PanelGroupHeader instance.
      *
      * @param {import('./PanelGroup.js').PanelGroup} panelGroup - The parent PanelGroup instance.
@@ -120,8 +128,13 @@ export class PanelGroupHeader {
 
         me.panelGroup = panelGroup;
 
+        // Initialize TabStrip with Simple Mode enabled
+        me.tabStrip = new TabStrip(panelGroup.id + '-tabs', {
+            orientation: 'horizontal',
+            simpleMode: true
+        });
+
         me.build();
-        me._initResizeObserver();
     }
 
     /**
@@ -130,25 +143,24 @@ export class PanelGroupHeader {
      * @returns {import('./PanelGroup.js').PanelGroup | null} The parent group.
      */
     get panelGroup() {
-        const me = this;
-        return me._panelGroup;
+        return this._panelGroup;
     }
 
     /**
      * Sets the parent PanelGroup instance.
-     * Validates that the value is an object or null.
      *
      * @param {import('./PanelGroup.js').PanelGroup | null} value - The new parent group.
      * @returns {void}
      */
     set panelGroup(value) {
+        const me = this;
         if (value !== null && typeof value !== 'object') {
             console.warn(
                 `[PanelGroupHeader] Invalid panelGroup assignment (${value}). Must be an object or null.`
             );
             return;
         }
-        this._panelGroup = value;
+        me._panelGroup = value;
     }
 
     /**
@@ -157,25 +169,24 @@ export class PanelGroupHeader {
      * @returns {string | null} The title.
      */
     get title() {
-        const me = this;
-        return me._title;
+        return this._title;
     }
 
     /**
      * Sets the title.
-     * Validates that the value is a string or null.
      *
      * @param {string | null} value - The new title.
      * @returns {void}
      */
     set title(value) {
+        const me = this;
         if (value !== null && typeof value !== 'string') {
             console.warn(
                 `[PanelGroupHeader] Invalid title assignment (${value}). Must be a string or null.`
             );
             return;
         }
-        this._title = value;
+        me._title = value;
     }
 
     /**
@@ -192,37 +203,27 @@ export class PanelGroupHeader {
             me.element.dataset.dropzone = me.panelGroup.dropZoneType;
         }
 
+        // 1. Move Handle
         me.moveHandle = document.createElement('div');
         me.moveHandle.classList.add('panel-group__move-handle', 'panel__move-handle');
-
-        // Pointer events for Drag
         me.moveHandle.style.touchAction = 'none';
         me.moveHandle.addEventListener('pointerdown', me.onGroupPointerDown.bind(me));
-
         me.moveHandle.setAttribute('role', 'button');
 
         const iconElement = document.createElement('span');
         iconElement.className = 'icon icon-handle';
         me.moveHandle.appendChild(iconElement);
 
-        me.scrollLeftBtn = document.createElement('button');
-        me.scrollLeftBtn.type = 'button';
-        me.scrollLeftBtn.classList.add('panel-group__tab-scroll', 'panel-group__tab-scroll--left');
-        me.scrollLeftBtn.textContent = '<';
-        me.scrollLeftBtn.style.display = 'none';
+        // 2. Tabs Wrapper (Container for TabStrip)
+        me._tabsWrapper = document.createElement('div');
+        // Mimic old tab container styles for layout
+        me._tabsWrapper.className = 'panel-group__tab-container';
+        me._tabsWrapper.style.overflow = 'hidden'; // Let TabStrip handle overflow internally
 
-        me.tabContainer = document.createElement('div');
-        me.tabContainer.classList.add('panel-group__tab-container');
+        // Mount TabStrip into wrapper
+        me.tabStrip.mount(me._tabsWrapper);
 
-        me.scrollRightBtn = document.createElement('button');
-        me.scrollRightBtn.type = 'button';
-        me.scrollRightBtn.classList.add(
-            'panel-group__tab-scroll',
-            'panel-group__tab-scroll--right'
-        );
-        me.scrollRightBtn.textContent = '>';
-        me.scrollRightBtn.style.display = 'none';
-
+        // 3. Controls (Collapse, Close)
         me.collapseBtn = document.createElement('button');
         me.collapseBtn.type = 'button';
         me.collapseBtn.classList.add('panel-group__collapse-btn', 'panel__collapse-btn');
@@ -241,65 +242,45 @@ export class PanelGroupHeader {
             }
         });
 
-        me.element.append(
-            me.moveHandle,
-            me.scrollLeftBtn,
-            me.tabContainer,
-            me.scrollRightBtn,
-            me.collapseBtn,
-            me.closeBtn
-        );
-
-        me.scrollLeftBtn.addEventListener('click', () =>
-            me.tabContainer.scrollBy({ left: -100, behavior: 'smooth' })
-        );
-        me.scrollRightBtn.addEventListener('click', () =>
-            me.tabContainer.scrollBy({ left: 100, behavior: 'smooth' })
-        );
-        me.tabContainer.addEventListener('scroll', me.updateScrollButtons.bind(me));
+        // Append in order
+        me.element.append(me.moveHandle, me._tabsWrapper, me.collapseBtn, me.closeBtn);
     }
 
     /**
-     * Initializes the ResizeObserver for the tab container.
+     * Creates a UIElement wrapper for a PanelHeader to be added to the TabStrip.
      *
-     * @private
-     * @returns {void}
+     * @param {object} panelHeader - The legacy PanelHeader instance.
+     * @returns {UIElement} The wrapped element.
      */
-    _initResizeObserver() {
-        const me = this;
-        me._resizeObserver = new ResizeObserver(me.updateScrollButtons.bind(me));
-        me._resizeObserver.observe(me.tabContainer);
+    createTabWrapper(panelHeader) {
+        return new PanelHeaderWrapper(panelHeader);
     }
 
     /**
-     * Cleans up the observer to prevent memory leaks.
+     * Cleans up the component and destroys the TabStrip.
      *
      * @returns {void}
      */
     destroy() {
         const me = this;
-        if (me._resizeObserver) {
-            me._resizeObserver.disconnect();
+        if (me.tabStrip) {
+            me.tabStrip.dispose();
         }
+        me.element.remove();
     }
 
     /**
-     * Shows or hides tab scroll buttons based on overflow.
+     * Proxy method to update scroll buttons (handled by TabStrip now).
+     * Kept for potential API compatibility if external calls exist, though likely unused.
      *
      * @returns {void}
      */
     updateScrollButtons() {
-        const me = this;
-        const { scrollLeft, scrollWidth, clientWidth } = me.tabContainer;
-        const showLeft = scrollLeft > 1;
-        const showRight = scrollWidth > clientWidth + 1;
-        me.scrollLeftBtn.style.display = showLeft ? '' : 'none';
-        me.scrollRightBtn.style.display = showRight ? '' : 'none';
+        // No-op: TabStrip handles this internally via ResizeObserver
     }
 
     /**
      * Updates ARIA labels for group control buttons.
-     * Uses the title from the parent PanelGroup.
      *
      * @returns {void}
      */
