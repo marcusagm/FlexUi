@@ -416,8 +416,6 @@ export class ApplicationWindow extends UIElement {
         }
     }
 
-    // --- UIElement Overrides ---
-
     /**
      * Implementation of render logic.
      * Uses the adapter to create the window structure.
@@ -480,8 +478,6 @@ export class ApplicationWindow extends UIElement {
             me.renderer.unmount(me.element.parentNode, me.element);
         }
     }
-
-    // --- Public Methods ---
 
     /**
      * Sets the window content.
@@ -750,8 +746,6 @@ export class ApplicationWindow extends UIElement {
             if (data.state.tabbed) me.setTabbed(true);
         }
     }
-
-    // --- Private Helpers ---
 
     /**
      * Initializes the ResizeHandleManager.

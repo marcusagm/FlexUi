@@ -1,28 +1,44 @@
+import { UIElement } from '../../core/UIElement.js';
+import { VanillaToolbarAdapter } from '../../renderers/vanilla/VanillaToolbarAdapter.js';
 import { appBus } from '../../utils/EventBus.js';
-import { generateId } from '../../utils/generateId.js';
 import { EventTypes } from '../../constants/EventTypes.js';
 
 /**
  * Description:
  * The abstract base class for a "Toolbar Group".
  * A ToolbarGroup is a self-contained, draggable UI component.
- * Updated with A11y attributes and Synthetic Pointer Drag.
+ * It inherits from UIElement to participate in the standard lifecycle and
+ * delegates rendering to an adapter.
  *
  * Properties summary:
- * - id {string} : Unique identifier for the group.
- * - element {HTMLElement} : The main DOM element.
  * - parentContainer {ToolbarContainer} : The container this group belongs to.
  * - title {string} : The visual title of the group.
  * - movable {boolean} : Whether the group is draggable.
+ * - contentElement {HTMLElement} : The container for the group's content buttons.
+ *
+ * Typical usage:
+ * // Subclass implementation
+ * class MyGroup extends ToolbarGroup {
+ * populate() {
+ * // Add buttons to this.contentElement
+ * }
+ * }
  *
  * Events:
- * - Emits: 'dragstart' (via appBus)
+ * - Emits: EventTypes.DND_DRAG_START (via appBus)
+ *
+ * Business rules implemented:
+ * - Extends UIElement -> Disposable.
+ * - Delegates visual operations to VanillaToolbarAdapter.
+ * - Manages drag interaction via synthetic pointer events.
+ * - Enforces "populate" method for subclasses.
  *
  * Dependencies:
- * - {import('../../utils/EventBus.js').appBus}
- * - {import('../../utils/generateId.js').generateId}
+ * - UIElement
+ * - VanillaToolbarAdapter
+ * - EventBus
  */
-export class ToolbarGroup {
+export class ToolbarGroup extends UIElement {
     /**
      * The container this group belongs to.
      *
@@ -34,10 +50,10 @@ export class ToolbarGroup {
     /**
      * The visual title of the group.
      *
-     * @type {string | null}
+     * @type {string}
      * @private
      */
-    _title = null;
+    _title = '';
 
     /**
      * Whether the group handles dragging.
@@ -46,46 +62,6 @@ export class ToolbarGroup {
      * @private
      */
     _movable = true;
-
-    /**
-     * The main DOM element.
-     *
-     * @type {HTMLElement | null}
-     * @public
-     */
-    element = null;
-
-    /**
-     * The DOM element for the drag handle.
-     *
-     * @type {HTMLElement | null}
-     * @private
-     */
-    _dragHandle = null;
-
-    /**
-     * The DOM element for the title text.
-     *
-     * @type {HTMLElement | null}
-     * @private
-     */
-    _titleEl = null;
-
-    /**
-     * The container for the content.
-     *
-     * @type {HTMLElement | null}
-     * @private
-     */
-    _contentElement = null;
-
-    /**
-     * Unique identifier.
-     *
-     * @type {string}
-     * @public
-     */
-    id = generateId();
 
     /**
      * Bound pointer down handler.
@@ -100,23 +76,25 @@ export class ToolbarGroup {
      *
      * @param {string} [title=''] - Initial title.
      * @param {object} [config={}] - Configuration options.
+     * @param {import('../../core/IRenderer.js').IRenderer} [renderer=null] - Optional renderer adapter.
      */
-    constructor(title = '', config = {}) {
+    constructor(title = '', config = {}, renderer = null) {
+        super(null, renderer || new VanillaToolbarAdapter());
         const me = this;
+
+        me._title = typeof title === 'string' ? title : '';
+
+        if (config.movable !== undefined) {
+            me._movable = Boolean(config.movable);
+        }
+        if (config.parentContainer !== undefined) {
+            me._parentContainer = config.parentContainer;
+        }
 
         me._boundOnPointerDown = me.onPointerDown.bind(me);
 
-        me.title = title;
-
-        if (config.movable !== undefined) {
-            me.movable = config.movable;
-        }
-        if (config.parentContainer !== undefined) {
-            me.parentContainer = config.parentContainer;
-        }
-
-        me._buildDOM();
-        me._initEventListeners();
+        // Ensure element is created immediately for compatibility
+        me.render();
     }
 
     /**
@@ -126,7 +104,9 @@ export class ToolbarGroup {
      * @abstract
      */
     static get toolbarGroupType() {
-        throw new Error('ToolbarGroup: Subclass must override static get toolbarGroupType()');
+        throw new Error(
+            "Method 'static get toolbarGroupType()' must be implemented by subclasses of ToolbarGroup."
+        );
     }
 
     /**
@@ -140,20 +120,18 @@ export class ToolbarGroup {
 
     /**
      * Sets the parent container for this group.
-     * Validates that the value is an instance of ToolbarContainer or null.
      *
      * @param {import('./ToolbarContainer.js').ToolbarContainer | null} value - The new parent container.
      * @returns {void}
      */
     set parentContainer(value) {
         const me = this;
-        const isValid =
-            value === null ||
-            (typeof value === 'object' && value.constructor.name === 'ToolbarContainer');
-
-        if (!isValid) {
+        if (
+            value !== null &&
+            (typeof value !== 'object' || value.constructor.name !== 'ToolbarContainer')
+        ) {
             console.warn(
-                `[ToolbarGroup] invalid parentContainer assignment (${value}). Must be an instance of ToolbarContainer or null. Keeping previous value: ${me._parentContainer}`
+                `[ToolbarGroup] invalid parentContainer assignment (${value}). Must be an instance of ToolbarContainer or null.`
             );
             return;
         }
@@ -163,35 +141,29 @@ export class ToolbarGroup {
     /**
      * Retrieves the current title of the group.
      *
-     * @returns {string | null} The title.
+     * @returns {string} The title.
      */
     get title() {
         return this._title;
     }
 
     /**
-     * Sets the title of the group and updates the DOM.
-     * Updates the title element text and the drag handle's ARIA label.
-     * Validates that the value is a string or null.
+     * Sets the title of the group and updates the DOM via renderer.
      *
-     * @param {string | null} value - The new title.
+     * @param {string} value - The new title.
      * @returns {void}
      */
     set title(value) {
         const me = this;
-        if (value !== null && typeof value !== 'string') {
+        if (typeof value !== 'string') {
             console.warn(
-                `[ToolbarGroup] invalid title assignment (${value}). Must be a string or null. Keeping previous value: ${me._title}`
+                `[ToolbarGroup] invalid title assignment (${value}). Must be a string. Keeping previous value: ${me._title}`
             );
             return;
         }
         me._title = value;
-
-        if (me._titleEl) {
-            me._titleEl.textContent = value || '';
-        }
-        if (me._dragHandle) {
-            me._dragHandle.setAttribute('aria-label', `Move ${value || 'Group'}`);
+        if (me.element) {
+            me.renderer.updateTitle(me.element, value);
         }
     }
 
@@ -206,8 +178,6 @@ export class ToolbarGroup {
 
     /**
      * Sets the movable state of the group.
-     * Shows or hides the drag handle based on the value.
-     * Validates that the value is a boolean.
      *
      * @param {boolean} value - The new movable state.
      * @returns {void}
@@ -221,9 +191,8 @@ export class ToolbarGroup {
             return;
         }
         me._movable = value;
-
-        if (me._dragHandle) {
-            me._dragHandle.style.display = value ? '' : 'none';
+        if (me.element) {
+            me.renderer.setMovable(me.element, value);
         }
     }
 
@@ -233,7 +202,11 @@ export class ToolbarGroup {
      * @returns {HTMLElement | null} The content DOM element.
      */
     get contentElement() {
-        return this._contentElement;
+        const me = this;
+        if (me.element) {
+            return me.renderer.getContentElement(me.element);
+        }
+        return null;
     }
 
     /**
@@ -247,73 +220,58 @@ export class ToolbarGroup {
     }
 
     /**
-     * Builds the component's DOM structure with A11y attributes.
+     * Implementation of the rendering logic.
+     * Uses the adapter to create the group DOM structure.
      *
-     * @private
-     * @returns {void}
+     * @returns {HTMLElement} The root group element.
+     * @protected
      */
-    _buildDOM() {
+    _doRender() {
         const me = this;
-        me.element = document.createElement('div');
-        me.element.classList.add('toolbar-group');
+        const element = me.renderer.createGroupElement(me.id);
 
-        me._dragHandle = document.createElement('div');
-        me._dragHandle.className = 'toolbar-group__handle';
+        me.renderer.updateTitle(element, me._title);
+        me.renderer.setMovable(element, me._movable);
 
-        me._dragHandle.style.touchAction = 'none';
-
-        me._dragHandle.setAttribute('role', 'button');
-        me._dragHandle.setAttribute('tabindex', '0');
-        me._dragHandle.setAttribute('aria-label', `Move ${me.title || 'Group'}`);
-        me._dragHandle.setAttribute('aria-roledescription', 'draggable item');
-
-        const icon = document.createElement('span');
-        icon.className = 'icon icon-handle';
-        icon.setAttribute('aria-hidden', 'true');
-
-        me._dragHandle.appendChild(icon);
-        me.element.appendChild(me._dragHandle);
-
-        if (me.title) {
-            me._titleEl = document.createElement('span');
-            me._titleEl.className = 'toolbar-group__title';
-            me._titleEl.textContent = me.title;
-            me.element.appendChild(me._titleEl);
+        // Attach drag listener
+        const dragHandle = me.renderer.getDragHandle(element);
+        if (dragHandle) {
+            me.renderer.on(dragHandle, 'pointerdown', me._boundOnPointerDown);
         }
 
-        me._contentElement = document.createElement('div');
-        me._contentElement.className = 'toolbar-group__content';
-        me.element.appendChild(me._contentElement);
-
-        if (!me.movable) {
-            me._dragHandle.style.display = 'none';
-        }
+        return element;
     }
 
     /**
-     * Attaches Pointer listeners to the drag handle.
+     * Extended render method to trigger population.
+     * Ensures subclass content is added after the base structure is ready.
      *
-     * @private
      * @returns {void}
      */
-    _initEventListeners() {
-        const me = this;
-        if (me.movable && me._dragHandle) {
-            me._dragHandle.addEventListener('pointerdown', me._boundOnPointerDown);
-        }
+    render() {
+        super.render();
+        this.populate();
     }
 
     /**
-     * Cleans up listeners and removes the element from the DOM.
+     * Implementation of unmount logic.
+     * Cleans up listeners and element.
      *
-     * @returns {void}
+     * @protected
      */
-    destroy() {
+    _doUnmount() {
         const me = this;
-        if (me.movable && me._dragHandle) {
-            me._dragHandle.removeEventListener('pointerdown', me._boundOnPointerDown);
+        // Clean up drag handle listener
+        if (me.element) {
+            const dragHandle = me.renderer.getDragHandle(me.element);
+            if (dragHandle) {
+                me.renderer.off(dragHandle, 'pointerdown', me._boundOnPointerDown);
+            }
+            // Unmount root
+            if (me.element.parentNode) {
+                me.renderer.unmount(me.element.parentNode, me.element);
+            }
         }
-        me.element.remove();
     }
 
     /**
@@ -325,15 +283,17 @@ export class ToolbarGroup {
     onPointerDown(event) {
         const me = this;
         if (event.button !== 0) return;
-
-        if (!me.movable) return;
+        if (!me._movable) return;
 
         event.preventDefault();
         event.stopPropagation();
 
         const target = event.target;
-        target.setPointerCapture(event.pointerId);
+        if (target && typeof target.setPointerCapture === 'function') {
+            target.setPointerCapture(event.pointerId);
+        }
 
+        // Access public element getter from UIElement
         appBus.emit(EventTypes.DND_DRAG_START, {
             item: me,
             type: 'ToolbarGroup',
@@ -375,16 +335,21 @@ export class ToolbarGroup {
      * @abstract
      */
     getToolbarGroupType() {
-        throw new Error('ToolbarGroup: Subclass must override getToolbarGroupType()');
+        throw new Error(
+            "Method 'getToolbarGroupType()' must be implemented by subclasses of ToolbarGroup."
+        );
     }
 
     /**
      * Renders the content of the group.
+     * Replaces the old abstract 'render()' method to avoid conflict with UIElement.
      *
      * @returns {void}
      * @abstract
      */
-    render() {
-        throw new Error('ToolbarGroup: Subclass must override render()');
+    populate() {
+        // Optional: throw error if enforcement is desired, or leave empty for optional override.
+        // Given previous architecture enforced it via abstract, we enforce it here too.
+        throw new Error("Method 'populate()' must be implemented by subclasses of ToolbarGroup.");
     }
 }

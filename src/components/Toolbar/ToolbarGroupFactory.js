@@ -7,14 +7,18 @@ import { ToolbarGroup } from './ToolbarGroup.js';
  * ToolbarGroup types (like ApplicationGroup) must be registered
  * by the application (e.g., in App.js) before they can be created.
  *
+ * It now supports dependency injection for the rendering engine via setDefaultRendererFactory.
+ *
  * Properties summary:
  * - _instance {ToolbarGroupFactory | null} : The private static instance.
- * - _registry {Map<string, ToolbarGroup>} : The registry mapping typeName to classes.
+ * - _registry {Map<string, typeof ToolbarGroup>} : The registry mapping typeName to classes.
+ * - _defaultRendererFactory {Function | null} : A factory function returning an IRenderer instance.
  *
  * Typical usage:
  * // In App.js (on init):
  * const factory = ToolbarGroupFactory.getInstance();
  * factory.registerToolbarGroupClasses([ApplicationGroup]);
+ * factory.setDefaultRendererFactory(() => new ReactToolbarAdapter());
  *
  * // In ToolbarContainer.fromJSON (during hydration):
  * const group = ToolbarGroupFactory.getInstance().createToolbarGroup(groupData);
@@ -24,19 +28,31 @@ import { ToolbarGroup } from './ToolbarGroup.js';
  */
 export class ToolbarGroupFactory {
     /**
+     * The private static instance.
+     *
      * @type {ToolbarGroupFactory | null}
      * @private
      */
     static _instance = null;
 
     /**
+     * The registry mapping typeName to classes.
+     *
      * @type {Map<string, typeof ToolbarGroup>}
      * @private
      */
     _registry;
 
     /**
+     * A factory function that returns a default renderer instance for new groups.
+     *
+     * @type {Function | null}
      * @private
+     */
+    _defaultRendererFactory = null;
+
+    /**
+     * Private constructor for Singleton.
      */
     constructor() {
         if (ToolbarGroupFactory._instance) {
@@ -48,15 +64,29 @@ export class ToolbarGroupFactory {
     }
 
     /**
-     * <Registry> getter.
-     * @returns {Map<string, typeof ToolbarGroup>} The internal class registry.
+     * Gets the single instance of the ToolbarGroupFactory.
+     *
+     * @returns {ToolbarGroupFactory} The singleton instance.
+     */
+    static getInstance() {
+        if (!ToolbarGroupFactory._instance) {
+            ToolbarGroupFactory._instance = new ToolbarGroupFactory();
+        }
+        return ToolbarGroupFactory._instance;
+    }
+
+    /**
+     * Registry getter.
+     *
+     * @returns {Map<string, typeof ToolbarGroup>}
      */
     getRegistry() {
         return this._registry;
     }
 
     /**
-     * <Registry> setter with validation.
+     * Registry setter with validation.
+     *
      * @param {Map<string, typeof ToolbarGroup>} map
      * @returns {void}
      */
@@ -70,18 +100,26 @@ export class ToolbarGroupFactory {
     }
 
     /**
-     * Gets the single instance of the ToolbarGroupFactory.
-     * @returns {ToolbarGroupFactory}
+     * Sets the default renderer factory function.
+     * This function will be called to create a renderer instance for each new toolbar group.
+     *
+     * @param {Function} factoryFunction - A function returning an IRenderer instance.
+     * @returns {void}
      */
-    static getInstance() {
-        if (!ToolbarGroupFactory._instance) {
-            ToolbarGroupFactory._instance = new ToolbarGroupFactory();
+    setDefaultRendererFactory(factoryFunction) {
+        const me = this;
+        if (typeof factoryFunction !== 'function') {
+            console.warn(
+                `[ToolbarGroupFactory] invalid factoryFunction assignment (${factoryFunction}). Must be a function.`
+            );
+            return;
         }
-        return ToolbarGroupFactory._instance;
+        me._defaultRendererFactory = factoryFunction;
     }
 
     /**
      * Registers a ToolbarGroup class constructor against a string identifier.
+     *
      * @param {string} typeName - The string identifier (e.g., 'ApplicationGroup').
      * @param {typeof ToolbarGroup} groupClass - The class constructor.
      * @returns {void}
@@ -99,6 +137,7 @@ export class ToolbarGroupFactory {
 
     /**
      * Registers multiple ToolbarGroup classes using their static 'toolbarGroupType'.
+     *
      * @param {Array<typeof ToolbarGroup>} classList - An array of ToolbarGroup classes.
      * @returns {void}
      */
@@ -126,6 +165,8 @@ export class ToolbarGroupFactory {
 
     /**
      * Creates and hydrates a ToolbarGroup instance based on its type and saved data.
+     * Uses the default renderer factory if configured.
+     *
      * @param {object} groupData - The serialized data object for the group.
      * @returns {ToolbarGroup | null} An instantiated and hydrated ToolbarGroup, or null.
      */
@@ -146,7 +187,13 @@ export class ToolbarGroupFactory {
             return null;
         }
 
-        const group = new GroupClass(groupData.title, groupData.config || {});
+        let renderer = null;
+        if (typeof me._defaultRendererFactory === 'function') {
+            renderer = me._defaultRendererFactory();
+        }
+
+        // Instantiate with basic title/config from data and injected renderer (3rd arg)
+        const group = new GroupClass(groupData.title, groupData.config || {}, renderer);
         group.fromJSON(groupData);
 
         return group;

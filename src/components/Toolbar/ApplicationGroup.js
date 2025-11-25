@@ -13,6 +13,17 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * Typical usage:
  * const appGroup = new ApplicationGroup('Actions');
  *
+ * Events:
+ * - Emits: APP_ADD_NEW_PANEL
+ * - Emits: APP_ADD_NEW_WINDOW
+ * - Emits: APP_SAVE_STATE
+ * - Emits: APP_RESTORE_STATE
+ * - Emits: APP_RESET_STATE
+ *
+ * Business rules implemented:
+ * - Defines specific buttons for application-level commands.
+ * - Uses 'populate' hook to inject content into the standardized toolbar structure.
+ *
  * Dependencies:
  * - {import('./ToolbarGroup.js').ToolbarGroup}
  * - {import('../../utils/EventBus.js').appBus}
@@ -27,8 +38,8 @@ export class ApplicationGroup extends ToolbarGroup {
      */
     constructor(title = '', config = {}) {
         super(title, config);
-        const me = this;
-        me.render();
+        // Note: super() calls ToolbarGroup constructor, which calls render(),
+        // which calls populate(). No need to call them here manually.
     }
 
     /**
@@ -50,46 +61,58 @@ export class ApplicationGroup extends ToolbarGroup {
     }
 
     /**
-     * (Overrides ToolbarGroup) Creates the DOM for the buttons.
+     * Populates the group content with application buttons.
+     * Overrides the abstract method from ToolbarGroup.
      *
      * @returns {void}
      */
-    render() {
+    populate() {
         const me = this;
-        const contentEl = me.contentElement;
+        const contentElement = me.contentElement;
 
-        const btnAdd = me._createButton(
+        // Guard clause in case contentElement is not yet available
+        if (!contentElement) return;
+
+        const addButton = me._createButton(
             EventTypes.APP_ADD_NEW_PANEL,
             'icon-add-panel',
             'Adicionar Novo Painel'
         );
 
-        const btnAddWindow = me._createButton(
+        const addWindowButton = me._createButton(
             EventTypes.APP_ADD_NEW_WINDOW,
             'icon-add-panel', // Reusing existing icon
             'Novo Documento'
         );
 
-        const btnSave = me._createButton(
+        const saveButton = me._createButton(
             EventTypes.APP_SAVE_STATE,
             'icon-save',
             'Salvar Workspace (Ctrl+S)'
         );
-        const btnRestore = me._createButton(
+        const restoreButton = me._createButton(
             EventTypes.APP_RESTORE_STATE,
             'icon-restore',
             'Restaurar Workspace (Ctrl+R)'
         );
-        const btnReset = me._createButton(
+        const resetButton = me._createButton(
             EventTypes.APP_RESET_STATE,
             'icon-reset',
             'Resetar Workspace (Ctrl+Shift+R)'
         );
 
-        const divider1 = me._createDivider();
-        const divider2 = me._createDivider();
+        const dividerFirst = me._createDivider();
+        const dividerSecond = me._createDivider();
 
-        contentEl.append(btnAdd, btnAddWindow, divider1, btnSave, btnRestore, divider2, btnReset);
+        contentElement.append(
+            addButton,
+            addWindowButton,
+            dividerFirst,
+            saveButton,
+            restoreButton,
+            dividerSecond,
+            resetButton
+        );
     }
 
     /**
