@@ -88,7 +88,8 @@ export class CounterPanel extends Panel {
         me._boundOnDecrease = me._onDecrease.bind(me);
         me._boundOnReset = me._onReset.bind(me);
 
-        me.render();
+        // No explicit call to render() or populate() here.
+        // super() calls Panel.constructor -> me.render() -> me.populate()
     }
 
     /**
@@ -110,13 +111,16 @@ export class CounterPanel extends Panel {
     }
 
     /**
-     * (Overrides Panel) Creates the DOM for the counter.
+     * (Overrides Panel.populate) Creates the DOM for the counter.
      *
      * @returns {void}
      */
-    render() {
+    populate() {
         const me = this;
         const contentElement = me.contentElement;
+
+        // Safety check
+        if (!contentElement) return;
 
         me._valueElement = document.createElement('h2');
         me._valueElement.style.fontSize = '2.5rem';

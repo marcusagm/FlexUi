@@ -140,7 +140,8 @@ export class Panel extends IPanel {
         if (config.collapsible !== undefined) me.collapsible = config.collapsible;
         if (config.movable !== undefined) me.movable = config.movable;
 
-        // Ensure element is created immediately for compatibility with legacy code that expects .contentElement
+        // Ensure element is created immediately via the standard lifecycle.
+        // This calls UIElement.render(), which calls _doRender() and then populate().
         me.render();
     }
 
@@ -283,7 +284,7 @@ export class Panel extends IPanel {
             return;
         }
         me._minWidth = num;
-        me.updateHeight(); // Assuming updateHeight also handles width/constraints update
+        me.updateHeight();
     }
 
     /**
@@ -437,6 +438,29 @@ export class Panel extends IPanel {
      */
     getMinWidth() {
         return Math.max(0, this._minWidth);
+    }
+
+    // --- UIElement Overrides ---
+
+    /**
+     * Extended render method.
+     * Calls super.render() to create the DOM via _doRender,
+     * then calls populate() to let subclasses fill the content.
+     *
+     * @returns {void}
+     */
+    render() {
+        super.render();
+        this.populate();
+    }
+
+    /**
+     * Hook for subclasses to populate content without overriding render.
+     *
+     * @returns {void}
+     */
+    populate() {
+        // Intentionally empty. Subclasses override this.
     }
 
     /**
