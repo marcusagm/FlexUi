@@ -1,5 +1,3 @@
-// Arquivo: src/App.js
-
 import { Menu } from './components/Menu/Menu.js';
 import { Container } from './components/Container/Container.js';
 import { Panel } from './components/Panel/Panel.js';
@@ -322,7 +320,6 @@ export class App {
      * @returns {void}
      */
     _registerStrategies() {
-        const me = this; // Adicionar const me = this
         const dds = DragDropService.getInstance();
 
         dds.registerStrategy(DropZoneType.COLUMN, new ColumnDropStrategy());
@@ -340,11 +337,7 @@ export class App {
         toolbarFactory.registerToolbarGroupClasses([ApplicationGroup]);
 
         const viewportFactory = ViewportFactory.getInstance();
-
-        // Registrar a classe base Viewport (DropZoneType.VIEWPORT)
         viewportFactory.registerWindowType(DropZoneType.VIEWPORT, Viewport);
-
-        // Registrar janelas específicas
         viewportFactory.registerWindowType(ItemType.APPLICATION_WINDOW, ApplicationWindow);
         viewportFactory.registerWindowType('NotepadWindow', NotepadWindow);
     }
@@ -383,18 +376,17 @@ export class App {
         me._toolbarBottom.element.style.gridArea = 'toolbar-bottom';
         me.statusBar.element.style.gridArea = 'statusbar';
 
-        // Append all 7 components to the grid wrapper
-        me._mainWrapper.append(
-            me.menu.element,
-            me._toolbarTop.element,
-            me._toolbarLeft.element,
-            me.container.element,
-            me._toolbarRight.element,
-            me._toolbarBottom.element,
-            me.statusBar.element
-        );
-        // Append only the wrapper to the body
+        // Append non-UIElement components manually to the grid wrapper
+        me._mainWrapper.append(me.menu.element, me.container.element, me.statusBar.element);
+
+        // Append wrapper to body
         document.body.append(me._mainWrapper);
+
+        // Mount UIElement components (Toolbars) to trigger lifecycle (ResizeObserver, etc.)
+        me._toolbarTop.mount(me._mainWrapper);
+        me._toolbarBottom.mount(me._mainWrapper);
+        me._toolbarLeft.mount(me._mainWrapper);
+        me._toolbarRight.mount(me._mainWrapper);
     }
 
     /**
@@ -626,7 +618,6 @@ export class App {
         const column = me.container.getFirstRow().getFirstColumn();
         const title = `Novo Painel (${new Date().toLocaleTimeString()})`;
 
-        // Usar novo construtor: (title, config, renderer)
         const panel = new TextPanel(title, { content: 'Conteúdo do novo painel.' });
 
         const panelGroup = new PanelGroup(panel);
@@ -667,7 +658,6 @@ export class App {
         traverse(me.container);
 
         if (targetViewport) {
-            // Usar novo construtor: (titleOrConfig, contentOrNull, config, renderer)
             const note = new NotepadWindow('Documento Novo', 'Digite seu texto aqui.', {
                 x: 10,
                 y: 10,

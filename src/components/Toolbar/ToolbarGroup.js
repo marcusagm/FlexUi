@@ -34,9 +34,9 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * - Enforces "populate" method for subclasses.
  *
  * Dependencies:
- * - UIElement
- * - VanillaToolbarAdapter
- * - EventBus
+ * - {import('../../core/UIElement.js').UIElement}
+ * - {import('../../renderers/vanilla/VanillaToolbarAdapter.js').VanillaToolbarAdapter}
+ * - {import('../../utils/EventBus.js').appBus}
  */
 export class ToolbarGroup extends UIElement {
     /**
@@ -348,8 +348,6 @@ export class ToolbarGroup extends UIElement {
      * @abstract
      */
     populate() {
-        // Optional: throw error if enforcement is desired, or leave empty for optional override.
-        // Given previous architecture enforced it via abstract, we enforce it here too.
         throw new Error("Method 'populate()' must be implemented by subclasses of ToolbarGroup.");
     }
 }
