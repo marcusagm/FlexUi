@@ -386,12 +386,7 @@ export class App {
         me.container.mount(me._mainWrapper);
         me._toolbarRight.mount(me._mainWrapper);
         me._toolbarBottom.mount(me._mainWrapper);
-
-        // 3. Append Legacy components (if any)
-        // StatusBar is assumed legacy/simple for now, appending element directly
-        if (me.statusBar && me.statusBar.element) {
-            me._mainWrapper.appendChild(me.statusBar.element);
-        }
+        me.statusBar.mount(me._mainWrapper);
     }
 
     /**
