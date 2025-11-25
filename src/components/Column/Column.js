@@ -6,6 +6,10 @@ import { generateId } from '../../utils/generateId.js';
 import { ResizeHandleManager } from '../../utils/ResizeHandleManager.js';
 import { DropZoneType, ItemType } from '../../constants/DNDTypes.js';
 import { EventTypes } from '../../constants/EventTypes.js';
+import { UIElement } from '../../core/UIElement.js';
+import { VanillaColumnAdapter } from '../../renderers/vanilla/VanillaColumnAdapter.js';
+import { PanelFactory } from '../Panel/PanelFactory.js';
+import { ViewportFactory } from '../Viewport/ViewportFactory.js';
 
 /**
  * Description:
@@ -13,56 +17,47 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * generic children components (PanelGroups or Viewports), manages horizontal
  * resizing via ResizeHandleManager, and delegates drag/drop logic.
  *
- * This class is agnostic to the specific type of child (PanelGroup or Viewport),
- * treating them as generic layout units provided they implement the expected interface
- * (element, destroy, toJSON, etc.).
+ * It extends UIElement to participate in the application lifecycle and delegates
+ * DOM rendering to VanillaColumnAdapter.
  *
  * Properties summary:
- * - _namespace {string} : Unique namespace for appBus listeners.
- * - element {HTMLElement} : The main DOM element (<div class="column">).
- * - dropZoneType {string} : The identifier for the DragDropService.
  * - id {string} : Unique ID for this instance.
- * - minWidth {number} : The minimum width of the column.
  * - parentContainer {Row} : The parent Row instance.
  * - children {Array<PanelGroup|Viewport>} : List of child components.
  * - width {number|null} : The width of the column.
- * - _throttledUpdate {Function | null} : The throttled function for resizing.
- * - _boundOnChildRemoved {Function | null} : Bound handler for child removal via events.
- * - _resizeHandleManager {ResizeHandleManager | null} : Manages the horizontal resize handles.
+ * - minWidth {number} : The minimum width of the column.
+ * - dropZoneType {string} : The identifier for the DragDropService.
  *
  * Typical usage:
- * // In Row.js
- * const column = new Column(this, width);
- * this.element.appendChild(column.element);
+ * const column = new Column(rowInstance, 300);
  * column.addChild(new PanelGroup(...));
  *
  * Events:
- * - Listens to: EventTypes.PANEL_GROUP_REMOVED (to clean up empty groups)
- * - Emits: EventTypes.LAYOUT_PANELGROUPS_CHANGED (to notify LayoutService)
- * - Emits: EventTypes.COLUMN_EMPTY (to notify Row when this column is empty)
+ * - Listens to: EventTypes.COLUMN_EMPTY (via appBus)
+ * - Emits: EventTypes.LAYOUT_PANELGROUPS_CHANGED
+ * - Emits: EventTypes.COLUMN_EMPTY
  *
  * Business rules implemented:
- * - Renders children vertically.
- * - Registers as a 'column' type drop zone.
- * - Automatically removes children via 'onChildRemoved' if they request removal.
- * - If it becomes empty (last child removed), emits EventTypes.COLUMN_EMPTY.
- * - Manages its own horizontal resize handle via ResizeHandleManager.
- * - Resize logic dynamically calculates minWidth based on children constraints.
- * - Supports serialization (toJSON/fromJSON) for both PanelGroups and Viewports.
+ * - Acts as a 'column' drop zone.
+ * - Manages children (PanelGroups/Viewports) and their lifecycle.
+ * - Supports fixed or fluid width (flex-basis).
+ * - Integrates with ResizeHandleManager for width adjustments.
+ * - Provides API for LayoutService to apply computed constraints.
  *
  * Dependencies:
+ * - {import('../../core/UIElement.js').UIElement}
+ * - {import('../../renderers/vanilla/VanillaColumnAdapter.js').VanillaColumnAdapter}
+ * - {import('../../utils/ResizeHandleManager.js').ResizeHandleManager}
+ * - {import('../../utils/EventBus.js').appBus}
  * - {import('../Panel/PanelGroup.js').PanelGroup}
  * - {import('../Viewport/Viewport.js').Viewport}
  * - {import('../Panel/PanelFactory.js').PanelFactory}
  * - {import('../Viewport/ViewportFactory.js').ViewportFactory}
- * - {import('../../utils/EventBus.js').appBus}
- * - {import('../../utils/ThrottleRAF.js').throttleRAF}
- * - {import('../../utils/generateId.js').generateId}
- * - {import('../../utils/ResizeHandleManager.js').ResizeHandleManager}
- * - {import('../../constants/DNDTypes.js').DropZoneType}
- * - {import('../../constants/EventTypes.js').EventTypes}
+ *
+ * Notes / Additional:
+ * - The Column delegates horizontal resizing to its child Columns logic via the LayoutService interactions.
  */
-export class Column {
+export class Column extends UIElement {
     /**
      * The parent Row instance.
      *
@@ -74,7 +69,7 @@ export class Column {
     /**
      * List of child components (PanelGroups or Viewports).
      *
-     * @type {Array<PanelGroup|Viewport>}
+     * @type {Array<import('../Panel/PanelGroup.js').PanelGroup | import('../Viewport/Viewport.js').Viewport>}
      * @private
      */
     _children = [];
@@ -96,20 +91,12 @@ export class Column {
     _minWidth = 150;
 
     /**
-     * Unique ID for this instance, used for namespacing events.
-     *
-     * @type {string}
-     * @public
-     */
-    id = generateId();
-
-    /**
      * Unique namespace for appBus listeners.
      *
-     * @type {string}
+     * @type {string | null}
      * @private
      */
-    _namespace = this.id;
+    _namespace = null;
 
     /**
      * The throttled (rAF) update function for resizing.
@@ -136,49 +123,41 @@ export class Column {
     _resizeHandleManager = null;
 
     /**
-     * The main DOM element.
-     *
-     * @type {HTMLElement}
-     * @public
-     */
-    element;
-
-    /**
      * The drop zone type identifier.
      *
      * @type {string}
      * @public
      */
-    dropZoneType;
+    dropZoneType = DropZoneType.COLUMN;
 
     /**
+     * Creates a new Column instance.
+     *
      * @param {import('../Row/Row.js').Row} container - The parent Row instance.
      * @param {number|null} [width=null] - The initial width of the column.
+     * @param {import('../../core/IRenderer.js').IRenderer} [renderer=null] - Optional renderer.
      */
-    constructor(container, width = null) {
+    constructor(container, width = null, renderer = null) {
+        super(generateId(), renderer || new VanillaColumnAdapter());
         const me = this;
 
+        me._namespace = me.id;
         me.minWidth = me._minWidth;
         me.parentContainer = container;
         me.width = width;
 
-        me.element = document.createElement('div');
-        me.element.classList.add('column');
-        me.dropZoneType = DropZoneType.COLUMN;
-
-        me.element.dataset.dropzone = me.dropZoneType;
-        me.element.dropZoneInstance = me;
-
         me.setThrottledUpdate(
             throttleRAF(() => {
-                if (me.width !== null) {
-                    me.element.style.flex = `0 0 ${me.width}px`;
+                if (me._width !== null && me.element) {
+                    me.renderer.updateWidth(me.element, me._width);
                 }
             })
         );
 
         me._boundOnChildRemoved = me.onChildRemoved.bind(me);
 
+        // Initialize DOM via UIElement lifecycle
+        me.render();
         me.initEventListeners();
     }
 
@@ -209,13 +188,18 @@ export class Column {
         if (me._width === value) return;
 
         me._width = value;
+
+        if (me.element) {
+            me.renderer.updateWidth(me.element, value);
+        }
+
         me.requestLayoutUpdate();
     }
 
     /**
      * Children getter.
      *
-     * @returns {Array<PanelGroup|Viewport>} The list of children.
+     * @returns {Array<import('../Panel/PanelGroup.js').PanelGroup | import('../Viewport/Viewport.js').Viewport>} The list of children.
      */
     get children() {
         return this._children;
@@ -271,25 +255,6 @@ export class Column {
     }
 
     /**
-     * Wrapper method for minWidth setter (for compatibility).
-     *
-     * @param {number} width
-     * @returns {void}
-     */
-    setMinWidth(width) {
-        this.minWidth = width;
-    }
-
-    /**
-     * Wrapper method for minWidth getter (for compatibility).
-     *
-     * @returns {number}
-     */
-    getMinWidth() {
-        return this.minWidth;
-    }
-
-    /**
      * ThrottledUpdate setter.
      *
      * @param {Function} throttledFunction - The throttled function.
@@ -309,6 +274,96 @@ export class Column {
     }
 
     /**
+     * Implementation of the rendering logic.
+     * Uses the adapter to create the column DOM structure.
+     *
+     * @returns {HTMLElement} The root column element.
+     * @protected
+     */
+    _doRender() {
+        const me = this;
+        const element = me.renderer.createColumnElement(me.id);
+
+        // Apply initial width
+        me.renderer.updateWidth(element, me._width);
+
+        // Configure DropZone
+        element.dataset.dropzone = me.dropZoneType;
+        element.dropZoneInstance = me;
+
+        return element;
+    }
+
+    /**
+     * Implementation of the mounting logic.
+     * Mounts all children into the column.
+     *
+     * @param {HTMLElement} container - The parent container.
+     * @protected
+     */
+    _doMount(container) {
+        const me = this;
+        if (me.element) {
+            me.renderer.mount(container, me.element);
+
+            // Mount all children
+            me._children.forEach(child => {
+                // Ensure child has its element created
+                if (!child.element) child.render();
+
+                // If a resize handle exists, we must insert before it
+                const resizeHandle = me.element.querySelector('.column__resize-handle');
+                if (resizeHandle) {
+                    me.element.insertBefore(child.element, resizeHandle);
+                } else {
+                    me.renderer.mount(me.element, child.element);
+                }
+
+                child.mount(me.element);
+            });
+        }
+    }
+
+    /**
+     * Implementation of the unmounting logic.
+     *
+     * @protected
+     */
+    _doUnmount() {
+        const me = this;
+
+        if (me._resizeHandleManager) {
+            me._resizeHandleManager.destroy();
+            me._resizeHandleManager = null;
+        }
+
+        if (me.getThrottledUpdate()) {
+            me.getThrottledUpdate().cancel();
+        }
+
+        // Unmount children
+        me._children.forEach(child => child.unmount());
+
+        if (me.element && me.element.parentNode) {
+            me.renderer.unmount(me.element.parentNode, me.element);
+        }
+    }
+
+    /**
+     * Sets a computed minimum width style on the element.
+     * Used by LayoutService to enforce constraints based on content.
+     *
+     * @param {number} value - The computed min-width in pixels.
+     * @returns {void}
+     */
+    setComputedMinWidth(value) {
+        const me = this;
+        if (me.element) {
+            me.renderer.setMinWidth(me.element, value);
+        }
+    }
+
+    /**
      * Calculates the effective minimum width by checking its own minWidth
      * and the minWidth of all children.
      *
@@ -319,7 +374,6 @@ export class Column {
         let effectiveMinWidth = me.minWidth;
         me._children.forEach(child => {
             let childMin = 0;
-            // PanelGroup has getMinPanelWidth(), Viewport/Windows usually have minWidth property
             if (typeof child.getMinPanelWidth === 'function') {
                 childMin = child.getMinPanelWidth();
             } else if (child.minWidth !== undefined) {
@@ -336,17 +390,16 @@ export class Column {
      * @returns {void}
      */
     initEventListeners() {
-        // Listens for legacy PanelGroup removal events to support PanelGroup closure
         appBus.on(EventTypes.PANEL_GROUP_REMOVED, this._boundOnChildRemoved, {
             namespace: this._namespace
         });
     }
 
     /**
-     * Event handler for when a child (specifically PanelGroup) reports removal via EventBus.
+     * Event handler for when a child reports removal.
      *
      * @param {object} eventData - The event data.
-     * @param {PanelGroup} eventData.panel - The instance being removed.
+     * @param {import('../Panel/PanelGroup.js').PanelGroup} eventData.panel - The instance being removed.
      * @param {Column} eventData.column - The Column it is being removed from.
      * @returns {void}
      */
@@ -361,13 +414,13 @@ export class Column {
      *
      * @returns {void}
      */
-    destroy() {
+    dispose() {
         const me = this;
         appBus.offByNamespace(me._namespace);
-        me.getThrottledUpdate()?.cancel();
-        me._resizeHandleManager?.destroy();
 
-        [...me._children].forEach(child => child.destroy());
+        [...me._children].forEach(child => child.dispose());
+
+        super.dispose();
     }
 
     /**
@@ -378,9 +431,16 @@ export class Column {
      */
     addResizeBars(isLast) {
         const me = this;
-        me.element.querySelectorAll('.column__resize-handle').forEach(element => element.remove());
+        if (!me.element) return;
+
+        // Clean up existing
+        const existingHandles = me.element.querySelectorAll('.column__resize-handle');
+        existingHandles.forEach(el => el.remove());
         me.element.classList.remove('column--resize-right');
-        me._resizeHandleManager?.destroy();
+        if (me._resizeHandleManager) {
+            me._resizeHandleManager.destroy();
+            me._resizeHandleManager = null;
+        }
 
         if (isLast) {
             return;
@@ -400,7 +460,9 @@ export class Column {
             }),
             onResize: ({ width }) => {
                 me._width = width;
-                me.getThrottledUpdate()();
+                if (me.getThrottledUpdate()) {
+                    me.getThrottledUpdate()();
+                }
             },
             onEnd: () => {
                 if (me.parentContainer) {
@@ -418,11 +480,13 @@ export class Column {
      */
     updateWidth(isLast) {
         const me = this;
+        if (!me.element) return;
+
         if (isLast) {
-            me.element.style.flex = `1 1 auto`;
+            me.renderer.updateWidth(me.element, null); // Auto
             me._width = null;
-        } else if (me.width !== null) {
-            me.element.style.flex = `0 0 ${me.width}px`;
+        } else {
+            me.renderer.updateWidth(me.element, me.width);
         }
         me.requestLayoutUpdate();
     }
@@ -430,18 +494,13 @@ export class Column {
     /**
      * Adds multiple children at once.
      *
-     * @param {Array<PanelGroup|Viewport>} children - Array of children instances.
+     * @param {Array<import('../Panel/PanelGroup.js').PanelGroup|import('../Viewport/Viewport.js').Viewport>} children - Array of children instances.
      * @returns {void}
      */
     addChildrenBulk(children) {
         const me = this;
-        const resizeHandle = me.element.querySelector('.column__resize-handle');
         children.forEach(child => {
-            me._children.push(child);
-            me.element.insertBefore(child.element, resizeHandle);
-            if (typeof child.setParentColumn === 'function') {
-                child.setParentColumn(me);
-            }
+            me.addChild(child);
         });
         me.requestLayoutUpdate();
     }
@@ -449,30 +508,41 @@ export class Column {
     /**
      * Adds a single child (PanelGroup or Viewport) to the column at a specific index.
      *
-     * @param {PanelGroup|Viewport} child - The component instance to add.
+     * @param {import('../Panel/PanelGroup.js').PanelGroup|import('../Viewport/Viewport.js').Viewport} child - The component instance to add.
      * @param {number|null} [index=null] - The index to insert at.
      * @returns {void}
      */
     addChild(child, index = null) {
         const me = this;
-        const resizeHandle = me.element.querySelector('.column__resize-handle');
+        if (!me.element) return;
 
-        if (index === null) {
+        if (index === null || index >= me._children.length) {
             me._children.push(child);
-            me.element.insertBefore(child.element, resizeHandle);
         } else {
             me._children.splice(index, 0, child);
-            const nextSibling = me._children[index + 1];
-            let nextSiblingElement = nextSibling ? nextSibling.element : null;
-
-            if (!nextSiblingElement) {
-                nextSiblingElement = resizeHandle;
-            }
-            me.element.insertBefore(child.element, nextSiblingElement);
         }
 
         if (typeof child.setParentColumn === 'function') {
             child.setParentColumn(me);
+        }
+
+        // Mount if we are mounted
+        if (me.isMounted) {
+            if (!child.element) child.render();
+
+            const safeIndex = index === null ? me._children.length - 1 : index;
+            const nextChild = me._children[safeIndex + 1];
+
+            const resizeHandle = me.element.querySelector('.column__resize-handle');
+            const referenceNode = nextChild ? nextChild.element : resizeHandle;
+
+            if (referenceNode) {
+                me.element.insertBefore(child.element, referenceNode);
+            } else {
+                me.renderer.mount(me.element, child.element);
+            }
+
+            child.mount(me.element);
         }
 
         me.requestLayoutUpdate();
@@ -480,25 +550,22 @@ export class Column {
 
     /**
      * Gets all collapsed children.
-     * Viewports are never collapsed, so this returns only collapsed PanelGroups.
      *
-     * @returns {Array<PanelGroup|Viewport>} Collapsed children instances.
+     * @returns {Array<import('../Panel/PanelGroup.js').PanelGroup|import('../Viewport/Viewport.js').Viewport>} Collapsed children instances.
      */
     getChildrenCollapsed() {
         return this._children.filter(child => {
             if (child instanceof PanelGroup) {
                 return child.collapsed;
             }
-            // Viewports are not collapsible
             return false;
         });
     }
 
     /**
      * Gets all uncollapsed children.
-     * Includes open PanelGroups and all Viewports.
      *
-     * @returns {Array<PanelGroup|Viewport>} Uncollapsed children instances.
+     * @returns {Array<import('../Panel/PanelGroup.js').PanelGroup|import('../Viewport/Viewport.js').Viewport>} Uncollapsed children instances.
      */
     getChildrenUncollapsed() {
         return this._children.filter(child => {
@@ -512,7 +579,7 @@ export class Column {
     /**
      * Removes a child from the column.
      *
-     * @param {PanelGroup|Viewport} child - The instance to remove.
+     * @param {import('../Panel/PanelGroup.js').PanelGroup|import('../Viewport/Viewport.js').Viewport} child - The instance to remove.
      * @param {boolean} [emitEmpty=true] - Whether to emit EventTypes.COLUMN_EMPTY.
      * @returns {void}
      */
@@ -523,13 +590,11 @@ export class Column {
             return;
         }
 
+        child.unmount();
+
         me._children.splice(index, 1);
         if (typeof child.setParentColumn === 'function') {
             child.setParentColumn(null);
-        }
-
-        if (me.element.contains(child.element)) {
-            me.element.removeChild(child.element);
         }
 
         me.requestLayoutUpdate();
@@ -553,7 +618,7 @@ export class Column {
     /**
      * Finds the state index of a child instance.
      *
-     * @param {PanelGroup|Viewport} child - The child to find.
+     * @param {import('../Panel/PanelGroup.js').PanelGroup|import('../Viewport/Viewport.js').Viewport} child - The child to find.
      * @returns {number} The index, or -1 if not found.
      */
     getChildIndex(child) {
@@ -568,20 +633,7 @@ export class Column {
      */
     getChildIndexByElement(element) {
         const me = this;
-        const allChildren = Array.from(me.element.children);
-        let panelIndex = 0;
-        for (const child of allChildren) {
-            if (child === element) {
-                break;
-            }
-            if (
-                (child.classList.contains('panel-group') || child.classList.contains('viewport')) &&
-                me._children.some(p => p.element === child)
-            ) {
-                panelIndex++;
-            }
-        }
-        return panelIndex;
+        return me._children.findIndex(child => child.element === element);
     }
 
     /**
@@ -595,7 +647,6 @@ export class Column {
 
     /**
      * Serializes the Column state to JSON.
-     * Handles polymorphic children types (PanelGroup vs Viewport).
      *
      * @returns {object} The serialized state object.
      */
@@ -616,37 +667,35 @@ export class Column {
 
     /**
      * Deserializes state from JSON data.
-     * Uses factories to instantiate correct child types (PanelGroup or Viewport).
      *
      * @param {object} data - The state object.
      * @returns {void}
      */
     fromJSON(data) {
         const me = this;
+        [...me._children].forEach(child => me.removeChild(child, false));
+
         if (data.width !== undefined) {
             me.width = data.width;
         }
 
-        // Support 'children' (new) or 'panelGroups' (legacy)
         const childrenData = data.children || data.panelGroups;
         const itemsToRestore = [];
 
         if (childrenData && Array.isArray(childrenData)) {
+            const panelFactory = PanelFactory.getInstance();
+            const viewportFactory = ViewportFactory.getInstance();
+
             childrenData.forEach(itemData => {
                 let item = null;
 
-                // Check for Viewport type
                 if (
                     itemData.type === ItemType.VIEWPORT ||
                     itemData.type === DropZoneType.VIEWPORT
                 ) {
-                    item = new Viewport();
-                    // Viewport hydration if it supports fromJSON in the future
-                    if (typeof item.fromJSON === 'function') {
-                        item.fromJSON(itemData);
-                    }
+                    item = viewportFactory.createViewport(itemData);
                 } else {
-                    // Default to PanelGroup for backward compatibility or explicit type
+                    // Default to PanelGroup
                     item = new PanelGroup();
                     item.fromJSON(itemData);
                 }
@@ -662,5 +711,24 @@ export class Column {
         }
 
         me.updateWidth(false);
+    }
+
+    /**
+     * Wrapper method for minWidth setter.
+     *
+     * @param {number} width
+     * @returns {void}
+     */
+    setMinWidth(width) {
+        this.minWidth = width;
+    }
+
+    /**
+     * Wrapper method for minWidth getter.
+     *
+     * @returns {number}
+     */
+    getMinWidth() {
+        return this.minWidth;
     }
 }
