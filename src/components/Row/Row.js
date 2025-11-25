@@ -5,60 +5,56 @@ import { generateId } from '../../utils/generateId.js';
 import { ResizeHandleManager } from '../../utils/ResizeHandleManager.js';
 import { DropZoneType } from '../../constants/DNDTypes.js';
 import { EventTypes } from '../../constants/EventTypes.js';
+import { UIElement } from '../../core/UIElement.js';
+import { VanillaRowAdapter } from '../../renderers/vanilla/VanillaRowAdapter.js';
 
 /**
  * Description:
  * Manages a single horizontal Row, which contains and organizes Columns.
  * It acts as a 'drop zone' (type 'row') to detect drops in the horizontal
  * gaps *between* columns. It also manages its own vertical (height) resizing
- * and collapse state using the unified ResizeHandleManager.
+ * and collapse state using the unified ResizeHandleManager and VanillaRowAdapter.
+ *
+ * It extends UIElement to participate in the application lifecycle.
  *
  * Properties summary:
- * - element {HTMLElement} : The main DOM element (<div class="row">).
- * - columns {Array<Column>} : List of child Columns.
+ * - id {string} : Unique ID for this instance.
  * - parentContainer {Container} : The parent Container instance.
+ * - columns {Array<Column>} : List of child Columns.
  * - height {number|null} : The height of the row.
  * - collapsed {boolean} : Whether the row is collapsed.
  * - collapsible {boolean} : Whether the row can be collapsed.
  * - minHeight {number} : Minimum height constraint.
- * - collapseBtn {HTMLElement|null} : The button element to toggle collapse state.
- * - _id {string} : Unique ID for this instance.
- * - _namespace {string} : Unique namespace for appBus listeners.
- * - _minHeight {number} : Minimum height in pixels for vertical resizing.
- * - _throttledUpdate {Function|null} : The throttled function for height updates.
- * - _resizeHandleManager {ResizeHandleManager|null} : Manages the vertical resize handles.
+ * - collapseBtn {HTMLElement|null} : The DOM element for the collapse button.
+ * - dropZoneType {string} : The identifier for the DragDropService.
  *
  * Typical usage:
- * // In Container.js
- * const row = new Row(this, height);
- * this.element.appendChild(row.element);
+ * const row = new Row(parentContainer, 200);
+ * row.createColumn();
  *
  * Events:
- * - Listens to: EventTypes.COLUMN_EMPTY (to clean up empty columns)
- * - Emits: EventTypes.LAYOUT_COLUMNS_CHANGED (to notify LayoutService)
- * - Emits: EventTypes.ROW_EMPTY (to notify Container when this row is empty)
+ * - Listens to: EventTypes.COLUMN_EMPTY
+ * - Emits: EventTypes.LAYOUT_COLUMNS_CHANGED
+ * - Emits: EventTypes.ROW_EMPTY
  *
  * Business rules implemented:
- * - Renders 'Column' children horizontally.
- * - Registers as a 'row' type drop zone.
- * - Automatically removes empty columns via 'onColumnEmpty'.
- * - Manages vertical resizing via ResizeHandleManager.
- * - Supports collapsing, which hides all child columns and reduces height.
- * - Validates all property assignments.
+ * - Manages children (Columns) and their lifecycle.
+ * - Handles vertical resizing logic.
+ * - Manages collapse state affecting visual height and child visibility.
+ * - Integrates with LayoutService for sibling-dependent logic (e.g. disabling collapse button).
  *
  * Dependencies:
+ * - {import('../../core/UIElement.js').UIElement}
+ * - {import('../../renderers/vanilla/VanillaRowAdapter.js').VanillaRowAdapter}
  * - {import('../Column/Column.js').Column}
- * - {import('../../utils/EventBus.js').appBus}
- * - {import('../../utils/ThrottleRAF.js').throttleRAF}
- * - {import('../../utils/generateId.js').generateId}
  * - {import('../../utils/ResizeHandleManager.js').ResizeHandleManager}
- * - {import('../../constants/DNDTypes.js').DropZoneType}
- * - {import('../../constants/EventTypes.js').EventTypes}
+ * - {import('../../utils/EventBus.js').appBus}
+ * - {import('../Container/Container.js').Container}
  *
  * Notes / Additional:
- * - The Row delegates horizontal resizing to its child Columns.
+ * - None
  */
-export class Row {
+export class Row extends UIElement {
     /**
      * List of child Column components.
      *
@@ -100,20 +96,12 @@ export class Row {
     _collapsible = true;
 
     /**
-     * Unique ID for this instance, used for namespacing events.
-     *
-     * @type {string}
-     * @private
-     */
-    _id = generateId();
-
-    /**
      * Unique namespace for appBus listeners.
      *
-     * @type {string}
+     * @type {string | null}
      * @private
      */
-    _namespace = this._id;
+    _namespace = null;
 
     /**
      * Minimum height in pixels for vertical resizing.
@@ -150,27 +138,18 @@ export class Row {
     /**
      * Stores the resize handle manager instance.
      *
-     * @type {ResizeHandleManager | null}
+     * @type {import('../../utils/ResizeHandleManager.js').ResizeHandleManager | null}
      * @private
      */
     _resizeHandleManager = null;
 
     /**
-     * The button element to toggle collapse state.
-     * Stored for access by LayoutService (to disable).
+     * The DOM element for the collapse button.
      *
      * @type {HTMLElement | null}
-     * @public
+     * @private
      */
-    collapseBtn = null;
-
-    /**
-     * The main DOM element.
-     *
-     * @type {HTMLElement}
-     * @public
-     */
-    element;
+    _collapseBtnElement = null;
 
     /**
      * The drop zone type identifier.
@@ -178,27 +157,23 @@ export class Row {
      * @type {string}
      * @public
      */
-    dropZoneType;
+    dropZoneType = DropZoneType.ROW;
 
     /**
      * Creates an instance of Row.
      *
      * @param {import('../Container/Container.js').Container} container - The parent Container instance.
      * @param {number|null} [height=null] - The initial height of the row.
+     * @param {import('../../core/IRenderer.js').IRenderer} [renderer=null] - Optional renderer.
      */
-    constructor(container, height = null) {
+    constructor(container, height = null, renderer = null) {
+        super(generateId(), renderer || new VanillaRowAdapter());
         const me = this;
-        me.element = document.createElement('div');
-        me.element.classList.add('row');
 
+        me._namespace = me.id;
         me.parentContainer = container;
         me.height = height;
         me.minHeight = me._minHeight;
-
-        me.dropZoneType = DropZoneType.ROW;
-
-        me.element.dataset.dropzone = me.dropZoneType;
-        me.element.dropZoneInstance = me;
 
         me.setThrottledUpdate(
             throttleRAF(() => {
@@ -209,8 +184,11 @@ export class Row {
         me._boundOnColumnEmpty = me.onColumnEmpty.bind(me);
         me._boundOnToggleCollapseRequest = me.toggleCollapse.bind(me);
 
-        me.clear();
+        // Initialize DOM via UIElement lifecycle
+        me.render();
         me.initEventListeners();
+
+        // Initial update (visual only if rendered)
         me.updateHeight(false);
     }
 
@@ -234,7 +212,6 @@ export class Row {
 
     /**
      * ParentContainer setter.
-     * Validates that the value looks like a Container.
      *
      * @param {import('../Container/Container.js').Container | null} value - The new parent container.
      * @returns {void}
@@ -261,7 +238,6 @@ export class Row {
 
     /**
      * Height setter.
-     * Validates that the value is a positive number or null.
      *
      * @param {number | null} value - The new height.
      * @returns {void}
@@ -293,7 +269,7 @@ export class Row {
 
     /**
      * Collapsed setter.
-     * Manages UI state: adds/removes classes, hides/shows columns, updates button, updates height.
+     * Manages UI state: updates adapter, toggles column visibility, updates button state.
      *
      * @param {boolean} value - The new collapsed state.
      * @returns {void}
@@ -308,20 +284,17 @@ export class Row {
         }
         me._collapsed = value;
 
-        if (value) {
-            me.element.classList.add('row--collapsed');
-            me._columns.forEach(column => (column.element.style.display = 'none'));
-            if (me.collapseBtn) {
-                me.collapseBtn.classList.add('row__collapse-btn--collapsed');
-            }
-        } else {
-            me.element.classList.remove('row--collapsed');
-            me._columns.forEach(column => (column.element.style.display = ''));
-            if (me.collapseBtn) {
-                me.collapseBtn.classList.remove('row__collapse-btn--collapsed');
+        // Update UI via adapter
+        if (me.element) {
+            me.updateHeight(false); // Re-apply height logic with new collapsed state
+
+            // Toggle visibility of children
+            me._columns.forEach(column => column.setVisible(!value));
+
+            if (me._collapseBtnElement) {
+                me.renderer.setCollapseButtonState(me._collapseBtnElement, value, false);
             }
         }
-        me.updateHeight(false);
     }
 
     /**
@@ -363,7 +336,6 @@ export class Row {
 
     /**
      * MinHeight setter.
-     * Validates that the value is a positive number.
      *
      * @param {number} value - The new minimum height.
      * @returns {void}
@@ -381,22 +353,12 @@ export class Row {
     }
 
     /**
-     * Wrapper method for minHeight setter (compatibility).
+     * Accessor for the collapse button element.
      *
-     * @param {number} height
-     * @returns {void}
+     * @returns {HTMLElement | null}
      */
-    setMinHeight(height) {
-        this.minHeight = height;
-    }
-
-    /**
-     * Wrapper method for minHeight getter (compatibility).
-     *
-     * @returns {number}
-     */
-    getMinHeight() {
-        return this.minHeight;
+    get collapseBtn() {
+        return this._collapseBtnElement;
     }
 
     /**
@@ -429,6 +391,82 @@ export class Row {
     }
 
     /**
+     * Implementation of the rendering logic.
+     * Uses the adapter to create the row DOM structure.
+     *
+     * @returns {HTMLElement} The root row element.
+     * @protected
+     */
+    _doRender() {
+        const me = this;
+        const element = me.renderer.createRowElement(me.id);
+
+        element.dataset.dropzone = me.dropZoneType;
+        element.dropZoneInstance = me;
+
+        return element;
+    }
+
+    /**
+     * Implementation of the mounting logic.
+     * Mounts children and sets up resize handles.
+     *
+     * @param {HTMLElement} container - The parent container.
+     * @protected
+     */
+    _doMount(container) {
+        const me = this;
+        if (me.element) {
+            me.renderer.mount(container, me.element);
+
+            // Mount columns
+            me._columns.forEach(column => {
+                if (!column.element) column.render();
+                // Check if there's a resize handle to insert before
+                const resizeHandle = me.element.querySelector('.row__resize-handle');
+                if (resizeHandle) {
+                    me.element.insertBefore(column.element, resizeHandle);
+                } else {
+                    me.renderer.mount(me.element, column.element);
+                }
+                column.mount(me.element);
+            });
+
+            // Initialize controls
+            me.updateAllResizeBars();
+            me.updateHeight(false);
+        }
+    }
+
+    /**
+     * Implementation of the unmounting logic.
+     *
+     * @protected
+     */
+    _doUnmount() {
+        const me = this;
+        if (me.getThrottledUpdate()) {
+            me.getThrottledUpdate().cancel();
+        }
+
+        // Cleanup button listener
+        if (me._collapseBtnElement) {
+            me.renderer.off(me._collapseBtnElement, 'click', me._boundOnToggleCollapseRequest);
+        }
+
+        if (me._resizeHandleManager) {
+            me._resizeHandleManager.destroy();
+            me._resizeHandleManager = null;
+        }
+
+        me._columns.forEach(column => column.unmount());
+
+        if (me.element && me.element.parentNode) {
+            me.renderer.unmount(me.element.parentNode, me.element);
+        }
+    }
+
+    /**
      * Initializes appBus event listeners for this component.
      *
      * @returns {void}
@@ -456,21 +494,16 @@ export class Row {
     destroy() {
         const me = this;
         appBus.offByNamespace(me._namespace);
-        me.getThrottledUpdate()?.cancel();
 
-        if (me.collapseBtn) {
-            me.collapseBtn.removeEventListener('click', me._boundOnToggleCollapseRequest);
-        }
+        [...me.columns].forEach(column => column.dispose());
 
-        me._resizeHandleManager?.destroy();
-
-        [...me.columns].forEach(column => column.destroy());
+        super.dispose();
     }
 
     /**
      * Event handler for when a child Column reports it is empty.
      *
-     * @param {import('../Column/Column.js').Column} column - The Column instance that emitted the event.
+     * @param {import('../Column/Column.js').Column} column - The Column instance.
      * @returns {void}
      */
     onColumnEmpty(column) {
@@ -497,26 +530,28 @@ export class Row {
     }
 
     /**
-     * Sets up the collapse button logic and DOM.
+     * Sets up the collapse button logic and DOM using the adapter.
      *
      * @private
      * @returns {void}
      */
     _setupCollapseButton() {
         const me = this;
-        me.element.querySelectorAll('.row__collapse-btn').forEach(button => button.remove());
-        me.collapseBtn = null;
 
-        if (me.collapsible) {
-            me.collapseBtn = document.createElement('button');
-            me.collapseBtn.type = 'button';
-            me.collapseBtn.className = 'row__collapse-btn';
-            me.collapseBtn.setAttribute('aria-label', 'Toggle Row Collapse');
-            if (me.collapsed) {
-                me.collapseBtn.classList.add('row__collapse-btn--collapsed');
-            }
-            me.collapseBtn.addEventListener('click', me._boundOnToggleCollapseRequest);
-            me.element.appendChild(me.collapseBtn);
+        // Cleanup existing button
+        if (me._collapseBtnElement) {
+            me.renderer.off(me._collapseBtnElement, 'click', me._boundOnToggleCollapseRequest);
+            me.renderer.unmountCollapseButton(me._collapseBtnElement);
+            me._collapseBtnElement = null;
+        }
+
+        if (me.collapsible && me.element) {
+            me._collapseBtnElement = me.renderer.createCollapseButton();
+            me.renderer.on(me._collapseBtnElement, 'click', me._boundOnToggleCollapseRequest);
+            me.renderer.mountCollapseButton(me.element, me._collapseBtnElement);
+
+            // Sync initial state
+            me.renderer.setCollapseButtonState(me._collapseBtnElement, me.collapsed, false);
         }
     }
 
@@ -528,10 +563,20 @@ export class Row {
      */
     addResizeBars(isLast) {
         const me = this;
-        me.element.querySelectorAll('.row__resize-handle').forEach(element => element.remove());
-        me.element.classList.remove('row--resize-bottom');
-        me._resizeHandleManager?.destroy();
+        if (!me.element) return;
 
+        // Remove existing handles manual query or track?
+        // ResizeHandleManager appends div.resize-handle.
+        const existingHandles = me.element.querySelectorAll('.row__resize-handle');
+        existingHandles.forEach(el => el.remove());
+        me.element.classList.remove('row--resize-bottom');
+
+        if (me._resizeHandleManager) {
+            me._resizeHandleManager.destroy();
+            me._resizeHandleManager = null;
+        }
+
+        // Re-create collapse button logic as it might depend on handle position visually
         me._setupCollapseButton();
 
         if (isLast) {
@@ -552,7 +597,9 @@ export class Row {
             }),
             onResize: ({ height }) => {
                 me.height = height;
-                me.getThrottledUpdate()();
+                if (me.getThrottledUpdate()) {
+                    me.getThrottledUpdate()();
+                }
             },
             onEnd: () => {
                 if (me.parentContainer) {
@@ -617,37 +664,41 @@ export class Row {
 
         if (index === null) {
             me._columns.push(column);
-            const resizeHandle = me.element.querySelector('.row__resize-handle');
-            if (resizeHandle) {
-                me.element.insertBefore(column.element, resizeHandle);
-            } else {
-                me.element.appendChild(column.element);
-            }
         } else {
             me._columns.splice(index, 0, column);
+        }
 
-            const nextSiblingColumn = me._columns[index + 1];
-            let nextDomNode = nextSiblingColumn ? nextSiblingColumn.element : null;
+        if (me.isMounted) {
+            if (!column.element) column.render();
 
-            if (!nextDomNode) {
-                const resizeHandle = me.element.querySelector('.row__resize-handle');
+            // Insert respecting handle
+            const resizeHandle = me.element.querySelector('.row__resize-handle');
+
+            // Determine insertion reference
+            if (index === null) {
                 if (resizeHandle) {
-                    nextDomNode = resizeHandle;
+                    me.element.insertBefore(column.element, resizeHandle);
+                } else {
+                    me.renderer.mount(me.element, column.element);
+                }
+            } else {
+                const nextCol = me._columns[index + 1];
+                const reference = nextCol ? nextCol.element : resizeHandle;
+
+                if (reference) {
+                    me.element.insertBefore(column.element, reference);
+                } else {
+                    me.renderer.mount(me.element, column.element);
                 }
             }
 
-            if (nextDomNode) {
-                me.element.insertBefore(column.element, nextDomNode);
-            } else {
-                me.element.appendChild(column.element);
-            }
+            column.mount(me.element);
         }
 
         if (me.collapsed) {
-            column.element.style.display = 'none';
+            column.setVisible(false);
         }
 
-        column.parentContainer = me;
         me.requestLayoutUpdate();
         return column;
     }
@@ -665,11 +716,9 @@ export class Row {
             return;
         }
 
-        column.destroy();
-        const columnElement = column.element;
-        if (columnElement && me.element.contains(columnElement)) {
-            me.element.removeChild(columnElement);
-        }
+        column.unmount();
+        column.dispose();
+
         me._columns.splice(index, 1);
         me.requestLayoutUpdate();
     }
@@ -715,33 +764,50 @@ export class Row {
     }
 
     /**
-     * Updates the CSS flex properties based on the row's state.
+     * Updates the CSS flex properties and height based on the row's state.
+     * Delegates styling to adapter.
      *
      * @param {boolean} isLast - True if this is the last Row in the Container.
      * @returns {void}
      */
     updateHeight(isLast) {
         const me = this;
-        me.element.style.minHeight = `${me.getMinHeight()}px`;
+        if (!me.element) return;
 
-        if (me.collapsed) {
-            me.element.style.flex = '0 0 auto';
-            me.element.style.height = 'auto';
-            me.element.classList.add('row--collapsed');
-            me.element.style.minHeight = 'auto';
-            return;
+        me.renderer.updateHeight(me.element, me.height, me._minHeight, me._collapsed, isLast);
+    }
+
+    /**
+     * Enables or disables the collapse button.
+     * Used by LayoutService.
+     *
+     * @param {boolean} disabled - Whether the button should be disabled.
+     * @returns {void}
+     */
+    setCollapseButtonDisabled(disabled) {
+        const me = this;
+        if (me._collapseBtnElement && me.element) {
+            me.renderer.setCollapseButtonState(me._collapseBtnElement, me._collapsed, disabled);
         }
+    }
 
-        me.element.classList.remove('row--collapsed');
+    /**
+     * Wrapper method for minHeight getter (compatibility).
+     *
+     * @returns {number}
+     */
+    getMinHeight() {
+        return this.minHeight;
+    }
 
-        if (isLast) {
-            me.element.style.flex = '1 1 auto';
-            me.height = null; // Reset internal height for fluid layout
-        } else if (me.height !== null) {
-            me.element.style.flex = `0 0 ${me.height}px`;
-        } else {
-            me.element.style.flex = '1 1 auto';
-        }
+    /**
+     * Wrapper method for minHeight setter (compatibility).
+     *
+     * @param {number} height
+     * @returns {void}
+     */
+    setMinHeight(height) {
+        this.minHeight = height;
     }
 
     /**
@@ -754,10 +820,7 @@ export class Row {
         [...me.columns].forEach(column => {
             me.deleteColumn(column);
         });
-
-        me.element.innerHTML = '';
         me._columns = [];
-        me.collapseBtn = null;
     }
 
     /**
@@ -802,7 +865,6 @@ export class Row {
         me.requestLayoutUpdate();
         me.updateHeight(false);
 
-        // Apply collapsed state last to trigger UI update
         if (data.collapsed !== undefined) {
             me.collapsed = data.collapsed;
         }
