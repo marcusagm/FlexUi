@@ -208,6 +208,8 @@ export class PanelGroupHeader extends UIElement {
         return null;
     }
 
+    // --- UIElement Overrides ---
+
     /**
      * Implementation of the rendering logic.
      * Uses the adapter to create the header structure.
@@ -301,6 +303,8 @@ export class PanelGroupHeader extends UIElement {
         super.dispose();
     }
 
+    // --- Logic and Handlers ---
+
     /**
      * Handler for collapse button click.
      *
@@ -386,6 +390,26 @@ export class PanelGroupHeader extends UIElement {
         const me = this;
         if (me.element) {
             me.renderer.setCollapsedState(me.element, isCollapsed);
+        }
+    }
+
+    /**
+     * Updates the configuration (visibility) of header controls.
+     *
+     * @param {object} config - Configuration object.
+     * @param {boolean} [config.closable] - Whether to show the close button.
+     * @param {boolean} [config.movable] - Whether to show the move handle.
+     * @returns {void}
+     */
+    updateConfig(config) {
+        const me = this;
+        if (!me.element) return;
+
+        if (config.closable !== undefined) {
+            me.renderer.setCloseButtonVisibility(me.element, config.closable);
+        }
+        if (config.movable !== undefined) {
+            me.renderer.setMoveHandleVisibility(me.element, config.movable);
         }
     }
 

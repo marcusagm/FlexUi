@@ -200,4 +200,34 @@ export class VanillaPanelGroupHeaderAdapter extends VanillaRenderer {
             }
         }
     }
+
+    /**
+     * Sets the visibility of the close button.
+     *
+     * @param {HTMLElement} headerElement - The root header element.
+     * @param {boolean} visible - Whether the button should be visible.
+     * @returns {void}
+     */
+    setCloseButtonVisibility(headerElement, visible) {
+        const me = this;
+        const btn = me.getCloseButton(headerElement);
+        if (btn) {
+            me.updateStyles(btn, { display: visible ? '' : 'none' });
+        }
+    }
+
+    /**
+     * Sets the visibility of the move handle.
+     *
+     * @param {HTMLElement} headerElement - The root header element.
+     * @param {boolean} visible - Whether the handle should be visible.
+     * @returns {void}
+     */
+    setMoveHandleVisibility(headerElement, visible) {
+        const me = this;
+        const handle = me.getMoveHandle(headerElement);
+        if (handle) {
+            me.updateStyles(handle, { display: visible ? '' : 'none' });
+        }
+    }
 }
