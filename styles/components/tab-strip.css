@@ -51,6 +51,7 @@
     align-items: stretch;
 }
 
+/* Scroll Buttons Base */
 .ui-strip__scroll-btn {
     display: flex;
     align-items: center;
@@ -73,6 +74,32 @@
     color: var(--tab-scroll-btn-hover-color);
 }
 
+/* Overflow Button Base (Same look & feel as scroll buttons) */
+.ui-strip__overflow-btn {
+    display: none; /* Controlado via JS (flex/none) */
+    align-items: center;
+    justify-content: center;
+    background-color: var(--tab-scroll-btn-bg);
+    color: var(--tab-scroll-btn-color);
+    border: none;
+    cursor: pointer;
+    z-index: 10;
+    transition:
+        background-color 0.2s,
+        color 0.2s;
+    padding: 0;
+}
+
+.ui-strip__overflow-btn:hover {
+    background-color: var(--tab-scroll-btn-hover-bg);
+    color: var(--tab-scroll-btn-hover-color);
+}
+
+.ui-strip__overflow-btn .icon {
+    font-size: 14px; /* Tamanho do ícone do menu */
+}
+
+/* Horizontal Styles */
 .ui-strip--horizontal .ui-strip__scroll-btn {
     width: var(--tab-scroll-btn-width);
     height: 100%;
@@ -85,6 +112,14 @@
     border-right: 1px solid var(--tab-scroll-btn-border);
 }
 
+.ui-strip--horizontal .ui-strip__overflow-btn {
+    width: var(--tab-scroll-btn-width);
+    height: 100%;
+    flex-shrink: 0;
+    border-left: 1px solid var(--tab-scroll-btn-border);
+}
+
+/* Vertical Styles */
 .ui-strip--vertical .ui-strip__scroll-btn {
     width: 100%;
     height: var(--tab-scroll-btn-width);
@@ -95,6 +130,13 @@
 .ui-strip--vertical .ui-strip__scroll-btn:first-child {
     border-top: none;
     border-bottom: 1px solid var(--tab-scroll-btn-border);
+}
+
+.ui-strip--vertical .ui-strip__overflow-btn {
+    width: 100%;
+    height: var(--tab-scroll-btn-width);
+    flex-shrink: 0;
+    border-top: 1px solid var(--tab-scroll-btn-border);
 }
 
 /* Generic Tab Item Style */

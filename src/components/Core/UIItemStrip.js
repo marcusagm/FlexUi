@@ -24,6 +24,7 @@ import { throttleRAF } from '../../utils/ThrottleRAF.js';
  * Business rules implemented:
  * - Manages a list of UIElements.
  * - Automatically calculates scroll button visibility based on content overflow.
+ * - Calculates overflow menu visibility.
  * - Observes resize events to update UI state using throttled execution.
  * - Delegates DOM operations to VanillaStripAdapter.
  *
@@ -66,6 +67,14 @@ export class UIItemStrip extends UIElement {
     _boundUpdateScrollButtons = null;
 
     /**
+     * Bound handler for overflow button click.
+     *
+     * @type {Function | null}
+     * @private
+     */
+    _boundOnOverflowClick = null;
+
+    /**
      * Creates an instance of UIItemStrip.
      *
      * @param {string} [id=null] - Optional unique ID.
@@ -82,6 +91,7 @@ export class UIItemStrip extends UIElement {
         }
 
         me._boundUpdateScrollButtons = throttleRAF(me._updateScrollButtons.bind(me));
+        me._boundOnOverflowClick = me.onOverflowClick.bind(me);
     }
 
     /**
@@ -187,6 +197,16 @@ export class UIItemStrip extends UIElement {
     }
 
     /**
+     * Hook for overflow button click.
+     * Subclasses should override this to display a menu.
+     *
+     * @returns {void}
+     */
+    onOverflowClick() {
+        // Intentionally empty hook
+    }
+
+    /**
      * Implementation of render logic.
      *
      * @returns {HTMLElement} The root element created by the adapter.
@@ -199,12 +219,16 @@ export class UIItemStrip extends UIElement {
         // Setup scroll listeners on the buttons created by the adapter
         const prevBtn = me.renderer.getScrollButton(element, 'prev');
         const nextBtn = me.renderer.getScrollButton(element, 'next');
+        const overflowBtn = me.renderer.getOverflowButton(element);
 
         if (prevBtn) {
             me.renderer.on(prevBtn, 'click', () => me.scroll(-1));
         }
         if (nextBtn) {
             me.renderer.on(nextBtn, 'click', () => me.scroll(1));
+        }
+        if (overflowBtn) {
+            me.renderer.on(overflowBtn, 'click', me._boundOnOverflowClick);
         }
 
         const scrollContainer = me.renderer.getScrollContainer(element);
@@ -253,6 +277,12 @@ export class UIItemStrip extends UIElement {
         // Stop observing resize
         if (me.element) {
             me.renderer.unobserveResize(me.element);
+
+            // Explicitly remove overflow listener (good practice, though element removal often suffices)
+            const overflowBtn = me.renderer.getOverflowButton(me.element);
+            if (overflowBtn) {
+                me.renderer.off(overflowBtn, 'click', me._boundOnOverflowClick);
+            }
         }
 
         // Unmount items (but do not dispose them here, logic ownership may vary)
@@ -296,6 +326,7 @@ export class UIItemStrip extends UIElement {
 
     /**
      * Calculates and updates the visibility of scroll buttons.
+     * Also updates the overflow menu button visibility.
      *
      * @private
      * @returns {void}
@@ -312,15 +343,22 @@ export class UIItemStrip extends UIElement {
         const bufferPixel = 1;
         let hasPrevious = false;
         let hasNext = false;
+        let hasOverflow = false;
 
         if (me._orientation === 'horizontal') {
             hasPrevious = scrollLeft > bufferPixel;
             hasNext = scrollWidth > clientWidth + scrollLeft + bufferPixel;
+            hasOverflow = scrollWidth > clientWidth;
         } else {
             hasPrevious = scrollTop > bufferPixel;
             hasNext = scrollHeight > clientHeight + scrollTop + bufferPixel;
+            hasOverflow = scrollHeight > clientHeight;
         }
 
         me.renderer.setScrollButtonsVisibility(me.element, hasPrevious, hasNext);
+
+        if (typeof me.renderer.setOverflowButtonVisibility === 'function') {
+            me.renderer.setOverflowButtonVisibility(me.element, hasOverflow);
+        }
     }
 }

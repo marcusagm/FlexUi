@@ -19,7 +19,7 @@ import { VanillaRenderer } from './VanillaRenderer.js';
  * - None
  *
  * Business rules implemented:
- * - Enforces a standard structure: Button Prev -> Viewport -> Button Next.
+ * - Enforces a standard structure: Button Prev -> Viewport -> Button Next -> Button Overflow.
  * - Manages ResizeObserver lifecycle for the strip elements.
  * - Handles orientation-specific styles and scrolling logic.
  *
@@ -103,9 +103,23 @@ export class VanillaStripAdapter extends VanillaRenderer {
         nextButton.innerHTML = orientation === 'horizontal' ? '&#8250;' : '&#709;';
         me.updateStyles(nextButton, { display: 'none' }); // Hidden by default
 
+        // 4. Overflow Button
+        const overflowButton = me.createElement('button', {
+            className: 'ui-strip__overflow-btn',
+            type: 'button'
+        });
+        overflowButton.setAttribute('aria-label', 'Show more tabs');
+        me.updateStyles(overflowButton, { display: 'none' }); // Hidden by default
+
+        const overflowIcon = me.createElement('span', {
+            className: 'icon icon-overflow-menu'
+        });
+        me.mount(overflowButton, overflowIcon);
+
         me.mount(stripElement, prevButton);
         me.mount(stripElement, viewport);
         me.mount(stripElement, nextButton);
+        me.mount(stripElement, overflowButton);
 
         return stripElement;
     }
@@ -207,6 +221,17 @@ export class VanillaStripAdapter extends VanillaRenderer {
     }
 
     /**
+     * Retrieves the overflow button element.
+     *
+     * @param {HTMLElement} stripElement - The strip element.
+     * @returns {HTMLElement|null} The overflow button.
+     */
+    getOverflowButton(stripElement) {
+        if (!stripElement) return null;
+        return stripElement.querySelector('.ui-strip__overflow-btn');
+    }
+
+    /**
      * Sets the visibility of the scroll buttons.
      *
      * @param {HTMLElement} stripElement - The strip element.
@@ -224,6 +249,21 @@ export class VanillaStripAdapter extends VanillaRenderer {
         }
         if (nextBtn) {
             me.updateStyles(nextBtn, { display: showNext ? '' : 'none' });
+        }
+    }
+
+    /**
+     * Sets the visibility of the overflow button.
+     *
+     * @param {HTMLElement} stripElement - The strip element.
+     * @param {boolean} visible - Whether to show the overflow button.
+     * @returns {void}
+     */
+    setOverflowButtonVisibility(stripElement, visible) {
+        const me = this;
+        const overflowBtn = me.getOverflowButton(stripElement);
+        if (overflowBtn) {
+            me.updateStyles(overflowBtn, { display: visible ? 'flex' : 'none' });
         }
     }
 

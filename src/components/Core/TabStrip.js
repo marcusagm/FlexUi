@@ -1,4 +1,5 @@
 import { UIItemStrip } from './UIItemStrip.js';
+import { ContextMenuService } from '../../services/ContextMenu/ContextMenuService.js';
 
 /**
  * Description:
@@ -27,10 +28,12 @@ import { UIItemStrip } from './UIItemStrip.js';
  * - If Simple Mode is enabled and Item Count == 1: The strip hides itself.
  * - If Item Count > 1 or Simple Mode disabled: The strip shows itself.
  * - Updates visual classes on item elements to reflect active state.
+ * - Provides an overflow menu listing all tabs for quick navigation.
  *
  * Dependencies:
  * - {import('./UIItemStrip.js').UIItemStrip}
  * - {import('../../core/UIElement.js').UIElement}
+ * - {import('../../services/ContextMenu/ContextMenuService.js').ContextMenuService}
  */
 export class TabStrip extends UIItemStrip {
     /**
@@ -189,6 +192,49 @@ export class TabStrip extends UIItemStrip {
         }
 
         me._checkSimpleMode();
+    }
+
+    /**
+     * (Override) Handles the overflow button click.
+     * Displays a context menu with a list of all tabs for quick navigation.
+     *
+     * @param {MouseEvent} event - The click event from the overflow button.
+     * @returns {void}
+     */
+    onOverflowClick(event) {
+        const me = this;
+        const menuItems = me.items.map(item => {
+            // Try to resolve a clean title
+            let label = 'Untitled';
+
+            if (item.title) {
+                label = item.title;
+            } else if (item.element) {
+                // Try specific classes to avoid grabbing button text like 'x' (close button)
+                const titleEl = item.element.querySelector('.panel__title, .window-header__title');
+                if (titleEl) {
+                    label = titleEl.textContent;
+                } else {
+                    // Fallback: use the whole text content
+                    label = item.element.textContent;
+                }
+            }
+
+            const isActive = item === me.activeItem;
+            // Add checkmark indicator for active item
+            const displayTitle = isActive ? `✔ ${label}` : label;
+
+            return {
+                title: displayTitle,
+                callback: () => {
+                    me.setActiveItem(item);
+                }
+            };
+        });
+
+        if (menuItems.length > 0) {
+            ContextMenuService.getInstance().show(event, menuItems);
+        }
     }
 
     /**
