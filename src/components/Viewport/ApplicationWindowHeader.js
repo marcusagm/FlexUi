@@ -43,10 +43,10 @@ import { ItemType } from '../../constants/DNDTypes.js';
  * - Adapts visual state and available controls when in "Tab Mode".
  *
  * Dependencies:
- * - ../../utils/EventBus.js
- * - ../../utils/DragTrigger.js
- * - ../../constants/EventTypes.js
- * - ../../constants/DNDTypes.js
+ * - {import('../../utils/EventBus.js').appBus}
+ * - {import('../../utils/DragTrigger.js').DragTrigger}
+ * - {import('../../constants/EventTypes.js').EventTypes}
+ * - {import('../../constants/DNDTypes.js').ItemType}
  *
  * Notes / Additional:
  * - This component is tightly coupled with ApplicationWindow.
@@ -63,7 +63,7 @@ export class ApplicationWindowHeader {
     /**
      * The parent window instance.
      *
-     * @type {object}
+     * @type {import('./ApplicationWindow.js').ApplicationWindow}
      * @private
      */
     _window;
@@ -167,7 +167,7 @@ export class ApplicationWindowHeader {
     /**
      * Creates an instance of ApplicationWindowHeader.
      *
-     * @param {object} windowInstance - The parent ApplicationWindow instance.
+     * @param {import('./ApplicationWindow.js').ApplicationWindow} windowInstance - The parent ApplicationWindow instance.
      * @param {string} title - The initial title text.
      */
     constructor(windowInstance, title) {
@@ -241,16 +241,16 @@ export class ApplicationWindowHeader {
      * @private
      */
     _createButton(action, label, ariaLabel) {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = `window-header__btn window-header__btn--${action}`;
-        btn.textContent = label;
-        btn.setAttribute('aria-label', ariaLabel);
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `window-header__btn window-header__btn--${action}`;
+        button.textContent = label;
+        button.setAttribute('aria-label', ariaLabel);
 
         // Stop propagation on pointerdown to prevent DragTrigger from capturing this as a drag
-        btn.addEventListener('pointerdown', e => e.stopPropagation());
+        button.addEventListener('pointerdown', event => event.stopPropagation());
 
-        return btn;
+        return button;
     }
 
     /**
@@ -302,30 +302,33 @@ export class ApplicationWindowHeader {
         let offsetY = 0;
 
         // If in Tab Mode, dragging the header represents undocking or reordering.
-        // The visual proxy (ghost) will be handled by DragDropService/GhostManager.
-        // We use the header element as the drag source proxy in this case.
         if (me._isTabMode) {
             const rect = me.element.getBoundingClientRect();
             offsetX = startCoords.startX - rect.left;
             offsetY = startCoords.startY - rect.top;
         } else if (me._window.isMaximized) {
             // Calculate relative position of mouse on the maximized header (0.0 to 1.0)
+            // Use public getter 'element' inherited from UIElement
             const rectMax = me._window.element.getBoundingClientRect();
             const ratioX = (event.clientX - rectMax.left) / rectMax.width;
 
-            // Restore window
+            // Restore window (will trigger resize and state updates)
             me._window.toggleMaximize();
 
             // Calculate new X position to keep mouse relative to the restored header
+            // Accessing 'element' again to get updated dimensions after restore
             const rectRestored = me._window.element.getBoundingClientRect();
             const newWindowWidth = rectRestored.width;
 
             offsetX = newWindowWidth * ratioX;
             const newX = event.clientX - offsetX;
+
+            // Update window coordinates (this triggers the renderer update via setters)
             me._window.x = newX;
             offsetY = event.clientY - rectMax.top;
             me._window.y = event.clientY - offsetY;
         } else {
+            // Standard drag
             const rect = me._window.element.getBoundingClientRect();
             offsetX = startCoords.startX - rect.left;
             offsetY = startCoords.startY - rect.top;
@@ -428,17 +431,18 @@ export class ApplicationWindowHeader {
      * @returns {void}
      */
     setTabMode(isTab) {
-        this._isTabMode = isTab;
+        const me = this;
+        me._isTabMode = isTab;
         if (isTab) {
-            this.element.classList.add('window-header--tab');
-            this._pinButton.style.display = 'none';
-            this._minimizeButton.style.display = 'none';
-            this._maximizeButton.style.display = 'none';
+            me.element.classList.add('window-header--tab');
+            me._pinButton.style.display = 'none';
+            me._minimizeButton.style.display = 'none';
+            me._maximizeButton.style.display = 'none';
         } else {
-            this.element.classList.remove('window-header--tab');
-            this._pinButton.style.display = '';
-            this._minimizeButton.style.display = '';
-            this._maximizeButton.style.display = '';
+            me.element.classList.remove('window-header--tab');
+            me._pinButton.style.display = '';
+            me._minimizeButton.style.display = '';
+            me._maximizeButton.style.display = '';
         }
     }
 }

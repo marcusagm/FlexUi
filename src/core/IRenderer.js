@@ -45,7 +45,9 @@ export class IRenderer {
      * @throws {Error} If not implemented by subclass.
      */
     createElement(tag, properties = {}, children = []) {
-        throw new Error('Method createElement must be implemented.');
+        throw new Error(
+            "Method 'createElement(tag, properties, children)' must be implemented by subclasses of IRenderer."
+        );
     }
 
     /**
@@ -57,7 +59,9 @@ export class IRenderer {
      * @throws {Error} If not implemented by subclass.
      */
     mount(target, element) {
-        throw new Error('Method mount must be implemented.');
+        throw new Error(
+            "Method 'mount(target, element)' must be implemented by subclasses of IRenderer."
+        );
     }
 
     /**
@@ -69,7 +73,9 @@ export class IRenderer {
      * @throws {Error} If not implemented by subclass.
      */
     unmount(target, element) {
-        throw new Error('Method unmount must be implemented.');
+        throw new Error(
+            "Method 'unmount(target, element)' must be implemented by subclasses of IRenderer."
+        );
     }
 
     /**
@@ -81,7 +87,9 @@ export class IRenderer {
      * @throws {Error} If not implemented by subclass.
      */
     updateProps(element, properties) {
-        throw new Error('Method updateProps must be implemented.');
+        throw new Error(
+            "Method 'updateProps(element, properties)' must be implemented by subclasses of IRenderer."
+        );
     }
 
     /**
@@ -93,7 +101,9 @@ export class IRenderer {
      * @throws {Error} If not implemented by subclass.
      */
     updateStyles(element, styles) {
-        throw new Error('Method updateStyles must be implemented.');
+        throw new Error(
+            "Method 'updateStyles(element, styles)' must be implemented by subclasses of IRenderer."
+        );
     }
 
     /**
@@ -106,7 +116,9 @@ export class IRenderer {
      * @throws {Error} If not implemented by subclass.
      */
     on(element, eventName, handler) {
-        throw new Error('Method on must be implemented.');
+        throw new Error(
+            "Method 'on(element, eventName, handler)' must be implemented by subclasses of IRenderer."
+        );
     }
 
     /**
@@ -119,7 +131,9 @@ export class IRenderer {
      * @throws {Error} If not implemented by subclass.
      */
     off(element, eventName, handler) {
-        throw new Error('Method off must be implemented.');
+        throw new Error(
+            "Method 'off(element, eventName, handler)' must be implemented by subclasses of IRenderer."
+        );
     }
 
     /**
@@ -130,6 +144,8 @@ export class IRenderer {
      * @throws {Error} If not implemented by subclass.
      */
     getDimensions(element) {
-        throw new Error('Method getDimensions must be implemented.');
+        throw new Error(
+            "Method 'getDimensions(element)' must be implemented by subclasses of IRenderer."
+        );
     }
 }

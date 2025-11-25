@@ -7,14 +7,18 @@ import { ApplicationWindow } from './ApplicationWindow.js';
  * Window types must be registered by the application before they can be created
  * from serialized data (e.g., during workspace restoration).
  *
+ * It now supports dependency injection for the rendering engine via setDefaultRendererFactory.
+ *
  * Properties summary:
  * - _instance {ViewportFactory | null} : The private static instance.
  * - _registry {Map<string, typeof ApplicationWindow>} : The registry mapping typeName to classes.
+ * - _defaultRendererFactory {Function | null} : A factory function returning an IRenderer instance.
  *
  * Typical usage:
  * // In App.js (on init):
  * const factory = ViewportFactory.getInstance();
  * factory.registerWindowType('MyCustomWindow', MyCustomWindow);
+ * factory.setDefaultRendererFactory(() => new ReactWindowAdapter());
  *
  * // In Viewport.fromJSON:
  * const window = ViewportFactory.getInstance().createWindow(windowData);
@@ -27,6 +31,7 @@ import { ApplicationWindow } from './ApplicationWindow.js';
  * - Validates that registered classes are valid constructors.
  * - Registers the base ApplicationWindow class by default.
  * - Hydrates created windows with saved state (maximized, minimized, pinned) if available.
+ * - Injects the configured renderer into new window instances.
  *
  * Dependencies:
  * - ./ApplicationWindow.js
@@ -50,6 +55,14 @@ export class ViewportFactory {
      * @private
      */
     _registry;
+
+    /**
+     * A factory function that returns a default renderer instance for new windows.
+     *
+     * @type {Function | null}
+     * @private
+     */
+    _defaultRendererFactory = null;
 
     /**
      * Private constructor for Singleton.
@@ -102,6 +115,24 @@ export class ViewportFactory {
     }
 
     /**
+     * Sets the default renderer factory function.
+     * This function will be called to create a renderer instance for each new window.
+     *
+     * @param {Function} factoryFunction - A function returning an IRenderer instance.
+     * @returns {void}
+     */
+    setDefaultRendererFactory(factoryFunction) {
+        const me = this;
+        if (typeof factoryFunction !== 'function') {
+            console.warn(
+                `[ViewportFactory] invalid factoryFunction assignment (${factoryFunction}). Must be a function.`
+            );
+            return;
+        }
+        me._defaultRendererFactory = factoryFunction;
+    }
+
+    /**
      * Registers a Window class constructor against a string identifier.
      *
      * @param {string} typeName - The string identifier.
@@ -151,8 +182,13 @@ export class ViewportFactory {
             config.height = windowData.geometry.height;
         }
 
-        // Instantiate with basic title/config from data
-        const windowInstance = new WindowClass(windowData.title, null, config);
+        let renderer = null;
+        if (typeof me._defaultRendererFactory === 'function') {
+            renderer = me._defaultRendererFactory();
+        }
+
+        // Instantiate with basic title/config from data and injected renderer (4th arg)
+        const windowInstance = new WindowClass(windowData.title, null, config, renderer);
 
         // Hydrate full state (maximized, minimized, pinned, etc.)
         if (typeof windowInstance.fromJSON === 'function') {

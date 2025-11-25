@@ -1,25 +1,18 @@
 import { ApplicationWindowHeader } from './ApplicationWindowHeader.js';
 import { ResizeHandleManager } from '../../utils/ResizeHandleManager.js';
 import { appBus } from '../../utils/EventBus.js';
-import { generateId } from '../../utils/generateId.js';
 import { EventTypes } from '../../constants/EventTypes.js';
 import { ItemType } from '../../constants/DNDTypes.js';
-import { FloatingPanelManagerService } from '../../services/DND/FloatingPanelManagerService.js';
+import { UIElement } from '../../core/UIElement.js';
+import { VanillaWindowAdapter } from '../../renderers/vanilla/VanillaWindowAdapter.js';
 
 /**
  * Description:
  * A standalone component representing a floating window within the application Viewport.
- * It manages its own DOM structure, lifecycle, geometry, and state (maximized, minimized, pinned).
- *
- * Unlike PanelGroup, this class is a dedicated window frame that can host arbitrary content.
- * It integrates with the system's EventBus and DND services, and uses ResizeHandleManager for
- * 8-directional resizing.
+ * It manages its own lifecycle, geometry, and state (maximized, minimized, pinned) as a
+ * controller, delegating DOM rendering and styling to an adapter (VanillaWindowAdapter).
  *
  * Properties summary:
- * - id {string} : Unique identifier for the window.
- * - element {HTMLElement} : The main DOM element (.application-window).
- * - header {ApplicationWindowHeader} : The window header component.
- * - contentElement {HTMLElement} : The container for window content.
  * - title {string} : The window title.
  * - x {number} : X coordinate relative to parent.
  * - y {number} : Y coordinate relative to parent.
@@ -27,61 +20,36 @@ import { FloatingPanelManagerService } from '../../services/DND/FloatingPanelMan
  * - height {number} : Window height in pixels.
  * - minWidth {number} : Minimum width constraint.
  * - minHeight {number} : Minimum height constraint.
- * - _isFocused {boolean} : Focused state flag.
- * - _isMaximized {boolean} : Maximized state flag.
- * - _isMinimized {boolean} : Minimized state flag.
- * - _isPinned {boolean} : Pinned (always on top) state flag.
- * - _isTabbed {boolean} : Tabbed (docked) state flag.
- * - _preMaximizeState {object|null} : Geometry snapshot before maximization.
- * - _resizeHandleManager {ResizeHandleManager} : Handles 8-way resizing.
- * - _canCloseHandler {Function|null} : Callback to validate closing.
+ * - isFocused {boolean} : Focused state flag.
+ * - isMaximized {boolean} : Maximized state flag.
+ * - isMinimized {boolean} : Minimized state flag.
+ * - isPinned {boolean} : Pinned (always on top) state flag.
+ * - isTabbed {boolean} : Tabbed (docked) state flag.
+ * - header {ApplicationWindowHeader} : The window header component.
+ * - contentElement {HTMLElement|null} : The container for window content.
  *
  * Typical usage:
  * const win = new ApplicationWindow('My Window', contentNode, { x: 100, y: 100 });
- * document.body.appendChild(win.element);
- * win.mount();
+ * viewport.addWindow(win);
  *
  * Events:
  * - Emits (appBus): EventTypes.WINDOW_FOCUS, EventTypes.WINDOW_CLOSE_REQUEST, EventTypes.WINDOW_MOUNT
  *
  * Business rules implemented:
- * - Independent lifecycle management (mount/destroy).
- * - 8-direction resizing with boundary constraints relative to the parent Viewport.
- * - Geometry state persistence (maximize/restore).
+ * - Extends UIElement -> Disposable.
+ * - Delegates visual operations to VanillaWindowAdapter.
+ * - Manages 8-direction resizing via ResizeHandleManager.
  * - Intercepts close requests via `preventClose` (async support).
  * - Identifies as `ItemType.APPLICATION_WINDOW` for DND.
- * - Automatically constrains itself to parent bounds on mount and un-minimize.
- * - Prevents minimization when maximized.
- * - Supports "Tabbed" mode where it acts as a content panel filling available space, disabling resize and absolute positioning.
  *
  * Dependencies:
- * - ./ApplicationWindowHeader.js
- * - ../../utils/ResizeHandleManager.js
- * - ../../utils/EventBus.js
- * - ../../utils/generateId.js
- * - ../../constants/EventTypes.js
- * - ../../constants/DNDTypes.js
- *
- * Notes / Additional:
- * - This class does not extend Panel or PanelGroup.
+ * - UIElement
+ * - VanillaWindowAdapter
+ * - ApplicationWindowHeader
+ * - ResizeHandleManager
+ * - EventBus
  */
-export class ApplicationWindow {
-    /**
-     * Unique identifier for the window.
-     *
-     * @type {string}
-     * @public
-     */
-    id = generateId();
-
-    /**
-     * The main DOM element (.application-window).
-     *
-     * @type {HTMLElement}
-     * @public
-     */
-    element;
-
+export class ApplicationWindow extends UIElement {
     /**
      * The window header component.
      *
@@ -89,14 +57,6 @@ export class ApplicationWindow {
      * @public
      */
     header;
-
-    /**
-     * The container for window content.
-     *
-     * @type {HTMLElement}
-     * @public
-     */
-    contentElement;
 
     /**
      * The window title.
@@ -222,11 +182,14 @@ export class ApplicationWindow {
      * Creates an instance of ApplicationWindow.
      *
      * @param {string} [title='Window'] - The window title.
-     * @param {HTMLElement|object|string|null} [content=null] - The initial content (Node, string, or object with .element).
+     * @param {HTMLElement|object|string|null} [content=null] - The initial content.
      * @param {object} [config={}] - Configuration options (x, y, width, height).
+     * @param {import('../../core/IRenderer.js').IRenderer} [renderer=null] - Optional renderer adapter.
      */
-    constructor(title = 'Window', content = null, config = {}) {
+    constructor(title = 'Window', content = null, config = {}, renderer = null) {
+        super(null, renderer || new VanillaWindowAdapter());
         const me = this;
+
         me._title = title;
 
         if (config.x !== undefined) me._x = config.x;
@@ -236,13 +199,17 @@ export class ApplicationWindow {
         if (config.minWidth !== undefined) me.minWidth = config.minWidth;
         if (config.minHeight !== undefined) me.minHeight = config.minHeight;
 
-        me._buildDOM();
-        me._initResizeHandles();
+        // Initialize Header (Dependent on 'me' instance)
+        me.header = new ApplicationWindowHeader(me, me._title);
+
+        // Ensure element is created via render lifecycle
+        me.render();
 
         if (content) {
             me.setContent(content);
         }
 
+        // Apply initial styles to the rendered element
         me._updateGeometryStyles();
     }
 
@@ -253,6 +220,20 @@ export class ApplicationWindow {
      */
     getPanelType() {
         return ItemType.APPLICATION_WINDOW;
+    }
+
+    /**
+     * Retrieves the content DOM element.
+     * Delegates to the renderer to find the correct container within the window structure.
+     *
+     * @returns {HTMLElement | null} The content container.
+     */
+    get contentElement() {
+        const me = this;
+        if (me.element) {
+            return me.renderer.getContentElement(me.element);
+        }
+        return null;
     }
 
     /**
@@ -270,9 +251,10 @@ export class ApplicationWindow {
      * @param {string} value
      */
     set title(value) {
-        this._title = value;
-        if (this.header) {
-            this.header.setTitle(value);
+        const me = this;
+        me._title = value;
+        if (me.header) {
+            me.header.setTitle(value);
         }
     }
 
@@ -291,8 +273,9 @@ export class ApplicationWindow {
      * @param {number} value
      */
     set x(value) {
-        this._x = value;
-        this._updateGeometryStyles();
+        const me = this;
+        me._x = value;
+        me._updateGeometryStyles();
     }
 
     /**
@@ -310,8 +293,9 @@ export class ApplicationWindow {
      * @param {number} value
      */
     set y(value) {
-        this._y = value;
-        this._updateGeometryStyles();
+        const me = this;
+        me._y = value;
+        me._updateGeometryStyles();
     }
 
     /**
@@ -329,8 +313,9 @@ export class ApplicationWindow {
      * @param {number} value
      */
     set width(value) {
-        this._width = value;
-        this._updateGeometryStyles();
+        const me = this;
+        me._width = value;
+        me._updateGeometryStyles();
     }
 
     /**
@@ -348,8 +333,9 @@ export class ApplicationWindow {
      * @param {number} value
      */
     set height(value) {
-        this._height = value;
-        this._updateGeometryStyles();
+        const me = this;
+        me._height = value;
+        me._updateGeometryStyles();
     }
 
     /**
@@ -367,8 +353,9 @@ export class ApplicationWindow {
      * @param {boolean} value
      */
     set isFocused(value) {
-        this._isFocused = !!value;
-        this.element.classList.toggle('application-window--focused', this._isFocused);
+        const me = this;
+        me._isFocused = !!value;
+        me._updateState();
     }
 
     /**
@@ -429,89 +416,72 @@ export class ApplicationWindow {
         }
     }
 
-    /**
-     * Builds the DOM structure (Frame, Header, Content).
-     *
-     * @private
-     * @returns {void}
-     */
-    _buildDOM() {
-        const me = this;
-        me.element = document.createElement('div');
-        me.element.classList.add('application-window');
-        // Ensure absolute positioning for floating behavior
-        me.element.style.position = 'absolute';
+    // --- UIElement Overrides ---
 
-        // Click on window brings to focus
-        me.element.addEventListener('pointerdown', () => {
+    /**
+     * Implementation of render logic.
+     * Uses the adapter to create the window structure.
+     *
+     * @returns {HTMLElement} The root window element.
+     * @protected
+     */
+    _doRender() {
+        const me = this;
+        const element = me.renderer.createWindowElement(me.id);
+
+        // Bind click for focus
+        element.addEventListener('pointerdown', () => {
             appBus.emit(EventTypes.WINDOW_FOCUS, me);
         });
 
-        me.header = new ApplicationWindowHeader(me, me._title);
-        me.element.appendChild(me.header.element);
-
-        me.contentElement = document.createElement('div');
-        me.contentElement.classList.add('application-window__content');
-        // Default styles for content area
-        me.contentElement.style.overflow = 'auto';
-        me.contentElement.style.flex = '1';
-        me.contentElement.style.position = 'relative';
-
-        me.element.appendChild(me.contentElement);
+        return element;
     }
 
     /**
-     * Initializes the ResizeHandleManager for 8-direction resizing.
+     * Implementation of mount logic.
+     * Inserts the window into the container and initializes components.
      *
-     * @private
-     * @returns {void}
+     * @param {HTMLElement} container - The parent container.
+     * @protected
      */
-    _initResizeHandles() {
-        const me = this;
-
-        me._resizeHandleManager = new ResizeHandleManager(me.element, {
-            handles: ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'],
-            customClass: 'window-resize-handle', // Theme hook
-            getConstraints: () => {
-                const parent = me.element.offsetParent || document.body;
-                return {
-                    minimumWidth: me.minWidth,
-                    maximumWidth: Infinity,
-                    minimumHeight: me.minHeight,
-                    maximumHeight: Infinity,
-                    containerRectangle: parent.getBoundingClientRect()
-                };
-            },
-            onResize: ({ xCoordinate, yCoordinate, width, height }) => {
-                if (me._isMaximized) return; // Block resize if maximized
-
-                me._x = xCoordinate;
-                me._y = yCoordinate;
-                me._width = width;
-                me._height = height;
-                me._updateGeometryStyles();
-            }
-        });
-    }
-
-    /**
-     * Updates the DOM styles to reflect current geometry properties.
-     *
-     * @private
-     * @returns {void}
-     */
-    _updateGeometryStyles() {
+    _doMount(container) {
         const me = this;
         if (me.element) {
-            // Only apply geometry styles if NOT tabbed
-            if (!me._isTabbed) {
-                me.element.style.left = `${me._x}px`;
-                me.element.style.top = `${me._y}px`;
-                me.element.style.width = `${me._width}px`;
-                me.element.style.height = `${me._height}px`;
+            me.renderer.mount(container, me.element);
+
+            // Mount header into the window structure
+            if (me.header && me.header.element) {
+                me.renderer.mountHeader(me.element, me.header.element);
             }
+
+            me._initResizeHandles();
+            me._updateGeometryStyles();
+            me._updateState();
+            me.constrainToParent();
+
+            // Trigger custom mount event for legacy compatibility
+            appBus.emit(EventTypes.WINDOW_MOUNT, me);
         }
     }
+
+    /**
+     * Implementation of unmount logic.
+     * Cleans up handles and removes element.
+     *
+     * @protected
+     */
+    _doUnmount() {
+        const me = this;
+        if (me._resizeHandleManager) {
+            me._resizeHandleManager.destroy();
+            me._resizeHandleManager = null;
+        }
+        if (me.element && me.element.parentNode) {
+            me.renderer.unmount(me.element.parentNode, me.element);
+        }
+    }
+
+    // --- Public Methods ---
 
     /**
      * Sets the window content.
@@ -521,14 +491,19 @@ export class ApplicationWindow {
      */
     setContent(content) {
         const me = this;
-        me.contentElement.innerHTML = '';
+        const contentElement = me.contentElement;
+        if (!contentElement) return;
+
+        // Use direct DOM manipulation here or delegate if renderer supported 'updateContent'
+        // Since ApplicationWindow handles arbitrary content, we do basic injection.
+        contentElement.innerHTML = '';
 
         if (typeof content === 'string') {
-            me.contentElement.innerHTML = content;
+            contentElement.innerHTML = content;
         } else if (content instanceof HTMLElement) {
-            me.contentElement.appendChild(content);
-        } else if (content && (typeof content.element) instanceof HTMLElement) {
-            me.contentElement.appendChild(content.element);
+            contentElement.appendChild(content);
+        } else if (content && content.element instanceof HTMLElement) {
+            contentElement.appendChild(content.element);
         } else {
             console.warn('ApplicationWindow: Unknown content type', content);
         }
@@ -541,7 +516,7 @@ export class ApplicationWindow {
      * @returns {void}
      */
     renderContent(container) {
-        container;
+        // Subclasses can override
     }
 
     /**
@@ -577,74 +552,37 @@ export class ApplicationWindow {
 
     /**
      * Constrains the window to fit within its parent container (Viewport).
-     * Ensures valid placement on mount or un-minimize.
      *
      * @returns {void}
      */
     constrainToParent() {
-        // Do not constrain if tabbed
-        if (this._isTabbed) return;
+        const me = this;
+        if (me._isTabbed) return;
+        if (!me.element) return;
 
-        const parent = this.element.offsetParent;
+        const parent = me.element.offsetParent;
         if (!parent) return;
 
         const parentWidth = parent.clientWidth;
         const parentHeight = parent.clientHeight;
 
-        const w = this._width;
-        const h = this._height;
+        const w = me._width;
+        const h = me._height;
 
-        if (w > parentWidth) this._width = Math.max(this.minWidth, parentWidth);
-        if (h > parentHeight) this._height = Math.max(this.minHeight, parentHeight);
+        if (w > parentWidth) me._width = Math.max(me.minWidth, parentWidth);
+        if (h > parentHeight) me._height = Math.max(me.minHeight, parentHeight);
 
-        if (this._x < 0) this._x = 0;
-        if (this._y < 0) this._y = 0;
+        if (me._x < 0) me._x = 0;
+        if (me._y < 0) me._y = 0;
 
-        if (this._x + this._width > parentWidth) {
-            this._x = Math.max(0, parentWidth - this._width);
+        if (me._x + me._width > parentWidth) {
+            me._x = Math.max(0, parentWidth - me._width);
         }
-        if (this._y + this._height > parentHeight) {
-            this._y = Math.max(0, parentHeight - this._height);
+        if (me._y + me._height > parentHeight) {
+            me._y = Math.max(0, parentHeight - me._height);
         }
 
-        this._updateGeometryStyles();
-    }
-
-    /**
-     * Lifecycle hook: Mounts the window.
-     *
-     * @returns {void}
-     */
-    mount() {
-        appBus.emit(EventTypes.WINDOW_MOUNT, this);
-        this.renderContent(this.contentElement);
-        this.constrainToParent();
-    }
-
-    /**
-     * Lifecycle hook: Unmounts the window.
-     *
-     * @returns {void}
-     */
-    unmount() {
-        // Cleanup hook
-    }
-
-    /**
-     * Destroys the window and cleans up listeners/DOM.
-     *
-     * @returns {void}
-     */
-    destroy() {
-        const me = this;
-        me.unmount();
-        if (me._resizeHandleManager) {
-            me._resizeHandleManager.destroy();
-        }
-        if (me.header) {
-            me.header.destroy();
-        }
-        me.element.remove();
+        me._updateGeometryStyles();
     }
 
     /**
@@ -657,28 +595,31 @@ export class ApplicationWindow {
         if (me._isMaximized) {
             // Restore
             me._isMaximized = false;
-            me.element.classList.remove('application-window--maximized');
             if (me._preMaximizeState) {
                 me._x = me._preMaximizeState.x;
                 me._y = me._preMaximizeState.y;
                 me._width = me._preMaximizeState.width;
                 me._height = me._preMaximizeState.height;
-                me._updateGeometryStyles();
             }
         } else {
             if (me._isMinimized) {
                 me._isMinimized = false;
-                me.element.classList.remove('application-window--minimized');
             }
             // Maximize
             me._isMaximized = true;
-            me._preMaximizeState = { x: me._x, y: me._y, width: me._width, height: me._height };
-            me.element.classList.add('application-window--maximized');
-
-            me.element.style.top = '0';
-            me.element.style.left = '0';
-            me.element.style.width = '100%';
-            me.element.style.height = '100%';
+            me._preMaximizeState = {
+                x: me._x,
+                y: me._y,
+                width: me._width,
+                height: me._height
+            };
+            // Coordinates are implicitly 0,0,100%,100% via CSS class,
+            // but properties remain what they were before or updated conceptually?
+            // For now, logic relies on CSS class.
+        }
+        me._updateState();
+        if (!me._isMaximized) {
+            me._updateGeometryStyles(); // Restore dimensions
         }
     }
 
@@ -688,15 +629,16 @@ export class ApplicationWindow {
      * @returns {void}
      */
     minimize() {
-        if (this._isMaximized) {
-            this.toggleMaximize();
+        const me = this;
+        if (me._isMaximized) {
+            me.toggleMaximize();
         }
 
-        this._isMinimized = !this._isMinimized;
-        this.element.classList.toggle('application-window--minimized', this._isMinimized);
+        me._isMinimized = !me._isMinimized;
+        me._updateState();
 
-        if (!this._isMinimized) {
-            this.constrainToParent();
+        if (!me._isMinimized) {
+            me.constrainToParent();
         }
     }
 
@@ -706,8 +648,9 @@ export class ApplicationWindow {
      * @returns {void}
      */
     togglePin() {
-        this._isPinned = !this._isPinned;
-        this.element.classList.toggle('application-window--pinned', this._isPinned);
+        const me = this;
+        me._isPinned = !me._isPinned;
+        me._updateState();
     }
 
     /**
@@ -723,31 +666,40 @@ export class ApplicationWindow {
         me._isTabbed = isTabbed;
         me.header.setTabMode(isTabbed);
 
+        if (me.element) {
+            me.renderer.setTabbedMode(me.element, isTabbed);
+        }
+
         if (isTabbed) {
-            // Enter Tab Mode
-            me.element.classList.add('application-window--tabbed');
-
-            // Reset absolute positioning styles
-            me.element.style.position = '';
-            me.element.style.left = '';
-            me.element.style.top = '';
-            me.element.style.width = '';
-            me.element.style.height = '';
-            me.element.style.zIndex = '';
-
-            // Ensure flags are reset
             if (me._isMaximized) me.toggleMaximize();
             if (me._isMinimized) me.minimize();
         } else {
-            // Exit Tab Mode (Restore Floating)
-            me.element.classList.remove('application-window--tabbed');
-            me.element.style.position = 'absolute';
-
-            // Restore geometry
             me._updateGeometryStyles();
-            // Ensure it is visible
             me.constrainToParent();
         }
+        me._updateState();
+    }
+
+    /**
+     * Destroys the window and cleans up listeners/DOM.
+     *
+     * @returns {void}
+     */
+    dispose() {
+        const me = this;
+        if (me.header && typeof me.header.destroy === 'function') {
+            me.header.destroy();
+        }
+        super.dispose();
+    }
+
+    /**
+     * Compatibility alias for destroy.
+     *
+     * @returns {void}
+     */
+    destroy() {
+        this.dispose();
     }
 
     /**
@@ -756,15 +708,21 @@ export class ApplicationWindow {
      * @returns {object}
      */
     toJSON() {
+        const me = this;
         return {
             type: ItemType.APPLICATION_WINDOW,
-            title: this._title,
-            geometry: { x: this._x, y: this._y, width: this._width, height: this._height },
+            title: me._title,
+            geometry: {
+                x: me._x,
+                y: me._y,
+                width: me._width,
+                height: me._height
+            },
             state: {
-                maximized: this._isMaximized,
-                minimized: this._isMinimized,
-                pinned: this._isPinned,
-                tabbed: this._isTabbed
+                maximized: me._isMaximized,
+                minimized: me._isMinimized,
+                pinned: me._isPinned,
+                tabbed: me._isTabbed
             }
         };
     }
@@ -776,19 +734,89 @@ export class ApplicationWindow {
      * @returns {void}
      */
     fromJSON(data) {
-        if (data.title) this.title = data.title;
+        const me = this;
+        if (data.title) me.title = data.title;
         if (data.geometry) {
-            this._x = data.geometry.x;
-            this._y = data.geometry.y;
-            this._width = data.geometry.width;
-            this._height = data.geometry.height;
-            this._updateGeometryStyles();
+            me._x = data.geometry.x;
+            me._y = data.geometry.y;
+            me._width = data.geometry.width;
+            me._height = data.geometry.height;
+            me._updateGeometryStyles();
         }
         if (data.state) {
-            if (data.state.pinned) this.togglePin();
-            if (data.state.minimized) this.minimize();
-            if (data.state.maximized) this.toggleMaximize();
-            if (data.state.tabbed) this.setTabbed(true);
+            if (data.state.pinned) me.togglePin();
+            if (data.state.minimized) me.minimize();
+            if (data.state.maximized) me.toggleMaximize();
+            if (data.state.tabbed) me.setTabbed(true);
+        }
+    }
+
+    // --- Private Helpers ---
+
+    /**
+     * Initializes the ResizeHandleManager.
+     *
+     * @private
+     * @returns {void}
+     */
+    _initResizeHandles() {
+        const me = this;
+        if (!me.element) return;
+
+        me._resizeHandleManager = new ResizeHandleManager(me.element, {
+            handles: ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'],
+            customClass: 'window-resize-handle',
+            getConstraints: () => {
+                const parent = me.element.offsetParent || document.body;
+                return {
+                    minimumWidth: me.minWidth,
+                    maximumWidth: Infinity,
+                    minimumHeight: me.minHeight,
+                    maximumHeight: Infinity,
+                    containerRectangle: parent.getBoundingClientRect()
+                };
+            },
+            onResize: ({ xCoordinate, yCoordinate, width, height }) => {
+                if (me._isMaximized) return;
+
+                me._x = xCoordinate;
+                me._y = yCoordinate;
+                me._width = width;
+                me._height = height;
+                me._updateGeometryStyles();
+            }
+        });
+    }
+
+    /**
+     * Updates the DOM geometry styles via renderer.
+     *
+     * @private
+     * @returns {void}
+     */
+    _updateGeometryStyles() {
+        const me = this;
+        if (me.element && !me._isTabbed) {
+            me.renderer.updateGeometry(me.element, me._x, me._y, me._width, me._height);
+        }
+    }
+
+    /**
+     * Updates the visual state classes via renderer.
+     *
+     * @private
+     * @returns {void}
+     */
+    _updateState() {
+        const me = this;
+        if (me.element) {
+            me.renderer.updateStateClasses(me.element, {
+                maximized: me._isMaximized,
+                minimized: me._isMinimized,
+                focused: me._isFocused,
+                pinned: me._isPinned,
+                tabbed: me._isTabbed
+            });
         }
     }
 }
