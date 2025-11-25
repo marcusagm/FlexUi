@@ -30,8 +30,11 @@ import { Modal } from '../../../services/Modal/Modal.js';
  * - Supports polymorphic constructor for flexible instantiation.
  *
  * Dependencies:
- * - ../ApplicationWindow.js
- * - ../../../services/Modal/Modal.js
+ * - {import('../ApplicationWindow.js').ApplicationWindow}
+ * - {import('../../../services/Modal/Modal.js').Modal}
+ *
+ * Notes / Additional:
+ * - Adapts to the UIElement architecture using the injected renderer.
  */
 export class NotepadWindow extends ApplicationWindow {
     /**
@@ -77,15 +80,16 @@ export class NotepadWindow extends ApplicationWindow {
     /**
      * Creates an instance of NotepadWindow.
      * Supports two signatures:
-     * 1. Standard/Factory: (title, content, config)
-     * 2. Config-first (legacy/quick): (config, initialText) - handled via type check.
+     * 1. Standard/Factory: (title, content, config, renderer)
+     * 2. Config-first (legacy/quick): (config, initialText)
      *
      * @param {string|object} [titleOrConfig='Notepad'] - Title string OR Config object.
      * @param {string|null} [contentOrNull=''] - Initial text content.
      * @param {object} [config={}] - Configuration options (if first arg is title).
+     * @param {import('../../../core/IRenderer.js').IRenderer} [renderer=null] - Optional renderer adapter.
      */
-    constructor(titleOrConfig = 'Notepad', contentOrNull = '', config = {}) {
-        // Argument normalization to support Factory (3 args) and direct App usage (1 arg)
+    constructor(titleOrConfig = 'Notepad', contentOrNull = '', config = {}, renderer = null) {
+        // Argument normalization
         let title = 'Notepad';
         let initialText = '';
         let cfg = {};
@@ -95,13 +99,13 @@ export class NotepadWindow extends ApplicationWindow {
             cfg = titleOrConfig;
             if (typeof contentOrNull === 'string') initialText = contentOrNull;
         } else {
-            // Usage: new NotepadWindow('Title', 'text', {x:10})
+            // Usage: new NotepadWindow('Title', 'text', {x:10}, renderer)
             title = String(titleOrConfig);
             initialText = contentOrNull || '';
             cfg = config || {};
         }
 
-        super(title, null, cfg);
+        super(title, null, cfg, renderer);
         const me = this;
 
         me._baseTitle = title;
@@ -110,6 +114,15 @@ export class NotepadWindow extends ApplicationWindow {
 
         // Register the dirty check handler
         me.preventClose(me._checkDirtyState.bind(me));
+
+        // Register cleanup hook using the Disposable/Event system
+        me.addDisposable(
+            me.onWillUnmount(() => {
+                if (me._textarea) {
+                    me.renderer.off(me._textarea, 'input', me._boundOnInput);
+                }
+            })
+        );
     }
 
     /**
@@ -141,22 +154,23 @@ export class NotepadWindow extends ApplicationWindow {
     renderContent(container) {
         const me = this;
 
-        me._textarea = document.createElement('textarea');
-        me._textarea.style.width = '100%';
-        me._textarea.style.height = '100%';
-        me._textarea.style.resize = 'none';
-        me._textarea.style.border = 'none';
-        me._textarea.style.outline = 'none';
-        me._textarea.style.padding = '10px';
-        me._textarea.style.backgroundColor = 'transparent';
-        me._textarea.style.color = 'inherit';
-        me._textarea.style.fontFamily = 'monospace';
+        me._textarea = me.renderer.createElement('textarea', {
+            style: {
+                width: '100%',
+                height: '100%',
+                resize: 'none',
+                border: 'none',
+                outline: 'none',
+                padding: '10px',
+                backgroundColor: 'transparent',
+                color: 'inherit',
+                fontFamily: 'monospace'
+            },
+            value: me._initialContent
+        });
 
-        me._textarea.value = me._initialContent;
-
-        me._textarea.addEventListener('input', me._boundOnInput);
-
-        container.appendChild(me._textarea);
+        me.renderer.on(me._textarea, 'input', me._boundOnInput);
+        me.renderer.mount(container, me._textarea);
     }
 
     /**
@@ -186,14 +200,10 @@ export class NotepadWindow extends ApplicationWindow {
      */
     _updateTitleVisuals() {
         const me = this;
-        // Use the stored base title instead of hardcoded string
         const displayTitle = me._isDirty ? `${me._baseTitle} *` : me._baseTitle;
 
-        // Call super setter to update header DOM
-        // We avoid this.title = ... to prevent loop if we had a setter logic
-        if (me.header) {
-            me.header.setTitle(displayTitle);
-        }
+        // Use public setter which delegates to header
+        me.title = displayTitle;
     }
 
     /**
@@ -240,7 +250,6 @@ export class NotepadWindow extends ApplicationWindow {
     fromJSON(data) {
         super.fromJSON(data);
 
-        // Update baseTitle from the loaded data to preserve "Document 1"
         if (data.title) {
             this._baseTitle = data.title;
         }
@@ -251,18 +260,5 @@ export class NotepadWindow extends ApplicationWindow {
                 this._textarea.value = data.content;
             }
         }
-    }
-
-    /**
-     * Cleans up event listeners.
-     *
-     * @returns {void}
-     */
-    unmount() {
-        const me = this;
-        if (me._textarea) {
-            me._textarea.removeEventListener('input', me._boundOnInput);
-        }
-        super.unmount();
     }
 }
