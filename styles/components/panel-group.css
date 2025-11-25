@@ -19,7 +19,6 @@
     box-shadow: var(--panel-floating-shadow);
     min-width: 150px;
     min-height: 100px;
-    /* Borders for floating panels */
     border: 1px solid var(--color-border-default);
 }
 
@@ -83,16 +82,37 @@
     overflow: hidden;
     position: relative;
     display: flex;
-    align-items: flex-end; /* Align tabs to bottom of header */
-
-    /* Override generic strip variables for Panel context */
-    --tab-strip-bg: transparent;
-    --tab-strip-height: 100%;
-    --tab-scroll-btn-bg: transparent;
-    --tab-scroll-btn-border: transparent;
+    align-items: flex-end;
+    min-width: 0; /* Crucial for flexbox shrinking */
 }
 
-/* Control Buttons */
+/* * TabStrip Overrides for Panel Context
+ * Adapta o componente genérico UIItemStrip/TabStrip para parecer nativo do painel
+ */
+.panel-group__header .ui-strip {
+    background-color: transparent; /* Remove fundo padrão do strip */
+    border: none;
+}
+
+.panel-group__header .ui-strip__scroll-btn {
+    background-color: transparent;
+    color: var(--color-text-secondary);
+    width: 16px; /* Botões de scroll mais finos no painel */
+}
+
+.panel-group__header .ui-strip__scroll-btn:hover {
+    background-color: var(--color-bg-hover);
+    color: var(--color-text-primary);
+}
+
+/* Feedback Visual de Drag Over no Strip */
+.panel-group__tab-container--drag-over {
+    background-color: var(--color-bg-hover) !important;
+    box-shadow: inset 0 0 4px var(--color-accent-hover);
+    border-radius: var(--border-radius-sm);
+}
+
+/* Control Buttons (Collapse, Close) */
 .panel-group__collapse-btn,
 .panel-group__close-btn {
     width: var(--panel-button-size);
@@ -109,6 +129,7 @@
     transition:
         background-color 0.2s,
         color 0.2s;
+    flex-shrink: 0;
 }
 
 .panel-group__collapse-btn:hover,
@@ -162,8 +183,8 @@
         color 0.2s,
         border-color 0.2s;
 
-    /* Ensure layout within the strip */
     flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .panel-group__tab:hover {
@@ -176,7 +197,7 @@
     background-color: var(--color-bg-tab-active);
     color: var(--color-text-primary);
     border-top-color: var(--color-accent-primary);
-    margin-bottom: -1px; /* Merge with content border if desired */
+    margin-bottom: -1px;
     position: relative;
     z-index: 1;
 }
@@ -209,6 +230,39 @@
     background-color: rgba(0, 0, 0, 0.1);
 }
 
+/* --- Simple Header Mode (Single Panel) --- */
+/* Quando o TabStrip está em modo simples (1 aba), ele oculta a strip
+   e o PanelGroupHeader exibe o título diretamente (se implementado assim)
+   ou estiliza a aba única para parecer um título.
+
+   Abaixo, assumimos que a classe .panel-group__header--simple é adicionada ao HEADER
+   pelo controlador quando necessário.
+*/
+.panel-group__header--simple .ui-strip {
+    padding-left: 0;
+}
+
+.panel-group__header--simple .panel-group__tab {
+    background: transparent;
+    border: none;
+    margin: 0;
+    padding: 0;
+    color: var(--color-text-bright);
+}
+
+.panel-group__header--simple .panel-group__tab:hover {
+    background: transparent;
+}
+
+.panel-group__header--simple .panel-group__tab--active {
+    border: none;
+    margin: 0;
+}
+
+.panel-group__header--simple .panel-group__tab-close {
+    display: none;
+}
+
 /* --- Content --- */
 .panel-group__content {
     flex: 1;
@@ -216,7 +270,7 @@
     flex-direction: column;
     overflow: hidden;
     background-color: var(--color-bg-panel-content);
-    min-height: 0; /* Crucial for nested flex scrolling */
+    min-height: 0;
 }
 
 /* Utility: Fills Space */

@@ -14,8 +14,8 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * - _baseZIndex {number} : The starting z-index for floating panels.
  * - _zIndexCounter {number} : The incrementing z-index counter.
  * - _namespace {string} : Unique namespace for appBus listeners.
- * - _boundOnPanelGroupRemoved {Function} : Bound handler for group removal event.
- * - _boundOnUndockRequest {Function} : Bound handler for undock command event.
+ * - _boundOnPanelGroupRemoved {Function | null} : Bound handler for group removal event.
+ * - _boundOnUndockRequest {Function | null} : Bound handler for undock command event.
  *
  * Typical usage:
  * // In App.js
@@ -219,8 +219,16 @@ export class FloatingPanelManagerService {
             return;
         }
 
-        // Ensure the element is in the DOM (floating context)
-        me.container.appendChild(panelGroup.element);
+        // Only mount if not already mounted to prevent "Component already mounted" errors
+        // when moving an existing floating panel.
+        if (!panelGroup.isMounted) {
+            panelGroup.mount(me.container);
+        } else if (panelGroup.element.parentNode !== me.container) {
+            // Safety: If mounted but in wrong parent, force re-mount
+            panelGroup.unmount();
+            panelGroup.mount(me.container);
+        }
+
         panelGroup.setFloatingState(true, x, y);
 
         if (!me._floatingPanels.includes(panelGroup)) {
@@ -255,9 +263,12 @@ export class FloatingPanelManagerService {
         // Clean up styles
         if (panelGroup.element) {
             panelGroup.element.style.zIndex = '';
-            // Removing from DOM is typically handled by the new parent (DropStrategy),
-            // but if we are just closing it, we remove it here.
-            if (panelGroup.element.parentNode === me.container) {
+
+            // Use unmount() to ensure cleanup of listeners and internal state
+            if (panelGroup.isMounted) {
+                panelGroup.unmount();
+            } else if (panelGroup.element.parentNode === me.container) {
+                // Fallback safety
                 panelGroup.element.remove();
             }
         }
