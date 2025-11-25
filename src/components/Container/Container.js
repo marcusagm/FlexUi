@@ -2,6 +2,9 @@ import { Row } from '../Row/Row.js';
 import { appBus } from '../../utils/EventBus.js';
 import { FloatingPanelManagerService } from '../../services/DND/FloatingPanelManagerService.js';
 import { EventTypes } from '../../constants/EventTypes.js';
+import { UIElement } from '../../core/UIElement.js';
+import { VanillaContainerAdapter } from '../../renderers/vanilla/VanillaContainerAdapter.js';
+import { generateId } from '../../utils/generateId.js';
 
 /**
  * Description:
@@ -10,20 +13,22 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * It also acts as a 'drop zone' (type 'container') to allow
  * panels to be dropped "between" rows, creating new rows.
  *
+ * It extends UIElement to participate in the application lifecycle and delegates
+ * DOM rendering to VanillaContainerAdapter.
+ *
  * Properties summary:
- * - _rows {Array<Row>} : Internal list of child Row instances.
- * - element {HTMLElement} : The main DOM element (<div class="container">).
- * - dropZoneType {string} : The identifier for the DragDropService.
+ * - id {string} : Unique ID for this instance.
  * - rows {Array<Row>} : Public getter for the list of rows.
+ * - dropZoneType {string} : The identifier for the DragDropService.
  *
  * Typical usage:
  * // In App.js
  * this.container = new Container();
- * document.body.append(this.container.element);
+ * this.container.mount(document.body);
  *
  * Events:
- * - Listens to: EventTypes.ROW_EMPTY (to clean up empty rows)
- * - Emits: EventTypes.LAYOUT_ROWS_CHANGED (to notify LayoutService)
+ * - Listens to: EventTypes.ROW_EMPTY
+ * - Emits: EventTypes.LAYOUT_ROWS_CHANGED
  *
  * Business rules implemented:
  * - Renders 'Row' children vertically.
@@ -31,16 +36,15 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * - Listens for EventTypes.ROW_EMPTY and automatically removes any Row that
  * reports its last Column has been removed.
  * - Manages the vertical resize handles/collapse buttons for its child Rows.
- * - Forces recalculation of *column* resize handles on all child Rows
- * whenever a row is added or deleted.
  *
  * Dependencies:
+ * - {import('../../core/UIElement.js').UIElement}
+ * - {import('../../renderers/vanilla/VanillaContainerAdapter.js').VanillaContainerAdapter}
  * - {import('../Row/Row.js').Row}
  * - {import('../../utils/EventBus.js').appBus}
  * - {import('../../services/DND/FloatingPanelManagerService.js').FloatingPanelManagerService}
- * - {import('../../constants/EventTypes.js').EventTypes}
  */
-export class Container {
+export class Container extends UIElement {
     /**
      * Internal list of child Row components.
      *
@@ -55,7 +59,7 @@ export class Container {
      * @type {string}
      * @private
      */
-    _namespace = 'app-container';
+    _namespace = null;
 
     /**
      * Stores the bound reference for the 'onRowEmpty' listener.
@@ -66,37 +70,27 @@ export class Container {
     _boundOnRowEmpty = null;
 
     /**
-     * The main DOM element (<div class="container">).
-     *
-     * @type {HTMLElement}
-     * @public
-     */
-    element;
-
-    /**
      * The identifier for the DragDropService.
      *
      * @type {string}
      * @public
      */
-    dropZoneType;
+    dropZoneType = 'container';
 
     /**
      * Creates an instance of Container.
+     *
+     * @param {import('../../core/IRenderer.js').IRenderer} [renderer=null] - Optional renderer.
      */
-    constructor() {
+    constructor(renderer = null) {
+        super(generateId(), renderer || new VanillaContainerAdapter());
         const me = this;
-        me.element = document.createElement('div');
-        me.element.classList.add('container');
 
-        me.dropZoneType = 'container';
-
-        me.element.dataset.dropzone = me.dropZoneType;
-        me.element.dropZoneInstance = me;
-
+        me._namespace = `app-container-${me.id}`;
         me._boundOnRowEmpty = me.onRowEmpty.bind(me);
 
-        me.clear();
+        // Initialize DOM via UIElement lifecycle
+        me.render();
         me.initEventListeners();
     }
 
@@ -119,6 +113,65 @@ export class Container {
         appBus.on(EventTypes.ROW_EMPTY, me._boundOnRowEmpty, { namespace: me._namespace });
     }
 
+    // --- UIElement Overrides ---
+
+    /**
+     * Implementation of the rendering logic.
+     * Uses the adapter to create the container DOM structure.
+     *
+     * @returns {HTMLElement} The root container element.
+     * @protected
+     */
+    _doRender() {
+        const me = this;
+        const element = me.renderer.createContainerElement(me.id);
+
+        element.dataset.dropzone = me.dropZoneType;
+        element.dropZoneInstance = me;
+
+        return element;
+    }
+
+    /**
+     * Implementation of the mounting logic.
+     * Mounts all child rows.
+     *
+     * @param {HTMLElement} container - The parent DOM element.
+     * @protected
+     */
+    _doMount(container) {
+        const me = this;
+        if (me.element) {
+            me.renderer.mount(container, me.element);
+
+            // Mount rows
+            me._rows.forEach(row => {
+                if (!row.element) row.render();
+                // Rows are appended sequentially. If we needed specific order re-mount,
+                // we would clear and append. Here we assume DOM order matches array.
+                me.renderer.mount(me.element, row.element);
+                row.mount(me.element);
+            });
+        }
+    }
+
+    /**
+     * Implementation of the unmounting logic.
+     *
+     * @protected
+     */
+    _doUnmount() {
+        const me = this;
+
+        me._rows.forEach(row => row.unmount());
+
+        if (me.element && me.element.parentNode) {
+            me.renderer.unmount(me.element.parentNode, me.element);
+        }
+    }
+
+    // --- Public Methods ---
+
     /**
      * Cleans up appBus listeners and destroys all child Row components.
      *
@@ -128,8 +181,9 @@ export class Container {
         const me = this;
         appBus.offByNamespace(me._namespace);
 
-        [...me.rows].forEach(row => row.destroy());
-        me.element.remove();
+        [...me.rows].forEach(row => row.dispose());
+
+        super.dispose();
     }
 
     /**
@@ -166,7 +220,6 @@ export class Container {
 
     /**
      * Forces all child Rows to recalculate their *column* resize handles.
-     * (Required to fix DND bugs where the "last" row changes).
      *
      * @private
      * @returns {void}
@@ -191,16 +244,35 @@ export class Container {
         const row = new Row(me, height);
 
         if (index === null) {
-            me.element.appendChild(row.element);
             me._rows.push(row);
         } else {
-            const targetElement = me.element.children[index] || null;
-            if (targetElement) {
-                me.element.insertBefore(row.element, targetElement);
-            } else {
-                me.element.appendChild(row.element);
-            }
             me._rows.splice(index, 0, row);
+        }
+
+        // Handle DOM insertion if container is rendered
+        if (me.element) {
+            if (!row.element) row.render();
+
+            if (index === null) {
+                // Append
+                me.renderer.mount(me.element, row.element);
+            } else {
+                // Insert at specific index
+                // Find the element that is currently at the target index (after splice it's index+1)
+                // The array splice happened, so the element currently at `index + 1`
+                // (or previously at `index`) is the reference.
+                const nextRow = me._rows[index + 1];
+                const referenceNode = nextRow ? nextRow.element : null;
+
+                if (referenceNode) {
+                    me.element.insertBefore(row.element, referenceNode);
+                } else {
+                    me.renderer.mount(me.element, row.element);
+                }
+            }
+
+            // Trigger lifecycle
+            row.mount(me.element);
         }
 
         me.requestLayoutUpdate();
@@ -221,12 +293,8 @@ export class Container {
         const index = me._rows.indexOf(row);
         if (index === -1) return;
 
-        const rowEl = row.element;
-        row.destroy();
-
-        if (rowEl && me.element.contains(rowEl)) {
-            me.element.removeChild(rowEl);
-        }
+        row.unmount();
+        row.dispose();
 
         me._rows.splice(index, 1);
 
@@ -274,8 +342,6 @@ export class Container {
         [...me.rows].forEach(row => {
             me.deleteRow(row);
         });
-
-        me.element.innerHTML = '';
         me._rows = [];
     }
 
