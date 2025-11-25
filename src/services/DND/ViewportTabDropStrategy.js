@@ -11,9 +11,9 @@ import { ItemType } from '../../constants/DNDTypes.js';
  *
  * Business rules implemented:
  * - Validates that the dragged item is strictly an ApplicationWindow.
- * - Calculates the insertion index based on the horizontal midpoint of existing tabs.
- * - Shows a 'vertical' placeholder between tabs to indicate position.
- * - Maintains Tab Bar visibility during the operation to prevent layout collapse.
+ * - Calculates the insertion index by iterating over logical docked windows and measuring their headers.
+ * - Inserts a vertical placeholder to indicate the drop position within the TabStrip's viewport.
+ * - Maintains Tab Bar visibility during the operation.
  * - On Drop: Calls `viewport.dockWindow(window, index)` to reorder or dock the window.
  *
  * Dependencies:
@@ -49,18 +49,18 @@ export class ViewportTabDropStrategy extends BaseDropStrategy {
      * @returns {boolean}
      */
     onDragEnter(point, dropZone, draggedData, dds) {
-        // Force visibility stability by adding drag-target class to the container
-        if (draggedData.type === ItemType.APPLICATION_WINDOW) {
-            if (dropZone.tabBar && dropZone.tabBar.parentElement) {
-                dropZone.tabBar.parentElement.classList.add('viewport__tab-bar--drag-target');
-            }
+        if (draggedData.type !== ItemType.APPLICATION_WINDOW) return false;
+
+        // Ensure tab bar is visible and stable during drag
+        if (dropZone.tabBar && dropZone.tabBar.parentElement) {
+            dropZone.tabBar.parentElement.classList.add('viewport__tab-bar--drag-target');
         }
         return true;
     }
 
     /**
      * Hook called when a drag moves over the zone.
-     * Calculates insertion index.
+     * Calculates insertion index based on logical window headers.
      *
      * @param {{x: number, y: number, target: HTMLElement}} point
      * @param {import('../../components/Viewport/Viewport.js').Viewport} dropZone
@@ -69,7 +69,6 @@ export class ViewportTabDropStrategy extends BaseDropStrategy {
      * @returns {boolean}
      */
     onDragOver(point, dropZone, draggedData, dds) {
-        // [FIX] Prevent visual feedback for non-windows (Panels/Groups)
         if (draggedData.type !== ItemType.APPLICATION_WINDOW) {
             dds.hidePlaceholder();
             return false;
@@ -81,43 +80,55 @@ export class ViewportTabDropStrategy extends BaseDropStrategy {
             return false;
         }
 
-        // Find the inner scrollable container (Viewport of the Strip)
-        const scrollContainer = stripElement.querySelector('.ui-strip__viewport');
+        // Locate the inner scrollable container where tabs actually live
+        // This depends on the structure created by VanillaStripAdapter
+        const scrollContainer = stripElement.querySelector('.ui-strip__viewport') || stripElement;
         const placeholder = dds.getPlaceholder();
 
-        if (!scrollContainer) {
-            dds.hidePlaceholder();
-            return false;
-        }
+        // Get logically docked windows to determine order
+        const dockedWindows = dropZone.windows.filter(win => win.isTabbed);
 
-        // Filter all children (tabs) inside the scroll container
-        const tabs = Array.from(scrollContainer.children).filter(
-            // Tabs are the direct children elements, and we filter out the placeholder itself
-            child => child !== placeholder
-        );
-
-        let targetElement = null;
+        let targetHeaderElement = null;
         let placed = false;
-        this._dropIndex = tabs.length;
+        this._dropIndex = dockedWindows.length;
 
-        // Horizontal index calculation
-        for (let i = 0; i < tabs.length; i++) {
-            const tab = tabs[i];
-            const rect = tab.getBoundingClientRect();
-            const midX = rect.left + rect.width / 2;
+        // Calculate index by checking geometry of each docked window's header
+        for (let i = 0; i < dockedWindows.length; i++) {
+            const win = dockedWindows[i];
+            // Skip the item being dragged to avoid self-reference issues in calculation
+            if (win === draggedData.item) continue;
 
-            if (point.x < midX) {
-                this._dropIndex = i;
-                targetElement = tab;
-                placed = true;
-                break;
+            // Access the header UIElement (WindowHeaderWrapper or direct header element)
+            // In Viewport logic, the header is wrapped, but the window instance has the header component
+            // which acts as the UI source.
+            const headerElement = win.header ? win.header.element : null;
+
+            if (headerElement && document.body.contains(headerElement)) {
+                const rect = headerElement.getBoundingClientRect();
+                const midX = rect.left + rect.width / 2;
+
+                if (point.x < midX) {
+                    this._dropIndex = i;
+                    targetHeaderElement = headerElement;
+                    placed = true;
+                    break;
+                }
             }
         }
 
         dds.showPlaceholder('vertical');
 
-        if (placed && targetElement) {
-            scrollContainer.insertBefore(placeholder, targetElement);
+        // Visual insertion
+        if (placed && targetHeaderElement) {
+            // Insert placeholder before the detected target's header
+            // We need to ensure we insert into the container that holds the headers (scrollContainer)
+            // targetHeaderElement should be a child (or descendant) of scrollContainer
+            if (scrollContainer.contains(targetHeaderElement)) {
+                scrollContainer.insertBefore(placeholder, targetHeaderElement);
+            } else {
+                // Fallback if nesting is complex
+                scrollContainer.appendChild(placeholder);
+            }
         } else {
             scrollContainer.appendChild(placeholder);
         }
@@ -127,6 +138,11 @@ export class ViewportTabDropStrategy extends BaseDropStrategy {
 
     /**
      * Cleanup on leave.
+     *
+     * @param {{x: number, y: number, target: HTMLElement}} point
+     * @param {import('../../components/Viewport/Viewport.js').Viewport} dropZone
+     * @param {{item: object, type: string}} draggedData
+     * @param {import('./DragDropService.js').DragDropService} dds
      */
     onDragLeave(point, dropZone, draggedData, dds) {
         if (dropZone.tabBar && dropZone.tabBar.parentElement) {
@@ -145,9 +161,7 @@ export class ViewportTabDropStrategy extends BaseDropStrategy {
      * @returns {boolean}
      */
     onDrop(point, dropZone, draggedData, dds) {
-        if (dropZone.tabBar && dropZone.tabBar.parentElement) {
-            dropZone.tabBar.parentElement.classList.remove('viewport__tab-bar--drag-target');
-        }
+        this.onDragLeave(point, dropZone, draggedData, dds);
 
         if (draggedData.type !== ItemType.APPLICATION_WINDOW || this._dropIndex === null) {
             return false;

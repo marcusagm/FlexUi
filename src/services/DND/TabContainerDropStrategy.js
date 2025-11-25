@@ -1,51 +1,29 @@
 import { BaseDropStrategy } from './BaseDropStrategy.js';
-import { PanelGroup } from '../../components/Panel/PanelGroup.js';
-import { Panel } from '../../components/Panel/Panel.js';
-import { FloatingPanelManagerService } from './FloatingPanelManagerService.js';
 import { ItemType } from '../../constants/DNDTypes.js';
 
 /**
  * Description:
- * A DND strategy for 'TabContainer' drop zones (PanelGroup headers).
- * This strategy is stateful and handles two distinct modes:
- * 1. Merging: Dropping a Panel (or single-Panel Group) from *another* group.
- * 2. Reordering: Dropping a Panel (tab) *within* its own group to reorder it.
+ * A DND strategy for handling drops into the Tab area of a PanelGroup.
+ * It allows reordering panels within the same group or moving panels between groups.
  *
  * Properties summary:
- * - _isReordering {boolean} : State flag, true if dragging within the same group.
- * - _dropIndex {number | null} : The calculated state index for reordering/merging.
- * - _tabCache {Array<object>} : Caches geometry of sibling tabs for reordering.
+ * - _dropIndex {number | null} : The calculated index for the drop.
  *
  * Business rules implemented:
- * - On DragEnter: Detects if it's a Merge or Reorder operation and caches tab geometry.
- * - On DragOver: Calculates drop index based on `midX` of sibling tabs
- * and shows a 'vertical' placeholder between them for both modes.
- * - Implements "ghost" logic (only for reordering) to prevent dropping a tab
- * in its original position.
- * - Prevents dropping a PanelGroup onto itself.
- * - Prevents dropping a single Panel back into its own group if it's the only child.
- * - On Drop (Merge): Moves the panel into the target group at the specific `_dropIndex`.
- * - On Drop (Reorder): Calls `panelGroup.movePanel()` to update the tab order.
- * - Returns boolean indicating if the drop was handled.
+ * - Validates that the dragged item is a Panel (or compatible type).
+ * - Calculates the insertion index based on the horizontal midpoint of existing tabs.
+ * - Inserts a vertical placeholder to indicate the drop position.
+ * - Supports dropping into empty tab strips (though rare in PanelGroups).
+ * - Updates the dropZone visual feedback (classes).
  *
  * Dependencies:
  * - {import('./BaseDropStrategy.js').BaseDropStrategy}
  * - {import('../../components/Panel/PanelGroup.js').PanelGroup}
- * - {import('../../components/Panel/Panel.js').Panel}
- * - {import('./FloatingPanelManagerService.js').FloatingPanelManagerService}
  * - {import('../../constants/DNDTypes.js').ItemType}
  */
 export class TabContainerDropStrategy extends BaseDropStrategy {
     /**
-     * State flag, true if dragging within the same group.
-     *
-     * @type {boolean}
-     * @private
-     */
-    _isReordering = false;
-
-    /**
-     * The calculated state index for reordering/merging.
+     * The calculated index for the drop.
      *
      * @type {number | null}
      * @private
@@ -53,248 +31,173 @@ export class TabContainerDropStrategy extends BaseDropStrategy {
     _dropIndex = null;
 
     /**
-     * Caches geometry of sibling tabs for reordering.
+     * Clears internal cache.
      *
-     * @type {Array<{element: HTMLElement, midX: number, stateIndex: number}>}
-     * @private
-     */
-    _tabCache = [];
-
-    /**
-     * Helper to get the source/target groups and the specific panel being moved.
-     *
-     * @param {{item: object, type: string}} draggedData - The item being dragged.
-     * @param {PanelGroup} dropZone - The target PanelGroup instance.
-     * @returns {{draggedPanel: Panel, sourceGroup: PanelGroup, targetGroup: PanelGroup} | null}
-     * @private
-     */
-    _getGroups(draggedData, dropZone) {
-        const targetGroup = dropZone;
-        if (!targetGroup) return null;
-
-        let draggedPanel = null;
-        let sourceGroup = null;
-
-        if (!draggedData.item) {
-            return null;
-        }
-
-        if (draggedData.type === ItemType.PANEL) {
-            if (!(draggedData.item instanceof Panel)) return null;
-            draggedPanel = draggedData.item;
-            sourceGroup = draggedPanel.parentGroup;
-        } else if (draggedData.type === ItemType.PANEL_GROUP) {
-            if (!(draggedData.item instanceof PanelGroup)) return null;
-            if (draggedData.item.panels.length === 1) {
-                sourceGroup = draggedData.item;
-                draggedPanel = sourceGroup.panels[0];
-            } else {
-                return null;
-            }
-        } else {
-            return null;
-        }
-
-        if (!targetGroup || !sourceGroup || !draggedPanel) {
-            return null;
-        }
-
-        return { draggedPanel, sourceGroup, targetGroup };
-    }
-
-    /**
-     * Caches the geometry of all tabs in the group for reordering.
-     *
-     * @param {PanelGroup} dropZone
-     * @private
-     */
-    _cacheTabGeometry(dropZone) {
-        const me = this;
-        me._tabCache = [];
-        const panels = dropZone.panels;
-
-        panels.forEach((panel, index) => {
-            const tabElement = panel.header.element;
-            const rect = tabElement.getBoundingClientRect();
-            me._tabCache.push({
-                element: tabElement,
-                midX: rect.left + rect.width / 2,
-                stateIndex: index
-            });
-        });
-    }
-
-    /**
-     * Clears any stray visual feedback from all tab containers.
-     *
-     * @param {boolean} [visualOnly=false] - If true, only clears visual state.
      * @returns {void}
      */
-    clearCache(visualOnly = false) {
-        const me = this;
-        if (!visualOnly) {
-            me._isReordering = false;
-            me._dropIndex = null;
-            me._tabCache = [];
-        }
-
-        const zones = document.querySelectorAll('.panel-group__tab-container--droptarget');
-        zones.forEach(zone => zone.classList.remove('panel-group__tab-container--droptarget'));
+    clearCache() {
+        this._dropIndex = null;
     }
 
     /**
      * Hook called when a drag enters the zone.
-     * Applies visual feedback and caches geometry.
      *
      * @param {{x: number, y: number, target: HTMLElement}} point
-     * @param {PanelGroup} dropZone
+     * @param {import('../../components/Panel/PanelGroup.js').PanelGroup} dropZone
      * @param {{item: object, type: string}} draggedData
      * @param {import('./DragDropService.js').DragDropService} dds
      * @returns {boolean}
      */
     onDragEnter(point, dropZone, draggedData, dds) {
-        const me = this;
-        me.clearCache(true);
-        if (!draggedData.item) return false;
+        if (!this._validateItem(draggedData)) return false;
 
-        if (draggedData.item === dropZone) {
-            return false;
+        // Access the TabStrip element via the header
+        // PanelGroup -> header (PanelGroupHeader) -> tabStrip (TabStrip) -> element
+        const stripElement =
+            dropZone.header && dropZone.header.tabStrip ? dropZone.header.tabStrip.element : null;
+
+        if (stripElement) {
+            stripElement.classList.add('panel-group__tab-container--drag-over');
         }
-
-        const groups = me._getGroups(draggedData, dropZone);
-        if (!groups) {
-            return false;
-        }
-
-        if (groups.sourceGroup === groups.targetGroup && groups.targetGroup.panels.length === 1) {
-            return false;
-        }
-
-        me._isReordering = groups.sourceGroup === groups.targetGroup;
-        me._cacheTabGeometry(dropZone);
-        dds.showPlaceholder('vertical');
         return true;
     }
 
     /**
      * Hook called when a drag moves over the zone.
-     * Maintains visual feedback and calculates drop index using Live Geometry.
+     * Calculates insertion index.
      *
      * @param {{x: number, y: number, target: HTMLElement}} point
-     * @param {PanelGroup} dropZone
+     * @param {import('../../components/Panel/PanelGroup.js').PanelGroup} dropZone
      * @param {{item: object, type: string}} draggedData
      * @param {import('./DragDropService.js').DragDropService} dds
      * @returns {boolean}
      */
     onDragOver(point, dropZone, draggedData, dds) {
-        const me = this;
+        if (!this._validateItem(draggedData)) {
+            dds.hidePlaceholder();
+            return false;
+        }
+
+        if (!dropZone.header || !dropZone.header.tabStrip) {
+            dds.hidePlaceholder();
+            return false;
+        }
+
+        const stripElement = dropZone.header.tabStrip.element;
+
+        // Find the inner scrollable container (Viewport of the Strip) to place the placeholder
+        // This is critical because TabStrip has buttons and a viewport wrapper
+        const scrollContainer = stripElement.querySelector('.ui-strip__viewport') || stripElement;
+
         const placeholder = dds.getPlaceholder();
-        const tabContainerElement = dropZone.header.tabContainer;
+        const panels = dropZone.panels || [];
 
-        if (draggedData.item === dropZone) {
-            return false;
-        }
-
-        if (
-            point.target &&
-            !tabContainerElement.contains(point.target) &&
-            point.target !== tabContainerElement &&
-            point.target !== placeholder
-        ) {
-            return false;
-        }
-
-        const groups = me._getGroups(draggedData, dropZone);
-        if (!groups) {
-            return false;
-        }
-
-        if (groups.sourceGroup === groups.targetGroup && groups.targetGroup.panels.length === 1) {
-            return false;
-        }
-
-        me._isReordering = groups.sourceGroup === groups.targetGroup;
-
-        const { draggedPanel } = groups;
-        const originalIndex = dropZone.panels.indexOf(draggedPanel);
-
-        const panels = dropZone.panels;
-        let targetElement = null;
+        // Filter panels to get their header elements
+        // We use the logical panels list from the Group to calculate positions
+        let targetPanel = null;
         let placed = false;
-        me._dropIndex = panels.length;
+        this._dropIndex = panels.length;
 
         for (let i = 0; i < panels.length; i++) {
             const panel = panels[i];
-            const tabElement = panel.header.element;
+            // Access the header UIElement
+            const headerElement = panel.header ? panel.header.element : null;
 
-            const rect = tabElement.getBoundingClientRect();
-            const midX = rect.left + rect.width / 2;
+            if (headerElement) {
+                const rect = headerElement.getBoundingClientRect();
+                const midX = rect.left + rect.width / 2;
 
-            if (point.x < midX) {
-                targetElement = tabElement;
-                me._dropIndex = i;
-                placed = true;
-                break;
-            }
-        }
-
-        if (me._isReordering) {
-            const isAdjacent =
-                me._dropIndex === originalIndex || me._dropIndex === originalIndex + 1;
-            if (isAdjacent) {
-                dds.hidePlaceholder();
-                me._dropIndex = null;
-                return false;
+                if (point.x < midX) {
+                    this._dropIndex = i;
+                    targetPanel = panel;
+                    placed = true;
+                    break;
+                }
             }
         }
 
         dds.showPlaceholder('vertical');
-        if (placed) {
-            tabContainerElement.insertBefore(placeholder, targetElement);
+
+        // Insert placeholder into the DOM
+        if (placed && targetPanel && targetPanel.header && targetPanel.header.element) {
+            // Insert before the target tab
+            scrollContainer.insertBefore(placeholder, targetPanel.header.element);
         } else {
-            tabContainerElement.appendChild(placeholder);
+            // Append to end
+            scrollContainer.appendChild(placeholder);
         }
 
         return true;
     }
 
     /**
-     * Hook called when the item is dropped.
-     * Handles logic for merging tabs/panels or reordering.
+     * Cleanup on leave.
      *
      * @param {{x: number, y: number, target: HTMLElement}} point
-     * @param {PanelGroup} dropZone
+     * @param {import('../../components/Panel/PanelGroup.js').PanelGroup} dropZone
+     * @param {{item: object, type: string}} draggedData
+     * @param {import('./DragDropService.js').DragDropService} dds
+     */
+    onDragLeave(point, dropZone, draggedData, dds) {
+        const stripElement =
+            dropZone.header && dropZone.header.tabStrip ? dropZone.header.tabStrip.element : null;
+        if (stripElement) {
+            stripElement.classList.remove('panel-group__tab-container--drag-over');
+        }
+    }
+
+    /**
+     * Hook called when the item is dropped.
+     * Executes the move or add logic.
+     *
+     * @param {{x: number, y: number, target: HTMLElement}} point
+     * @param {import('../../components/Panel/PanelGroup.js').PanelGroup} dropZone
      * @param {{item: object, type: string}} draggedData
      * @param {import('./DragDropService.js').DragDropService} dds
      * @returns {boolean}
      */
     onDrop(point, dropZone, draggedData, dds) {
-        const me = this;
-        const groups = me._getGroups(draggedData, dropZone);
+        this.onDragLeave(point, dropZone, draggedData, dds);
 
-        if (!groups) {
+        if (!this._validateItem(draggedData) || this._dropIndex === null) {
             return false;
         }
 
-        me._isReordering = groups.sourceGroup === groups.targetGroup;
+        const panel = draggedData.item;
 
-        const { draggedPanel, sourceGroup, targetGroup } = groups;
-
-        if (me._isReordering) {
-            if (me._dropIndex !== null) {
-                dropZone.movePanel(draggedPanel, me._dropIndex);
-            }
+        // Move logic
+        if (dropZone.panels.includes(panel)) {
+            dropZone.movePanel(panel, this._dropIndex);
         } else {
-            if (sourceGroup.isFloating) {
-                if (draggedData.type === ItemType.PANEL_GROUP) {
-                    FloatingPanelManagerService.getInstance().removeFloatingPanel(sourceGroup);
-                }
+            // Moving from another group
+            if (panel.parentGroup) {
+                // Pass false to avoid disposal, as we are moving it
+                panel.parentGroup.removePanel(panel, true);
             }
-
-            sourceGroup.removePanel(draggedPanel, true);
-            targetGroup.addPanel(draggedPanel, me._dropIndex, true);
+            dropZone.addPanel(panel, this._dropIndex, true);
         }
 
         return true;
+    }
+
+    /**
+     * Validates if the dragged item is a Panel.
+     *
+     * @param {{item: object, type: string}} draggedData
+     * @returns {boolean}
+     * @private
+     */
+    _validateItem(draggedData) {
+        // Accept Panel, TextPanel, ToolbarPanel, etc. based on checking inheritance or type
+        // Assuming ItemType.PANEL covers specific panels or checking the instance
+        // For simplicity, we check if it has a 'header' property which implies it's a Panel
+        return (
+            draggedData.item &&
+            (draggedData.type === ItemType.PANEL ||
+                draggedData.item.getPanelType() === 'Panel' ||
+                draggedData.item.getPanelType() === 'TextPanel' ||
+                draggedData.item.getPanelType() === 'ToolbarPanel' ||
+                draggedData.item.getPanelType() === 'CounterPanel')
+        );
     }
 }

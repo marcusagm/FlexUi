@@ -1,146 +1,142 @@
 /**
  * Description:
- * Manages the visual "ghost" element that follows the cursor during a drag operation.
- * It encapsulates creation, styling, positioning (including constrained movement),
- * and destruction of the drag proxy, ensuring visual isolation from the rest of the UI.
+ * Manages the creation, positioning, and destruction of the "Ghost" element
+ * during a Drag-and-Drop operation. The ghost is a visual clone of the dragged
+ * item that follows the cursor.
  *
  * Properties summary:
- * - _ghostElement {HTMLElement | null} : The cloned DOM element acting as the ghost.
- * - _offsetX {number} : The horizontal offset from the cursor to the element's top-left.
- * - _offsetY {number} : The vertical offset from the cursor to the element's top-left.
+ * - _ghostElement {HTMLElement | null} : The active ghost DOM element.
+ * - _offsetX {number} : X offset from the cursor to the element's top-left corner.
+ * - _offsetY {number} : Y offset from the cursor to the element's top-left corner.
  *
  * Typical usage:
  * const ghostManager = new GhostManager();
- * ghostManager.create(sourceEl, clientX, clientY, offsetX, offsetY);
- * ghostManager.update(newX, newY, boundingBox);
+ * ghostManager.create(draggedElement, event.clientX, event.clientY, offsetX, offsetY);
+ * ghostManager.update(event.clientX, event.clientY, boundingBox);
  * ghostManager.destroy();
  *
  * Events:
  * - None
  *
  * Business rules implemented:
- * - Creates a visual clone of the dragged element attached to the document body.
- * - Enforces 'position: fixed', high z-index, and 'pointer-events: none' to ensure
- * it floats above content and acts as a purely visual element without blocking hit-testing.
- * - Maintains exact dimensions of the original element.
- * - Supports clamping logic to constrain the ghost within specific container bounds
- * (e.g., keeping panels within the main workspace).
+ * - Clones the source element deeply.
+ * - Applies fixed positioning and pointer-events: none to avoid interference.
+ * - Maintains the visual dimensions of the original element.
+ * - Constrains movement to specific bounds if provided (essential for Viewport usability).
+ * - Cleans up globally attached styles or classes on destroy.
  *
  * Dependencies:
  * - None
- *
- * Notes / Additional:
- * - This class is designed to be used by DragDropService to offload visual management.
  */
 export class GhostManager {
     /**
-     * The cloned DOM element acting as the ghost.
+     * The active ghost DOM element.
+     *
      * @type {HTMLElement | null}
      * @private
      */
     _ghostElement = null;
 
     /**
-     * The horizontal offset from the cursor to the element's top-left.
+     * X offset from the cursor.
+     *
      * @type {number}
      * @private
      */
     _offsetX = 0;
 
     /**
-     * The vertical offset from the cursor to the element's top-left.
+     * Y offset from the cursor.
+     *
      * @type {number}
      * @private
      */
     _offsetY = 0;
 
     /**
-     * Description:
-     * Creates the ghost element by cloning the source.
-     * Applies rigorous inline styles to ensure the ghost behaves correctly
-     * (fixed positioning, ignored by pointer events, high z-index).
+     * Creates and mounts the ghost element.
      *
-     * @param {HTMLElement} sourceElement - The original DOM element being dragged.
-     * @param {number} x - The initial pointer X coordinate.
-     * @param {number} y - The initial pointer Y coordinate.
-     * @param {number} [offsetX=0] - The offset X from the pointer to the element's origin.
-     * @param {number} [offsetY=0] - The offset Y from the pointer to the element's origin.
+     * @param {HTMLElement} sourceElement - The original element to clone.
+     * @param {number} clientX - Initial mouse X position.
+     * @param {number} clientY - Initial mouse Y position.
+     * @param {number} offsetX - Offset X to maintain relative position.
+     * @param {number} offsetY - Offset Y to maintain relative position.
      * @returns {void}
      */
-    create(sourceElement, x, y, offsetX = 0, offsetY = 0) {
+    create(sourceElement, clientX, clientY, offsetX = 0, offsetY = 0) {
         const me = this;
         if (!sourceElement) return;
 
+        // Capture dimensions before cloning to prevent style collapse
+        const rect = sourceElement.getBoundingClientRect();
+        const width = rect.width;
+        const height = rect.height;
+
+        me._ghostElement = sourceElement.cloneNode(true);
         me._offsetX = offsetX;
         me._offsetY = offsetY;
 
-        const clone = sourceElement.cloneNode(true);
-        const rect = sourceElement.getBoundingClientRect();
+        // Apply critical styles for the ghost
+        me._ghostElement.style.position = 'fixed';
+        me._ghostElement.style.pointerEvents = 'none';
+        me._ghostElement.style.zIndex = '9999';
+        me._ghostElement.style.opacity = '0.85';
+        me._ghostElement.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
+        me._ghostElement.style.width = `${width}px`;
+        me._ghostElement.style.height = `${height}px`;
+        me._ghostElement.style.margin = '0';
+        me._ghostElement.style.top = '0'; // Reset to allow transform positioning
+        me._ghostElement.style.left = '0';
 
-        // Apply structural styles to ensure isolation
-        clone.style.position = 'fixed';
-        clone.style.zIndex = '99999';
-        clone.style.pointerEvents = 'none'; // CRITICAL: Allows drops on elements below
-        clone.style.margin = '0';
-        clone.style.top = '0';
-        clone.style.left = '0';
-        clone.style.bottom = 'auto';
-        clone.style.right = 'auto';
-        clone.style.opacity = '0.9'; // Slight transparency for feedback
+        // Add a class for specific CSS targeting if needed
+        me._ghostElement.classList.add('dnd-ghost-active');
+        document.body.classList.add('dnd-dragging-active');
 
-        // Enforce dimensions
-        clone.style.width = `${rect.width}px`;
-        clone.style.height = `${rect.height}px`;
+        // Initial position
+        me.update(clientX, clientY);
 
-        // Remove potential interference classes if necessary, or add specific ghost class
-        clone.classList.add('dnd-ghost');
-
-        document.body.appendChild(clone);
-        me._ghostElement = clone;
-
-        // Set initial position immediately
-        me.update(x, y, null);
+        document.body.appendChild(me._ghostElement);
     }
 
     /**
-     * Description:
-     * Updates the ghost's position on the screen based on the new pointer coordinates.
-     * If `containerBounds` is provided, the ghost's position is clamped to stay
-     * within those bounds.
+     * Updates the position of the ghost element.
+     * Supports constraining the ghost within a bounding box.
      *
-     * @param {number} x - The current pointer X coordinate.
-     * @param {number} y - The current pointer Y coordinate.
-     * @param {DOMRect|null} [containerBounds=null] - Optional bounds to restrict movement.
+     * @param {number} clientX - Current mouse X position.
+     * @param {number} clientY - Current mouse Y position.
+     * @param {DOMRect|object|null} [containerBounds=null] - Optional boundaries to constrain the ghost.
      * @returns {void}
      */
-    update(x, y, containerBounds = null) {
+    update(clientX, clientY, containerBounds = null) {
         const me = this;
         if (!me._ghostElement) return;
 
-        let left = x - me._offsetX;
-        let top = y - me._offsetY;
+        let x = clientX - me._offsetX;
+        let y = clientY - me._offsetY;
 
-        // Apply clamping logic if bounds are provided (e.g., for Panels)
+        // [RESTORED] Logic to constrain ghost within bounds
         if (containerBounds) {
-            const ghostWidth = me._ghostElement.offsetWidth;
-            const ghostHeight = me._ghostElement.offsetHeight;
+            // We need the ghost's current dimensions to calculate max boundaries
+            // Using getBoundingClientRect is safe here as the element is in DOM
+            const ghostRect = me._ghostElement.getBoundingClientRect();
+            const ghostWidth = ghostRect.width;
+            const ghostHeight = ghostRect.height;
 
             const minX = containerBounds.left;
-            const minY = containerBounds.top;
             const maxX = containerBounds.right - ghostWidth;
+            const minY = containerBounds.top;
             const maxY = containerBounds.bottom - ghostHeight;
 
-            left = Math.max(minX, Math.min(left, maxX));
-            top = Math.max(minY, Math.min(top, maxY));
+            // Clamp values
+            x = Math.max(minX, Math.min(x, maxX));
+            y = Math.max(minY, Math.min(y, maxY));
         }
 
-        // Use translate3d for hardware acceleration
-        me._ghostElement.style.transform = `translate3d(${left}px, ${top}px, 0)`;
+        me._ghostElement.style.transform = `translate(${x}px, ${y}px)`;
     }
 
     /**
-     * Description:
-     * Removes the ghost element from the DOM and cleans up internal references.
+     * Removes the ghost element from the DOM and cleans up.
      *
      * @returns {void}
      */
@@ -150,7 +146,6 @@ export class GhostManager {
             me._ghostElement.parentNode.removeChild(me._ghostElement);
         }
         me._ghostElement = null;
-        me._offsetX = 0;
-        me._offsetY = 0;
+        document.body.classList.remove('dnd-dragging-active');
     }
 }

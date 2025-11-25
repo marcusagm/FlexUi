@@ -3,6 +3,7 @@ import { VanillaPanelGroupHeaderAdapter } from '../../renderers/vanilla/VanillaP
 import { TabStrip } from '../Core/TabStrip.js';
 import { appBus } from '../../utils/EventBus.js';
 import { EventTypes } from '../../constants/EventTypes.js';
+import { DropZoneType } from '../../constants/DNDTypes.js'; // Import DropZoneType
 
 /**
  * Description:
@@ -28,6 +29,7 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * - Composes TabStrip via the 'mount' lifecycle.
  * - Delegates DOM events to internal handlers.
  * - Updates visual state via adapter methods.
+ * - Registers itself as a 'tab-container' drop zone to enable tab reordering.
  *
  * Dependencies:
  * - {import('../../core/UIElement.js').UIElement}
@@ -104,7 +106,7 @@ export class PanelGroupHeader extends UIElement {
                 simpleMode: true
             },
             renderer
-        ); // Pass renderer to TabStrip if needed or let it default
+        );
 
         me._boundOnCollapse = me._onCollapse.bind(me);
         me._boundOnClose = me._onClose.bind(me);
@@ -219,10 +221,23 @@ export class PanelGroupHeader extends UIElement {
         const me = this;
         const element = me.renderer.createHeaderElement(me.id);
 
-        // Link DND properties from the parent group if available
+        // [CRITICAL] Configure Drop Zone for Tab Reordering
+        // This ensures DragDropService recognizes the header area as a 'tab-container'
         if (me.panelGroup) {
+            element.dataset.dropzone = DropZoneType.TAB_CONTAINER;
+            // The strategy needs the PanelGroup instance to call addPanel/movePanel
+            // We attach a proxy object or the PanelGroup itself, but PanelGroup handles the logic.
+            // The TabContainerDropStrategy expects `dropZone` to be the PanelGroup.
+            // So we link the instance to the PanelGroup.
             element.dropZoneInstance = me.panelGroup;
-            element.dataset.dropzone = me.panelGroup.dropZoneType;
+
+            // Also ensure the TabStrip slot allows pass-through or is part of the zone
+            const tabSlot = me.renderer.getTabContainerSlot(element);
+            if (tabSlot) {
+                // Optional: mark slot too if hit testing is precise
+                tabSlot.dataset.dropzone = DropZoneType.TAB_CONTAINER;
+                tabSlot.dropZoneInstance = me.panelGroup;
+            }
         }
 
         // Attach listeners
@@ -410,6 +425,17 @@ export class PanelGroupHeader extends UIElement {
     }
 
     /**
+     * Exposes the root element of the internal TabStrip.
+     * Used by DND strategies to locate the drop target area.
+     *
+     * @returns {HTMLElement} The TabStrip root element.
+     */
+    get tabStripElement() {
+        const me = this;
+        return me.tabStrip.element;
+    }
+
+    /**
      * Compatibility method used by DND strategies.
      * Returns the DOM element where tabs are effectively dropped.
      *
@@ -417,7 +443,6 @@ export class PanelGroupHeader extends UIElement {
      */
     get tabContainer() {
         const me = this;
-        // The TabStrip root element is the effective drop target logic
-        return me.tabStrip.element;
+        return me.tabStripElement;
     }
 }
