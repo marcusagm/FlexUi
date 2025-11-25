@@ -14,8 +14,8 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * - _baseZIndex {number} : The starting z-index for floating panels.
  * - _zIndexCounter {number} : The incrementing z-index counter.
  * - _namespace {string} : Unique namespace for appBus listeners.
- * - _boundOnPanelGroupRemoved {Function | null} : Bound handler for group removal event.
- * - _boundOnUndockRequest {Function | null} : Bound handler for undock command event.
+ * - _boundOnPanelGroupRemoved {Function} : Bound handler for group removal event.
+ * - _boundOnUndockRequest {Function} : Bound handler for undock command event.
  *
  * Typical usage:
  * // In App.js
@@ -29,7 +29,13 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * fpms.removeFloatingPanel(panelGroup);
  *
  * Events:
- * - Listens to: EventTypes.PANEL_GROUP_REMOVED, EventTypes.APP_UNDOCK_PANEL_REQUEST
+ * - Listens to: EventTypes.PANEL_GROUP_REMOVED
+ * - Listens to: EventTypes.APP_UNDOCK_PANEL_REQUEST
+ *
+ * Business rules implemented:
+ * - Manages stacking context (z-index) to ensure active panels are on top.
+ * - Constrains floating panels within the boundaries of the registered container.
+ * - Handles the conversion of docked panels to floating panels upon request.
  *
  * Dependencies:
  * - {import('../../components/Panel/PanelGroup.js').PanelGroup}
@@ -88,25 +94,28 @@ export class FloatingPanelManagerService {
     /**
      * Bound handler for group removal event.
      *
-     * @type {Function | null}
+     * @type {Function}
      * @private
      */
-    _boundOnPanelGroupRemoved = null;
+    _boundOnPanelGroupRemoved;
 
     /**
      * Bound handler for undock command event.
      *
-     * @type {Function | null}
+     * @type {Function}
      * @private
      */
-    _boundOnUndockRequest = null;
+    _boundOnUndockRequest;
 
     /**
+     * Creates an instance of FloatingPanelManagerService.
      * Private constructor for Singleton.
      */
     constructor() {
         if (FloatingPanelManagerService._instance) {
-            console.warn('FloatingPanelManagerService is a singleton. Use getInstance().');
+            console.warn(
+                '[FloatingPanelManagerService] Instance already exists. Use getInstance().'
+            );
             return FloatingPanelManagerService._instance;
         }
         FloatingPanelManagerService._instance = this;
@@ -119,7 +128,6 @@ export class FloatingPanelManagerService {
     }
 
     /**
-     * Description:
      * Gets the singleton instance.
      *
      * @returns {FloatingPanelManagerService} The singleton instance.
@@ -138,14 +146,14 @@ export class FloatingPanelManagerService {
      * @returns {void}
      */
     set container(element) {
+        const me = this;
         if (!(element instanceof HTMLElement)) {
             console.warn(
-                'FloatingPanelManagerService: Invalid container provided. Must be an HTMLElement.'
+                `[FloatingPanelManagerService] invalid container assignment (${element}). Must be an HTMLElement. Keeping previous value: ${me._container}`
             );
-            this._container = null;
             return;
         }
-        this._container = element;
+        me._container = element;
     }
 
     /**
@@ -158,7 +166,6 @@ export class FloatingPanelManagerService {
     }
 
     /**
-     * Description:
      * Destroys all currently active floating panels and clears the manager.
      * This is used when restoring or resetting the workspace to prevent duplicates.
      *
@@ -166,6 +173,7 @@ export class FloatingPanelManagerService {
      */
     clearAll() {
         const me = this;
+        // Create a copy to avoid modification issues during iteration
         const panelsToClose = [...me._floatingPanels];
         panelsToClose.forEach(panelGroup => {
             if (panelGroup && typeof panelGroup.close === 'function') {
@@ -178,32 +186,6 @@ export class FloatingPanelManagerService {
     }
 
     /**
-     * Description:
-     * Initializes appBus event listeners for this component.
-     *
-     * @private
-     * @returns {void}
-     */
-    _initEventListeners() {
-        const me = this;
-        const options = { namespace: me._namespace };
-        appBus.on(EventTypes.PANEL_GROUP_REMOVED, me._boundOnPanelGroupRemoved, options);
-        appBus.on(EventTypes.APP_UNDOCK_PANEL_REQUEST, me._boundOnUndockRequest, options);
-    }
-
-    /**
-     * Description:
-     * Cleans up appBus listeners.
-     *
-     * @returns {void}
-     */
-    destroy() {
-        const me = this;
-        appBus.offByNamespace(me._namespace);
-    }
-
-    /**
-     * Description:
      * Registers the main container element used for coordinate calculations
      * and appending floating panels.
      *
@@ -215,7 +197,6 @@ export class FloatingPanelManagerService {
     }
 
     /**
-     * Description:
      * Adds a PanelGroup to the manager, making it floating.
      *
      * @param {import('../../components/Panel/PanelGroup.js').PanelGroup} panelGroup - The PanelGroup instance.
@@ -226,16 +207,19 @@ export class FloatingPanelManagerService {
     addFloatingPanel(panelGroup, x, y) {
         const me = this;
         if (!me.container) {
-            console.error('FloatingPanelManagerService: Container not registered.');
+            console.error(
+                '[FloatingPanelManagerService] addFloatingPanel failed. Container not registered.'
+            );
             return;
         }
         if (!panelGroup || typeof panelGroup.setFloatingState !== 'function') {
             console.warn(
-                'FloatingPanelManagerService: Invalid panelGroup passed to addFloatingPanel.'
+                `[FloatingPanelManagerService] invalid panelGroup argument (${panelGroup}). Must be a valid PanelGroup instance.`
             );
             return;
         }
 
+        // Ensure the element is in the DOM (floating context)
         me.container.appendChild(panelGroup.element);
         panelGroup.setFloatingState(true, x, y);
 
@@ -247,7 +231,6 @@ export class FloatingPanelManagerService {
     }
 
     /**
-     * Description:
      * Removes a PanelGroup from the manager (e.g., when docking).
      *
      * @param {import('../../components/Panel/PanelGroup.js').PanelGroup} panelGroup - The PanelGroup instance.
@@ -264,13 +247,23 @@ export class FloatingPanelManagerService {
             me._floatingPanels.splice(index, 1);
         }
 
-        panelGroup.setFloatingState(false, null, null);
-        panelGroup.element.style.zIndex = '';
-        panelGroup.element.remove();
+        // Reset state on the group itself
+        if (typeof panelGroup.setFloatingState === 'function') {
+            panelGroup.setFloatingState(false, null, null);
+        }
+
+        // Clean up styles
+        if (panelGroup.element) {
+            panelGroup.element.style.zIndex = '';
+            // Removing from DOM is typically handled by the new parent (DropStrategy),
+            // but if we are just closing it, we remove it here.
+            if (panelGroup.element.parentNode === me.container) {
+                panelGroup.element.remove();
+            }
+        }
     }
 
     /**
-     * Description:
      * Handles the drop event for an item being "undocked" (dropped outside a dropzone).
      * Applies constraints to ensure the panel stays within container bounds.
      *
@@ -295,16 +288,21 @@ export class FloatingPanelManagerService {
 
         let panelGroup = null;
 
+        // Determine the PanelGroup to float
         if (draggedData.type === 'PanelGroup') {
             panelGroup = draggedData.item;
         } else if (draggedData.type === 'Panel') {
             const panel = draggedData.item;
             const sourceGroup = panel.parentGroup;
 
-            if (sourceGroup.panels.length === 1) {
+            if (sourceGroup && sourceGroup.panels.length === 1) {
+                // If it's the last panel, float the whole group
                 panelGroup = sourceGroup;
-            } else {
+            } else if (sourceGroup) {
+                // Otherwise, extract the panel into a new group
                 sourceGroup.removePanel(panel, true);
+                // Import dynamically or rely on dependency injection if needed,
+                // but here PanelGroup is imported at top.
                 panelGroup = new PanelGroup(panel);
             }
         }
@@ -313,9 +311,12 @@ export class FloatingPanelManagerService {
             return;
         }
 
-        // Ensure proper removal from Column using new API
-        if (panelGroup.getColumn()) {
-            panelGroup.getColumn().removeChild(panelGroup);
+        // Ensure proper removal from Column using new API if applicable
+        if (typeof panelGroup.getColumn === 'function') {
+            const col = panelGroup.getColumn();
+            if (col) {
+                col.removeChild(panelGroup);
+            }
         }
 
         me.addFloatingPanel(panelGroup, initialX, initialY);
@@ -326,7 +327,131 @@ export class FloatingPanelManagerService {
     }
 
     /**
-     * Description:
+     * Brings a specific floating panel to the top (highest z-index).
+     *
+     * @param {import('../../components/Panel/PanelGroup.js').PanelGroup} panelGroup - The panel to bring front.
+     * @returns {void}
+     */
+    bringToFront(panelGroup) {
+        const me = this;
+        const index = me._floatingPanels.indexOf(panelGroup);
+
+        if (index === -1) {
+            return;
+        }
+
+        // Move to end of array (top of stack)
+        me._floatingPanels.splice(index, 1);
+        me._floatingPanels.push(panelGroup);
+
+        me._normalizeZIndexes();
+    }
+
+    /**
+     * Gets the bounding rectangle of the registered container.
+     *
+     * @returns {DOMRect|null} The bounds or null if container is not set.
+     */
+    getContainerBounds() {
+        const me = this;
+        if (!me.container) {
+            return null;
+        }
+        return me.container.getBoundingClientRect();
+    }
+
+    /**
+     * Updates a floating panel's position, applying container constraints.
+     * Explicitly requires bounds to be passed in, making the method pure
+     * regarding DOM reads.
+     *
+     * @param {import('../../components/Panel/PanelGroup.js').PanelGroup} panelGroup - The panel to move.
+     * @param {number} newX - The desired new X coordinate.
+     * @param {number} newY - The desired new Y coordinate.
+     * @param {DOMRect} containerBounds - The boundaries of the container.
+     * @returns {{x: number, y: number}} The constrained (applied) coordinates.
+     */
+    updatePanelPosition(panelGroup, newX, newY, containerBounds) {
+        if (!containerBounds || !panelGroup.element) {
+            return { x: newX, y: newY };
+        }
+
+        const panelElement = panelGroup.element;
+        const panelWidth = panelElement.offsetWidth;
+        const panelHeight = panelElement.offsetHeight;
+
+        const constrainedX = Math.max(0, Math.min(newX, containerBounds.width - panelWidth));
+        const constrainedY = Math.max(0, Math.min(newY, containerBounds.height - panelHeight));
+
+        panelElement.style.left = `${constrainedX}px`;
+        panelElement.style.top = `${constrainedY}px`;
+
+        return { x: constrainedX, y: constrainedY };
+    }
+
+    /**
+     * Serializes the state of all managed floating panels.
+     *
+     * @returns {Array<object>} An array of serialized PanelGroup data.
+     */
+    toJSON() {
+        const me = this;
+        return me._floatingPanels.map(panelGroup => {
+            if (typeof panelGroup.toJSON === 'function') {
+                return panelGroup.toJSON();
+            }
+            return null;
+        });
+    }
+
+    /**
+     * Deserializes and restores floating panels from saved data.
+     *
+     * @param {Array<object>} floatingPanelsData - Data from StateService.
+     * @returns {void}
+     */
+    fromJSON(floatingPanelsData) {
+        const me = this;
+        if (!Array.isArray(floatingPanelsData)) {
+            return;
+        }
+
+        floatingPanelsData.forEach(groupData => {
+            const panelGroup = new PanelGroup();
+            if (typeof panelGroup.fromJSON === 'function') {
+                panelGroup.fromJSON(groupData);
+            }
+
+            if (panelGroup.isFloating) {
+                me.addFloatingPanel(panelGroup, panelGroup.x, panelGroup.y);
+            }
+        });
+    }
+
+    /**
+     * Cleans up appBus listeners.
+     *
+     * @returns {void}
+     */
+    destroy() {
+        const me = this;
+        appBus.offByNamespace(me._namespace);
+    }
+
+    /**
+     * Initializes appBus event listeners for this component.
+     *
+     * @private
+     * @returns {void}
+     */
+    _initEventListeners() {
+        const me = this;
+        const options = { namespace: me._namespace };
+        appBus.on(EventTypes.PANEL_GROUP_REMOVED, me._boundOnPanelGroupRemoved, options);
+        appBus.on(EventTypes.APP_UNDOCK_PANEL_REQUEST, me._boundOnUndockRequest, options);
+    }
+
+    /**
      * Event handler for 'app:undock-panel-request' from ContextMenu.
      *
      * @param {object} contextData - The data from the context menu action.
@@ -345,7 +470,7 @@ export class FloatingPanelManagerService {
 
         const containerRect = me.getContainerBounds();
         if (!containerRect) {
-            console.warn('FPMS: Container not found for undock request.');
+            console.warn('[FloatingPanelManagerService] Container not found for undock request.');
             return;
         }
 
@@ -355,7 +480,7 @@ export class FloatingPanelManagerService {
         if (isLastPanel) {
             panelGroupToFloat = group;
             const sourceColumn = panelGroupToFloat.getColumn();
-            // Ensure proper removal from Column using new API
+            // Ensure proper removal from Column
             if (sourceColumn) {
                 sourceColumn.removeChild(panelGroupToFloat, true);
             }
@@ -373,7 +498,6 @@ export class FloatingPanelManagerService {
     }
 
     /**
-     * Description:
      * Event handler for when any PanelGroup is removed from the layout.
      *
      * @param {object} eventData - The event payload containing panel reference.
@@ -389,28 +513,6 @@ export class FloatingPanelManagerService {
     }
 
     /**
-     * Description:
-     * Brings a specific floating panel to the top (highest z-index).
-     *
-     * @param {import('../../components/Panel/PanelGroup.js').PanelGroup} panelGroup - The panel to bring front.
-     * @returns {void}
-     */
-    bringToFront(panelGroup) {
-        const me = this;
-        const index = me._floatingPanels.indexOf(panelGroup);
-
-        if (index === -1) {
-            return;
-        }
-
-        me._floatingPanels.splice(index, 1);
-        me._floatingPanels.push(panelGroup);
-
-        me._normalizeZIndexes();
-    }
-
-    /**
-     * Description:
      * Normalizes the z-indexes of all floating panels to avoid infinite growth.
      * Reassigns sequential z-indexes starting from baseZIndex based on the
      * current order in the _floatingPanels array.
@@ -422,86 +524,10 @@ export class FloatingPanelManagerService {
         const me = this;
         me._floatingPanels.forEach((panel, index) => {
             const newZ = me._baseZIndex + index;
-            panel.element.style.zIndex = newZ;
-        });
-        me._zIndexCounter = me._baseZIndex + me._floatingPanels.length;
-    }
-
-    /**
-     * Description:
-     * Gets the bounding rectangle of the registered container.
-     *
-     * @returns {DOMRect|null} The bounds or null if container is not set.
-     */
-    getContainerBounds() {
-        const me = this;
-        if (!me.container) {
-            return null;
-        }
-        return me.container.getBoundingClientRect();
-    }
-
-    /**
-     * Description:
-     * Updates a floating panel's position, applying container constraints.
-     * Explicitly requires bounds to be passed in, making the method pure
-     * regarding DOM reads.
-     *
-     * @param {import('../../components/Panel/PanelGroup.js').PanelGroup} panelGroup - The panel to move.
-     * @param {number} newX - The desired new X coordinate.
-     * @param {number} newY - The desired new Y coordinate.
-     * @param {DOMRect} containerBounds - The boundaries of the container.
-     * @returns {{x: number, y: number}} The constrained (applied) coordinates.
-     */
-    updatePanelPosition(panelGroup, newX, newY, containerBounds) {
-        if (!containerBounds) {
-            return { x: newX, y: newY };
-        }
-
-        const panelElement = panelGroup.element;
-        const panelWidth = panelElement.offsetWidth;
-        const panelHeight = panelElement.offsetHeight;
-
-        const constrainedX = Math.max(0, Math.min(newX, containerBounds.width - panelWidth));
-        const constrainedY = Math.max(0, Math.min(newY, containerBounds.height - panelHeight));
-
-        panelElement.style.left = `${constrainedX}px`;
-        panelElement.style.top = `${constrainedY}px`;
-
-        return { x: constrainedX, y: constrainedY };
-    }
-
-    /**
-     * Description:
-     * Serializes the state of all managed floating panels.
-     *
-     * @returns {Array<object>} An array of serialized PanelGroup data.
-     */
-    toJSON() {
-        const me = this;
-        return me._floatingPanels.map(panelGroup => panelGroup.toJSON());
-    }
-
-    /**
-     * Description:
-     * Deserializes and restores floating panels from saved data.
-     *
-     * @param {Array<object>} floatingPanelsData - Data from StateService.
-     * @returns {void}
-     */
-    fromJSON(floatingPanelsData) {
-        const me = this;
-        if (!Array.isArray(floatingPanelsData)) {
-            return;
-        }
-
-        floatingPanelsData.forEach(groupData => {
-            const panelGroup = new PanelGroup();
-            panelGroup.fromJSON(groupData);
-
-            if (panelGroup.isFloating) {
-                me.addFloatingPanel(panelGroup, panelGroup.x, panelGroup.y);
+            if (panel.element) {
+                panel.element.style.zIndex = newZ;
             }
         });
+        me._zIndexCounter = me._baseZIndex + me._floatingPanels.length;
     }
 }
