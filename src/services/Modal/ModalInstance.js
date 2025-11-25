@@ -121,8 +121,6 @@ export class ModalInstance {
         }
     }
 
-    // --- Public Getters ---
-
     /**
      * @returns {Promise} The promise associated with this modal.
      */
@@ -150,8 +148,6 @@ export class ModalInstance {
     get isClosing() {
         return this._isClosing;
     }
-
-    // --- DOM and Content ---
 
     /**
      * Builds the modal shell (header, footer, content area).
@@ -454,8 +450,6 @@ export class ModalInstance {
 
         header.onmousedown = dragMouseDown;
     }
-
-    // --- Public API / Actions ---
 
     /**
      * Gets the limited API to pass to controllers and buttons.

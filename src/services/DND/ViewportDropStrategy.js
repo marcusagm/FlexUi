@@ -101,8 +101,6 @@ export class ViewportDropStrategy extends BaseDropStrategy {
             return true;
         }
 
-        // --- Empty State Logic (No Tabs) ---
-
         // Check if mouse is in the top docking zone
         const relativeY = point.y - viewportRect.top;
 

@@ -208,8 +208,6 @@ export class PanelGroupHeader extends UIElement {
         return null;
     }
 
-    // --- UIElement Overrides ---
-
     /**
      * Implementation of the rendering logic.
      * Uses the adapter to create the header structure.
@@ -302,8 +300,6 @@ export class PanelGroupHeader extends UIElement {
         }
         super.dispose();
     }
-
-    // --- Logic and Handlers ---
 
     /**
      * Handler for collapse button click.

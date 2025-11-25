@@ -611,8 +611,6 @@ export class Panel extends IPanel {
         }
     }
 
-    // --- Reactive State Management ---
-
     /**
      * Subscribes to keys in GlobalStateService.
      * Called automatically on mount.

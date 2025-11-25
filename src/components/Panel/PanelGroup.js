@@ -628,8 +628,6 @@ export class PanelGroup extends UIElement {
         return this._column;
     }
 
-    // --- UIElement Overrides ---
-
     /**
      * Implementation of the rendering logic.
      * Uses the adapter to create the group DOM structure.
@@ -716,8 +714,6 @@ export class PanelGroup extends UIElement {
             me.renderer.unmount(me.element.parentNode, me.element);
         }
     }
-
-    // --- Methods ---
 
     /**
      * Sets the floating state and updates the DOM, managing the correct resize handles.
