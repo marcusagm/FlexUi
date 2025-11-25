@@ -180,7 +180,7 @@ export class VanillaPanelGroupHeaderAdapter extends VanillaRenderer {
     }
 
     /**
-     * Updates the visual state of the collapse button.
+     * Updates the visual state of the collapse button (collapsed/expanded style).
      *
      * @param {HTMLElement} headerElement - The root header element.
      * @param {boolean} isCollapsed - Whether the group is collapsed.
@@ -198,6 +198,23 @@ export class VanillaPanelGroupHeaderAdapter extends VanillaRenderer {
             } else {
                 btn.classList.remove(collapsedClass);
             }
+        }
+    }
+
+    /**
+     * Sets the disabled state of the collapse button.
+     *
+     * @param {HTMLElement} headerElement - The root header element.
+     * @param {boolean} isDisabled - Whether the button is disabled.
+     * @returns {void}
+     */
+    setCollapseButtonDisabled(headerElement, isDisabled) {
+        const me = this;
+        if (!headerElement) return;
+
+        const btn = me.getCollapseButton(headerElement);
+        if (btn) {
+            btn.disabled = !!isDisabled;
         }
     }
 

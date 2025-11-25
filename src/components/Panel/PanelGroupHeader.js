@@ -3,7 +3,7 @@ import { VanillaPanelGroupHeaderAdapter } from '../../renderers/vanilla/VanillaP
 import { TabStrip } from '../Core/TabStrip.js';
 import { appBus } from '../../utils/EventBus.js';
 import { EventTypes } from '../../constants/EventTypes.js';
-import { DropZoneType } from '../../constants/DNDTypes.js'; // Import DropZoneType
+import { DropZoneType } from '../../constants/DNDTypes.js';
 
 /**
  * Description:
@@ -221,20 +221,13 @@ export class PanelGroupHeader extends UIElement {
         const me = this;
         const element = me.renderer.createHeaderElement(me.id);
 
-        // [CRITICAL] Configure Drop Zone for Tab Reordering
-        // This ensures DragDropService recognizes the header area as a 'tab-container'
+        // Link DND properties from the parent group if available
         if (me.panelGroup) {
             element.dataset.dropzone = DropZoneType.TAB_CONTAINER;
-            // The strategy needs the PanelGroup instance to call addPanel/movePanel
-            // We attach a proxy object or the PanelGroup itself, but PanelGroup handles the logic.
-            // The TabContainerDropStrategy expects `dropZone` to be the PanelGroup.
-            // So we link the instance to the PanelGroup.
             element.dropZoneInstance = me.panelGroup;
 
-            // Also ensure the TabStrip slot allows pass-through or is part of the zone
             const tabSlot = me.renderer.getTabContainerSlot(element);
             if (tabSlot) {
-                // Optional: mark slot too if hit testing is precise
                 tabSlot.dataset.dropzone = DropZoneType.TAB_CONTAINER;
                 tabSlot.dropZoneInstance = me.panelGroup;
             }
@@ -401,6 +394,19 @@ export class PanelGroupHeader extends UIElement {
         const me = this;
         if (me.element) {
             me.renderer.setCollapsedState(me.element, isCollapsed);
+        }
+    }
+
+    /**
+     * Sets the disabled state of the collapse button.
+     *
+     * @param {boolean} disabled - Whether the button is disabled.
+     * @returns {void}
+     */
+    setCollapseButtonDisabled(disabled) {
+        const me = this;
+        if (me.element) {
+            me.renderer.setCollapseButtonDisabled(me.element, disabled);
         }
     }
 

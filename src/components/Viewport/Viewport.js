@@ -79,13 +79,14 @@ class WindowHeaderWrapper extends UIElement {
  * - Integrates TabStrip for docking functionality.
  * - Automatically hides the TabStrip when no windows are docked.
  * - Synchronizes Window focus with Tab selection.
+ * - Supports 'Fill Space' layout mode managed by LayoutService.
  *
  * Dependencies:
- * - TabStrip
- * - UIElement
- * - VanillaViewportAdapter
- * - EventBus
- * - ViewportFactory
+ * - {import('../Core/TabStrip.js').TabStrip}
+ * - {import('../../core/UIElement.js').UIElement}
+ * - {import('../../renderers/vanilla/VanillaViewportAdapter.js').VanillaViewportAdapter}
+ * - {import('../../utils/EventBus.js').appBus}
+ * - {import('./ViewportFactory.js').ViewportFactory}
  */
 export class Viewport extends UIElement {
     /**
@@ -280,8 +281,6 @@ export class Viewport extends UIElement {
                 me._tabStrip.mount(tabSlot);
 
                 // Configure Tab Bar DropZone on the slot or strip
-                // The strategy looks for DropZoneType.VIEWPORT_TAB_BAR
-                // We attach it to the slot for broader hit area or the strip element
                 tabSlot.dataset.dropzone = DropZoneType.VIEWPORT_TAB_BAR;
                 tabSlot.dropZoneInstance = {
                     dropZoneType: DropZoneType.VIEWPORT_TAB_BAR,
@@ -330,6 +329,31 @@ export class Viewport extends UIElement {
     }
 
     /**
+     * Sets whether the viewport should fill the available space in the column.
+     * Used by LayoutService.
+     *
+     * @param {boolean} fillsSpace - True to fill vertical space.
+     * @returns {void}
+     */
+    setFillSpace(fillsSpace) {
+        const me = this;
+        if (me.element) {
+            me.renderer.setFillSpace(me.element, fillsSpace);
+        }
+    }
+
+    /**
+     * Interface implementation for LayoutService compatibility.
+     * Viewports do not have a collapse button, so this is a no-op.
+     *
+     * @param {boolean} disabled
+     * @returns {void}
+     */
+    setCollapseButtonDisabled(disabled) {
+        // No-op
+    }
+
+    /**
      * Adds a window to the viewport and mounts it.
      *
      * @param {import('./ApplicationWindow.js').ApplicationWindow} windowInstance - The window to add.
@@ -375,7 +399,7 @@ export class Viewport extends UIElement {
         me._windows.splice(index, 1);
 
         // Clean up
-        windowInstance.dispose(); // Will trigger unmount if mounted
+        windowInstance.dispose();
 
         me._updateTabBarVisibility();
 
@@ -593,20 +617,6 @@ export class Viewport extends UIElement {
             win.width = cellWidth;
             win.height = cellHeight;
         });
-    }
-
-    /**
-     * Sets whether the viewport should fill the available space.
-     * Used by LayoutService.
-     *
-     * @param {boolean} fillsSpace
-     * @returns {void}
-     */
-    setFillSpace(fillsSpace) {
-        const me = this;
-        if (me.element) {
-            me.renderer.setFillSpace(me.element, fillsSpace);
-        }
     }
 
     /**

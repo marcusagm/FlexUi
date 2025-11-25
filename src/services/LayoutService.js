@@ -22,7 +22,8 @@ import { EventTypes } from '../constants/EventTypes.js';
  *
  * Business rules implemented:
  * - Enforces that at least one row (usually the last) fills the available vertical space.
- * - Disables row collapse if it is the only row or a critical layout element.
+ * - Disables row collapse if it is the only row.
+ * - Disables panel group collapse if it is the only item in a column.
  * - Calculates minimum widths for columns based on their children's constraints.
  * - Determines which child in a column should expand to fill available vertical space.
  *
@@ -113,8 +114,7 @@ export class LayoutService {
         const rows = container.rows;
         if (!rows || rows.length === 0) return;
 
-        // Business Rule: If there is only one row, it shouldn't be collapsible
-        // to prevent the user from collapsing the entire interface.
+        // Business Rule: If there is only one row, it shouldn't be collapsible.
         const shouldDisableCollapse = rows.length <= 1;
 
         rows.forEach((row, index) => {
@@ -122,9 +122,7 @@ export class LayoutService {
 
             // Update resize bars availability
             if (typeof row.updateAllResizeBars === 'function') {
-                row.updateAllResizeBars(); // Internal logic handles isLast inside if needed, or we pass it
-                // Row.addResizeBars takes (isLast). Row.updateAllResizeBars calls addResizeBars internally?
-                // Checking Row.js: updateAllResizeBars calls addResizeBars(index === length - 1). Correct.
+                row.updateAllResizeBars();
             }
 
             // Update height styles (last row usually fills space)
@@ -216,25 +214,32 @@ export class LayoutService {
             column.setComputedMinWidth(maxMinWidth);
         }
 
-        // 3. Determine which child fills the remaining vertical space.
-        // Rule: The last uncollapsed child fills the space.
+        // 3. Determine layout logic (Fill Space & Collapse)
         const uncollapsedChildren = children.filter(child => {
             return typeof child.collapsed !== 'boolean' || !child.collapsed;
         });
 
         const lastUncollapsed = uncollapsedChildren[uncollapsedChildren.length - 1];
 
+        // Prevent collapsing if it's the only item in the column
+        const shouldDisableCollapse = children.length <= 1;
+
         children.forEach(child => {
             const shouldFill = child === lastUncollapsed;
 
-            // Use new public API to set fill state
+            // [API Use] Set Fill Space behavior
             if (typeof child.setFillSpace === 'function') {
-                child.setFillSpace(shouldFill);
+                // Ensure floating panels don't get layout classes from parent flow
+                if (child.isFloating) {
+                    child.setFillSpace(false);
+                } else {
+                    child.setFillSpace(shouldFill);
+                }
             }
 
-            // Ensure floating panels don't get layout classes from parent flow
-            if (child.isFloating && typeof child.setFillSpace === 'function') {
-                child.setFillSpace(false);
+            // [API Use] Set Collapse Button State
+            if (typeof child.setCollapseButtonDisabled === 'function') {
+                child.setCollapseButtonDisabled(shouldDisableCollapse);
             }
         });
     }

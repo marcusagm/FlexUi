@@ -51,12 +51,12 @@ import { VanillaPanelGroupAdapter } from '../../renderers/vanilla/VanillaPanelGr
  * - Coordinates lifecycle of children (Panel and Header).
  *
  * Dependencies:
- * - UIElement
- * - VanillaPanelGroupAdapter
- * - PanelGroupHeader
- * - PanelFactory
- * - ResizeHandleManager
- * - EventBus
+ * - {import('../../core/UIElement.js').UIElement}
+ * - {import('../../renderers/vanilla/VanillaPanelGroupAdapter.js').VanillaPanelGroupAdapter}
+ * - {import('./PanelGroupHeader.js').PanelGroupHeader}
+ * - {import('./PanelFactory.js').PanelFactory}
+ * - {import('../../utils/ResizeHandleManager.js').ResizeHandleManager}
+ * - {import('../../utils/EventBus.js').appBus}
  */
 export class PanelGroup extends UIElement {
     /**
@@ -734,7 +734,10 @@ export class PanelGroup extends UIElement {
         me._y = y;
 
         if (me.header && me.header.collapseBtn) {
-            me.header.collapseBtn.disabled = !me._collapsible;
+            // TODO: Refactor to use updateConfig or setCollapseButtonDisabled properly
+            // me.header.collapseBtn.disabled = !me._collapsible;
+            // Using the new API:
+            me.header.setCollapseButtonDisabled(!me._collapsible);
         }
 
         if (me.element) {
@@ -791,13 +794,40 @@ export class PanelGroup extends UIElement {
                 });
             }
         }
-        // TabStrip logic handles Simple Mode updates internally if items change,
-        // but header mode might need specific updates if styling changes.
+
         if (me.header) {
             me.header.updateConfig({
                 closable: me._closable,
                 movable: me._movable
             });
+        }
+    }
+
+    /**
+     * Sets whether the group should fill the available space in the column.
+     * Used by LayoutService.
+     *
+     * @param {boolean} fillsSpace
+     * @returns {void}
+     */
+    setFillSpace(fillsSpace) {
+        const me = this;
+        if (me.element) {
+            me.renderer.setFillSpace(me.element, fillsSpace);
+        }
+    }
+
+    /**
+     * Sets whether the collapse button should be disabled.
+     * Used by LayoutService.
+     *
+     * @param {boolean} disabled
+     * @returns {void}
+     */
+    setCollapseButtonDisabled(disabled) {
+        const me = this;
+        if (me.header) {
+            me.header.setCollapseButtonDisabled(disabled);
         }
     }
 
@@ -1011,20 +1041,6 @@ export class PanelGroup extends UIElement {
         // Ensure Min Height is applied
         const minH = me.getMinPanelHeight();
         me.renderer.updateStyles(me.element, { minHeight: `${minH}px` });
-    }
-
-    /**
-     * Sets whether the group should fill the available space in the column.
-     * Used by LayoutService.
-     *
-     * @param {boolean} fillsSpace
-     * @returns {void}
-     */
-    setFillSpace(fillsSpace) {
-        const me = this;
-        if (me.element) {
-            me.renderer.setFillSpace(me.element, fillsSpace);
-        }
     }
 
     /**
