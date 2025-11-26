@@ -1,5 +1,4 @@
 import { appBus } from '../../utils/EventBus.js';
-import { generateId } from '../../utils/generateId.js';
 import { EventTypes } from '../../constants/EventTypes.js';
 import { DropZoneType } from '../../constants/DNDTypes.js';
 import { ViewportFactory } from './ViewportFactory.js';
@@ -351,7 +350,7 @@ export class Viewport extends UIElement {
      * @returns {void}
      */
     setCollapseButtonDisabled(disabled) {
-        // No-op
+        disabled;
     }
 
     /**
@@ -585,8 +584,8 @@ export class Viewport extends UIElement {
             if (windowInstance.isTabbed) return;
             if (windowInstance.isMaximized) windowInstance.toggleMaximize();
 
-            const x = 20 + count * offset;
-            const y = 20 + count * offset;
+            const x = count * offset;
+            const y = count * offset;
 
             windowInstance.x = x;
             windowInstance.y = y;
