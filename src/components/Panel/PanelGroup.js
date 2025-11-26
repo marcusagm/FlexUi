@@ -680,10 +680,6 @@ export class PanelGroup extends UIElement {
         const me = this;
         const element = me.renderer.createGroupElement(me.id);
 
-        // Configure drop zone attributes
-        element.dataset.dropzone = me.dropZoneType;
-        element.dropZoneInstance = me;
-
         // Attach listener for BringToFront if floating
         element.addEventListener('pointerdown', () => {
             if (me.isFloating) {
