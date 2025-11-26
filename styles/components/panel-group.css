@@ -180,13 +180,19 @@
     border-top-color: var(--color-accent-inactive);
 }
 
+/* * [CORREÇÃO] Mapeando a classe genérica do TabStrip (.ui-strip__item--active)
+ * para os estilos de aba ativa do painel.
+ */
+.panel-group__tab.ui-strip__item--active,
 .panel-group__tab--active {
     background-color: var(--color-bg-tab-active);
     color: var(--color-text-primary);
     border-top-color: var(--color-accent-primary);
-    margin-bottom: -1px;
+    margin-top: 0;
     position: relative;
     z-index: 1;
+    border-top: var(--panel-tab-border-top-width) solid var(--color-accent-hover);
+    border-bottom: 0;
 }
 
 .panel-group__tab .panel__title {
@@ -195,17 +201,28 @@
     text-overflow: ellipsis;
     padding: 0 4px;
     flex-grow: 1;
+
+    color: var(--color-text-bright);
+    font-size: var(--panel-title-font-size);
+    user-select: none;
+    min-width: var(--panel-title-min-width);
+    height: 100%;
+    align-content: center;
 }
 
 .panel-group__tab-close {
     background: none;
     border: none;
-    color: inherit;
-    font-size: 1.1em;
-    margin-left: 6px;
-    padding: 0 2px;
+    color: var(--color-text-secondary);
+    font-size: var(--panel-tab-close-font-size);
+    line-height: var(--panel-tab-close-line-height);
+    /* margin-left: 6px; */
+    margin-right: var(--panel-tab-close-margin-right);
+    padding: var(--panel-tab-close-padding);
+    width: var(--panel-tab-close-size);
+    height: var(--panel-tab-close-size);
+    flex-shrink: var(--panel-tab-close-flex-shrink);
     cursor: pointer;
-    opacity: 0.6;
     border-radius: var(--border-radius-sm);
     display: flex;
     align-items: center;
@@ -213,8 +230,9 @@
 }
 
 .panel-group__tab-close:hover {
-    opacity: 1;
-    background-color: rgba(0, 0, 0, 0.1);
+    color: var(--color-text-primary);
+    background-color: var(--color-bg-hover);
+    border-radius: var(--border-radius-base);
 }
 
 .panel-group__header--simple .ui-strip {
@@ -237,17 +255,25 @@
     color: var(--color-text-primary);
 }
 
+.panel-group__header--simple .panel-group__tab.ui-strip__item--active,
 .panel-group__header--simple .panel-group__tab--active {
     background: transparent;
     border: none;
     margin: 0;
     color: var(--color-text-primary);
+    border-bottom: none;
 }
 
 .panel-group__header--simple .panel-group__tab-close {
     display: none;
 }
 
+/* Ajustes nos controles para alinhar com o texto simples */
+.panel-group__header--simple .panel-group__controls {
+    margin-left: auto;
+}
+
+/* --- Content --- */
 .panel-group__content {
     flex: 1;
     display: flex;
@@ -257,11 +283,8 @@
     min-height: 0;
 }
 
+/* Utility: Fills Space */
 .panel-group--fills-space {
     flex: 1 1 auto !important;
     height: auto !important;
-}
-
-.panel-group__header--simple .panel-group__controls {
-    margin-left: auto;
 }

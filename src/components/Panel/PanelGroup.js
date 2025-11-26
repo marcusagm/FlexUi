@@ -1,6 +1,5 @@
 import { PanelGroupHeader } from './PanelGroupHeader.js';
 import { PanelFactory } from './PanelFactory.js';
-import { Panel } from './Panel.js';
 import { appBus } from '../../utils/EventBus.js';
 import { throttleRAF } from '../../utils/ThrottleRAF.js';
 import { FloatingPanelManagerService } from '../../services/DND/FloatingPanelManagerService.js';
