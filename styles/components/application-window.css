@@ -36,6 +36,13 @@
     box-shadow: none;
     /* Garante que fique acima de janelas flutuantes normais se necessário via CSS */
     z-index: var(--window-z-index-maximized);
+
+    /* [CORREÇÃO] Forçar preenchimento total do viewport sobrepondo estilos inline */
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    transform: none !important;
 }
 
 /* Ocultar alças de redimensionamento quando maximizado OU em modo aba */

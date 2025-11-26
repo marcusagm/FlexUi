@@ -58,7 +58,7 @@
     --color-text-on-accent: var(--primary-on-10);
 
     /* Bordas e Divisórias */
-    --color-border-default: var(--neutral-variant-30);
+    --color-border-default: var(--neutral-30);
     --color-border-focus: var(--color-accent-primary);
 
     /* Placeholders (Drag-n-Drop) */
@@ -532,6 +532,7 @@
 
     /* Component: Viewport & ApplicationWindow */
     --color-bg-viewport: var(--neutral-5);
+    --color-bg-viewport-tabbar: var(--surface-level-0);
 
     --window-header-height: 32px;
     --window-header-bg-active: var(--primary-30);

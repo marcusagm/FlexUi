@@ -1,5 +1,6 @@
 import { UIItemStrip } from './UIItemStrip.js';
 import { ContextMenuService } from '../../services/ContextMenu/ContextMenuService.js';
+import { Emitter } from '../../core/Emitter.js';
 
 /**
  * Description:
@@ -21,7 +22,7 @@ import { ContextMenuService } from '../../services/ContextMenu/ContextMenuServic
  *
  * Events:
  * - (Inherits from UIItemStrip)
- * - Emits 'selectionChanged' (via Emitter if implemented, currently managing state directly).
+ * - Emits 'selectionChange' via onSelectionChange getter.
  *
  * Business rules implemented:
  * - Only one item can be active at a time.
@@ -34,6 +35,7 @@ import { ContextMenuService } from '../../services/ContextMenu/ContextMenuServic
  * - {import('./UIItemStrip.js').UIItemStrip}
  * - {import('../../core/UIElement.js').UIElement}
  * - {import('../../services/ContextMenu/ContextMenuService.js').ContextMenuService}
+ * - {import('../../core/Emitter.js').Emitter}
  */
 export class TabStrip extends UIItemStrip {
     /**
@@ -61,6 +63,14 @@ export class TabStrip extends UIItemStrip {
     _isSimpleModeActive = false;
 
     /**
+     * Emitter for selection changes.
+     *
+     * @type {Emitter}
+     * @private
+     */
+    _onSelectionChange;
+
+    /**
      * Creates an instance of TabStrip.
      *
      * @param {string} [id=null] - Optional unique ID.
@@ -71,6 +81,8 @@ export class TabStrip extends UIItemStrip {
     constructor(id = null, config = {}, renderer = null) {
         super(id, config, renderer);
         const me = this;
+
+        me._onSelectionChange = new Emitter();
 
         if (config.simpleMode !== undefined) {
             me.setSimpleModeConfig(Boolean(config.simpleMode));
@@ -102,6 +114,15 @@ export class TabStrip extends UIItemStrip {
      */
     get isSimpleModeActive() {
         return this._isSimpleModeActive;
+    }
+
+    /**
+     * Public event for selection changes.
+     *
+     * @returns {Function}
+     */
+    get onSelectionChange() {
+        return this._onSelectionChange.event;
     }
 
     /**
@@ -143,6 +164,9 @@ export class TabStrip extends UIItemStrip {
                 });
             }
         }
+
+        // [CORREÇÃO] Notify listeners (e.g. Viewport) that selection changed
+        me._onSelectionChange.fire(item);
     }
 
     /**
@@ -261,5 +285,14 @@ export class TabStrip extends UIItemStrip {
             // Use inherited setVisible from UIElement
             me.setVisible(!shouldBeHidden);
         }
+    }
+
+    /**
+     * Dispose emitter on destroy.
+     * * @override
+     */
+    dispose() {
+        this._onSelectionChange.dispose();
+        super.dispose();
     }
 }

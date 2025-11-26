@@ -191,6 +191,14 @@ export class ApplicationWindow extends UIElement {
     _canCloseHandler = null;
 
     /**
+     * Initial content stored until render.
+     *
+     * @type {HTMLElement|object|string|null}
+     * @private
+     */
+    _pendingContent = null;
+
+    /**
      * Creates an instance of ApplicationWindow.
      *
      * @param {string} [title='Window'] - The window title.
@@ -205,6 +213,7 @@ export class ApplicationWindow extends UIElement {
         me._api = new WindowApi(me);
 
         me._title = title;
+        me._pendingContent = content;
 
         if (config.x !== undefined) me._x = config.x;
         if (config.y !== undefined) me._y = config.y;
@@ -215,16 +224,6 @@ export class ApplicationWindow extends UIElement {
 
         // Initialize Header (Dependent on 'me' instance)
         me.header = new ApplicationWindowHeader(me, me._title);
-
-        // Ensure element is created via render lifecycle
-        me.render();
-
-        if (content) {
-            me.setContent(content);
-        }
-
-        // Apply initial styles to the rendered element
-        me._updateGeometryStyles();
     }
 
     /**
@@ -451,6 +450,32 @@ export class ApplicationWindow extends UIElement {
     }
 
     /**
+     * Ensures the window is rendered before mounting.
+     *
+     * @param {HTMLElement} container
+     * @returns {void}
+     */
+    mount(container) {
+        if (!this.element) {
+            this.render();
+        }
+        super.mount(container);
+    }
+
+    /**
+     * Restores the header to the window DOM.
+     * Useful when undocking the window from a TabStrip.
+     *
+     * @returns {void}
+     */
+    restoreHeader() {
+        const me = this;
+        if (me.element && me.header && me.header.element) {
+            me.renderer.mountHeader(me.element, me.header.element);
+        }
+    }
+
+    /**
      * Implementation of render logic.
      * Uses the adapter to create the window structure.
      *
@@ -465,6 +490,11 @@ export class ApplicationWindow extends UIElement {
         element.addEventListener('pointerdown', () => {
             me.focus();
         });
+
+        const contentContainer = me.renderer.getContentElement(element);
+        if (contentContainer) {
+            me.renderContent(contentContainer);
+        }
 
         return element;
     }
@@ -521,6 +551,13 @@ export class ApplicationWindow extends UIElement {
      */
     setContent(content) {
         const me = this;
+
+        // If not rendered yet, store for later
+        if (!me.element) {
+            me._pendingContent = content;
+            return;
+        }
+
         const contentElement = me.contentElement;
         if (!contentElement) return;
 
@@ -546,7 +583,11 @@ export class ApplicationWindow extends UIElement {
      * @returns {void}
      */
     renderContent(container) {
-        // Subclasses can override
+        // Base implementation: use pending content if available
+        if (this._pendingContent) {
+            this.setContent(this._pendingContent);
+            this._pendingContent = null;
+        }
     }
 
     /**
@@ -643,9 +684,6 @@ export class ApplicationWindow extends UIElement {
                 width: me._width,
                 height: me._height
             };
-            // Coordinates are implicitly 0,0,100%,100% via CSS class,
-            // but properties remain what they were before or updated conceptually?
-            // For now, logic relies on CSS class.
         }
         me._updateState();
         if (!me._isMaximized) {

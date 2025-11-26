@@ -19,10 +19,12 @@ class WindowHeaderWrapper extends UIElement {
      * Creates an instance of WindowHeaderWrapper.
      *
      * @param {import('./ApplicationWindowHeader.js').ApplicationWindowHeader} header - The window header component.
+     * @param {import('./ApplicationWindow.js').ApplicationWindow} window - The window instance associated with this header.
      */
-    constructor(header) {
+    constructor(header, window) {
         super();
         this.header = header;
+        this.window = window;
     }
 
     /**
@@ -164,7 +166,7 @@ export class Viewport extends UIElement {
     /**
      * The TabStrip component instance.
      *
-     * @type {TabStrip}
+     * @type {import('../Core/TabStrip.js').TabStrip}
      * @private
      */
     _tabStrip;
@@ -197,7 +199,6 @@ export class Viewport extends UIElement {
 
         me._namespace = `viewport-${me.id}`;
 
-        // Initialize TabStrip (Simple mode false to keep bar visible if desired, or logic controlled)
         me._tabStrip = new TabStrip(me.id + '-tabs', {
             orientation: 'horizontal',
             simpleMode: false
@@ -208,7 +209,6 @@ export class Viewport extends UIElement {
         me._boundOnArrangeCascade = me.cascade.bind(me);
         me._boundOnArrangeTile = me.tile.bind(me);
 
-        // Initialize DOM via UIElement lifecycle
         me.render();
         me._initEventListeners();
     }
@@ -256,7 +256,6 @@ export class Viewport extends UIElement {
         const me = this;
         const element = me.renderer.createViewportElement(me.id);
 
-        // Setup Drop Zone properties
         element.dataset.dropzone = me.dropZoneType;
         element.dropZoneInstance = me;
 
@@ -275,28 +274,28 @@ export class Viewport extends UIElement {
         if (me.element) {
             me.renderer.mount(container, me.element);
 
-            // Mount TabStrip into its slot
             const tabSlot = me.renderer.getTabContainerSlot(me.element);
             if (tabSlot) {
                 me._tabStrip.mount(tabSlot);
 
-                // Configure Tab Bar DropZone on the slot or strip
                 tabSlot.dataset.dropzone = DropZoneType.VIEWPORT_TAB_BAR;
                 tabSlot.dropZoneInstance = {
                     dropZoneType: DropZoneType.VIEWPORT_TAB_BAR,
                     dockWindow: me.dockWindow.bind(me),
                     get tabBar() {
                         return me._tabStrip.element;
+                    },
+                    get windows() {
+                        return me.windows;
                     }
                 };
             }
 
-            // Mount Windows
             const contentContainer = me.contentContainer;
             if (contentContainer) {
-                me._windows.forEach(win => {
-                    if (!win.isMounted) {
-                        win.mount(contentContainer);
+                me._windows.forEach(windowInstance => {
+                    if (!windowInstance.isMounted) {
+                        windowInstance.mount(contentContainer);
                     }
                 });
             }
@@ -317,9 +316,9 @@ export class Viewport extends UIElement {
             me._tabStrip.unmount();
         }
 
-        me._windows.forEach(win => {
-            if (win.isMounted) {
-                win.unmount();
+        me._windows.forEach(windowInstance => {
+            if (windowInstance.isMounted) {
+                windowInstance.unmount();
             }
         });
 
@@ -391,24 +390,35 @@ export class Viewport extends UIElement {
             return;
         }
 
-        // Undock if docked
+        const wasActive = me._activeWindow === windowInstance;
+        const remainingActiveWindow = me._activeWindow;
+
         if (windowInstance.isTabbed) {
-            me.undockWindow(windowInstance);
+            const wrapper = me._windowWrappers.get(windowInstance);
+            if (wrapper) {
+                me._tabStrip.removeItem(wrapper);
+                me._windowWrappers.delete(windowInstance);
+                wrapper.dispose();
+            }
+            if (windowInstance.element) {
+                windowInstance.element.classList.remove('application-window--active-tab');
+            }
         }
 
         me._windows.splice(index, 1);
-
-        // Clean up
         windowInstance.dispose();
 
         me._updateTabBarVisibility();
 
-        // Focus next available
-        if (me._activeWindow === windowInstance) {
+        if (wasActive) {
             me._activeWindow = null;
-            const remaining = me._windows;
-            if (remaining.length > 0) {
-                me.focusWindow(remaining[remaining.length - 1]);
+            if (me._windows.length > 0) {
+                const nextIndex = Math.min(index, me._windows.length - 1);
+                me.focusWindow(me._windows[nextIndex], true);
+            }
+        } else {
+            if (remainingActiveWindow) {
+                me.focusWindow(remainingActiveWindow, true);
             }
         }
     }
@@ -419,11 +429,18 @@ export class Viewport extends UIElement {
      * If tabbed: Shows content via TabStrip selection.
      *
      * @param {import('./ApplicationWindow.js').ApplicationWindow} windowInstance - The window to focus.
+     * @param {boolean} [force=false] - If true, re-asserts focus even if already active.
      * @returns {void}
      */
-    focusWindow(windowInstance) {
+    focusWindow(windowInstance, force = false) {
         const me = this;
         if (!me._windows.includes(windowInstance)) {
+            return;
+        }
+
+        const alreadyActive = me._activeWindow === windowInstance;
+
+        if (alreadyActive && !force) {
             return;
         }
 
@@ -434,7 +451,10 @@ export class Viewport extends UIElement {
         me._activeWindow = windowInstance;
         windowInstance.isFocused = true;
 
-        // Reorder array to reflect recency
+        if (windowInstance.element) {
+            windowInstance.element.focus({ preventScroll: true });
+        }
+
         const index = me._windows.indexOf(windowInstance);
         if (index > -1) {
             me._windows.splice(index, 1);
@@ -442,13 +462,11 @@ export class Viewport extends UIElement {
         }
 
         if (windowInstance.isTabbed) {
-            // Tab Mode
             const wrapper = me._windowWrappers.get(windowInstance);
             if (wrapper) {
                 me._tabStrip.setActiveItem(wrapper);
             }
 
-            // Update visibility classes for content switching
             me._windows.forEach(win => {
                 if (win.isTabbed) {
                     const isActive = win === windowInstance;
@@ -458,10 +476,8 @@ export class Viewport extends UIElement {
                 }
             });
         } else {
-            // Floating Mode
             me._updateZIndices();
 
-            // Keep a background tab active if exists
             const hasActiveTab = me._windows.some(
                 w =>
                     w.isTabbed &&
@@ -470,14 +486,16 @@ export class Viewport extends UIElement {
             );
 
             if (!hasActiveTab && me._tabStrip.items.length > 0) {
-                // Find last tabbed window
                 for (let i = me._windows.length - 1; i >= 0; i--) {
                     const win = me._windows[i];
                     if (win.isTabbed) {
-                        if (win.element)
+                        if (win.element) {
                             win.element.classList.add('application-window--active-tab');
+                        }
                         const wrapper = me._windowWrappers.get(win);
-                        if (wrapper) me._tabStrip.setActiveItem(wrapper);
+                        if (wrapper) {
+                            me._tabStrip.setActiveItem(wrapper);
+                        }
                         break;
                     }
                 }
@@ -507,13 +525,12 @@ export class Viewport extends UIElement {
 
         windowInstance.setTabbed(true);
 
-        // Wrap header and add to strip
-        const wrapper = new WindowHeaderWrapper(windowInstance.header);
+        const wrapper = new WindowHeaderWrapper(windowInstance.header, windowInstance);
         me._windowWrappers.set(windowInstance, wrapper);
         me._tabStrip.addItem(wrapper, index);
 
         me._updateTabBarVisibility();
-        me.focusWindow(windowInstance);
+        me.focusWindow(windowInstance, true);
     }
 
     /**
@@ -535,7 +552,6 @@ export class Viewport extends UIElement {
             windowInstance.element.classList.remove('application-window--active-tab');
         }
 
-        // Remove from Strip
         const wrapper = me._windowWrappers.get(windowInstance);
         if (wrapper) {
             me._tabStrip.removeItem(wrapper);
@@ -543,17 +559,14 @@ export class Viewport extends UIElement {
             wrapper.dispose();
         }
 
-        // Ensure header is back in window flow (if strip moved it)
-        if (windowInstance.element && windowInstance.header && windowInstance.header.element) {
-            me.renderer.mountHeader(windowInstance.element, windowInstance.header.element);
-        }
+        windowInstance.restoreHeader();
 
         windowInstance.x = x;
         windowInstance.y = y;
         windowInstance.constrainToParent();
 
         me._updateTabBarVisibility();
-        me.focusWindow(windowInstance);
+        me.focusWindow(windowInstance, true);
     }
 
     /**
@@ -566,15 +579,15 @@ export class Viewport extends UIElement {
         const offset = 30;
         let count = 0;
 
-        me._windows.forEach(win => {
-            if (win.isTabbed) return;
-            if (win.isMaximized) win.toggleMaximize();
+        me._windows.forEach(windowInstance => {
+            if (windowInstance.isTabbed) return;
+            if (windowInstance.isMaximized) windowInstance.toggleMaximize();
 
             const x = 20 + count * offset;
             const y = 20 + count * offset;
 
-            win.x = x;
-            win.y = y;
+            windowInstance.x = x;
+            windowInstance.y = y;
 
             count++;
         });
@@ -603,19 +616,19 @@ export class Viewport extends UIElement {
         const cellWidth = areaWidth / cols;
         const cellHeight = areaHeight / rows;
 
-        floatingWindows.forEach((win, index) => {
-            if (win.isMaximized) win.toggleMaximize();
+        floatingWindows.forEach((windowInstance, index) => {
+            if (windowInstance.isMaximized) windowInstance.toggleMaximize();
 
             const colIndex = index % cols;
             const rowIndex = Math.floor(index / cols);
 
             const x = colIndex * cellWidth;
-            const y = rowIndex * cellHeight + tabBarHeight; // Offset by tab bar
+            const y = rowIndex * cellHeight + tabBarHeight;
 
-            win.x = x;
-            win.y = y;
-            win.width = cellWidth;
-            win.height = cellHeight;
+            windowInstance.x = x;
+            windowInstance.y = y;
+            windowInstance.width = cellWidth;
+            windowInstance.height = cellHeight;
         });
     }
 
@@ -628,9 +641,7 @@ export class Viewport extends UIElement {
         const me = this;
         appBus.offByNamespace(me._namespace);
 
-        // Windows and Strip are unmounted via super.dispose() -> _doUnmount()
-        // But we need to ensure children are disposed correctly
-        [...me._windows].forEach(win => win.dispose());
+        [...me._windows].forEach(windowInstance => windowInstance.dispose());
         me._windows = [];
 
         if (me._tabStrip) {
@@ -649,7 +660,7 @@ export class Viewport extends UIElement {
         const me = this;
         return {
             type: DropZoneType.VIEWPORT,
-            windows: me._windows.map(win => win.toJSON())
+            windows: me._windows.map(windowInstance => windowInstance.toJSON())
         };
     }
 
@@ -661,7 +672,7 @@ export class Viewport extends UIElement {
      */
     fromJSON(data) {
         const me = this;
-        [...me._windows].forEach(win => me.removeWindow(win));
+        [...me._windows].forEach(windowInstance => me.removeWindow(windowInstance));
 
         if (data.windows && Array.isArray(data.windows)) {
             const factory = ViewportFactory.getInstance();
@@ -691,6 +702,14 @@ export class Viewport extends UIElement {
         appBus.on(EventTypes.WINDOW_CLOSE_REQUEST, me._boundOnWindowClose, options);
         appBus.on(EventTypes.VIEWPORT_ARRANGE_CASCADE, me._boundOnArrangeCascade, options);
         appBus.on(EventTypes.VIEWPORT_ARRANGE_TILE, me._boundOnArrangeTile, options);
+
+        if (me._tabStrip) {
+            me._tabStrip.onSelectionChange(wrapper => {
+                if (wrapper && wrapper.window) {
+                    me.focusWindow(wrapper.window);
+                }
+            });
+        }
     }
 
     /**
