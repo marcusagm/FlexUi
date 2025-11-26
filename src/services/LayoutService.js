@@ -22,8 +22,8 @@ import { EventTypes } from '../constants/EventTypes.js';
  *
  * Business rules implemented:
  * - Enforces that at least one row (usually the last) fills the available vertical space.
- * - Disables row collapse if it is the only row.
- * - Disables panel group collapse if it is the only item in a column.
+ * - Disables row collapse if it is the only row OR the only visible row.
+ * - Disables panel group collapse if it is the only item in a column OR the only visible item.
  * - Calculates minimum widths for columns based on their children's constraints.
  * - Determines which child in a column should expand to fill available vertical space.
  *
@@ -114,8 +114,8 @@ export class LayoutService {
         const rows = container.rows;
         if (!rows || rows.length === 0) return;
 
-        // Business Rule: If there is only one row, it shouldn't be collapsible.
-        const shouldDisableCollapse = rows.length <= 1;
+        // Calculate uncollapsed rows to enforce "always one visible" rule
+        const uncollapsedRows = rows.filter(r => !r.collapsed);
 
         rows.forEach((row, index) => {
             const isLast = index === rows.length - 1;
@@ -131,8 +131,10 @@ export class LayoutService {
             }
 
             // Enable/Disable collapse button using public API
+            // Disable if this is the only visible row
             if (typeof row.setCollapseButtonDisabled === 'function') {
-                row.setCollapseButtonDisabled(shouldDisableCollapse);
+                const isLastVisible = uncollapsedRows.length <= 1 && uncollapsedRows.includes(row);
+                row.setCollapseButtonDisabled(isLastVisible);
             }
         });
     }
@@ -221,9 +223,6 @@ export class LayoutService {
 
         const lastUncollapsed = uncollapsedChildren[uncollapsedChildren.length - 1];
 
-        // Prevent collapsing if it's the only item in the column
-        const shouldDisableCollapse = children.length <= 1;
-
         children.forEach(child => {
             const shouldFill = child === lastUncollapsed;
 
@@ -238,8 +237,12 @@ export class LayoutService {
             }
 
             // [API Use] Set Collapse Button State
+            // Enforce "At least one visible" rule:
+            // Disable collapse if this is the ONLY visible child.
             if (typeof child.setCollapseButtonDisabled === 'function') {
-                child.setCollapseButtonDisabled(shouldDisableCollapse);
+                const isLastVisible =
+                    uncollapsedChildren.length <= 1 && uncollapsedChildren.includes(child);
+                child.setCollapseButtonDisabled(isLastVisible);
             }
         });
     }
