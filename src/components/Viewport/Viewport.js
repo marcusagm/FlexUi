@@ -272,7 +272,9 @@ export class Viewport extends UIElement {
     _doMount(container) {
         const me = this;
         if (me.element) {
-            me.renderer.mount(container, me.element);
+            if (me.element.parentNode !== container) {
+                me.renderer.mount(container, me.element);
+            }
 
             const tabSlot = me.renderer.getTabContainerSlot(me.element);
             if (tabSlot) {
@@ -605,7 +607,7 @@ export class Viewport extends UIElement {
         if (count === 0) return;
 
         const dimensions = me.renderer.getDimensions(me.element);
-        const tabBarHeight = me._tabBarContainer ? me._tabBarContainer.offsetHeight : 0;
+        const tabBarHeight = me._tabBar ? me._tabBar.offsetHeight : 0;
 
         const areaWidth = dimensions.width;
         const areaHeight = dimensions.height - tabBarHeight;

@@ -287,7 +287,9 @@ export class UIItemStrip extends UIElement {
     _doMount(container) {
         const me = this;
         if (me.element) {
-            me.renderer.mount(container, me.element);
+            if (me.element.parentNode !== container) {
+                me.renderer.mount(container, me.element);
+            }
         }
 
         me._items.forEach((item, index) => {

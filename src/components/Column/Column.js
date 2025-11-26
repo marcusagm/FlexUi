@@ -8,7 +8,6 @@ import { DropZoneType, ItemType } from '../../constants/DNDTypes.js';
 import { EventTypes } from '../../constants/EventTypes.js';
 import { UIElement } from '../../core/UIElement.js';
 import { VanillaColumnAdapter } from '../../renderers/vanilla/VanillaColumnAdapter.js';
-import { PanelFactory } from '../Panel/PanelFactory.js';
 import { ViewportFactory } from '../Viewport/ViewportFactory.js';
 
 /**
@@ -304,7 +303,9 @@ export class Column extends UIElement {
     _doMount(container) {
         const me = this;
         if (me.element) {
-            me.renderer.mount(container, me.element);
+            if (me.element.parentNode !== container) {
+                me.renderer.mount(container, me.element);
+            }
 
             // Mount all children
             me._children.forEach(child => {
@@ -683,7 +684,6 @@ export class Column extends UIElement {
         const itemsToRestore = [];
 
         if (childrenData && Array.isArray(childrenData)) {
-            const panelFactory = PanelFactory.getInstance();
             const viewportFactory = ViewportFactory.getInstance();
 
             childrenData.forEach(itemData => {

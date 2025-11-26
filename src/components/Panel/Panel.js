@@ -507,7 +507,9 @@ export class Panel extends IPanel {
     _doMount(container) {
         const me = this;
         if (me.element) {
-            me.renderer.mount(container, me.element);
+            if (me.element.parentNode !== container) {
+                me.renderer.mount(container, me.element);
+            }
         }
         me._setupStateListeners();
     }
@@ -533,9 +535,12 @@ export class Panel extends IPanel {
      */
     updateHeight() {
         const me = this;
-        if (me.element) {
-            me.renderer.updateMinSize(me.element, me._minWidth, me._minHeight);
-        }
+        const contentEl = me.contentElement;
+        if (!contentEl) return;
+
+        contentEl.style.minHeight = `${me.getMinPanelHeight()}px`;
+        contentEl.style.height = 'auto';
+        contentEl.style.flex = '1 1 auto';
     }
 
     /**

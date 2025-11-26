@@ -417,22 +417,25 @@ export class Row extends UIElement {
     _doMount(container) {
         const me = this;
         if (me.element) {
-            me.renderer.mount(container, me.element);
+            if (me.element.parentNode !== container) {
+                me.renderer.mount(container, me.element);
+            }
 
-            // Mount columns
             me._columns.forEach(column => {
                 if (!column.element) column.render();
-                // Check if there's a resize handle to insert before
+
                 const resizeHandle = me.element.querySelector('.row__resize-handle');
-                if (resizeHandle) {
-                    me.element.insertBefore(column.element, resizeHandle);
+                const collapseBtn = me.element.querySelector('.row__collapse-btn');
+                const referenceNode = resizeHandle || collapseBtn;
+
+                if (referenceNode) {
+                    me.element.insertBefore(column.element, referenceNode);
                 } else {
                     me.renderer.mount(me.element, column.element);
                 }
                 column.mount(me.element);
             });
 
-            // Initialize controls
             me.updateAllResizeBars();
             me.updateHeight(false);
         }
@@ -662,34 +665,36 @@ export class Row extends UIElement {
         const me = this;
         const column = new Column(me, width);
 
-        if (index === null) {
+        const safeIndex = index === undefined || index === null ? null : Number(index);
+
+        if (safeIndex === null) {
             me._columns.push(column);
         } else {
-            me._columns.splice(index, 0, column);
+            me._columns.splice(safeIndex, 0, column);
         }
 
         if (me.isMounted) {
             if (!column.element) column.render();
 
-            // Insert respecting handle
-            const resizeHandle = me.element.querySelector('.row__resize-handle');
+            let referenceNode = null;
 
-            // Determine insertion reference
-            if (index === null) {
-                if (resizeHandle) {
-                    me.element.insertBefore(column.element, resizeHandle);
-                } else {
-                    me.renderer.mount(me.element, column.element);
+            if (safeIndex !== null) {
+                const nextCol = me._columns[safeIndex + 1];
+                if (nextCol) {
+                    referenceNode = nextCol.element;
                 }
+            }
+
+            if (!referenceNode) {
+                const resizeHandle = me.element.querySelector('.row__resize-handle');
+                const collapseBtn = me.element.querySelector('.row__collapse-btn');
+                referenceNode = resizeHandle || collapseBtn;
+            }
+
+            if (referenceNode) {
+                me.element.insertBefore(column.element, referenceNode);
             } else {
-                const nextCol = me._columns[index + 1];
-                const reference = nextCol ? nextCol.element : resizeHandle;
-
-                if (reference) {
-                    me.element.insertBefore(column.element, reference);
-                } else {
-                    me.renderer.mount(me.element, column.element);
-                }
+                me.renderer.mount(me.element, column.element);
             }
 
             column.mount(me.element);

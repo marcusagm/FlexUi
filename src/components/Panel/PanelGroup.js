@@ -290,7 +290,6 @@ export class PanelGroup extends UIElement {
         if (config.collapsible !== undefined) me._collapsible = config.collapsible;
         if (config.movable !== undefined) me._movable = config.movable;
 
-        // Initialize Header (It is a UIElement now)
         me._header = new PanelGroupHeader(me);
 
         if (height !== null) {
@@ -302,7 +301,6 @@ export class PanelGroup extends UIElement {
         me._boundOnCloseRequest = me.onCloseRequest.bind(me);
         me._boundOnToggleCollapseRequest = me.onToggleCollapseRequest.bind(me);
 
-        // Ensure element is created via lifecycle
         me.render();
 
         if (config.isFloating) {
@@ -391,7 +389,6 @@ export class PanelGroup extends UIElement {
             me.renderer.setCollapsed(me.element, value);
         }
 
-        // Hide/Show resize handles based on collapse state
         const handles = me.element ? me.element.querySelectorAll('.resize-handle') : [];
         handles.forEach(h => {
             h.style.display = value ? 'none' : '';
@@ -423,25 +420,20 @@ export class PanelGroup extends UIElement {
     set activePanel(panel) {
         const me = this;
 
-        // 1. Validation
         if (!panel) return;
-        if (panel === me._activePanel && me._panels.length > 1) return; // Allow re-set if single panel (simple mode init)
+        if (panel === me._activePanel && me._panels.length > 1) return;
 
-        // 2. Unmount current active panel
         if (me._activePanel) {
             me._activePanel.unmount();
         }
 
-        // 3. Update internal state
         me._activePanel = panel;
         me.title = panel.title;
 
-        // 4. Update visual state (Tabs)
         if (me._header && me._header.tabStrip) {
             me._header.tabStrip.setActiveItem(panel.header);
         }
 
-        // 5. Mount new active panel content
         if (me.isMounted && me.contentContainer) {
             panel.mount(me.contentContainer);
         }
@@ -679,7 +671,6 @@ export class PanelGroup extends UIElement {
         const me = this;
         const element = me.renderer.createGroupElement(me.id);
 
-        // Attach listener for BringToFront if floating
         element.addEventListener('pointerdown', () => {
             if (me.isFloating) {
                 FloatingPanelManagerService.getInstance().bringToFront(me);
@@ -699,23 +690,21 @@ export class PanelGroup extends UIElement {
     _doMount(container) {
         const me = this;
         if (me.element) {
-            me.renderer.mount(container, me.element);
+            if (me.element.parentNode !== container) {
+                me.renderer.mount(container, me.element);
+            }
 
-            // Mount Header
             if (me.header) {
                 me.header.mount(me.element);
-                // Ensure it's visualy at the top using adapter logic
                 if (me.header.element) {
                     me.renderer.mountHeader(me.element, me.header.element);
                 }
             }
 
-            // Mount Active Panel Content
             if (me._activePanel && me.contentContainer) {
                 me._activePanel.mount(me.contentContainer);
             }
 
-            // Apply initial states
             me.collapsed = me._collapsed;
             if (me._isFloating) {
                 me.setFloatingState(true, me._x, me._y);
@@ -810,7 +799,6 @@ export class PanelGroup extends UIElement {
                 });
             }
         } else {
-            // Reset maximized state when docking
             if (me._isMaximized) me.toggleMaximize();
 
             if (me._collapsible && me.element) {
@@ -854,12 +842,8 @@ export class PanelGroup extends UIElement {
 
         if (me._isMaximized) {
             me.element.classList.add('panel-group--maximized');
-            // Apply full size logic or class based sizing
-            // Assuming CSS handles the dimensions for .panel-group--maximized
-            // e.g. top:0, left:0, width:100%, height:100% relative to container
         } else {
             me.element.classList.remove('panel-group--maximized');
-            // Restore geometry
             me.renderer.updateGeometry(me.element, me._x, me._y, me._width, me._height);
         }
     }
@@ -1081,7 +1065,6 @@ export class PanelGroup extends UIElement {
         if (!me.element) return;
 
         if (me._collapsed) {
-            // Collapsed visuals handled by setter and adapter
             return;
         }
 
@@ -1095,11 +1078,8 @@ export class PanelGroup extends UIElement {
                 height: 'auto',
                 flex: '0 0 auto'
             });
-        } else {
-            // Floating geometry handles its own height
         }
 
-        // Ensure Min Height is applied
         const minH = me.getMinPanelHeight();
         me.renderer.updateStyles(me.element, { minHeight: `${minH}px` });
     }
@@ -1122,7 +1102,6 @@ export class PanelGroup extends UIElement {
 
         panel.parentGroup = me;
 
-        // Insert into panels array
         const safeIndex = index === null ? me._panels.length : index;
         if (safeIndex >= me._panels.length) {
             me._panels.push(panel);
@@ -1130,7 +1109,6 @@ export class PanelGroup extends UIElement {
             me._panels.splice(safeIndex, 0, panel);
         }
 
-        // Add to TabStrip
         if (me.header && me.header.tabStrip) {
             me.header.tabStrip.addItem(panel.header, safeIndex);
         }
@@ -1138,7 +1116,6 @@ export class PanelGroup extends UIElement {
         if (makeActive || me._panels.length === 1) {
             me.activePanel = panel;
         } else {
-            // Ensure new panel content is hidden if not active
             if (panel.contentElement) {
                 panel.contentElement.style.display = 'none';
             }
@@ -1173,12 +1150,10 @@ export class PanelGroup extends UIElement {
         const index = me._panels.indexOf(panel);
         if (index === -1) return;
 
-        // Remove from TabStrip
         if (me.header && me.header.tabStrip) {
             me.header.tabStrip.removeItem(panel.header);
         }
 
-        // Unmount content
         if (panel.isMounted) {
             panel.unmount();
         }
@@ -1222,7 +1197,6 @@ export class PanelGroup extends UIElement {
         const adjustedIndex = oldIndex < newIndex ? newIndex - 1 : newIndex;
         me._panels.splice(adjustedIndex, 0, panel);
 
-        // Move in TabStrip (removeItem + addItem)
         if (me.header && me.header.tabStrip) {
             me.header.tabStrip.removeItem(panel.header);
             me.header.tabStrip.addItem(panel.header, adjustedIndex);
@@ -1252,7 +1226,7 @@ export class PanelGroup extends UIElement {
             height: me.height,
             width: me.width,
             collapsed: me.collapsed,
-            maximized: me._isMaximized, // Persist maximized state
+            maximized: me._isMaximized,
             activePanelId: me.activePanel ? me.activePanel.id : null,
             isFloating: me.isFloating,
             x: me.x,
@@ -1291,7 +1265,7 @@ export class PanelGroup extends UIElement {
 
         if (me.isFloating) {
             me.setFloatingState(true, me.x, me.y);
-            if (data.maximized) me.toggleMaximize(); // Restore maximized state
+            if (data.maximized) me.toggleMaximize();
         } else {
             me.setFloatingState(false, null, null);
         }

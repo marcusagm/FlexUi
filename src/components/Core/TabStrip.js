@@ -279,30 +279,24 @@ export class TabStrip extends UIItemStrip {
         const me = this;
         const count = me.items.length;
 
-        // Determine if we are effectively in simple mode (enabled AND exactly one item)
         let isSimple = false;
         if (me._simpleModeEnabled && count === 1) {
             isSimple = true;
         }
 
-        // Change state and notify if changed
         if (isSimple !== me._isSimpleModeActive) {
             me._isSimpleModeActive = isSimple;
             me._onSimpleModeChange.fire(isSimple);
         }
 
-        // Enforce Draggable State on Items
-        // In Simple Mode, the single item behaves as a title (not draggable individually)
         me.items.forEach(item => {
             const shouldBeDraggable = !isSimple;
 
-            // Check if the item supports setDraggable (e.g., PanelHeader via adapter)
             if (item && typeof item.setDraggable === 'function') {
                 item.setDraggable(shouldBeDraggable);
             }
         });
 
-        // Ensure the strip is always visible (unlike previous logic which hid it)
         if (!me.isVisible) {
             me.setVisible(true);
         }

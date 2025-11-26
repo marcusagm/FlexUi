@@ -1,8 +1,10 @@
 import { ApplicationWindowHeader } from './ApplicationWindowHeader.js';
 import { ResizeHandleManager } from '../../utils/ResizeHandleManager.js';
 import { appBus } from '../../utils/EventBus.js';
+import { generateId } from '../../utils/generateId.js';
 import { EventTypes } from '../../constants/EventTypes.js';
 import { ItemType } from '../../constants/DNDTypes.js';
+import { FloatingPanelManagerService } from '../../services/DND/FloatingPanelManagerService.js';
 import { UIElement } from '../../core/UIElement.js';
 import { VanillaWindowAdapter } from '../../renderers/vanilla/VanillaWindowAdapter.js';
 import { WindowApi } from '../../api/WindowApi.js';
@@ -222,7 +224,6 @@ export class ApplicationWindow extends UIElement {
         if (config.minWidth !== undefined) me.minWidth = config.minWidth;
         if (config.minHeight !== undefined) me.minHeight = config.minHeight;
 
-        // Initialize Header (Dependent on 'me' instance)
         me.header = new ApplicationWindowHeader(me, me._title);
     }
 
@@ -445,8 +446,8 @@ export class ApplicationWindow extends UIElement {
      * @returns {void}
      */
     focus() {
-        super.focus(); // Set DOM focus
-        appBus.emit(EventTypes.WINDOW_FOCUS, this); // Request logical focus (Z-Index)
+        super.focus();
+        appBus.emit(EventTypes.WINDOW_FOCUS, this);
     }
 
     /**
@@ -486,7 +487,6 @@ export class ApplicationWindow extends UIElement {
         const me = this;
         const element = me.renderer.createWindowElement(me.id);
 
-        // Bind click for focus
         element.addEventListener('pointerdown', () => {
             me.focus();
         });
@@ -509,9 +509,9 @@ export class ApplicationWindow extends UIElement {
     _doMount(container) {
         const me = this;
         if (me.element) {
-            me.renderer.mount(container, me.element);
-
-            // Mount header into the window structure
+            if (me.element.parentNode !== container) {
+                me.renderer.mount(container, me.element);
+            }
             if (me.header && me.header.element) {
                 me.renderer.mountHeader(me.element, me.header.element);
             }
@@ -521,7 +521,6 @@ export class ApplicationWindow extends UIElement {
             me._updateState();
             me.constrainToParent();
 
-            // Trigger custom mount event for legacy compatibility
             appBus.emit(EventTypes.WINDOW_MOUNT, me);
         }
     }
@@ -552,7 +551,6 @@ export class ApplicationWindow extends UIElement {
     setContent(content) {
         const me = this;
 
-        // If not rendered yet, store for later
         if (!me.element) {
             me._pendingContent = content;
             return;
@@ -561,8 +559,6 @@ export class ApplicationWindow extends UIElement {
         const contentElement = me.contentElement;
         if (!contentElement) return;
 
-        // Use direct DOM manipulation here or delegate if renderer supported 'updateContent'
-        // Since ApplicationWindow handles arbitrary content, we do basic injection.
         contentElement.innerHTML = '';
 
         if (typeof content === 'string') {
@@ -583,7 +579,6 @@ export class ApplicationWindow extends UIElement {
      * @returns {void}
      */
     renderContent(container) {
-        // Base implementation: use pending content if available
         if (this._pendingContent) {
             this.setContent(this._pendingContent);
             this._pendingContent = null;
@@ -664,7 +659,6 @@ export class ApplicationWindow extends UIElement {
     toggleMaximize() {
         const me = this;
         if (me._isMaximized) {
-            // Restore
             me._isMaximized = false;
             if (me._preMaximizeState) {
                 me._x = me._preMaximizeState.x;
@@ -676,7 +670,6 @@ export class ApplicationWindow extends UIElement {
             if (me._isMinimized) {
                 me._isMinimized = false;
             }
-            // Maximize
             me._isMaximized = true;
             me._preMaximizeState = {
                 x: me._x,
@@ -687,7 +680,7 @@ export class ApplicationWindow extends UIElement {
         }
         me._updateState();
         if (!me._isMaximized) {
-            me._updateGeometryStyles(); // Restore dimensions
+            me._updateGeometryStyles();
         }
     }
 

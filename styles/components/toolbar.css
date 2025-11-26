@@ -63,6 +63,7 @@
     position: relative;
     height: 100%;
     flex-direction: row;
+    background-color: var(--toolbar-background);
 }
 
 /* Remove borda do último item */

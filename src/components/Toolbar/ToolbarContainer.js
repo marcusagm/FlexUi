@@ -81,7 +81,7 @@ export class ToolbarContainer extends UIElement {
      * @param {object} [config={}] - Configuration options.
      * @param {import('../../core/IRenderer.js').IRenderer} [renderer=null] - Optional renderer adapter.
      */
-    constructor(position, orientation, config = {}, renderer = null) {
+    constructor(position, orientation, renderer = null) {
         super(generateId(), renderer || new VanillaToolbarContainerAdapter());
         const me = this;
 
@@ -187,8 +187,6 @@ export class ToolbarContainer extends UIElement {
      */
     get scrollContainer() {
         if (this._strip && this._strip.element) {
-            // Access the strip's renderer to get the internal viewport element.
-            // This ensures that insertBefore calls in DropStrategies target the direct parent of the items.
             return (
                 this._strip.renderer.getScrollContainer(this._strip.element) || this._strip.element
             );
@@ -346,7 +344,9 @@ export class ToolbarContainer extends UIElement {
     _doMount(container) {
         const me = this;
         if (me.element) {
-            me.renderer.mount(container, me.element);
+            if (me.element.parentNode !== container) {
+                me.renderer.mount(container, me.element);
+            }
 
             const stripContainer = me.renderer.getStripContainer(me.element);
             if (stripContainer) {

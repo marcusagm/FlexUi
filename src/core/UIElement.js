@@ -632,7 +632,7 @@ export class UIElement extends Disposable {
      */
     _doMount(container) {
         const me = this;
-        if (me._element) {
+        if (me._element && me._element.parentNode !== container) {
             me._renderer.mount(container, me._element);
         }
     }

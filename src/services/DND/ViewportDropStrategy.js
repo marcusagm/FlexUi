@@ -64,8 +64,6 @@ export class ViewportDropStrategy extends BaseDropStrategy {
      * @returns {boolean}
      */
     onDragEnter(point, dropZone, draggedData, dds) {
-        // Allow entry for Panels/Groups so they can be dropped (floating fallback)
-        // But visual feedback will be restricted in onDragOver
         return true;
     }
 
@@ -79,8 +77,6 @@ export class ViewportDropStrategy extends BaseDropStrategy {
      * @returns {boolean}
      */
     onDragOver(point, dropZone, draggedData, dds) {
-        // [FIX] Only ApplicationWindows can show docking placeholders.
-        // Panels/Groups should strictly float (no visual feedback for docking).
         if (draggedData.type !== ItemType.APPLICATION_WINDOW) {
             this._isDocking = false;
             dds.hidePlaceholder();
@@ -90,24 +86,19 @@ export class ViewportDropStrategy extends BaseDropStrategy {
         const viewportRect = dropZone.element.getBoundingClientRect();
         const placeholder = dds.getPlaceholder();
 
-        // Check if Viewport already has tabs
         const hasTabs = dropZone.windows.some(w => w.isTabbed);
 
         if (hasTabs) {
-            // If tabs exist, drops on the bar are handled by ViewportTabDropStrategy.
-            // Drops in the rest of the viewport are strictly floating.
             this._isDocking = false;
             dds.hidePlaceholder();
             return true;
         }
 
-        // Check if mouse is in the top docking zone
         const relativeY = point.y - viewportRect.top;
 
         if (relativeY >= 0 && relativeY <= this._dockZoneHeight) {
             this._isDocking = true;
 
-            // Show Horizontal placeholder at the top
             dds.showPlaceholder('horizontal');
 
             if (!dropZone.element.contains(placeholder)) {
@@ -131,7 +122,6 @@ export class ViewportDropStrategy extends BaseDropStrategy {
     handleDrop(point, dropZone, draggedData, dds) {
         const me = this;
 
-        // If not docking (floating), we hide placeholder manually because base expects it in DOM
         if (!me._isDocking) {
             dds.hidePlaceholder();
             const result = me.onDrop(point, dropZone, draggedData, dds);
@@ -152,26 +142,22 @@ export class ViewportDropStrategy extends BaseDropStrategy {
      * @returns {boolean}
      */
     onDrop(point, dropZone, draggedData, dds) {
-        // If it's not a window, return false to trigger the Undock fallback in DragDropService
         if (draggedData.type !== ItemType.APPLICATION_WINDOW) {
             return false;
         }
 
         const windowInstance = draggedData.item;
 
-        // --- SCENARIO A: Initial Docking (Creating first tab) ---
         if (this._isDocking) {
             dropZone.dockWindow(windowInstance);
             return true;
         }
 
-        // --- SCENARIO B: Floating / Undocking ---
         const viewportRect = dropZone.element.getBoundingClientRect();
 
         let newX = point.x - viewportRect.left - (draggedData.offsetX || 0);
         let newY = point.y - viewportRect.top - (draggedData.offsetY || 0);
 
-        // Dimensions for clamping
         const isMinimized = windowInstance.isMinimized;
         const winWidth =
             windowInstance.width ||
@@ -181,7 +167,6 @@ export class ViewportDropStrategy extends BaseDropStrategy {
                 ? windowInstance.element.offsetHeight
                 : windowInstance.height || 150;
 
-        // Clamp constraints
         const maxX = Math.max(0, viewportRect.width - winWidth);
         const maxY = Math.max(0, viewportRect.height - winHeight);
 
@@ -189,10 +174,8 @@ export class ViewportDropStrategy extends BaseDropStrategy {
         newY = Math.max(0, Math.min(newY, maxY));
 
         if (windowInstance.isTabbed) {
-            // Undock logic
             dropZone.undockWindow(windowInstance, newX, newY);
         } else {
-            // Move logic
             if ('x' in windowInstance) windowInstance.x = newX;
             if ('y' in windowInstance) windowInstance.y = newY;
 

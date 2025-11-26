@@ -18,8 +18,7 @@ import { ItemType } from '../../constants/DNDTypes.js';
  * - Shows a 'vertical' placeholder in the calculated gap.
  * - Implements "ghost" logic in real-time within onDragOver to prevent
  * redundant drops (e.g., dropping the sole content of a column next to itself).
- * - Validates drop zone strictly: The target MUST be the row element itself
- * or the placeholder.
+ * - Validates drop zone strictly: The target MUST be inside the row element.
  * - On drop: Creates a new Column, creates a new PanelGroup inside it (or adds existing),
  * and moves the dropped Panel or PanelGroup into the new Column.
  * - Supports the new Column API (addChild, removeChild, getChildCount).
@@ -87,7 +86,9 @@ export class RowDropStrategy extends BaseDropStrategy {
         const me = this;
         const placeholder = dds.getPlaceholder();
 
-        if (point.target !== dropZone.element && point.target !== placeholder) {
+        // [CORREÇÃO] Relaxed check: Allow any target INSIDE the row (handles, buttons, placeholder)
+        // as long as DragDropService identified the Row as the active dropzone.
+        if (!dropZone.element.contains(point.target)) {
             dds.hidePlaceholder();
             me._dropIndex = null;
             return false;
@@ -189,7 +190,7 @@ export class RowDropStrategy extends BaseDropStrategy {
      */
     onDrop(point, dropZone, draggedData, dds) {
         const me = this;
-        const panelIndex = me._dropIndex;
+        const initialPanelIndex = me._dropIndex;
 
         if (
             !draggedData.item ||
@@ -211,7 +212,7 @@ export class RowDropStrategy extends BaseDropStrategy {
             }
         }
 
-        if (panelIndex === null) {
+        if (initialPanelIndex === null) {
             return false;
         }
 
@@ -220,24 +221,51 @@ export class RowDropStrategy extends BaseDropStrategy {
             const oldColumn =
                 typeof draggedItem.getColumn === 'function' ? draggedItem.getColumn() : null;
 
-            const newColumn = dropZone.createColumn(null, panelIndex);
+            // [CORREÇÃO] Calcular índice ajustado em caso de remoção na mesma linha
+            let correction = 0;
+            if (oldColumn && oldColumn.parentContainer === dropZone) {
+                // Se a coluna antiga for ficar vazia (será removida), e estava ANTES do índice de inserção,
+                // precisamos decrementar o índice.
+                if (oldColumn.getChildCount() === 1) {
+                    const oldIndex = dropZone.getColumns().indexOf(oldColumn);
+                    if (oldIndex !== -1 && oldIndex < initialPanelIndex) {
+                        correction = -1;
+                    }
+                }
+            }
+            const finalIndex = initialPanelIndex + correction;
+
+            const newColumn = dropZone.createColumn(null, finalIndex);
 
             if (oldColumn) {
-                // Use new Column API: removeChild() instead of removePanelGroup()
                 oldColumn.removeChild(draggedItem, true);
             }
             draggedItem.height = null;
 
-            // Use new Column API: addChild() instead of addPanelGroup()
             newColumn.addChild(draggedItem);
         } else if (draggedData.type === ItemType.PANEL) {
             const draggedPanel = draggedData.item;
             const sourceParentGroup = draggedPanel.parentGroup;
 
-            const newColumn = dropZone.createColumn(null, panelIndex);
+            // Verificar se a coluna original vai desaparecer
+            let correction = 0;
+            if (sourceParentGroup) {
+                const oldColumn = sourceParentGroup.getColumn();
+                if (oldColumn && oldColumn.parentContainer === dropZone) {
+                    // Se for o único painel no grupo, E o único grupo na coluna
+                    if (sourceParentGroup.panels.length === 1 && oldColumn.getChildCount() === 1) {
+                        const oldIndex = dropZone.getColumns().indexOf(oldColumn);
+                        if (oldIndex !== -1 && oldIndex < initialPanelIndex) {
+                            correction = -1;
+                        }
+                    }
+                }
+            }
+            const finalIndex = initialPanelIndex + correction;
+
+            const newColumn = dropZone.createColumn(null, finalIndex);
             const newPanelGroup = new PanelGroup(null);
 
-            // Use new Column API: addChild()
             newColumn.addChild(newPanelGroup);
 
             if (sourceParentGroup) {

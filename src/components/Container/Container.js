@@ -113,8 +113,6 @@ export class Container extends UIElement {
         appBus.on(EventTypes.ROW_EMPTY, me._boundOnRowEmpty, { namespace: me._namespace });
     }
 
-    // --- UIElement Overrides ---
-
     /**
      * Implementation of the rendering logic.
      * Uses the adapter to create the container DOM structure.
@@ -142,14 +140,15 @@ export class Container extends UIElement {
     _doMount(container) {
         const me = this;
         if (me.element) {
-            me.renderer.mount(container, me.element);
+            if (me.element.parentNode !== container) {
+                me.renderer.mount(container, me.element);
+            }
 
-            // Mount rows
             me._rows.forEach(row => {
                 if (!row.element) row.render();
-                // Rows are appended sequentially. If we needed specific order re-mount,
-                // we would clear and append. Here we assume DOM order matches array.
-                me.renderer.mount(me.element, row.element);
+                if (row.element.parentNode !== me.element) {
+                    me.renderer.mount(me.element, row.element);
+                }
                 row.mount(me.element);
             });
         }
@@ -169,8 +168,6 @@ export class Container extends UIElement {
             me.renderer.unmount(me.element.parentNode, me.element);
         }
     }
-
-    // --- Public Methods ---
 
     /**
      * Cleans up appBus listeners and destroys all child Row components.

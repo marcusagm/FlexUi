@@ -85,11 +85,8 @@ export class StatusBar extends UIElement {
         me._boundSetMessage = (msg, duration) => me.setMessage(msg, duration);
         me._boundSetPermanent = msg => me.setPermanentMessage(msg);
 
-        // Ensure element is created immediately for App consumption
         me.render();
     }
-
-    // --- UIElement Overrides ---
 
     /**
      * Implementation of the rendering logic.
@@ -115,7 +112,9 @@ export class StatusBar extends UIElement {
     _doMount(container) {
         const me = this;
         if (me.element) {
-            me.renderer.mount(container, me.element);
+            if (me.element.parentNode !== container) {
+                me.renderer.mount(container, me.element);
+            }
         }
 
         appBus.on(EventTypes.STATUSBAR_SET_STATUS, me._boundSetMessage);
@@ -143,8 +142,6 @@ export class StatusBar extends UIElement {
             me.renderer.unmount(me.element.parentNode, me.element);
         }
     }
-
-    // --- Public Methods ---
 
     /**
      * Sets a temporary message on the status bar.
