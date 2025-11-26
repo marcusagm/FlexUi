@@ -64,6 +64,10 @@ export class ViewportDropStrategy extends BaseDropStrategy {
      * @returns {boolean}
      */
     onDragEnter(point, dropZone, draggedData, dds) {
+        point;
+        dropZone;
+        draggedData;
+        dds;
         return true;
     }
 
@@ -142,6 +146,7 @@ export class ViewportDropStrategy extends BaseDropStrategy {
      * @returns {boolean}
      */
     onDrop(point, dropZone, draggedData, dds) {
+        dds;
         if (draggedData.type !== ItemType.APPLICATION_WINDOW) {
             return false;
         }
@@ -158,14 +163,16 @@ export class ViewportDropStrategy extends BaseDropStrategy {
         let newX = point.x - viewportRect.left - (draggedData.offsetX || 0);
         let newY = point.y - viewportRect.top - (draggedData.offsetY || 0);
 
+        const defaultMinWidth = 200;
+        const defaultMinHeight = 150;
         const isMinimized = windowInstance.isMinimized;
         const winWidth =
             windowInstance.width ||
-            (windowInstance.element ? windowInstance.element.offsetWidth : 200);
+            (windowInstance.element ? windowInstance.element.offsetWidth : defaultMinWidth);
         const winHeight =
             isMinimized && windowInstance.element
                 ? windowInstance.element.offsetHeight
-                : windowInstance.height || 150;
+                : windowInstance.height || defaultMinHeight;
 
         const maxX = Math.max(0, viewportRect.width - winWidth);
         const maxY = Math.max(0, viewportRect.height - winHeight);
