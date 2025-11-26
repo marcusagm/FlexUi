@@ -27,6 +27,7 @@ import { VanillaRowAdapter } from '../../renderers/vanilla/VanillaRowAdapter.js'
  * - minHeight {number} : Minimum height constraint.
  * - collapseBtn {HTMLElement|null} : The DOM element for the collapse button.
  * - dropZoneType {string} : The identifier for the DragDropService.
+ * - _collapseButtonDisabled {boolean} : Internal state for collapse button disabled status.
  *
  * Typical usage:
  * const row = new Row(parentContainer, 200);
@@ -94,6 +95,15 @@ export class Row extends UIElement {
      * @private
      */
     _collapsible = true;
+
+    /**
+     * Internal state to track if the collapse button should be disabled.
+     * Persists across redraws/updates.
+     *
+     * @type {boolean}
+     * @private
+     */
+    _collapseButtonDisabled = false;
 
     /**
      * Unique namespace for appBus listeners.
@@ -184,11 +194,9 @@ export class Row extends UIElement {
         me._boundOnColumnEmpty = me.onColumnEmpty.bind(me);
         me._boundOnToggleCollapseRequest = me.toggleCollapse.bind(me);
 
-        // Initialize DOM via UIElement lifecycle
         me.render();
         me.initEventListeners();
 
-        // Initial update (visual only if rendered)
         me.updateHeight(false);
     }
 
@@ -284,15 +292,17 @@ export class Row extends UIElement {
         }
         me._collapsed = value;
 
-        // Update UI via adapter
         if (me.element) {
-            me.updateHeight(false); // Re-apply height logic with new collapsed state
+            me.updateHeight(false);
 
-            // Toggle visibility of children
             me._columns.forEach(column => column.setVisible(!value));
 
             if (me._collapseBtnElement) {
-                me.renderer.setCollapseButtonState(me._collapseBtnElement, value, false);
+                me.renderer.setCollapseButtonState(
+                    me._collapseBtnElement,
+                    value,
+                    me._collapseButtonDisabled
+                );
             }
         }
     }
@@ -452,7 +462,6 @@ export class Row extends UIElement {
             me.getThrottledUpdate().cancel();
         }
 
-        // Cleanup button listener
         if (me._collapseBtnElement) {
             me.renderer.off(me._collapseBtnElement, 'click', me._boundOnToggleCollapseRequest);
         }
@@ -541,7 +550,6 @@ export class Row extends UIElement {
     _setupCollapseButton() {
         const me = this;
 
-        // Cleanup existing button
         if (me._collapseBtnElement) {
             me.renderer.off(me._collapseBtnElement, 'click', me._boundOnToggleCollapseRequest);
             me.renderer.unmountCollapseButton(me._collapseBtnElement);
@@ -553,8 +561,11 @@ export class Row extends UIElement {
             me.renderer.on(me._collapseBtnElement, 'click', me._boundOnToggleCollapseRequest);
             me.renderer.mountCollapseButton(me.element, me._collapseBtnElement);
 
-            // Sync initial state
-            me.renderer.setCollapseButtonState(me._collapseBtnElement, me.collapsed, false);
+            me.renderer.setCollapseButtonState(
+                me._collapseBtnElement,
+                me.collapsed,
+                me._collapseButtonDisabled
+            );
         }
     }
 
@@ -568,8 +579,6 @@ export class Row extends UIElement {
         const me = this;
         if (!me.element) return;
 
-        // Remove existing handles manual query or track?
-        // ResizeHandleManager appends div.resize-handle.
         const existingHandles = me.element.querySelectorAll('.row__resize-handle');
         existingHandles.forEach(el => el.remove());
         me.element.classList.remove('row--resize-bottom');
@@ -579,7 +588,6 @@ export class Row extends UIElement {
             me._resizeHandleManager = null;
         }
 
-        // Re-create collapse button logic as it might depend on handle position visually
         me._setupCollapseButton();
 
         if (isLast) {
@@ -791,6 +799,9 @@ export class Row extends UIElement {
      */
     setCollapseButtonDisabled(disabled) {
         const me = this;
+
+        me._collapseButtonDisabled = disabled;
+
         if (me._collapseBtnElement && me.element) {
             me.renderer.setCollapseButtonState(me._collapseBtnElement, me._collapsed, disabled);
         }
