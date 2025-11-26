@@ -6,7 +6,7 @@ import { Emitter } from '../../core/Emitter.js';
  * Description:
  * A specialized implementation of UIItemStrip for managing tabbed interfaces.
  * It adds logic for item selection (active state) and a "Simple Mode" behavior,
- * which automatically hides the strip when only one item is present (common in IDE layouts).
+ * which automatically hides the strip when only one item is present.
  *
  * Properties summary:
  * - activeItem {UIElement|null} : The currently selected tab item.
@@ -30,6 +30,8 @@ import { Emitter } from '../../core/Emitter.js';
  * - If Item Count > 1 or Simple Mode disabled: The strip shows itself.
  * - Updates visual classes on item elements to reflect active state.
  * - Provides an overflow menu listing all tabs for quick navigation.
+ * - onSelectionChange: Fired when the active item changes.
+ * - onSimpleModeChange: Fired when the simple mode state changes (true/false).
  *
  * Dependencies:
  * - {import('./UIItemStrip.js').UIItemStrip}
@@ -71,6 +73,14 @@ export class TabStrip extends UIItemStrip {
     _onSelectionChange;
 
     /**
+     * Emitter for selection changes.
+     *
+     * @type {Emitter}
+     * @private
+     */
+    _onSimpleModeChange;
+
+    /**
      * Creates an instance of TabStrip.
      *
      * @param {string} [id=null] - Optional unique ID.
@@ -83,6 +93,7 @@ export class TabStrip extends UIItemStrip {
         const me = this;
 
         me._onSelectionChange = new Emitter();
+        me._onSimpleModeChange = new Emitter();
 
         if (config.simpleMode !== undefined) {
             me.setSimpleModeConfig(Boolean(config.simpleMode));
@@ -126,6 +137,14 @@ export class TabStrip extends UIItemStrip {
     }
 
     /**
+     * Public event for simple mode changes.
+     * @returns {Function}
+     */
+    get onSimpleModeChange() {
+        return this._onSimpleModeChange.event;
+    }
+
+    /**
      * Sets the active item and updates visual states.
      *
      * @param {import('../../core/UIElement.js').UIElement} item - The item to select.
@@ -133,7 +152,6 @@ export class TabStrip extends UIItemStrip {
      */
     setActiveItem(item) {
         const me = this;
-        // Validation
         if (item && !me.items.includes(item)) {
             console.warn(
                 `[TabStrip] Cannot set active item. Item is not part of this strip.`,
@@ -146,16 +164,13 @@ export class TabStrip extends UIItemStrip {
             return;
         }
 
-        // Deactivate current
         if (me._activeItem && me._activeItem.element) {
             me._activeItem.element.classList.remove('ui-strip__item--active');
         }
 
-        // Activate new
         me._activeItem = item;
         if (me._activeItem && me._activeItem.element) {
             me._activeItem.element.classList.add('ui-strip__item--active');
-            // Ensure element is visible in scroll area
             if (typeof me._activeItem.element.scrollIntoView === 'function') {
                 me._activeItem.element.scrollIntoView({
                     behavior: 'smooth',
@@ -165,7 +180,6 @@ export class TabStrip extends UIItemStrip {
             }
         }
 
-        // [CORREÇÃO] Notify listeners (e.g. Viewport) that selection changed
         me._onSelectionChange.fire(item);
     }
 
@@ -207,14 +221,10 @@ export class TabStrip extends UIItemStrip {
     removeItem(item) {
         const me = this;
         const wasActive = me._activeItem === item;
-
         super.removeItem(item);
-
         if (wasActive) {
             me._activeItem = null;
-            // Optional: Auto-select neighbour could be implemented here or left to the controller (PanelGroup)
         }
-
         me._checkSimpleMode();
     }
 
@@ -228,24 +238,16 @@ export class TabStrip extends UIItemStrip {
     onOverflowClick(event) {
         const me = this;
         const menuItems = me.items.map(item => {
-            // Try to resolve a clean title
             let label = 'Untitled';
-
             if (item.title) {
                 label = item.title;
             } else if (item.element) {
-                // Try specific classes to avoid grabbing button text like 'x' (close button)
                 const titleEl = item.element.querySelector('.panel__title, .window-header__title');
-                if (titleEl) {
-                    label = titleEl.textContent;
-                } else {
-                    // Fallback: use the whole text content
-                    label = item.element.textContent;
-                }
+                if (titleEl) label = titleEl.textContent;
+                else label = item.element.textContent;
             }
 
             const isActive = item === me.activeItem;
-            // Add checkmark indicator for active item
             const displayTitle = isActive ? `✔ ${label}` : label;
 
             return {
@@ -273,6 +275,7 @@ export class TabStrip extends UIItemStrip {
             if (me._isSimpleModeActive) {
                 me.setVisible(true);
                 me._isSimpleModeActive = false;
+                me._onSimpleModeChange.fire(false);
             }
             return;
         }
@@ -282,8 +285,9 @@ export class TabStrip extends UIItemStrip {
 
         if (shouldBeHidden !== me._isSimpleModeActive) {
             me._isSimpleModeActive = shouldBeHidden;
-            // Use inherited setVisible from UIElement
             me.setVisible(!shouldBeHidden);
+            // Notify listeners about mode change
+            me._onSimpleModeChange.fire(shouldBeHidden);
         }
     }
 
@@ -293,6 +297,7 @@ export class TabStrip extends UIItemStrip {
      */
     dispose() {
         this._onSelectionChange.dispose();
+        this._onSimpleModeChange.dispose();
         super.dispose();
     }
 }

@@ -30,6 +30,7 @@ import { DropZoneType } from '../../constants/DNDTypes.js';
  * - Delegates DOM events to internal handlers.
  * - Updates visual state via adapter methods.
  * - Registers itself as a 'tab-container' drop zone to enable tab reordering.
+ * - Handles "Simple Mode" visualization (showing title when single tab).
  *
  * Dependencies:
  * - {import('../../core/UIElement.js').UIElement}
@@ -169,6 +170,11 @@ export class PanelGroupHeader extends UIElement {
         }
         me._title = value;
         me.updateAriaLabels();
+
+        // Update title in renderer for Simple Mode display
+        if (me.element) {
+            me.renderer.updateTitle(me.element, value);
+        }
     }
 
     /**
@@ -211,6 +217,28 @@ export class PanelGroupHeader extends UIElement {
     }
 
     /**
+     * Exposes the root element of the internal TabStrip.
+     * Used by DND strategies to locate the drop target area.
+     *
+     * @returns {HTMLElement} The TabStrip root element.
+     */
+    get tabStripElement() {
+        const me = this;
+        return me.tabStrip.element;
+    }
+
+    /**
+     * Compatibility method used by DND strategies.
+     * Returns the DOM element where tabs are effectively dropped.
+     *
+     * @returns {HTMLElement|null} The tab container slot.
+     */
+    get tabContainer() {
+        const me = this;
+        return me.tabStripElement;
+    }
+
+    /**
      * Implementation of the rendering logic.
      * Uses the adapter to create the header structure.
      *
@@ -233,10 +261,28 @@ export class PanelGroupHeader extends UIElement {
             }
         }
 
-        // Attach listeners
-        const moveHandle = me.renderer.getMoveHandle(element);
-        const collapseBtn = me.renderer.getCollapseButton(element);
-        const closeBtn = me.renderer.getCloseButton(element);
+        // Note: Listeners are now attached in _doMount via _attachListeners
+        // to ensure they persist across re-mounts (dock/undock).
+
+        // Initialize title text
+        me.renderer.updateTitle(element, me._title);
+
+        return element;
+    }
+
+    /**
+     * Helper to attach DOM event listeners.
+     * Called on mount to ensure interactivity is restored if element was moved.
+     *
+     * @private
+     */
+    _attachListeners() {
+        const me = this;
+        if (!me.element) return;
+
+        const moveHandle = me.renderer.getMoveHandle(me.element);
+        const collapseBtn = me.renderer.getCollapseButton(me.element);
+        const closeBtn = me.renderer.getCloseButton(me.element);
 
         if (moveHandle) {
             me.renderer.on(moveHandle, 'pointerdown', me._boundOnGroupPointerDown);
@@ -247,8 +293,25 @@ export class PanelGroupHeader extends UIElement {
         if (closeBtn) {
             me.renderer.on(closeBtn, 'click', me._boundOnClose);
         }
+    }
 
-        return element;
+    /**
+     * Helper to detach DOM event listeners.
+     * Called on unmount to prevent leaks.
+     *
+     * @private
+     */
+    _detachListeners() {
+        const me = this;
+        if (!me.element) return;
+
+        const moveHandle = me.renderer.getMoveHandle(me.element);
+        const collapseBtn = me.renderer.getCollapseButton(me.element);
+        const closeBtn = me.renderer.getCloseButton(me.element);
+
+        if (moveHandle) me.renderer.off(moveHandle, 'pointerdown', me._boundOnGroupPointerDown);
+        if (collapseBtn) me.renderer.off(collapseBtn, 'click', me._boundOnCollapse);
+        if (closeBtn) me.renderer.off(closeBtn, 'click', me._boundOnClose);
     }
 
     /**
@@ -262,9 +325,22 @@ export class PanelGroupHeader extends UIElement {
         const me = this;
         super._doMount(container);
 
+        // [CORREÇÃO] Reattach listeners on mount to ensure they exist after undocking/docking
+        me._attachListeners();
+
         const tabSlot = me.renderer.getTabContainerSlot(me.element);
         if (tabSlot) {
             me.tabStrip.mount(tabSlot);
+        }
+
+        // Connect TabStrip Simple Mode changes to Header Visuals
+        if (me.tabStrip.onSimpleModeChange) {
+            me.tabStrip.onSimpleModeChange(isSimple => {
+                me.renderer.setSimpleMode(me.element, isSimple);
+            });
+
+            // Apply initial state
+            me.renderer.setSimpleMode(me.element, me.tabStrip.isSimpleModeActive);
         }
     }
 
@@ -277,16 +353,8 @@ export class PanelGroupHeader extends UIElement {
     _doUnmount() {
         const me = this;
 
-        // Remove listeners
-        if (me.element) {
-            const moveHandle = me.renderer.getMoveHandle(me.element);
-            const collapseBtn = me.renderer.getCollapseButton(me.element);
-            const closeBtn = me.renderer.getCloseButton(me.element);
-
-            if (moveHandle) me.renderer.off(moveHandle, 'pointerdown', me._boundOnGroupPointerDown);
-            if (collapseBtn) me.renderer.off(collapseBtn, 'click', me._boundOnCollapse);
-            if (closeBtn) me.renderer.off(closeBtn, 'click', me._boundOnClose);
-        }
+        // [CORREÇÃO] Detach listeners explicitly
+        me._detachListeners();
 
         // Unmount TabStrip
         if (me.tabStrip && me.tabStrip.isMounted) {
@@ -428,27 +496,5 @@ export class PanelGroupHeader extends UIElement {
         if (config.movable !== undefined) {
             me.renderer.setMoveHandleVisibility(me.element, config.movable);
         }
-    }
-
-    /**
-     * Exposes the root element of the internal TabStrip.
-     * Used by DND strategies to locate the drop target area.
-     *
-     * @returns {HTMLElement} The TabStrip root element.
-     */
-    get tabStripElement() {
-        const me = this;
-        return me.tabStrip.element;
-    }
-
-    /**
-     * Compatibility method used by DND strategies.
-     * Returns the DOM element where tabs are effectively dropped.
-     *
-     * @returns {HTMLElement|null} The tab container slot.
-     */
-    get tabContainer() {
-        const me = this;
-        return me.tabStripElement;
     }
 }

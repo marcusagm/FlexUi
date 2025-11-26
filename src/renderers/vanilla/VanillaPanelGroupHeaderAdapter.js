@@ -4,7 +4,8 @@ import { VanillaRenderer } from './VanillaRenderer.js';
  * Description:
  * A specialized adapter for rendering PanelGroupHeader components in a Vanilla JS environment.
  * It extends the generic VanillaRenderer to encapsulate the creation and manipulation
- * of the panel group header structure, including move handles, tab slots, and control buttons.
+ * of the panel group header structure, including move handles, tab slots, simple titles,
+ * and control buttons.
  *
  * Properties summary:
  * - None
@@ -12,7 +13,8 @@ import { VanillaRenderer } from './VanillaRenderer.js';
  * Typical usage:
  * const adapter = new VanillaPanelGroupHeaderAdapter();
  * const headerElement = adapter.createHeaderElement('group-1');
- * const tabSlot = adapter.getTabContainerSlot(headerElement);
+ * adapter.updateTitle(headerElement, 'My Title');
+ * adapter.setSimpleMode(headerElement, true);
  *
  * Events:
  * - None
@@ -20,7 +22,7 @@ import { VanillaRenderer } from './VanillaRenderer.js';
  * Business rules implemented:
  * - Enforces BEM structure for panel group headers.
  * - Provides a dedicated slot for injecting the TabStrip component.
- * - Manages visual states for collapse buttons and ARIA labels.
+ * - Manages visual states for collapse buttons, simple mode titles, and ARIA labels.
  *
  * Dependencies:
  * - {import('./VanillaRenderer.js').VanillaRenderer}
@@ -38,8 +40,12 @@ export class VanillaPanelGroupHeaderAdapter extends VanillaRenderer {
      * Structure:
      * <div class="panel-group__header">
      * <div class="panel-group__move-handle">...</div>
-     * <div class="panel-group__tab-container-slot"></div> * <button class="panel-group__collapse-btn">...</button>
+     * <div class="panel-group__simple-title">...</div>  <-- [NOVO]
+     * <div class="panel-group__tab-container-slot"></div>
+     * <div class="panel-group__controls">
+     * <button class="panel-group__collapse-btn">...</button>
      * <button class="panel-group__close-btn">...</button>
+     * </div>
      * </div>
      *
      * @param {string} id - The unique ID of the panel group.
@@ -75,34 +81,47 @@ export class VanillaPanelGroupHeaderAdapter extends VanillaRenderer {
         me.mount(moveHandle, handleIcon);
         me.mount(headerElement, moveHandle);
 
-        // 2. Tab Container Slot (Where TabStrip will be mounted)
+        // 2. Simple Title (Hidden by default)
+        const simpleTitle = me.createElement('div', {
+            className: 'panel-group__simple-title'
+        });
+        me.updateStyles(simpleTitle, { display: 'none' });
+        me.mount(headerElement, simpleTitle);
+
+        // 3. Tab Container Slot (Where TabStrip will be mounted)
         const tabSlot = me.createElement('div', {
             className: 'panel-group__tab-container-slot'
         });
-
-        // Styles to ensure it fills the space between handle and buttons
+        // Styles to ensure it fills the space
         me.updateStyles(tabSlot, {
             flexGrow: '1',
             overflow: 'hidden',
             display: 'flex',
             height: '100%'
         });
-
         me.mount(headerElement, tabSlot);
 
-        // 3. Collapse Button
+        // 4. Controls Container (Optional wrapper for better layout control)
+        const controlsContainer = me.createElement('div', {
+            className: 'panel-group__controls',
+            style: { display: 'flex', alignItems: 'center' }
+        });
+
+        // 5. Collapse Button
         const collapseButton = me.createElement('button', {
             className: 'panel-group__collapse-btn panel__collapse-btn',
             type: 'button'
         });
-        me.mount(headerElement, collapseButton);
+        me.mount(controlsContainer, collapseButton);
 
-        // 4. Close Button
+        // 6. Close Button
         const closeButton = me.createElement('button', {
             className: 'panel-group__close-btn panel__close-btn',
             type: 'button'
         });
-        me.mount(headerElement, closeButton);
+        me.mount(controlsContainer, closeButton);
+
+        me.mount(headerElement, controlsContainer);
 
         return headerElement;
     }
@@ -149,6 +168,46 @@ export class VanillaPanelGroupHeaderAdapter extends VanillaRenderer {
     getCloseButton(headerElement) {
         if (!headerElement) return null;
         return headerElement.querySelector('.panel-group__close-btn');
+    }
+
+    /**
+     * Updates the text of the simple title element.
+     *
+     * @param {HTMLElement} headerElement - The root header element.
+     * @param {string} title - The text to display.
+     * @returns {void}
+     */
+    updateTitle(headerElement, title) {
+        if (!headerElement) return;
+
+        const titleEl = headerElement.querySelector('.panel-group__simple-title');
+        if (titleEl) {
+            titleEl.textContent = title || '';
+        }
+    }
+
+    /**
+     * Toggles between simple mode (title only) and normal mode (tabs).
+     *
+     * @param {HTMLElement} headerElement - The root header element.
+     * @param {boolean} isSimple - True for simple mode (title visible), False for tab mode.
+     * @returns {void}
+     */
+    setSimpleMode(headerElement, isSimple) {
+        const me = this;
+        if (!headerElement) return;
+
+        const titleEl = headerElement.querySelector('.panel-group__simple-title');
+
+        if (isSimple) {
+            headerElement.classList.add('panel-group__header--simple');
+            if (titleEl) me.updateStyles(titleEl, { display: 'block' });
+            // In simple mode, the tab slot is usually hidden or empty (handled by TabStrip hiding itself)
+            // But we can enforce style here if needed.
+        } else {
+            headerElement.classList.remove('panel-group__header--simple');
+            if (titleEl) me.updateStyles(titleEl, { display: 'none' });
+        }
     }
 
     /**

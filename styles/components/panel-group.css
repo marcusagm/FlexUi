@@ -278,3 +278,27 @@
     flex: 1 1 auto !important;
     height: auto !important;
 }
+
+/* --- Simple Header Title --- */
+.panel-group__simple-title {
+    display: none; /* Gerenciado pelo Adapter/JS */
+    font-size: 0.75rem; /* Pequeno, similar à aba */
+    font-weight: 600;
+    color: var(--color-text-primary);
+    padding: 0 8px;
+    flex-grow: 1; /* Ocupa o espaço que seria das abas */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: var(--panel-group-header-height);
+}
+
+/* Quando em modo simples, garantimos que o slot de abas não atrapalhe */
+.panel-group__header--simple .panel-group__tab-container-slot {
+    display: none !important;
+}
+
+/* Ajustes nos controles para alinhar com o texto simples */
+.panel-group__header--simple .panel-group__controls {
+    margin-left: auto;
+}
