@@ -4,7 +4,8 @@ import { VanillaRenderer } from './VanillaRenderer.js';
  * Description:
  * A specialized adapter for rendering PanelHeader (tab) components in a Vanilla JS environment.
  * It extends the generic VanillaRenderer to encapsulate the creation and state updates
- * of the tab UI, including title updates, close button visibility, and active states.
+ * of the tab UI, including title updates, close button visibility, active states,
+ * and drag interactions.
  *
  * Properties summary:
  * - None
@@ -13,7 +14,7 @@ import { VanillaRenderer } from './VanillaRenderer.js';
  * const adapter = new VanillaPanelHeaderAdapter();
  * const tabElement = adapter.createTabElement('panel-1');
  * adapter.updateTitle(tabElement, 'My Panel');
- * adapter.updateActiveState(tabElement, true);
+ * adapter.setDraggable(tabElement, true);
  *
  * Events:
  * - None
@@ -21,7 +22,8 @@ import { VanillaRenderer } from './VanillaRenderer.js';
  * Business rules implemented:
  * - Enforces BEM structure for tabs (.panel-group__tab).
  * - Manages 'simple mode' styling (single panel view vs tabbed view).
- * - Handles visual state attributes (draggable, display).
+ * - Handles visual state attributes (draggable, display, active).
+ * - Validates all inputs before DOM manipulation.
  *
  * Dependencies:
  * - {import('./VanillaRenderer.js').VanillaRenderer}
@@ -60,7 +62,6 @@ export class VanillaPanelHeaderAdapter extends VanillaRenderer {
             draggable: 'true'
         });
 
-        // Important for DragTrigger to work correctly without scrolling interference
         me.updateStyles(tabElement, { touchAction: 'none' });
 
         const titleElement = me.createElement('span', {
@@ -87,7 +88,12 @@ export class VanillaPanelHeaderAdapter extends VanillaRenderer {
      * @returns {void}
      */
     updateTitle(element, title) {
-        if (!element) return;
+        if (!(element instanceof HTMLElement)) {
+            console.warn(
+                `[VanillaPanelHeaderAdapter] invalid element assignment (${element}). Element must be an HTMLElement.`
+            );
+            return;
+        }
         const titleElement = element.querySelector('.panel__title');
         if (titleElement) {
             titleElement.textContent = title || 'No title';
@@ -103,9 +109,17 @@ export class VanillaPanelHeaderAdapter extends VanillaRenderer {
      */
     updateCloseButtonVisibility(element, visible) {
         const me = this;
+        if (!(element instanceof HTMLElement)) {
+            console.warn(
+                `[VanillaPanelHeaderAdapter] invalid element assignment (${element}). Element must be an HTMLElement.`
+            );
+            return;
+        }
         const button = me.getCloseButton(element);
+        const isVisible = Boolean(visible);
+
         if (button) {
-            me.updateStyles(button, { display: visible ? '' : 'none' });
+            me.updateStyles(button, { display: isVisible ? '' : 'none' });
         }
     }
 
@@ -117,9 +131,16 @@ export class VanillaPanelHeaderAdapter extends VanillaRenderer {
      * @returns {void}
      */
     updateActiveState(element, isActive) {
-        if (!element) return;
+        if (!(element instanceof HTMLElement)) {
+            console.warn(
+                `[VanillaPanelHeaderAdapter] invalid element assignment (${element}). Element must be an HTMLElement.`
+            );
+            return;
+        }
+        const activeState = Boolean(isActive);
         const activeClass = 'panel-group__tab--active';
-        if (isActive) {
+
+        if (activeState) {
             element.classList.add(activeClass);
         } else {
             element.classList.remove(activeClass);
@@ -136,22 +157,23 @@ export class VanillaPanelHeaderAdapter extends VanillaRenderer {
      */
     setSimpleMode(element, isSimple) {
         const me = this;
-        if (!element) return;
+        if (!(element instanceof HTMLElement)) {
+            console.warn(
+                `[VanillaPanelHeaderAdapter] invalid element assignment (${element}). Element must be an HTMLElement.`
+            );
+            return;
+        }
 
+        const simpleState = Boolean(isSimple);
         const tabClass = 'panel-group__tab';
-        if (isSimple) {
-            element.classList.remove(tabClass);
-            // Disable dragging in simple mode (header typically handles drag if movable, but tab logic differs)
-            element.setAttribute('draggable', 'false');
-            me.updateStyles(element, { cursor: 'default' });
 
-            // Usually close button is hidden in simple mode tabs (handled by group header)
+        if (simpleState) {
+            element.classList.remove(tabClass);
+            me.setDraggable(element, false);
             me.updateCloseButtonVisibility(element, false);
         } else {
             element.classList.add(tabClass);
-            // Re-enable dragging for tabs (if movable, controller sets this, but default is true)
-            element.setAttribute('draggable', 'true');
-            me.updateStyles(element, { cursor: 'grab' });
+            me.setDraggable(element, true);
         }
     }
 
@@ -164,9 +186,16 @@ export class VanillaPanelHeaderAdapter extends VanillaRenderer {
      */
     setDraggable(element, isDraggable) {
         const me = this;
-        if (!element) return;
+        if (!(element instanceof HTMLElement)) {
+            console.warn(
+                `[VanillaPanelHeaderAdapter] invalid element assignment (${element}). Element must be an HTMLElement.`
+            );
+            return;
+        }
 
-        if (isDraggable) {
+        const draggable = Boolean(isDraggable);
+
+        if (draggable) {
             element.setAttribute('draggable', 'true');
             me.updateStyles(element, { cursor: 'grab' });
         } else {

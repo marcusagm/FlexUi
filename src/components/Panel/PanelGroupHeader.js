@@ -16,9 +16,6 @@ import { DropZoneType } from '../../constants/DNDTypes.js';
  * - panelGroup {PanelGroup} : Reference to the parent PanelGroup.
  * - title {string} : The title used for ARIA labels.
  * - tabStrip {TabStrip} : The component managing the list of tabs.
- * - moveHandle {HTMLElement|null} : The drag handle element (accessed via adapter).
- * - collapseBtn {HTMLElement|null} : Button to toggle collapse state (accessed via adapter).
- * - closeBtn {HTMLElement|null} : Button to close the group (accessed via adapter).
  *
  * Events:
  * - Emits (appBus): EventTypes.PANEL_TOGGLE_COLLAPSE
@@ -30,7 +27,7 @@ import { DropZoneType } from '../../constants/DNDTypes.js';
  * - Delegates DOM events to internal handlers.
  * - Updates visual state via adapter methods.
  * - Registers itself as a 'tab-container' drop zone to enable tab reordering.
- * - Handles "Simple Mode" visualization (showing title when single tab).
+ * - Handles "Simple Mode" visualization via TabStrip callbacks.
  *
  * Dependencies:
  * - {import('../../core/UIElement.js').UIElement}
@@ -170,11 +167,6 @@ export class PanelGroupHeader extends UIElement {
         }
         me._title = value;
         me.updateAriaLabels();
-
-        // Update title in renderer for Simple Mode display
-        if (me.element) {
-            me.renderer.updateTitle(me.element, value);
-        }
     }
 
     /**
@@ -260,13 +252,6 @@ export class PanelGroupHeader extends UIElement {
                 tabSlot.dropZoneInstance = me.panelGroup;
             }
         }
-
-        // Note: Listeners are now attached in _doMount via _attachListeners
-        // to ensure they persist across re-mounts (dock/undock).
-
-        // Initialize title text
-        me.renderer.updateTitle(element, me._title);
-
         return element;
     }
 
@@ -325,7 +310,6 @@ export class PanelGroupHeader extends UIElement {
         const me = this;
         super._doMount(container);
 
-        // [CORREÇÃO] Reattach listeners on mount to ensure they exist after undocking/docking
         me._attachListeners();
 
         const tabSlot = me.renderer.getTabContainerSlot(me.element);
@@ -353,7 +337,6 @@ export class PanelGroupHeader extends UIElement {
     _doUnmount() {
         const me = this;
 
-        // [CORREÇÃO] Detach listeners explicitly
         me._detachListeners();
 
         // Unmount TabStrip

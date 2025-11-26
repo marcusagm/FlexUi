@@ -1,6 +1,5 @@
 @import '../theme.css';
 
-/* Base Panel Structure */
 .panel {
     background-color: var(--color-bg-panel);
     border-radius: var(--border-radius-base);
@@ -12,7 +11,6 @@
     box-sizing: border-box;
 }
 
-/* Floating State */
 .panel-group--floating {
     position: absolute;
     z-index: var(--viewport-z-floating);
@@ -22,13 +20,11 @@
     border: 1px solid var(--color-border-default);
 }
 
-/* Dragging Feedback */
 .panel--dragging {
     opacity: var(--panel-dragging-opacity);
     pointer-events: none;
 }
 
-/* Collapsed State */
 .panel--collapsed {
     height: var(--panel-collapsed-height) !important;
     min-height: var(--panel-collapsed-height) !important;
@@ -39,7 +35,6 @@
     border-bottom: none;
 }
 
-/* --- Header --- */
 .panel-group__header {
     background-color: var(--color-bg-panel-header);
     display: flex;
@@ -52,7 +47,6 @@
     gap: 2px;
 }
 
-/* Move Handle */
 .panel-group__move-handle {
     width: var(--panel-group-header-move-handle-width);
     height: 100%;
@@ -75,7 +69,6 @@
     height: var(--panel-move-handle-icon-height);
 }
 
-/* Tab Container Slot (Hosts the UIItemStrip) */
 .panel-group__tab-container-slot {
     flex-grow: 1;
     height: 100%;
@@ -83,21 +76,18 @@
     position: relative;
     display: flex;
     align-items: flex-end;
-    min-width: 0; /* Crucial for flexbox shrinking */
+    min-width: 0;
 }
 
-/* * TabStrip Overrides for Panel Context
- * Adapta o componente genérico UIItemStrip/TabStrip para parecer nativo do painel
- */
 .panel-group__header .ui-strip {
-    background-color: transparent; /* Remove fundo padrão do strip */
+    background-color: transparent;
     border: none;
 }
 
 .panel-group__header .ui-strip__scroll-btn {
     background-color: transparent;
     color: var(--color-text-secondary);
-    width: 16px; /* Botões de scroll mais finos no painel */
+    width: 16px;
 }
 
 .panel-group__header .ui-strip__scroll-btn:hover {
@@ -105,14 +95,12 @@
     color: var(--color-text-primary);
 }
 
-/* Feedback Visual de Drag Over no Strip */
 .panel-group__tab-container--drag-over {
     background-color: var(--color-bg-hover) !important;
     box-shadow: inset 0 0 4px var(--color-accent-hover);
     border-radius: var(--border-radius-sm);
 }
 
-/* Control Buttons (Collapse, Close) */
 .panel-group__collapse-btn,
 .panel-group__close-btn {
     width: var(--panel-button-size);
@@ -159,7 +147,6 @@
     line-height: 1;
 }
 
-/* --- Tabs (Specific to Panel Group Items) --- */
 .panel-group__tab {
     display: flex;
     align-items: center;
@@ -230,14 +217,6 @@
     background-color: rgba(0, 0, 0, 0.1);
 }
 
-/* --- Simple Header Mode (Single Panel) --- */
-/* Quando o TabStrip está em modo simples (1 aba), ele oculta a strip
-   e o PanelGroupHeader exibe o título diretamente (se implementado assim)
-   ou estiliza a aba única para parecer um título.
-
-   Abaixo, assumimos que a classe .panel-group__header--simple é adicionada ao HEADER
-   pelo controlador quando necessário.
-*/
 .panel-group__header--simple .ui-strip {
     padding-left: 0;
 }
@@ -246,24 +225,29 @@
     background: transparent;
     border: none;
     margin: 0;
-    padding: 0;
-    color: var(--color-text-bright);
+    padding: 0 4px;
+    color: var(--color-text-primary);
+    cursor: default;
+    max-width: 100%;
 }
 
 .panel-group__header--simple .panel-group__tab:hover {
     background: transparent;
+    border-color: transparent;
+    color: var(--color-text-primary);
 }
 
 .panel-group__header--simple .panel-group__tab--active {
+    background: transparent;
     border: none;
     margin: 0;
+    color: var(--color-text-primary);
 }
 
 .panel-group__header--simple .panel-group__tab-close {
     display: none;
 }
 
-/* --- Content --- */
 .panel-group__content {
     flex: 1;
     display: flex;
@@ -273,32 +257,11 @@
     min-height: 0;
 }
 
-/* Utility: Fills Space */
 .panel-group--fills-space {
     flex: 1 1 auto !important;
     height: auto !important;
 }
 
-/* --- Simple Header Title --- */
-.panel-group__simple-title {
-    display: none; /* Gerenciado pelo Adapter/JS */
-    font-size: 0.75rem; /* Pequeno, similar à aba */
-    font-weight: 600;
-    color: var(--color-text-primary);
-    padding: 0 8px;
-    flex-grow: 1; /* Ocupa o espaço que seria das abas */
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    line-height: var(--panel-group-header-height);
-}
-
-/* Quando em modo simples, garantimos que o slot de abas não atrapalhe */
-.panel-group__header--simple .panel-group__tab-container-slot {
-    display: none !important;
-}
-
-/* Ajustes nos controles para alinhar com o texto simples */
 .panel-group__header--simple .panel-group__controls {
     margin-left: auto;
 }

@@ -6,12 +6,15 @@ import { Emitter } from '../../core/Emitter.js';
  * Description:
  * A specialized implementation of UIItemStrip for managing tabbed interfaces.
  * It adds logic for item selection (active state) and a "Simple Mode" behavior,
- * which automatically hides the strip when only one item is present.
+ * which styles the strip as a static title header when only one item is present,
+ * instead of hiding it.
  *
  * Properties summary:
  * - activeItem {UIElement|null} : The currently selected tab item.
  * - simpleModeEnabled {boolean} : Whether simple mode behavior is active.
- * - isSimpleModeActive {boolean} : Read-only flag indicating if the strip is currently in simple mode (hidden).
+ * - isSimpleModeActive {boolean} : Read-only flag indicating if the strip is currently in simple mode.
+ * - onSelectionChange: Fired when the active item changes.
+ * - onSimpleModeChange: Fired when the simple mode state changes (true/false).
  *
  * Typical usage:
  * const tabs = new TabStrip('main-tabs');
@@ -23,15 +26,14 @@ import { Emitter } from '../../core/Emitter.js';
  * Events:
  * - (Inherits from UIItemStrip)
  * - Emits 'selectionChange' via onSelectionChange getter.
+ * - Emits 'simpleModeChange' via onSimpleModeChange getter.
  *
  * Business rules implemented:
  * - Only one item can be active at a time.
- * - If Simple Mode is enabled and Item Count == 1: The strip hides itself.
- * - If Item Count > 1 or Simple Mode disabled: The strip shows itself.
+ * - If Simple Mode is enabled and Item Count == 1: The strip remains visible, but the item is locked (not draggable) and styled as a title.
+ * - If Item Count > 1 or Simple Mode disabled: Standard tab behavior (draggable, closable).
  * - Updates visual classes on item elements to reflect active state.
  * - Provides an overflow menu listing all tabs for quick navigation.
- * - onSelectionChange: Fired when the active item changes.
- * - onSimpleModeChange: Fired when the simple mode state changes (true/false).
  *
  * Dependencies:
  * - {import('./UIItemStrip.js').UIItemStrip}
@@ -57,7 +59,7 @@ export class TabStrip extends UIItemStrip {
     _simpleModeEnabled = false;
 
     /**
-     * Current state of Simple Mode (true = strip is hidden due to single item).
+     * Current state of Simple Mode (true = single item styled as title).
      *
      * @type {boolean}
      * @private
@@ -73,7 +75,7 @@ export class TabStrip extends UIItemStrip {
     _onSelectionChange;
 
     /**
-     * Emitter for selection changes.
+     * Emitter for simple mode state changes.
      *
      * @type {Emitter}
      * @private
@@ -103,7 +105,7 @@ export class TabStrip extends UIItemStrip {
     /**
      * Retrieves the currently active item.
      *
-     * @returns {import('../../core/UIElement.js').UIElement | null}
+     * @returns {import('../../core/UIElement.js').UIElement | null} The active item.
      */
     get activeItem() {
         return this._activeItem;
@@ -112,16 +114,16 @@ export class TabStrip extends UIItemStrip {
     /**
      * Retrieves the simple mode configuration.
      *
-     * @returns {boolean}
+     * @returns {boolean} True if simple mode is enabled.
      */
     get simpleModeEnabled() {
         return this._simpleModeEnabled;
     }
 
     /**
-     * Checks if simple mode is currently effective (strip hidden).
+     * Checks if simple mode is currently effective (single item behavior).
      *
-     * @returns {boolean}
+     * @returns {boolean} True if in simple mode.
      */
     get isSimpleModeActive() {
         return this._isSimpleModeActive;
@@ -130,7 +132,7 @@ export class TabStrip extends UIItemStrip {
     /**
      * Public event for selection changes.
      *
-     * @returns {Function}
+     * @returns {Function} The subscription function.
      */
     get onSelectionChange() {
         return this._onSelectionChange.event;
@@ -138,7 +140,8 @@ export class TabStrip extends UIItemStrip {
 
     /**
      * Public event for simple mode changes.
-     * @returns {Function}
+     *
+     * @returns {Function} The subscription function.
      */
     get onSimpleModeChange() {
         return this._onSimpleModeChange.event;
@@ -186,7 +189,7 @@ export class TabStrip extends UIItemStrip {
     /**
      * Configures the Simple Mode behavior.
      *
-     * @param {boolean} enabled - True to enable hiding when single item.
+     * @param {boolean} enabled - True to enable special handling for single items.
      * @returns {void}
      */
     setSimpleModeConfig(enabled) {
@@ -200,7 +203,8 @@ export class TabStrip extends UIItemStrip {
     }
 
     /**
-     * (Override) Adds an item and triggers Simple Mode check.
+     * Adds an item and triggers Simple Mode check.
+     * Overrides base method.
      *
      * @param {import('../../core/UIElement.js').UIElement} item - The item to add.
      * @param {number|null} [index=null] - The index.
@@ -212,8 +216,8 @@ export class TabStrip extends UIItemStrip {
     }
 
     /**
-     * (Override) Removes an item and triggers Simple Mode check.
-     * Handles active item reset if the active item is removed.
+     * Removes an item and triggers Simple Mode check.
+     * Overrides base method.
      *
      * @param {import('../../core/UIElement.js').UIElement} item - The item to remove.
      * @returns {void}
@@ -229,8 +233,9 @@ export class TabStrip extends UIItemStrip {
     }
 
     /**
-     * (Override) Handles the overflow button click.
+     * Handles the overflow button click.
      * Displays a context menu with a list of all tabs for quick navigation.
+     * Overrides base method.
      *
      * @param {MouseEvent} event - The click event from the overflow button.
      * @returns {void}
@@ -264,36 +269,50 @@ export class TabStrip extends UIItemStrip {
     }
 
     /**
-     * Evaluates if the strip should be hidden or shown based on item count.
+     * Evaluates if the strip should be in simple mode based on item count.
+     * Updates draggable state of items and notifies listeners.
      *
      * @private
      * @returns {void}
      */
     _checkSimpleMode() {
         const me = this;
-        if (!me._simpleModeEnabled) {
-            if (me._isSimpleModeActive) {
-                me.setVisible(true);
-                me._isSimpleModeActive = false;
-                me._onSimpleModeChange.fire(false);
-            }
-            return;
+        const count = me.items.length;
+
+        // Determine if we are effectively in simple mode (enabled AND exactly one item)
+        let isSimple = false;
+        if (me._simpleModeEnabled && count === 1) {
+            isSimple = true;
         }
 
-        const count = me.items.length;
-        const shouldBeHidden = count === 1;
+        // Change state and notify if changed
+        if (isSimple !== me._isSimpleModeActive) {
+            me._isSimpleModeActive = isSimple;
+            me._onSimpleModeChange.fire(isSimple);
+        }
 
-        if (shouldBeHidden !== me._isSimpleModeActive) {
-            me._isSimpleModeActive = shouldBeHidden;
-            me.setVisible(!shouldBeHidden);
-            // Notify listeners about mode change
-            me._onSimpleModeChange.fire(shouldBeHidden);
+        // Enforce Draggable State on Items
+        // In Simple Mode, the single item behaves as a title (not draggable individually)
+        me.items.forEach(item => {
+            const shouldBeDraggable = !isSimple;
+
+            // Check if the item supports setDraggable (e.g., PanelHeader via adapter)
+            if (item && typeof item.setDraggable === 'function') {
+                item.setDraggable(shouldBeDraggable);
+            }
+        });
+
+        // Ensure the strip is always visible (unlike previous logic which hid it)
+        if (!me.isVisible) {
+            me.setVisible(true);
         }
     }
 
     /**
-     * Dispose emitter on destroy.
-     * * @override
+     * Disposes resources and emitters.
+     * Overrides base method.
+     *
+     * @returns {void}
      */
     dispose() {
         this._onSelectionChange.dispose();

@@ -378,6 +378,20 @@ export class PanelHeader extends UIElement {
     }
 
     /**
+     * Sets the draggable state of the header element.
+     * Used by TabStrip to enforce "no-drag" policy in simple mode.
+     *
+     * @param {boolean} draggable - Whether the header should be draggable.
+     * @returns {void}
+     */
+    setDraggable(draggable) {
+        const me = this;
+        if (me.element) {
+            me.renderer.setDraggable(me.element, draggable);
+        }
+    }
+
+    /**
      * Wrapper for setTitle (Compatibility).
      *
      * @param {string} title
