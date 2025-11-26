@@ -1,10 +1,8 @@
 import { ApplicationWindowHeader } from './ApplicationWindowHeader.js';
 import { ResizeHandleManager } from '../../utils/ResizeHandleManager.js';
 import { appBus } from '../../utils/EventBus.js';
-import { generateId } from '../../utils/generateId.js';
 import { EventTypes } from '../../constants/EventTypes.js';
 import { ItemType } from '../../constants/DNDTypes.js';
-import { FloatingPanelManagerService } from '../../services/DND/FloatingPanelManagerService.js';
 import { UIElement } from '../../core/UIElement.js';
 import { VanillaWindowAdapter } from '../../renderers/vanilla/VanillaWindowAdapter.js';
 import { WindowApi } from '../../api/WindowApi.js';
@@ -471,6 +469,10 @@ export class ApplicationWindow extends UIElement {
      */
     restoreHeader() {
         const me = this;
+        if (me.header && !me.header.isMounted) {
+            me.header.mount(me.element);
+        }
+
         if (me.element && me.header && me.header.element) {
             me.renderer.mountHeader(me.element, me.header.element);
         }
@@ -512,8 +514,12 @@ export class ApplicationWindow extends UIElement {
             if (me.element.parentNode !== container) {
                 me.renderer.mount(container, me.element);
             }
-            if (me.header && me.header.element) {
-                me.renderer.mountHeader(me.element, me.header.element);
+
+            if (!me._isTabbed && me.header) {
+                me.header.mount(me.element);
+                if (me.header.element) {
+                    me.renderer.mountHeader(me.element, me.header.element);
+                }
             }
 
             me._initResizeHandles();
@@ -537,6 +543,11 @@ export class ApplicationWindow extends UIElement {
             me._resizeHandleManager.destroy();
             me._resizeHandleManager = null;
         }
+
+        if (me.header && me.header.isMounted) {
+            me.header.unmount();
+        }
+
         if (me.element && me.element.parentNode) {
             me.renderer.unmount(me.element.parentNode, me.element);
         }
@@ -579,6 +590,7 @@ export class ApplicationWindow extends UIElement {
      * @returns {void}
      */
     renderContent(container) {
+        container;
         if (this._pendingContent) {
             this.setContent(this._pendingContent);
             this._pendingContent = null;

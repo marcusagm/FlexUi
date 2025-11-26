@@ -8,46 +8,6 @@ import { VanillaViewportAdapter } from '../../renderers/vanilla/VanillaViewportA
 
 /**
  * Description:
- * A wrapper class to adapt the ApplicationWindowHeader to the UIElement interface
- * required by TabStrip. This acts as the "Tab Item" within the strip.
- *
- * @internal
- */
-class WindowHeaderWrapper extends UIElement {
-    /**
-     * Creates an instance of WindowHeaderWrapper.
-     *
-     * @param {import('./ApplicationWindowHeader.js').ApplicationWindowHeader} header - The window header component.
-     * @param {import('./ApplicationWindow.js').ApplicationWindow} window - The window instance associated with this header.
-     */
-    constructor(header, window) {
-        super();
-        this.header = header;
-        this.window = window;
-    }
-
-    /**
-     * Renders the wrapped element.
-     *
-     * @returns {HTMLElement} The header element.
-     * @protected
-     */
-    _doRender() {
-        return this.header.element;
-    }
-
-    /**
-     * Gets the root element.
-     *
-     * @returns {HTMLElement} The header element.
-     */
-    get element() {
-        return this.header.element;
-    }
-}
-
-/**
- * Description:
  * A container component that acts as a manager for ApplicationWindow instances.
  * It provides a bounded area (relative positioning context) where windows can float,
  * overlap, or be docked into tabs using a TabStrip.
@@ -169,14 +129,6 @@ export class Viewport extends UIElement {
      * @private
      */
     _tabStrip;
-
-    /**
-     * Maps windows to their UIElement wrappers for the TabStrip.
-     *
-     * @type {Map<import('./ApplicationWindow.js').ApplicationWindow, WindowHeaderWrapper>}
-     * @private
-     */
-    _windowWrappers = new Map();
 
     /**
      * The drop zone type identifier.
@@ -394,13 +346,8 @@ export class Viewport extends UIElement {
         const wasActive = me._activeWindow === windowInstance;
         const remainingActiveWindow = me._activeWindow;
 
-        if (windowInstance.isTabbed) {
-            const wrapper = me._windowWrappers.get(windowInstance);
-            if (wrapper) {
-                me._tabStrip.removeItem(wrapper);
-                me._windowWrappers.delete(windowInstance);
-                wrapper.dispose();
-            }
+        if (windowInstance.isTabbed && windowInstance.header) {
+            me._tabStrip.removeItem(windowInstance.header);
             if (windowInstance.element) {
                 windowInstance.element.classList.remove('application-window--active-tab');
             }
@@ -463,9 +410,8 @@ export class Viewport extends UIElement {
         }
 
         if (windowInstance.isTabbed) {
-            const wrapper = me._windowWrappers.get(windowInstance);
-            if (wrapper) {
-                me._tabStrip.setActiveItem(wrapper);
+            if (windowInstance.header) {
+                me._tabStrip.setActiveItem(windowInstance.header);
             }
 
             me._windows.forEach(win => {
@@ -493,9 +439,8 @@ export class Viewport extends UIElement {
                         if (win.element) {
                             win.element.classList.add('application-window--active-tab');
                         }
-                        const wrapper = me._windowWrappers.get(win);
-                        if (wrapper) {
-                            me._tabStrip.setActiveItem(wrapper);
+                        if (win.header) {
+                            me._tabStrip.setActiveItem(win.header);
                         }
                         break;
                     }
@@ -514,21 +459,19 @@ export class Viewport extends UIElement {
     dockWindow(windowInstance, index = null) {
         const me = this;
         if (!me._windows.includes(windowInstance)) return;
+        if (!windowInstance.header) return;
 
-        if (windowInstance.isTabbed && me._windowWrappers.has(windowInstance)) {
+        if (windowInstance.isTabbed && me._tabStrip.items.includes(windowInstance.header)) {
             if (index !== null) {
-                const wrapper = me._windowWrappers.get(windowInstance);
-                me._tabStrip.removeItem(wrapper);
-                me._tabStrip.addItem(wrapper, index);
+                me._tabStrip.removeItem(windowInstance.header);
+                me._tabStrip.addItem(windowInstance.header, index);
             }
             return;
         }
 
         windowInstance.setTabbed(true);
 
-        const wrapper = new WindowHeaderWrapper(windowInstance.header, windowInstance);
-        me._windowWrappers.set(windowInstance, wrapper);
-        me._tabStrip.addItem(wrapper, index);
+        me._tabStrip.addItem(windowInstance.header, index);
 
         me._updateTabBarVisibility();
         me.focusWindow(windowInstance, true);
@@ -553,11 +496,8 @@ export class Viewport extends UIElement {
             windowInstance.element.classList.remove('application-window--active-tab');
         }
 
-        const wrapper = me._windowWrappers.get(windowInstance);
-        if (wrapper) {
-            me._tabStrip.removeItem(wrapper);
-            me._windowWrappers.delete(windowInstance);
-            wrapper.dispose();
+        if (windowInstance.header) {
+            me._tabStrip.removeItem(windowInstance.header);
         }
 
         windowInstance.restoreHeader();
@@ -705,9 +645,9 @@ export class Viewport extends UIElement {
         appBus.on(EventTypes.VIEWPORT_ARRANGE_TILE, me._boundOnArrangeTile, options);
 
         if (me._tabStrip) {
-            me._tabStrip.onSelectionChange(wrapper => {
-                if (wrapper && wrapper.window) {
-                    me.focusWindow(wrapper.window);
+            me._tabStrip.onSelectionChange(header => {
+                if (header && header.windowInstance) {
+                    me.focusWindow(header.windowInstance);
                 }
             });
         }

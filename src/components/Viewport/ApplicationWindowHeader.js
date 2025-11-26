@@ -1,3 +1,5 @@
+import { UIElement } from '../../core/UIElement.js';
+import { VanillaWindowHeaderAdapter } from '../../renderers/vanilla/VanillaWindowHeaderAdapter.js';
 import { appBus } from '../../utils/EventBus.js';
 import { DragTrigger } from '../../utils/DragTrigger.js';
 import { EventTypes } from '../../constants/EventTypes.js';
@@ -6,123 +8,68 @@ import { ItemType } from '../../constants/DNDTypes.js';
 /**
  * Description:
  * Represents the header/title bar of an ApplicationWindow.
- * This component is responsible for rendering the window title and control buttons
- * (Minimize, Maximize, Close, Pin). It also acts as the primary drag handle for
- * the window using the DragTrigger utility.
+ * This class is a controller that inherits from UIElement. It delegates
+ * DOM rendering to an adapter and handles user interactions like clicking,
+ * dragging (via DragTrigger), and window control actions.
  *
  * Properties summary:
- * - element {HTMLElement} : The main DOM element of the header.
- * - _window {ApplicationWindow} : The parent window instance.
- * - _titleElement {HTMLElement} : The element displaying the title text.
- * - _controlsContainer {HTMLElement} : Container for control buttons.
- * - _closeButton {HTMLButtonElement} : Button to close the window.
- * - _maximizeButton {HTMLButtonElement} : Button to maximize/restore the window.
- * - _minimizeButton {HTMLButtonElement} : Button to minimize the window.
- * - _pinButton {HTMLButtonElement} : Button to toggle "always on top".
- * - _dragTrigger {DragTrigger} : Utility to handle drag detection vs clicks.
- * - _boundOnCloseClick {Function} : Bound handler for close click.
- * - _boundOnMaximizeClick {Function} : Bound handler for maximize click.
- * - _boundOnMinimizeClick {Function} : Bound handler for minimize click.
- * - _boundOnPinClick {Function} : Bound handler for pin click.
- * - _isTabMode {boolean} : Internal flag indicating if the header is in tab mode.
+ * - windowInstance {ApplicationWindow} : The parent window instance.
+ * - isTabMode {boolean} : Whether the header is in "Tab" (docked) mode.
  *
  * Typical usage:
- * const header = new ApplicationWindowHeader(myWindowInstance, 'My Window Title');
+ * const header = new ApplicationWindowHeader(myWindowInstance, 'My Title');
  * parentElement.appendChild(header.element);
  *
  * Events:
- * - Emits (appBus): EventTypes.DND_DRAG_START when dragging starts.
- * - Emits (appBus): EventTypes.WINDOW_CLOSE_REQUEST when close is clicked.
- * - Emits (appBus): EventTypes.WINDOW_FOCUS when clicked.
+ * - Emits (appBus): EventTypes.DND_DRAG_START
+ * - Emits (appBus): EventTypes.WINDOW_CLOSE_REQUEST
+ * - Emits (appBus): EventTypes.WINDOW_FOCUS
  *
  * Business rules implemented:
- * - Stops propagation on control buttons to prevent drag initiation.
- * - Emits specific events for window actions (close, maximize, minimize, pin) to be handled by the parent window or service.
- * - Initiates a drag operation specifically typed as APPLICATION_WINDOW.
- * - Handles auto-restore when dragging a maximized window, maintaining relative cursor position.
- * - Adapts visual state and available controls when in "Tab Mode".
+ * - Inherits from UIElement -> Disposable.
+ * - Delegates visual operations to VanillaWindowHeaderAdapter.
+ * - Initiates drag operations (supporting both Window and Tab modes).
+ * - Handles auto-restore logic when dragging a maximized window.
+ * - Validates inputs via setters.
  *
  * Dependencies:
+ * - {import('../../core/UIElement.js').UIElement}
+ * - {import('../../renderers/vanilla/VanillaWindowHeaderAdapter.js').VanillaWindowHeaderAdapter}
  * - {import('../../utils/EventBus.js').appBus}
  * - {import('../../utils/DragTrigger.js').DragTrigger}
- * - {import('../../constants/EventTypes.js').EventTypes}
- * - {import('../../constants/DNDTypes.js').ItemType}
- *
- * Notes / Additional:
- * - This component is tightly coupled with ApplicationWindow.
  */
-export class ApplicationWindowHeader {
-    /**
-     * The main DOM element of the header.
-     *
-     * @type {HTMLElement}
-     * @public
-     */
-    element;
-
+export class ApplicationWindowHeader extends UIElement {
     /**
      * The parent window instance.
      *
      * @type {import('./ApplicationWindow.js').ApplicationWindow}
      * @private
      */
-    _window;
+    _windowInstance;
 
     /**
-     * The element displaying the title text.
+     * The initial title to render (state is managed by adapter after render).
      *
-     * @type {HTMLElement}
+     * @type {string}
      * @private
      */
-    _titleElement;
+    _initialTitle;
 
     /**
-     * Container for control buttons.
+     * Internal flag for current display mode.
      *
-     * @type {HTMLElement}
+     * @type {boolean}
      * @private
      */
-    _controlsContainer;
-
-    /**
-     * Button to close the window.
-     *
-     * @type {HTMLButtonElement}
-     * @private
-     */
-    _closeButton;
-
-    /**
-     * Button to maximize/restore the window.
-     *
-     * @type {HTMLButtonElement}
-     * @private
-     */
-    _maximizeButton;
-
-    /**
-     * Button to minimize the window.
-     *
-     * @type {HTMLButtonElement}
-     * @private
-     */
-    _minimizeButton;
-
-    /**
-     * Button to toggle "always on top".
-     *
-     * @type {HTMLButtonElement}
-     * @private
-     */
-    _pinButton;
+    _isTabMode = false;
 
     /**
      * Utility to handle drag detection vs clicks.
      *
-     * @type {DragTrigger}
+     * @type {DragTrigger | null}
      * @private
      */
-    _dragTrigger;
+    _dragTrigger = null;
 
     /**
      * Bound handler for close click.
@@ -157,132 +104,188 @@ export class ApplicationWindowHeader {
     _boundOnPinClick;
 
     /**
-     * Internal flag for current display mode.
-     *
-     * @type {boolean}
-     * @private
-     */
-    _isTabMode = false;
-
-    /**
      * Creates an instance of ApplicationWindowHeader.
      *
      * @param {import('./ApplicationWindow.js').ApplicationWindow} windowInstance - The parent ApplicationWindow instance.
      * @param {string} title - The initial title text.
+     * @param {import('../../core/IRenderer.js').IRenderer} [renderer=null] - Optional renderer adapter.
      */
-    constructor(windowInstance, title) {
-        const me = this;
-        me._window = windowInstance;
-
-        me.element = document.createElement('div');
-        me.element.classList.add('window-header');
-
-        me._boundOnCloseClick = me.onCloseClick.bind(me);
-        me._boundOnMaximizeClick = me.onMaximizeClick.bind(me);
-        me._boundOnMinimizeClick = me.onMinimizeClick.bind(me);
-        me._boundOnPinClick = me.onPinClick.bind(me);
-
-        me.build(title);
-        me.initEventListeners();
-
-        me._dragTrigger = new DragTrigger(me.element, {
-            threshold: 3,
-            onDragStart: (event, startCoords) => me._startDrag(event, startCoords),
-            onClick: () => me.onHeaderClick()
-        });
-    }
-
-    /**
-     * Builds the DOM structure for the header.
-     *
-     * @param {string} title - The title to display.
-     * @returns {void}
-     */
-    build(title) {
+    constructor(windowInstance, title, renderer = null) {
+        super(null, renderer || new VanillaWindowHeaderAdapter());
         const me = this;
 
-        // Title
-        me._titleElement = document.createElement('span');
-        me._titleElement.classList.add('window-header__title');
-        me._titleElement.textContent = title;
-        me.element.appendChild(me._titleElement);
+        me._windowInstance = windowInstance;
+        me._initialTitle = title;
 
-        // Controls Container
-        me._controlsContainer = document.createElement('div');
-        me._controlsContainer.classList.add('window-header__controls');
+        me._boundOnCloseClick = me._onCloseClick.bind(me);
+        me._boundOnMaximizeClick = me._onMaximizeClick.bind(me);
+        me._boundOnMinimizeClick = me._onMinimizeClick.bind(me);
+        me._boundOnPinClick = me._onPinClick.bind(me);
 
-        // Pin Button
-        me._pinButton = me._createButton('pin', '📌', 'Always on Top');
-        me._controlsContainer.appendChild(me._pinButton);
-
-        // Minimize Button
-        me._minimizeButton = me._createButton('minimize', '−', 'Minimize');
-        me._controlsContainer.appendChild(me._minimizeButton);
-
-        // Maximize Button
-        me._maximizeButton = me._createButton('maximize', '□', 'Maximize');
-        me._controlsContainer.appendChild(me._maximizeButton);
-
-        // Close Button
-        me._closeButton = me._createButton('close', '×', 'Close');
-        me._closeButton.classList.add('window-header__btn--close');
-        me._controlsContainer.appendChild(me._closeButton);
-
-        me.element.appendChild(me._controlsContainer);
+        // Initialize DOM via UIElement lifecycle
+        me.render();
     }
 
     /**
-     * Helper to create standardized control buttons.
+     * Retrieves the parent window instance.
      *
-     * @param {string} action - The action identifier (class suffix).
-     * @param {string} label - The visible text/icon.
-     * @param {string} ariaLabel - The accessibility label.
-     * @returns {HTMLButtonElement} The created button.
-     * @private
+     * @returns {import('./ApplicationWindow.js').ApplicationWindow} The parent window.
      */
-    _createButton(action, label, ariaLabel) {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = `window-header__btn window-header__btn--${action}`;
-        button.textContent = label;
-        button.setAttribute('aria-label', ariaLabel);
-
-        // Stop propagation on pointerdown to prevent DragTrigger from capturing this as a drag
-        button.addEventListener('pointerdown', event => event.stopPropagation());
-
-        return button;
+    get windowInstance() {
+        return this._windowInstance;
     }
 
     /**
-     * Initializes DOM event listeners for buttons.
+     * Checks if the header is in Tab Mode.
      *
-     * @returns {void}
+     * @returns {boolean} True if in tab mode.
      */
-    initEventListeners() {
+    get isTabMode() {
+        return this._isTabMode;
+    }
+
+    /**
+     * Implementation of the rendering logic.
+     * Uses the adapter to create the header structure.
+     *
+     * @returns {HTMLElement} The root header element.
+     * @protected
+     */
+    _doRender() {
         const me = this;
-        me._closeButton.addEventListener('click', me._boundOnCloseClick);
-        me._maximizeButton.addEventListener('click', me._boundOnMaximizeClick);
-        me._minimizeButton.addEventListener('click', me._boundOnMinimizeClick);
-        me._pinButton.addEventListener('click', me._boundOnPinClick);
+        const element = me.renderer.createHeaderElement(me.id);
+        me.renderer.buildStructure(element, me._initialTitle);
+        return element;
     }
 
     /**
-     * Cleans up listeners and the DragTrigger instance.
+     * Implementation of mount logic.
+     * Initializes DragTrigger and event listeners.
      *
-     * @returns {void}
+     * @param {HTMLElement} container - The parent container.
+     * @protected
      */
-    destroy() {
+    _doMount(container) {
+        const me = this;
+        super._doMount(container);
+
+        if (me.element) {
+            me._dragTrigger = new DragTrigger(me.element, {
+                threshold: 3,
+                onDragStart: (event, startCoords) => me._startDrag(event, startCoords),
+                onClick: () => me._onHeaderClick()
+            });
+
+            me._attachListeners();
+        }
+    }
+
+    /**
+     * Implementation of unmount logic.
+     * Cleans up DragTrigger and listeners.
+     *
+     * @protected
+     */
+    _doUnmount() {
         const me = this;
         if (me._dragTrigger) {
             me._dragTrigger.destroy();
+            me._dragTrigger = null;
         }
 
-        me._closeButton.removeEventListener('click', me._boundOnCloseClick);
-        me._maximizeButton.removeEventListener('click', me._boundOnMaximizeClick);
-        me._minimizeButton.removeEventListener('click', me._boundOnMinimizeClick);
-        me._pinButton.removeEventListener('click', me._boundOnPinClick);
+        me._detachListeners();
+        super._doUnmount();
+    }
 
-        me.element.remove();
+    /**
+     * Attaches listeners to the control buttons via the adapter.
+     *
+     * @private
+     * @returns {void}
+     */
+    _attachListeners() {
+        const me = this;
+        if (!me.element) return;
+
+        const closeBtn = me.renderer.getCloseButton(me.element);
+        const minBtn = me.renderer.getMinimizeButton(me.element);
+        const maxBtn = me.renderer.getMaximizeButton(me.element);
+        const pinBtn = me.renderer.getPinButton(me.element);
+
+        if (closeBtn) me.renderer.on(closeBtn, 'click', me._boundOnCloseClick);
+        if (minBtn) me.renderer.on(minBtn, 'click', me._boundOnMinimizeClick);
+        if (maxBtn) me.renderer.on(maxBtn, 'click', me._boundOnMaximizeClick);
+        if (pinBtn) me.renderer.on(pinBtn, 'click', me._boundOnPinClick);
+    }
+
+    /**
+     * Detaches listeners from the control buttons via the adapter.
+     *
+     * @private
+     * @returns {void}
+     */
+    _detachListeners() {
+        const me = this;
+        if (!me.element) return;
+
+        const closeBtn = me.renderer.getCloseButton(me.element);
+        const minBtn = me.renderer.getMinimizeButton(me.element);
+        const maxBtn = me.renderer.getMaximizeButton(me.element);
+        const pinBtn = me.renderer.getPinButton(me.element);
+
+        if (closeBtn) me.renderer.off(closeBtn, 'click', me._boundOnCloseClick);
+        if (minBtn) me.renderer.off(minBtn, 'click', me._boundOnMinimizeClick);
+        if (maxBtn) me.renderer.off(maxBtn, 'click', me._boundOnMaximizeClick);
+        if (pinBtn) me.renderer.off(pinBtn, 'click', me._boundOnPinClick);
+    }
+
+    /**
+     * Sets the title text.
+     *
+     * @param {string} title - The new title.
+     * @returns {void}
+     */
+    setTitle(title) {
+        const me = this;
+        if (typeof title !== 'string') {
+            console.warn(
+                `[ApplicationWindowHeader] Invalid title assignment (${title}). Must be a string.`
+            );
+            return;
+        }
+        if (me.element) {
+            me.renderer.updateTitle(me.element, title);
+        } else {
+            me._initialTitle = title;
+        }
+    }
+
+    /**
+     * Toggles the header between Window mode and Tab mode.
+     * In Tab mode, irrelevant controls (Pin, Min, Max) are hidden.
+     *
+     * @param {boolean} isTab - True for tab mode, false for window mode.
+     * @returns {void}
+     */
+    setTabMode(isTab) {
+        const me = this;
+        me._isTabMode = Boolean(isTab);
+        if (me.element) {
+            me.renderer.setTabMode(me.element, me._isTabMode);
+        }
+    }
+
+    /**
+     * Updates the visual state of the pin button.
+     *
+     * @param {boolean} isPinned - True if pinned.
+     * @returns {void}
+     */
+    setPinState(isPinned) {
+        const me = this;
+        if (me.element) {
+            me.renderer.setPinState(me.element, Boolean(isPinned));
+        }
     }
 
     /**
@@ -296,7 +299,9 @@ export class ApplicationWindowHeader {
      */
     _startDrag(event, startCoords) {
         const me = this;
-        appBus.emit(EventTypes.WINDOW_FOCUS, me._window);
+        if (!me._windowInstance) return;
+
+        appBus.emit(EventTypes.WINDOW_FOCUS, me._windowInstance);
 
         let offsetX = 0;
         let offsetY = 0;
@@ -306,40 +311,38 @@ export class ApplicationWindowHeader {
             const rect = me.element.getBoundingClientRect();
             offsetX = startCoords.startX - rect.left;
             offsetY = startCoords.startY - rect.top;
-        } else if (me._window.isMaximized) {
+        } else if (me._windowInstance.isMaximized) {
             // Calculate relative position of mouse on the maximized header (0.0 to 1.0)
-            // Use public getter 'element' inherited from UIElement
-            const rectMax = me._window.element.getBoundingClientRect();
+            const rectMax = me._windowInstance.element.getBoundingClientRect();
             const ratioX = (event.clientX - rectMax.left) / rectMax.width;
 
             // Restore window (will trigger resize and state updates)
-            me._window.toggleMaximize();
+            me._windowInstance.toggleMaximize();
 
             // Calculate new X position to keep mouse relative to the restored header
-            // Accessing 'element' again to get updated dimensions after restore
-            const rectRestored = me._window.element.getBoundingClientRect();
+            const rectRestored = me._windowInstance.element.getBoundingClientRect();
             const newWindowWidth = rectRestored.width;
 
             offsetX = newWindowWidth * ratioX;
             const newX = event.clientX - offsetX;
 
-            // Update window coordinates (this triggers the renderer update via setters)
-            me._window.x = newX;
+            // Update window coordinates
+            me._windowInstance.x = newX;
             offsetY = event.clientY - rectMax.top;
-            me._window.y = event.clientY - offsetY;
+            me._windowInstance.y = event.clientY - offsetY;
         } else {
             // Standard drag
-            const rect = me._window.element.getBoundingClientRect();
+            const rect = me._windowInstance.element.getBoundingClientRect();
             offsetX = startCoords.startX - rect.left;
             offsetY = startCoords.startY - rect.top;
         }
 
         // In Tab Mode, we drag the header element itself (the tab).
         // In Window Mode, we drag the whole window element.
-        const elementToDrag = me._isTabMode ? me.element : me._window.element;
+        const elementToDrag = me._isTabMode ? me.element : me._windowInstance.element;
 
         appBus.emit(EventTypes.DND_DRAG_START, {
-            item: me._window,
+            item: me._windowInstance,
             type: ItemType.APPLICATION_WINDOW,
             element: elementToDrag,
             event: event,
@@ -353,96 +356,72 @@ export class ApplicationWindowHeader {
      * Handles simple clicks on the header (without dragging).
      * Used mainly to bring the window to focus.
      *
+     * @private
      * @returns {void}
      */
-    onHeaderClick() {
+    _onHeaderClick() {
         const me = this;
-        appBus.emit(EventTypes.WINDOW_FOCUS, me._window);
-    }
-
-    /**
-     * Handles the close button click.
-     *
-     * @param {MouseEvent} event - The click event.
-     * @returns {void}
-     */
-    onCloseClick(event) {
-        event.stopPropagation();
-        appBus.emit(EventTypes.WINDOW_CLOSE_REQUEST, this._window);
-    }
-
-    /**
-     * Handles the maximize button click.
-     *
-     * @param {MouseEvent} event - The click event.
-     * @returns {void}
-     */
-    onMaximizeClick(event) {
-        event.stopPropagation();
-        if (this._window && typeof this._window.toggleMaximize === 'function') {
-            this._window.toggleMaximize();
+        if (me._windowInstance) {
+            appBus.emit(EventTypes.WINDOW_FOCUS, me._windowInstance);
         }
     }
 
     /**
-     * Handles the minimize button click.
+     * Handler for close button click.
      *
-     * @param {MouseEvent} event - The click event.
+     * @private
+     * @param {MouseEvent} event
      * @returns {void}
      */
-    onMinimizeClick(event) {
+    _onCloseClick(event) {
         event.stopPropagation();
-        if (this._window && typeof this._window.minimize === 'function') {
-            this._window.minimize();
+        if (this._windowInstance) {
+            appBus.emit(EventTypes.WINDOW_CLOSE_REQUEST, this._windowInstance);
         }
     }
 
     /**
-     * Handles the pin button click.
+     * Handler for maximize button click.
      *
-     * @param {MouseEvent} event - The click event.
+     * @private
+     * @param {MouseEvent} event
      * @returns {void}
      */
-    onPinClick(event) {
+    _onMaximizeClick(event) {
         event.stopPropagation();
-        if (this._window && typeof this._window.togglePin === 'function') {
-            this._window.togglePin();
-            this._pinButton.classList.toggle('active');
+        if (this._windowInstance && typeof this._windowInstance.toggleMaximize === 'function') {
+            this._windowInstance.toggleMaximize();
         }
     }
 
     /**
-     * Updates the title text.
+     * Handler for minimize button click.
      *
-     * @param {string} title - The new title.
+     * @private
+     * @param {MouseEvent} event
      * @returns {void}
      */
-    setTitle(title) {
-        if (this._titleElement) {
-            this._titleElement.textContent = title;
+    _onMinimizeClick(event) {
+        event.stopPropagation();
+        if (this._windowInstance && typeof this._windowInstance.minimize === 'function') {
+            this._windowInstance.minimize();
         }
     }
 
     /**
-     * Toggles the header between Window mode and Tab mode.
-     * In Tab mode, hides unnecessary controls (Pin, Min, Max) and updates style.
+     * Handler for pin button click.
      *
-     * @param {boolean} isTab - True for tab mode, false for window mode.
+     * @private
+     * @param {MouseEvent} event
      * @returns {void}
      */
-    setTabMode(isTab) {
+    _onPinClick(event) {
         const me = this;
-        me._isTabMode = isTab;
-        if (isTab) {
-            me.element.classList.add('window-header--tab');
-            me._pinButton.style.display = 'none';
-            me._minimizeButton.style.display = 'none';
-            me._maximizeButton.style.display = 'none';
-        } else {
-            me.element.classList.remove('window-header--tab');
-            me._pinButton.style.display = '';
-            me._minimizeButton.style.display = '';
-            me._maximizeButton.style.display = '';
+        event.stopPropagation();
+        if (me._windowInstance && typeof me._windowInstance.togglePin === 'function') {
+            me._windowInstance.togglePin();
+            // Update visual state
+            me.setPinState(me._windowInstance.isPinned);
         }
     }
 }
