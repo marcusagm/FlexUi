@@ -136,7 +136,9 @@
                                 "height": null,
                                 "collapsed": false,
                                 "activePanelId": null,
-                                "config": {},
+                                "config": {
+                                    "collapsible": false
+                                },
                                 "panels": [
                                     {
                                         "type": "TextPanel",

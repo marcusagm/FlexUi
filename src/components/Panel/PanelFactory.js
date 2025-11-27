@@ -192,6 +192,11 @@ export class PanelFactory {
         // Legacy properties like 'content', 'height', 'width' at root are no longer merged automatically.
         const config = panelData.config || {};
 
+        // Inject ID from persistence if available to ensure ID stability
+        if (panelData.id) {
+            config.id = panelData.id;
+        }
+
         // Instantiate using the standardized signature: (title, config, renderer)
         const panel = new PanelClass(panelData.title, config, renderer);
 

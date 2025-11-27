@@ -136,7 +136,8 @@ export class Panel extends IPanel {
      * @param {import('../../core/IRenderer.js').IRenderer} [renderer=null] - Optional renderer adapter.
      */
     constructor(title, config = {}, renderer = null) {
-        super(null, renderer || new VanillaPanelAdapter());
+        // Pass config.id to super to restore ID if provided
+        super(config.id || null, renderer || new VanillaPanelAdapter());
         const me = this;
 
         me._api = new PanelApi(me);
@@ -600,7 +601,7 @@ export class Panel extends IPanel {
 
     /**
      * Serializes the Panel's state.
-     * Stores configuration in a nested 'config' object.
+     * Stores configuration in a nested 'config' object and the ID.
      *
      * @returns {object} The serialized data.
      */
@@ -608,6 +609,7 @@ export class Panel extends IPanel {
         const me = this;
         return {
             type: me.getPanelType(),
+            id: me.id, // Persist ID to restore active tab properly
             title: me.title
         };
     }
