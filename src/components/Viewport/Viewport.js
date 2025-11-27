@@ -423,6 +423,7 @@ export class Viewport extends UIElement {
             });
         } else {
             me._updateZIndices();
+            // Floating window focused; tabs remain as they were visually
         }
     }
 
@@ -467,6 +468,8 @@ export class Viewport extends UIElement {
         if (!me._windows.includes(windowInstance)) return;
         if (!windowInstance.isTabbed) return;
 
+        const wasActiveTab = windowInstance.activeTab;
+
         windowInstance.setTabbed(false);
         windowInstance.activeTab = false;
 
@@ -479,6 +482,17 @@ export class Viewport extends UIElement {
         windowInstance.x = x;
         windowInstance.y = y;
         windowInstance.constrainToParent();
+
+        if (wasActiveTab) {
+            const remainingTabs = me._windows.filter(win => win.isTabbed && win !== windowInstance);
+            if (remainingTabs.length > 0) {
+                const newActive = remainingTabs[remainingTabs.length - 1];
+                newActive.activeTab = true;
+                if (newActive.header) {
+                    me._tabStrip.setActiveItem(newActive.header);
+                }
+            }
+        }
 
         me._updateTabBarVisibility();
         me.focusWindow(windowInstance, true);
