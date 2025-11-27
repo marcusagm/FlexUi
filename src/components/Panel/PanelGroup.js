@@ -847,7 +847,7 @@ export class PanelGroup extends UIElement {
                         containerRectangle: fpms.getContainerBounds()
                     }),
                     onResize: ({ xCoordinate, yCoordinate, width, height }) => {
-                        if (me._isMaximized) return; // Disable resize when maximized
+                        if (me._isMaximized) return;
 
                         me._x = xCoordinate;
                         me._y = yCoordinate;
@@ -960,6 +960,18 @@ export class PanelGroup extends UIElement {
         );
         appBus.on(EventTypes.PANEL_CLOSE_REQUEST, me._boundOnCloseRequest, options);
         appBus.on(EventTypes.PANEL_TOGGLE_COLLAPSE, me._boundOnToggleCollapseRequest, options);
+
+        if (me._header && me._header.tabStrip) {
+            me.addDisposable(
+                me._header.tabStrip.onSelectionChange(headerItem => {
+                    if (headerItem && headerItem.panel) {
+                        if (me.activePanel !== headerItem.panel) {
+                            me.activePanel = headerItem.panel;
+                        }
+                    }
+                })
+            );
+        }
     }
 
     /**
@@ -1321,7 +1333,6 @@ export class PanelGroup extends UIElement {
         if (data.x !== undefined) me._x = data.x;
         if (data.y !== undefined) me._y = data.y;
         if (data.config) {
-            // Use setters to ensure side effects (header update)
             if (data.config.closable !== undefined) me.closable = data.config.closable;
             if (data.config.collapsible !== undefined) me.collapsible = data.config.collapsible;
             if (data.config.movable !== undefined) me.movable = data.config.movable;

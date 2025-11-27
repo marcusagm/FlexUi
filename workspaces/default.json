@@ -34,9 +34,7 @@
                                 "height": null,
                                 "collapsed": false,
                                 "activePanelId": null,
-                                "config": {
-                                    "closable": false
-                                },
+                                "config": {},
                                 "panels": [
                                     {
                                         "type": "CounterPanel",
