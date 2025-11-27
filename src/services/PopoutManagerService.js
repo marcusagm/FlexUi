@@ -1,5 +1,6 @@
 import { PopoutWindow } from '../core/PopoutWindow.js';
 import { FloatingPanelManagerService } from './DND/FloatingPanelManagerService.js';
+import { appNotifications } from './Notification/Notification.js';
 
 /**
  * Description:
@@ -20,7 +21,7 @@ import { FloatingPanelManagerService } from './DND/FloatingPanelManagerService.j
  * popoutService.popoutWindow(myAppWindow);
  *
  * Events:
- * - None
+ * - Listens to window 'beforeunload' to cleanup external windows.
  *
  * Business rules implemented:
  * - Ensures an element is only popped out once.
@@ -28,10 +29,13 @@ import { FloatingPanelManagerService } from './DND/FloatingPanelManagerService.j
  * - Handles "return" logic for both Groups and Windows.
  * - Sincronizes ApplicationWindow geometry with the native window size/position.
  * - Supports serialization of external window states.
+ * - Implements sequential restoration with fallback for popup blockers.
+ * - Automatically closes all popouts when the main window is closed/reloaded.
  *
  * Dependencies:
  * - {import('../core/PopoutWindow.js').PopoutWindow}
  * - {import('./DND/FloatingPanelManagerService.js').FloatingPanelManagerService}
+ * - {import('./Notification/Notification.js').appNotifications}
  */
 export class PopoutManagerService {
     /**
@@ -83,6 +87,11 @@ export class PopoutManagerService {
             return PopoutManagerService._instance;
         }
         PopoutManagerService._instance = this;
+
+        const me = this;
+        window.addEventListener('beforeunload', () => {
+            me.closeAll();
+        });
     }
 
     /**
@@ -130,11 +139,8 @@ export class PopoutManagerService {
             }
         }
 
-        const defaultWidth = 400;
-        const defaultHeight = 300;
-
-        const width = geometry?.width || panelGroup.width || defaultWidth;
-        const height = geometry?.height || panelGroup.height || defaultHeight;
+        const width = geometry?.width || panelGroup.width || 400;
+        const height = geometry?.height || panelGroup.height || 300;
         const left = geometry?.x;
         const top = geometry?.y;
         const title = panelGroup.title || 'External Panel';
@@ -173,8 +179,7 @@ export class PopoutManagerService {
                 panelGroup.requestLayoutUpdate();
             }
         } catch (error) {
-            console.error('[PopoutManagerService] Failed to open popout window.', error);
-            me.returnGroup(panelGroup);
+            me._onDidOpenPopoutWindowFail(panelGroup, 'PanelGroup', error);
         }
     }
 
@@ -215,12 +220,10 @@ export class PopoutManagerService {
 
         let targetX = 50;
         let targetY = 50;
-        const defaultHeight = 200;
-        const defaultWidth = 300;
 
         if (containerBounds) {
-            targetX = (containerBounds.width - (panelGroup.width || defaultWidth)) / 2;
-            targetY = (containerBounds.height - (panelGroup.height || defaultHeight)) / 2;
+            targetX = (containerBounds.width - (panelGroup.width || 300)) / 2;
+            targetY = (containerBounds.height - (panelGroup.height || 200)) / 2;
         }
 
         fpms.addFloatingPanel(panelGroup, targetX, targetY);
@@ -267,11 +270,8 @@ export class PopoutManagerService {
             }
         }
 
-        const defaultWidth = 800;
-        const defaultHeight = 600;
-
-        const width = geometry?.width || appWindow.width || defaultWidth;
-        const height = geometry?.height || appWindow.height || defaultHeight;
+        const width = geometry?.width || appWindow.width || 800;
+        const height = geometry?.height || appWindow.height || 600;
         const left = geometry?.x;
         const top = geometry?.y;
         const title = appWindow.title || 'Application Window';
@@ -316,8 +316,7 @@ export class PopoutManagerService {
             nativeWin.addEventListener('resize', syncHandler);
             nativeWin.addEventListener('move', syncHandler);
         } catch (error) {
-            console.error('[PopoutManagerService] Failed to open window popout.', error);
-            me.returnWindow(appWindow);
+            me._onDidOpenPopoutWindowFail(appWindow, 'ApplicationWindow', error);
         }
     }
 
@@ -368,6 +367,53 @@ export class PopoutManagerService {
 
             viewport.addWindow(appWindow);
         }
+    }
+
+    /**
+     * Restores a list of popout items sequentially to avoid browser blocking.
+     * This method encapsulates the delay logic and error handling.
+     *
+     * @param {Array<{item: object, geometry: object, type: string}>} items - List of items to restore.
+     * @returns {Promise<void>}
+     */
+    async restorePopouts(items) {
+        const me = this;
+        if (!Array.isArray(items) || items.length === 0) return;
+
+        const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+        for (const record of items) {
+            const { item, geometry, type } = record;
+
+            if (type === 'ApplicationWindow') {
+                await me.popoutWindow(item, geometry);
+            } else {
+                await me.popoutGroup(item, geometry);
+            }
+
+            await delay(300);
+        }
+    }
+
+    /**
+     * Closes all active popout windows.
+     * Intended for application shutdown or reload scenarios.
+     *
+     * @returns {void}
+     */
+    closeAll() {
+        const me = this;
+        me._activePopouts.forEach(popout => {
+            if (popout) {
+                popout.onClose = null; // Prevent return logic loop
+                popout.close();
+                popout.dispose();
+            }
+        });
+        me._activePopouts.clear();
+        me._groupInstances.clear();
+        me._windowInstances.clear();
+        me._viewportReferences.clear();
     }
 
     /**
@@ -466,5 +512,33 @@ export class PopoutManagerService {
         });
 
         return result;
+    }
+
+    /**
+     * Handles failure when opening a popout (e.g., Popup Blocker).
+     * Reverts the item to a floating state in the main window and notifies the user.
+     *
+     * @param {object} item - The item that failed to pop out.
+     * @param {string} type - The type of the item ('PanelGroup' or 'ApplicationWindow').
+     * @param {Error} error - The error object.
+     * @private
+     * @returns {void}
+     */
+    _onDidOpenPopoutWindowFail(item, type, error) {
+        const me = this;
+        console.warn(
+            `[PopoutManagerService] Failed to open ${type} popout. Reverting to floating.`,
+            error
+        );
+
+        appNotifications.warning(
+            'Popout blocked by browser settings. The window has been docked back to the main workspace.'
+        );
+
+        if (type === 'ApplicationWindow') {
+            me.returnWindow(item);
+        } else {
+            me.returnGroup(item);
+        }
     }
 }

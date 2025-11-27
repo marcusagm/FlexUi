@@ -499,8 +499,9 @@ export class App {
     }
 
     /**
-     * Loads the initial layout from ApplicationStateService (localStorage or default JSON).
+     * Loads the initial layout from ApplicationStateService.
      * Handles restoration of standard grid and external popouts.
+     * Includes a delay loop to mitigate popup blockers.
      *
      * @returns {Promise<void>}
      */
@@ -521,28 +522,44 @@ export class App {
             }
 
             if (workspaceData.popouts && Array.isArray(workspaceData.popouts)) {
-                workspaceData.popouts.forEach(popoutData => {
+                let targetViewport = null;
+                const traverse = node => {
+                    if (targetViewport) return;
+                    if (node instanceof Viewport) {
+                        targetViewport = node;
+                        return;
+                    }
+                    if (node.children) node.children.forEach(traverse);
+                    else if (node.columns) node.columns.forEach(traverse);
+                    else if (node.rows) node.rows.forEach(traverse);
+                };
+                traverse(me.container);
+
+                const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+                for (const popoutData of workspaceData.popouts) {
                     const payload = popoutData.data || popoutData.groupData;
                     const geometry = popoutData.geometry;
                     const type = popoutData.type || 'PanelGroup';
 
-                    if (!payload) return;
+                    if (!payload) continue;
 
                     if (type === 'ApplicationWindow') {
                         const factory = ViewportFactory.getInstance();
-                        const windowInstance = factory.createWindow(payload);
-                        if (windowInstance) {
-                            PopoutManagerService.getInstance().popoutWindow(
-                                windowInstance,
-                                geometry
-                            );
+                        const win = factory.createWindow(payload);
+                        if (win && targetViewport) {
+                            targetViewport.addWindow(win);
+
+                            await PopoutManagerService.getInstance().popoutWindow(win, geometry);
                         }
                     } else {
                         const group = new PanelGroup();
                         group.fromJSON(payload);
-                        PopoutManagerService.getInstance().popoutGroup(group, geometry);
+                        await PopoutManagerService.getInstance().popoutGroup(group, geometry);
                     }
-                });
+
+                    await delay(200);
+                }
             }
         } else {
             console.error(
@@ -608,6 +625,7 @@ export class App {
 
         try {
             FloatingPanelManagerService.getInstance().clearAll();
+
             const popoutService = PopoutManagerService.getInstance();
             if (popoutService._activePopouts) {
                 popoutService._activePopouts.forEach(win => {
@@ -680,7 +698,6 @@ export class App {
         const title = `Novo Painel (${new Date().toLocaleTimeString()})`;
 
         const panel = new TextPanel(title, { content: 'Conteúdo do novo painel.' });
-
         const panelGroup = new PanelGroup(panel);
 
         column.addChild(panelGroup);
