@@ -1,6 +1,7 @@
 import { BaseDropStrategy } from './BaseDropStrategy.js';
 import { PanelGroup } from '../../components/Panel/PanelGroup.js';
 import { FloatingPanelManagerService } from './FloatingPanelManagerService.js';
+import { PopoutManagerService } from '../PopoutManagerService.js';
 import { ItemType } from '../../constants/DNDTypes.js';
 
 /**
@@ -14,20 +15,21 @@ import { ItemType } from '../../constants/DNDTypes.js';
  *
  * Business rules implemented:
  * - Uses "Live Geometry" in onDragOver to handle layout shifts caused by the placeholder.
- * - Calculates drop index based on 'midX' (horizontal midpoint) of current columns.
+ * - Calculates drop index based on 'middleX' (horizontal midpoint) of current columns.
  * - Shows a 'vertical' placeholder in the calculated gap.
  * - Implements "ghost" logic in real-time within onDragOver to prevent
  * redundant drops (e.g., dropping the sole content of a column next to itself).
  * - Validates drop zone strictly: The target MUST be inside the row element.
  * - On drop: Creates a new Column, creates a new PanelGroup inside it (or adds existing),
  * and moves the dropped Panel or PanelGroup into the new Column.
- * - Supports the new Column API (addChild, removeChild, getChildCount).
+ * - Handles cleanup of Floating and Popout states upon drop.
  *
  * Dependencies:
  * - {import('./BaseDropStrategy.js').BaseDropStrategy}
  * - {import('../../components/Panel/PanelGroup.js').PanelGroup}
  * - {import('../../components/Panel/Panel.js').Panel}
  * - {import('./FloatingPanelManagerService.js').FloatingPanelManagerService}
+ * - {import('../PopoutManagerService.js').PopoutManagerService}
  * - {import('../../constants/DNDTypes.js').ItemType}
  */
 export class RowDropStrategy extends BaseDropStrategy {
@@ -53,15 +55,17 @@ export class RowDropStrategy extends BaseDropStrategy {
      * Hook called when a drag enters the zone.
      * Sets up initial state and validates the item type.
      *
-     * @param {{x: number, y: number, target: HTMLElement}} point
-     * @param {import('../../components/Row/Row.js').Row} dropZone
-     * @param {{item: object, type: string}} draggedData
-     * @param {import('./DragDropService.js').DragDropService} dds
-     * @returns {boolean}
+     * @param {{x: number, y: number, target: HTMLElement}} point - The drag point coordinates and target.
+     * @param {import('../../components/Row/Row.js').Row} dropZone - The drop zone instance.
+     * @param {{item: object, type: string}} draggedData - The drag data payload.
+     * @param {import('./DragDropService.js').DragDropService} dragDropService - The DND service instance.
+     * @returns {boolean} True if the strategy accepts the drag, false otherwise.
      */
-    onDragEnter(point, dropZone, draggedData, dds) {
-        dds;
+    onDragEnter(point, dropZone, draggedData, dragDropService) {
         const me = this;
+
+        if (!dragDropService) return false;
+
         if (
             !draggedData.item ||
             (draggedData.type !== ItemType.PANEL_GROUP && draggedData.type !== ItemType.PANEL)
@@ -77,18 +81,18 @@ export class RowDropStrategy extends BaseDropStrategy {
      * Hook called when a drag moves over the zone.
      * Calculates the drop position using Live Geometry and handles Ghost logic.
      *
-     * @param {{x: number, y: number, target: HTMLElement}} point
-     * @param {import('../../components/Row/Row.js').Row} dropZone
-     * @param {{item: object, type: string}} draggedData
-     * @param {import('./DragDropService.js').DragDropService} dds
-     * @returns {boolean}
+     * @param {{x: number, y: number, target: HTMLElement}} point - The drag point coordinates and target.
+     * @param {import('../../components/Row/Row.js').Row} dropZone - The drop zone instance.
+     * @param {{item: object, type: string}} draggedData - The drag data payload.
+     * @param {import('./DragDropService.js').DragDropService} dragDropService - The DND service instance.
+     * @returns {boolean} True if the drop position is valid and handled, false otherwise.
      */
-    onDragOver(point, dropZone, draggedData, dds) {
+    onDragOver(point, dropZone, draggedData, dragDropService) {
         const me = this;
-        const placeholder = dds.getPlaceholder();
+        const placeholder = dragDropService.getPlaceholder();
 
         if (!dropZone.element.contains(point.target)) {
-            dds.hidePlaceholder();
+            dragDropService.hidePlaceholder();
             me._dropIndex = null;
             return false;
         }
@@ -100,13 +104,8 @@ export class RowDropStrategy extends BaseDropStrategy {
             return false;
         }
 
-        let effectiveItem;
-        if (draggedData.type === ItemType.PANEL_GROUP) {
-            effectiveItem = draggedData.item;
-        } else {
-            effectiveItem = draggedData.item.parentGroup;
-            if (!effectiveItem) return false;
-        }
+        const effectiveItem = me._getEffectiveDraggedItem(draggedData);
+        if (!effectiveItem) return false;
 
         let originalColumnIndex = -1;
         let isOriginSingle = false;
@@ -138,14 +137,14 @@ export class RowDropStrategy extends BaseDropStrategy {
         let placed = false;
         me._dropIndex = columns.length;
 
-        for (let i = 0; i < columns.length; i++) {
-            const col = columns[i];
-            const rect = col.element.getBoundingClientRect();
-            const midX = rect.left + rect.width / 2;
+        for (let index = 0; index < columns.length; index++) {
+            const column = columns[index];
+            const rectangle = column.element.getBoundingClientRect();
+            const middleX = rectangle.left + rectangle.width / 2;
 
-            if (mouseX < midX) {
-                me._dropIndex = i;
-                targetElement = col.element;
+            if (mouseX < middleX) {
+                me._dropIndex = index;
+                targetElement = column.element;
                 placed = true;
                 break;
             }
@@ -155,12 +154,12 @@ export class RowDropStrategy extends BaseDropStrategy {
         const isRightGap = me._dropIndex === originalColumnIndex + 1;
 
         if (isOriginSingle && (isLeftGap || isRightGap)) {
-            dds.hidePlaceholder();
+            dragDropService.hidePlaceholder();
             me._dropIndex = null;
             return false;
         }
 
-        dds.showPlaceholder('vertical');
+        dragDropService.showPlaceholder('vertical');
 
         if (placed && targetElement) {
             if (dropZone.element.contains(targetElement)) {
@@ -179,14 +178,15 @@ export class RowDropStrategy extends BaseDropStrategy {
      * Hook called when the item is dropped.
      * Creates a new Column/PanelGroup and moves the item.
      *
-     * @param {{x: number, y: number, target: HTMLElement}} point
-     * @param {import('../../components/Row/Row.js').Row} dropZone
-     * @param {{item: object, type: string}} draggedData
-     * @param {import('./DragDropService.js').DragDropService} dds
-     * @returns {boolean}
+     * @param {{x: number, y: number, target: HTMLElement}} point - The drop point coordinates and target.
+     * @param {import('../../components/Row/Row.js').Row} dropZone - The drop zone instance.
+     * @param {{item: object, type: string}} draggedData - The drag data payload.
+     * @param {import('./DragDropService.js').DragDropService} dragDropService - The DND service instance.
+     * @returns {boolean} True if the drop was successful.
      */
-    onDrop(point, dropZone, draggedData, dds) {
-        dds;
+    onDrop(point, dropZone, draggedData, dragDropService) {
+        if (!dragDropService || !point) return false;
+
         const me = this;
         const initialPanelIndex = me._dropIndex;
 
@@ -197,14 +197,13 @@ export class RowDropStrategy extends BaseDropStrategy {
             return false;
         }
 
-        let sourceGroup = null;
-        if (draggedData.type === ItemType.PANEL_GROUP) {
-            sourceGroup = draggedData.item;
-        } else if (draggedData.type === ItemType.PANEL) {
-            sourceGroup = draggedData.item.parentGroup;
-        }
+        const sourceGroup = me._getSourceGroup(draggedData);
+        if (!sourceGroup) return false;
 
-        if (sourceGroup && sourceGroup.isFloating) {
+        if (sourceGroup.isPopout) {
+            PopoutManagerService.getInstance().closePopout(sourceGroup);
+            sourceGroup.setPopoutMode(false);
+        } else if (sourceGroup.isFloating) {
             if (draggedData.type === ItemType.PANEL_GROUP) {
                 FloatingPanelManagerService.getInstance().removeFloatingPanel(sourceGroup);
             }
@@ -215,34 +214,92 @@ export class RowDropStrategy extends BaseDropStrategy {
         }
 
         if (draggedData.type === ItemType.PANEL_GROUP) {
-            const draggedItem = draggedData.item;
-            const oldColumn =
-                typeof draggedItem.getColumn === 'function' ? draggedItem.getColumn() : null;
-
-            const newColumn = dropZone.createColumn(null, initialPanelIndex);
-
-            if (oldColumn) {
-                oldColumn.removeChild(draggedItem, true);
-            }
-            draggedItem.height = null;
-
-            newColumn.addChild(draggedItem);
+            me._movePanelGroup(draggedData.item, dropZone, initialPanelIndex);
         } else if (draggedData.type === ItemType.PANEL) {
-            const draggedPanel = draggedData.item;
-            const sourceParentGroup = draggedPanel.parentGroup;
-
-            const newColumn = dropZone.createColumn(null, initialPanelIndex);
-            const newPanelGroup = new PanelGroup(null);
-
-            newColumn.addChild(newPanelGroup);
-
-            if (sourceParentGroup) {
-                sourceParentGroup.removePanel(draggedPanel, true);
-            }
-            draggedPanel.height = null;
-            newPanelGroup.addPanel(draggedPanel, true);
+            me._movePanelToNewGroup(draggedData.item, dropZone, initialPanelIndex);
         }
 
         return true;
+    }
+
+    /**
+     * Determines the effective item being moved (the Group or the Panel's parent group).
+     *
+     * @param {{item: object, type: string}} draggedData - The drag data.
+     * @returns {import('../../components/Panel/PanelGroup.js').PanelGroup | null} The effective item.
+     * @private
+     */
+    _getEffectiveDraggedItem(draggedData) {
+        if (draggedData.type === ItemType.PANEL_GROUP) {
+            return draggedData.item;
+        }
+        if (draggedData.type === ItemType.PANEL) {
+            return draggedData.item.parentGroup;
+        }
+        return null;
+    }
+
+    /**
+     * Resolves the source PanelGroup from the drag data.
+     *
+     * @param {{item: object, type: string}} draggedData - The drag data.
+     * @returns {import('../../components/Panel/PanelGroup.js').PanelGroup | null} The source group.
+     * @private
+     */
+    _getSourceGroup(draggedData) {
+        if (draggedData.type === ItemType.PANEL_GROUP) {
+            return draggedData.item;
+        }
+        if (draggedData.type === ItemType.PANEL) {
+            return draggedData.item.parentGroup;
+        }
+        return null;
+    }
+
+    /**
+     * Moves an entire PanelGroup to a new column at the target index.
+     *
+     * @param {import('../../components/Panel/PanelGroup.js').PanelGroup} draggedItem - The group being moved.
+     * @param {import('../../components/Row/Row.js').Row} dropZone - The target row.
+     * @param {number} targetIndex - The index to insert the new column.
+     * @private
+     * @returns {void}
+     */
+    _movePanelGroup(draggedItem, dropZone, targetIndex) {
+        const oldColumn =
+            typeof draggedItem.getColumn === 'function' ? draggedItem.getColumn() : null;
+
+        const newColumn = dropZone.createColumn(null, targetIndex);
+
+        if (oldColumn) {
+            oldColumn.removeChild(draggedItem, true);
+        }
+        draggedItem.height = null;
+
+        newColumn.addChild(draggedItem);
+    }
+
+    /**
+     * Moves a single Panel into a new PanelGroup wrapper within a new Column.
+     *
+     * @param {import('../../components/Panel/Panel.js').Panel} draggedPanel - The panel being moved.
+     * @param {import('../../components/Row/Row.js').Row} dropZone - The target row.
+     * @param {number} targetIndex - The index to insert the new column.
+     * @private
+     * @returns {void}
+     */
+    _movePanelToNewGroup(draggedPanel, dropZone, targetIndex) {
+        const sourceParentGroup = draggedPanel.parentGroup;
+
+        const newColumn = dropZone.createColumn(null, targetIndex);
+        const newPanelGroup = new PanelGroup(null);
+
+        newColumn.addChild(newPanelGroup);
+
+        if (sourceParentGroup) {
+            sourceParentGroup.removePanel(draggedPanel, true);
+        }
+        draggedPanel.height = null;
+        newPanelGroup.addPanel(draggedPanel, true);
     }
 }

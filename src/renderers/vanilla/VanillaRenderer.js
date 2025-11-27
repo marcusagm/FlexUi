@@ -1,11 +1,22 @@
 import { IRenderer } from '../../core/IRenderer.js';
 
 /**
+ * Node type constants to avoid magic numbers.
+ * @private
+ */
+const ELEMENT_NODE = 1;
+
+/**
  * Description:
  * Concrete implementation of the IRenderer interface for standard web browser environments.
  * This class handles direct DOM manipulation, providing a unified API for creating,
  * updating, and managing HTML elements. It serves as the default rendering engine
- * for the framework when no specific framework adapter (e.g., React, Vue) is used.
+ * for the framework.
+ *
+ * Security Note:
+ * This renderer uses `nodeType` checks instead of `instanceof` to ensure compatibility
+ * with elements moved between different window contexts (Popouts), where prototype
+ * chains differ.
  *
  * Properties summary:
  * - None
@@ -19,16 +30,12 @@ import { IRenderer } from '../../core/IRenderer.js';
  * - None
  *
  * Business rules implemented:
- * - Validates all DOM operations before execution to prevent runtime errors.
- * - Sanitizes 'innerHTML' assignments to prevent basic XSS (warns and blocks javascript: protocols).
- * - Handles differentiation between attributes (e.g., 'class', 'id') and properties (e.g., 'value', 'checked').
- * - Manages event listener attachment and detachment securely.
+ * - Validates DOM nodes using `nodeType` for cross-window compatibility.
+ * - Sanitizes 'innerHTML' assignments to prevent basic XSS.
+ * - Handles adoption of nodes into new documents automatically via appendChild.
  *
  * Dependencies:
  * - {import('../../core/IRenderer.js').IRenderer}
- *
- * Notes / Additional:
- * - This class is stateless.
  */
 export class VanillaRenderer extends IRenderer {
     /**
@@ -41,6 +48,7 @@ export class VanillaRenderer extends IRenderer {
 
     /**
      * Creates a new DOM element with the specified tag, properties, and children.
+     * Elements are created in the main document context but can be adopted by others.
      *
      * @param {string} tagName - The HTML tag name (e.g., 'div', 'button').
      * @param {object} [properties={}] - An object of attributes and properties to apply.
@@ -66,7 +74,7 @@ export class VanillaRenderer extends IRenderer {
             children.forEach(child => {
                 if (typeof child === 'string' || typeof child === 'number') {
                     element.appendChild(document.createTextNode(String(child)));
-                } else if (child instanceof Node) {
+                } else if (child && child.nodeType) {
                     element.appendChild(child);
                 } else {
                     console.warn(
@@ -81,6 +89,7 @@ export class VanillaRenderer extends IRenderer {
 
     /**
      * Mounts (appends) a child element to a target parent container.
+     * Automatically handles adoption if the target is in a different document.
      *
      * @param {HTMLElement} target - The parent container element.
      * @param {HTMLElement} element - The element to be mounted.
@@ -88,10 +97,10 @@ export class VanillaRenderer extends IRenderer {
      * @throws {Error} If target or element are invalid DOM nodes.
      */
     mount(target, element) {
-        if (!(target instanceof Node)) {
+        if (!target || !target.nodeType) {
             throw new Error('[VanillaRenderer] Mount target must be a valid DOM Node.');
         }
-        if (!(element instanceof Node)) {
+        if (!element || !element.nodeType) {
             throw new Error('[VanillaRenderer] Element to mount must be a valid DOM Node.');
         }
 
@@ -106,7 +115,7 @@ export class VanillaRenderer extends IRenderer {
      * @returns {void}
      */
     unmount(target, element) {
-        if (!(target instanceof Node) || !(element instanceof Node)) {
+        if (!target || !target.nodeType || !element || !element.nodeType) {
             console.warn('[VanillaRenderer] Cannot unmount: Invalid target or element.');
             return;
         }
@@ -126,7 +135,7 @@ export class VanillaRenderer extends IRenderer {
      */
     updateProps(element, properties) {
         const me = this;
-        if (!(element instanceof HTMLElement) || !properties) {
+        if (!element || element.nodeType !== ELEMENT_NODE || !properties) {
             return;
         }
 
@@ -164,7 +173,6 @@ export class VanillaRenderer extends IRenderer {
             } else if (value === true) {
                 element.setAttribute(key, '');
             } else {
-                // Try setting as property first (for inputs), then attribute
                 if (key in element) {
                     try {
                         element[key] = value;
@@ -190,7 +198,12 @@ export class VanillaRenderer extends IRenderer {
      * @returns {void}
      */
     updateStyles(element, styles) {
-        if (!(element instanceof HTMLElement) || typeof styles !== 'object' || styles === null) {
+        if (
+            !element ||
+            element.nodeType !== ELEMENT_NODE ||
+            typeof styles !== 'object' ||
+            styles === null
+        ) {
             return;
         }
 
@@ -210,6 +223,7 @@ export class VanillaRenderer extends IRenderer {
 
     /**
      * Adds an event listener to an element.
+     * Safe for elements in any window context.
      *
      * @param {HTMLElement} element - The target element.
      * @param {string} eventName - The name of the event (e.g., 'click').
@@ -285,8 +299,6 @@ export class VanillaRenderer extends IRenderer {
     _setInnerHTMLSecurely(element, htmlContent) {
         const contentString = String(htmlContent);
 
-        // Basic check for script tags
-
         if (/<script\b[^>]*>([\s\S]*?)<\/script>/gim.test(contentString)) {
             console.warn(
                 '[VanillaRenderer] Security Warning: Attempted to set innerHTML with <script> tags. Operation blocked.'
@@ -294,7 +306,6 @@ export class VanillaRenderer extends IRenderer {
             return;
         }
 
-        // Basic check for javascript: protocol in attributes
         if (/javascript:/gim.test(contentString)) {
             console.warn(
                 '[VanillaRenderer] Security Warning: Attempted to set innerHTML with "javascript:" protocol. Operation blocked.'

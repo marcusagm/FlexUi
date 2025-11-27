@@ -26,6 +26,7 @@ import { GroupApi } from '../../api/GroupApi.js';
  * - height {number|null} : The height of the group.
  * - width {number|null} : The width of the group.
  * - isFloating {boolean} : Whether the group is floating.
+ * - isPopout {boolean} : Whether the group is in an external window.
  * - isMaximized {boolean} : Whether the group is maximized.
  * - x {number|null} : X coordinate (if floating).
  * - y {number|null} : Y coordinate (if floating).
@@ -51,6 +52,7 @@ import { GroupApi } from '../../api/GroupApi.js';
  * - Manages active tab state via TabStrip in Header.
  * - Manages hybrid resizing (Docked vs Floating).
  * - Coordinates lifecycle of children (Panel and Header).
+ * - Supports Popout Mode (external window).
  * - Exposes a GroupApi facade.
  *
  * Dependencies:
@@ -198,6 +200,14 @@ export class PanelGroup extends UIElement {
      * @private
      */
     _isFloating = false;
+
+    /**
+     * Whether the group is in an external popout window.
+     *
+     * @type {boolean}
+     * @private
+     */
+    _isPopout = false;
 
     /**
      * X coordinate (if floating).
@@ -494,6 +504,15 @@ export class PanelGroup extends UIElement {
     }
 
     /**
+     * IsPopout getter.
+     *
+     * @returns {boolean}
+     */
+    get isPopout() {
+        return this._isPopout;
+    }
+
+    /**
      * IsMaximized getter.
      *
      * @returns {boolean}
@@ -782,6 +801,8 @@ export class PanelGroup extends UIElement {
             me.collapsed = me._collapsed;
             if (me._isFloating) {
                 me.setFloatingState(true, me._x, me._y);
+            } else if (me._isPopout) {
+                me.setPopoutMode(true);
             } else {
                 me.setFloatingState(false, null, null);
             }
@@ -898,6 +919,69 @@ export class PanelGroup extends UIElement {
     }
 
     /**
+     * Sets the popout mode state (external window).
+     * Disables resize handles and hides closable/collapsible buttons.
+     * Handles rigorous style reset when disabling.
+     *
+     * @param {boolean} value - True to enable popout mode.
+     * @returns {void}
+     */
+    setPopoutMode(value) {
+        const me = this;
+        const isPopout = Boolean(value);
+        if (me._isPopout === isPopout) return;
+
+        me._isPopout = isPopout;
+
+        if (me.element) {
+            if (isPopout) {
+                if (me._resizeHandleManager) {
+                    me._resizeHandleManager.destroy();
+                    me._resizeHandleManager = null;
+                }
+
+                me.renderer.updateStyles(me.element, {
+                    width: '100%',
+                    height: '100%',
+                    position: 'static',
+                    left: '',
+                    top: '',
+                    flex: '1 1 auto'
+                });
+
+                if (me.header) {
+                    me.header.updateConfig({
+                        movable: true,
+                        collapsible: false,
+                        closable: false
+                    });
+                    me.header.setPopoutState(true);
+                }
+            } else {
+                me.renderer.updateStyles(me.element, {
+                    width: '',
+                    height: '',
+                    position: '',
+                    left: '',
+                    top: '',
+                    flex: ''
+                });
+
+                if (me.header) {
+                    me.header.updateConfig({
+                        movable: me._movable,
+                        collapsible: me._collapsible,
+                        closable: me._closable
+                    });
+                    me.header.setPopoutState(false);
+                }
+            }
+        }
+
+        me.updateHeight();
+    }
+
+    /**
      * Updates the docked resize handle state based on visibility and floating status.
      *
      * @private
@@ -905,7 +989,7 @@ export class PanelGroup extends UIElement {
      */
     _updateDockedResizeHandle() {
         const me = this;
-        if (me._isFloating) return;
+        if (me._isFloating || me._isPopout) return;
         if (!me.element) return;
 
         if (!me._resizeHandleVisible) {
@@ -1203,6 +1287,15 @@ export class PanelGroup extends UIElement {
     updateHeight() {
         const me = this;
         if (!me.element) return;
+
+        if (me._isPopout) {
+            me.renderer.updateStyles(me.element, {
+                height: '100%',
+                minHeight: '0',
+                flex: '1 1 auto'
+            });
+            return;
+        }
 
         if (me._collapsed) {
             return;

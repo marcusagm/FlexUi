@@ -21,12 +21,10 @@ import { VanillaRenderer } from './VanillaRenderer.js';
  * - Enforces BEM structure for panel group headers.
  * - Provides a dedicated slot for injecting the TabStrip component.
  * - Manages visual states for collapse buttons and ARIA labels.
+ * - Supports Popout/Dock button states.
  *
  * Dependencies:
  * - {import('./VanillaRenderer.js').VanillaRenderer}
- *
- * Notes / Additional:
- * - None
  */
 export class VanillaPanelGroupHeaderAdapter extends VanillaRenderer {
     /**
@@ -43,6 +41,7 @@ export class VanillaPanelGroupHeaderAdapter extends VanillaRenderer {
      * <div class="panel-group__move-handle">...</div>
      * <div class="panel-group__tab-container-slot"></div>
      * <div class="panel-group__controls">
+     * <button class="panel-group__popout-btn">...</button>
      * <button class="panel-group__collapse-btn">...</button>
      * <button class="panel-group__close-btn">...</button>
      * </div>
@@ -96,6 +95,14 @@ export class VanillaPanelGroupHeaderAdapter extends VanillaRenderer {
             style: { display: 'flex', alignItems: 'center' }
         });
 
+        const popoutButton = me.createElement('button', {
+            className: 'panel-group__popout-btn panel__popout-btn',
+            type: 'button',
+            title: 'Popout'
+        });
+        popoutButton.innerHTML = '&#8599;';
+        me.mount(controlsContainer, popoutButton);
+
         const collapseButton = me.createElement('button', {
             className: 'panel-group__collapse-btn panel__collapse-btn',
             type: 'button'
@@ -136,6 +143,17 @@ export class VanillaPanelGroupHeaderAdapter extends VanillaRenderer {
     }
 
     /**
+     * Retrieves the popout button element.
+     *
+     * @param {HTMLElement} headerElement - The root header element.
+     * @returns {HTMLElement|null} The popout button element.
+     */
+    getPopoutButton(headerElement) {
+        if (!headerElement) return null;
+        return headerElement.querySelector('.panel-group__popout-btn');
+    }
+
+    /**
      * Retrieves the collapse button element.
      *
      * @param {HTMLElement} headerElement - The root header element.
@@ -159,7 +177,6 @@ export class VanillaPanelGroupHeaderAdapter extends VanillaRenderer {
 
     /**
      * Toggles between simple mode (single tab styled as title) and normal mode (tabs).
-     * It just toggles the class; the visual changes are handled by CSS and Tab/Strip logic.
      *
      * @param {HTMLElement} headerElement - The root header element.
      * @param {boolean} isSimple - True for simple mode, False for tab mode.
@@ -189,11 +206,15 @@ export class VanillaPanelGroupHeaderAdapter extends VanillaRenderer {
         const safeTitle = title || 'Group';
 
         const moveHandle = me.getMoveHandle(headerElement);
+        const popoutButton = me.getPopoutButton(headerElement);
         const collapseButton = me.getCollapseButton(headerElement);
         const closeButton = me.getCloseButton(headerElement);
 
         if (moveHandle) {
             moveHandle.setAttribute('aria-label', `Move group ${safeTitle}`);
+        }
+        if (popoutButton) {
+            popoutButton.setAttribute('aria-label', `Popout group ${safeTitle}`);
         }
         if (collapseButton) {
             collapseButton.setAttribute('aria-label', `Collapse group ${safeTitle}`);
@@ -204,7 +225,32 @@ export class VanillaPanelGroupHeaderAdapter extends VanillaRenderer {
     }
 
     /**
-     * Updates the visual state of the collapse button (collapsed/expanded style).
+     * Updates the visual state of the popout button (Popout vs Dock).
+     *
+     * @param {HTMLElement} headerElement - The root header element.
+     * @param {boolean} isPopout - Whether the group is currently popped out.
+     * @returns {void}
+     */
+    setPopoutState(headerElement, isPopout) {
+        const me = this;
+        if (!headerElement) return;
+
+        const button = me.getPopoutButton(headerElement);
+        if (button) {
+            if (isPopout) {
+                button.innerHTML = '&#8601;';
+                button.title = 'Return to Workspace';
+                button.classList.add('panel-group__popout-btn--active');
+            } else {
+                button.innerHTML = '&#8599;';
+                button.title = 'Popout Window';
+                button.classList.remove('panel-group__popout-btn--active');
+            }
+        }
+    }
+
+    /**
+     * Updates the visual state of the collapse button.
      *
      * @param {HTMLElement} headerElement - The root header element.
      * @param {boolean} isCollapsed - Whether the group is collapsed.
@@ -267,6 +313,21 @@ export class VanillaPanelGroupHeaderAdapter extends VanillaRenderer {
     setCloseButtonVisibility(headerElement, visible) {
         const me = this;
         const button = me.getCloseButton(headerElement);
+        if (button) {
+            me.updateStyles(button, { display: visible ? '' : 'none' });
+        }
+    }
+
+    /**
+     * Sets the visibility of the popout button.
+     *
+     * @param {HTMLElement} headerElement - The root header element.
+     * @param {boolean} visible - Whether the button should be visible.
+     * @returns {void}
+     */
+    setPopoutButtonVisibility(headerElement, visible) {
+        const me = this;
+        const button = me.getPopoutButton(headerElement);
         if (button) {
             me.updateStyles(button, { display: visible ? '' : 'none' });
         }

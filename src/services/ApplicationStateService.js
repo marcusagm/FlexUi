@@ -1,3 +1,5 @@
+import { PopoutManagerService } from './PopoutManagerService.js';
+
 /**
  * Description:
  * A Singleton service responsible for persisting and restoring the application
@@ -17,9 +19,10 @@
  * Business rules implemented:
  * - Loads state from localStorage, falling back to 'workspaces/default.json'.
  * - Saves state asynchronously (using setTimeout + Promise) to prevent UI blocking.
+ * - Integrates with PopoutManagerService to persist external windows.
  *
  * Dependencies:
- * - None (loads 'workspaces/default.json' via native fetch)
+ * - {import('./PopoutManagerService.js').PopoutManagerService}
  */
 export class ApplicationStateService {
     /**
@@ -86,6 +89,8 @@ export class ApplicationStateService {
 
     /**
      * Saves data to localStorage asynchronously and returns a Promise.
+     * Automatically injects current Popout window states into the data payload.
+     *
      * @param {string} key - The key to save under.
      * @param {object} data - The state object to be stringified and saved.
      * @returns {Promise<void>} A promise that resolves when saving is complete or rejects on error.
@@ -94,7 +99,15 @@ export class ApplicationStateService {
         return new Promise((resolve, reject) => {
             setTimeout(() => {
                 try {
-                    localStorage.setItem(key, JSON.stringify(data));
+                    const popoutService = PopoutManagerService.getInstance();
+                    const activePopouts = popoutService.getOpenPopouts();
+
+                    const payload = {
+                        ...data,
+                        popouts: activePopouts
+                    };
+
+                    localStorage.setItem(key, JSON.stringify(payload));
                     resolve();
                 } catch (e) {
                     console.error('Failed to save state to localStorage.', e);

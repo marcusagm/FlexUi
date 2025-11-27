@@ -29,6 +29,7 @@ import { ViewportDropStrategy } from './services/DND/ViewportDropStrategy.js';
 import { ViewportTabDropStrategy } from './services/DND/ViewportTabDropStrategy.js';
 import { LayoutService } from './services/LayoutService.js';
 import { FloatingPanelManagerService } from './services/DND/FloatingPanelManagerService.js';
+import { PopoutManagerService } from './services/PopoutManagerService.js';
 import { appShortcuts } from './services/Shortcuts/Shortcuts.js';
 import { Loader } from './services/Loader/Loader.js';
 import { appBus } from './utils/EventBus.js';
@@ -109,6 +110,7 @@ import { EventTypes } from './constants/EventTypes.js';
  * - {import('./services/LayoutService.js').LayoutService}
  * - {import('./utils/EventBus.js').appBus}
  * - {import('./services/DND/FloatingPanelManagerService.js').FloatingPanelManagerService}
+ * - {import('./services/PopoutManagerService.js').PopoutManagerService}
  * - {import('./services/GlobalStateService.js').globalState}
  * - {import('./services/Shortcuts/Shortcuts.js').appShortcuts}
  * - {import('./services/Loader/Loader.js').Loader}
@@ -307,14 +309,13 @@ export class App {
         const me = this;
         me.stateService = ApplicationStateService.getInstance();
 
-        // Initialize factories and layout service for registration
         PanelFactory.getInstance();
         ToolbarGroupFactory.getInstance();
         ViewportFactory.getInstance();
         LayoutService.getInstance();
         FloatingPanelManagerService.getInstance();
+        PopoutManagerService.getInstance();
 
-        // Initialize global state keys for the application
         globalState.set('counterValue', 0);
         globalState.set('activeTool', 'pointer');
         globalState.set('activeColor', '#FFFFFF');
@@ -375,7 +376,6 @@ export class App {
 
         me._workspaceLoader = new Loader(me._mainWrapper, { type: 'inset' });
 
-        // Assign grid-areas
         me.menu.element.style.gridArea = 'menu';
         me._toolbarTop.element.style.gridArea = 'toolbar-top';
         me._toolbarLeft.element.style.gridArea = 'toolbar-left';
@@ -384,11 +384,8 @@ export class App {
         me._toolbarBottom.element.style.gridArea = 'toolbar-bottom';
         me.statusBar.element.style.gridArea = 'statusbar';
 
-        // 1. Append wrapper to body first to ensure mounts trigger lifecycle on live DOM
         document.body.append(me._mainWrapper);
 
-        // 2. Mount UIElement components in order
-        // This ensures ResizeObservers and other lifecycle events fire correctly
         me.menu.mount(me._mainWrapper);
         me._toolbarTop.mount(me._mainWrapper);
         me._toolbarLeft.mount(me._mainWrapper);
@@ -479,7 +476,6 @@ export class App {
         window.removeEventListener('resize', me.debouncedResize);
         me.debouncedResize?.cancel();
 
-        // Unmount/Destroy UI Elements via their dispose methods (which call unmount)
         me.menu?.dispose();
         me.container?.dispose();
         me.statusBar?.dispose();
@@ -495,6 +491,7 @@ export class App {
 
     /**
      * Loads the initial layout from ApplicationStateService (localStorage or default JSON).
+     * Handles restoration of standard grid and external popouts.
      *
      * @returns {Promise<void>}
      */
@@ -505,15 +502,22 @@ export class App {
         if (workspaceData && workspaceData.layout) {
             me.currentWorkspace = workspaceData;
 
-            // Restore Panels, Rows, Columns, Floating
             me.container.fromJSON(workspaceData.layout);
 
-            // Restore Toolbars
             if (workspaceData.layout.toolbars) {
                 me._toolbarTop.fromJSON(workspaceData.layout.toolbars.top || []);
                 me._toolbarBottom.fromJSON(workspaceData.layout.toolbars.bottom || []);
                 me._toolbarLeft.fromJSON(workspaceData.layout.toolbars.left || []);
                 me._toolbarRight.fromJSON(workspaceData.layout.toolbars.right || []);
+            }
+
+            if (workspaceData.popouts && Array.isArray(workspaceData.popouts)) {
+                workspaceData.popouts.forEach(popoutData => {
+                    const group = new PanelGroup();
+                    group.fromJSON(popoutData.groupData);
+
+                    PopoutManagerService.getInstance().popoutGroup(group, popoutData.geometry);
+                });
             }
         } else {
             console.error(
@@ -536,7 +540,7 @@ export class App {
         me._workspaceLoader.show(i18n.translate('actions.saving'));
 
         try {
-            const layoutData = me.container.toJSON(); // { rows, floatingPanels }
+            const layoutData = me.container.toJSON();
             layoutData.toolbars = {
                 top: me._toolbarTop.toJSON(),
                 bottom: me._toolbarBottom.toJSON(),
@@ -579,6 +583,15 @@ export class App {
 
         try {
             FloatingPanelManagerService.getInstance().clearAll();
+            const popoutService = PopoutManagerService.getInstance();
+            if (popoutService._activePopouts) {
+                popoutService._activePopouts.forEach((win, id) => {
+                    id;
+                    win.close();
+                });
+                popoutService._activePopouts.clear();
+            }
+
             me.container.clear();
             await me.loadInitialLayout();
 
@@ -604,6 +617,15 @@ export class App {
 
         try {
             FloatingPanelManagerService.getInstance().clearAll();
+            const popoutService = PopoutManagerService.getInstance();
+            if (popoutService._activePopouts) {
+                popoutService._activePopouts.forEach((win, id) => {
+                    id;
+                    win.close();
+                });
+                popoutService._activePopouts.clear();
+            }
+
             me.stateService.clearState(me.STORAGE_KEY);
             me.container.clear();
 
@@ -631,7 +653,6 @@ export class App {
         const column = me.container.getFirstRow().getFirstColumn();
         const title = `Novo Painel (${new Date().toLocaleTimeString()})`;
 
-        // Uses standardized constructor signature: (title, config, renderer)
         const panel = new TextPanel(title, { content: 'Conteúdo do novo painel.' });
 
         const panelGroup = new PanelGroup(panel);
@@ -649,7 +670,6 @@ export class App {
         const me = this;
         let targetViewport = null;
 
-        // Traverse the container to find the first Viewport
         const traverse = node => {
             if (targetViewport) return;
             if (node instanceof Viewport) {
@@ -658,13 +678,10 @@ export class App {
             }
 
             if (node.children) {
-                // Column
                 node.children.forEach(traverse);
             } else if (node.columns) {
-                // Row
                 node.columns.forEach(traverse);
             } else if (node.rows) {
-                // Container
                 node.rows.forEach(traverse);
             }
         };
@@ -672,7 +689,6 @@ export class App {
         traverse(me.container);
 
         if (targetViewport) {
-            // Uses polymorphic constructor compatible with Factory: (title, content, config, renderer)
             const note = new NotepadWindow('Documento Novo', 'Digite seu texto aqui.', {
                 x: 10,
                 y: 10,

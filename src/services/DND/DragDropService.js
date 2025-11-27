@@ -34,6 +34,7 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * - _boundOnPointerUp {Function | null} : Bound handler for window pointerup.
  * - _throttledMoveHandler {Function | null} : Throttled logic for visual updates and hit-testing.
  * - _lastCoordinates {object} : Caches the last known pointer coordinates.
+ * - _activeWindow {Window | null} : The window where the drag originated.
  *
  * Typical usage:
  * const dds = DragDropService.getInstance();
@@ -49,6 +50,7 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * - Applies constraints to panel movement via GhostManager updates.
  * - Centralizes magic strings using DNDTypes constants.
  * - Supports ApplicationWindow constraints relative to their Viewport.
+ * - Supports multi-window Drag and Drop (Popout).
  *
  * Dependencies:
  * - ../../utils/EventBus.js
@@ -79,7 +81,9 @@ export class DragDropService {
      * offsetX: number,
      * offsetY: number,
      * initialX: number,
-     * initialY: number
+     * initialY: number,
+     * initialScreenX: number,
+     * initialScreenY: number
      * }}
      * @private
      */
@@ -90,7 +94,9 @@ export class DragDropService {
         offsetX: 0,
         offsetY: 0,
         initialX: 0,
-        initialY: 0
+        initialY: 0,
+        initialScreenX: 0,
+        initialScreenY: 0
     };
 
     /**
@@ -197,6 +203,14 @@ export class DragDropService {
      * @private
      */
     _lastCoordinates = { x: 0, y: 0 };
+
+    /**
+     * The window where the drag originated.
+     *
+     * @type {Window | null}
+     * @private
+     */
+    _activeWindow = null;
 
     /**
      * Private constructor. Use getInstance().
@@ -407,6 +421,8 @@ export class DragDropService {
         }
 
         me._isDragging = true;
+        me._activeWindow = event.view || window;
+
         me._dragState.item = item;
         me._dragState.type = type;
         me._dragState.element = element;
@@ -414,6 +430,8 @@ export class DragDropService {
         me._dragState.offsetY = offsetY || 0;
         me._dragState.initialX = event.clientX;
         me._dragState.initialY = event.clientY;
+        me._dragState.initialScreenX = event.screenX;
+        me._dragState.initialScreenY = event.screenY;
         me._activePointerId = event.pointerId;
 
         me._lastCoordinates.x = event.clientX;
@@ -427,7 +445,6 @@ export class DragDropService {
 
         element.style.pointerEvents = 'none';
 
-        // Hide original element logic for Floating Panels AND Application Windows
         const isFloatingPanel =
             me._dragState.item && me._dragState.item._state && me._dragState.item._state.isFloating;
 
@@ -447,9 +464,11 @@ export class DragDropService {
 
         me._clearStrategyCaches();
 
-        window.addEventListener('pointermove', me._boundOnPointerMove, { passive: false });
-        window.addEventListener('pointerup', me._boundOnPointerUp);
-        window.addEventListener('pointercancel', me._boundOnPointerUp);
+        me._activeWindow.addEventListener('pointermove', me._boundOnPointerMove, {
+            passive: false
+        });
+        me._activeWindow.addEventListener('pointerup', me._boundOnPointerUp);
+        me._activeWindow.addEventListener('pointercancel', me._boundOnPointerUp);
     }
 
     /**
@@ -468,10 +487,12 @@ export class DragDropService {
 
         event.preventDefault();
 
-        me._lastCoordinates.x = event.clientX;
-        me._lastCoordinates.y = event.clientY;
+        const coords = me._getGlobalClientCoordinates(event);
 
-        me._throttledMoveHandler(event.clientX, event.clientY);
+        me._lastCoordinates.x = coords.x;
+        me._lastCoordinates.y = coords.y;
+
+        me._throttledMoveHandler(coords.x, coords.y);
     }
 
     /**
@@ -479,8 +500,8 @@ export class DragDropService {
      * Throttled move handler.
      * Updates ghost position via GhostManager and performs hit-testing.
      *
-     * @param {number} clientX - Pointer X coordinate.
-     * @param {number} clientY - Pointer Y coordinate.
+     * @param {number} clientX - Pointer X coordinate (normalized to Main Window).
+     * @param {number} clientY - Pointer Y coordinate (normalized to Main Window).
      * @private
      * @returns {void}
      */
@@ -490,34 +511,30 @@ export class DragDropService {
             return;
         }
 
-        // 1. Calculate constraints (Bounds)
         let bounds = null;
         const isPanel =
             me._dragState.type === ItemType.PANEL || me._dragState.type === ItemType.PANEL_GROUP;
 
         const isWindow = me._dragState.type === ItemType.APPLICATION_WINDOW;
 
-        if (isPanel) {
-            const fpms = FloatingPanelManagerService.getInstance();
-            bounds = fpms.getContainerBounds();
-        } else if (isWindow && me._dragState.element) {
-            // Windows are constrained by their Viewport
-            const viewport = me._dragState.element.closest('.viewport');
-            if (viewport) {
-                bounds = viewport.getBoundingClientRect();
+        if (me._activeWindow === window) {
+            if (isPanel) {
+                const fpms = FloatingPanelManagerService.getInstance();
+                bounds = fpms.getContainerBounds();
+            } else if (isWindow && me._dragState.element) {
+                const viewport = me._dragState.element.closest('.viewport');
+                if (viewport) {
+                    bounds = viewport.getBoundingClientRect();
+                }
             }
         }
 
-        // 2. Update Ghost
         me._ghostManager.update(clientX, clientY, bounds);
 
-        // 3. Hit Test
-        // Important: Ghost element must have pointer-events: none (handled in GhostManager)
         const targetBelow = document.elementFromPoint(clientX, clientY);
         const dropZoneElement = targetBelow ? targetBelow.closest('[data-dropzone]') : null;
         const newDropZoneInstance = dropZoneElement ? dropZoneElement.dropZoneInstance : null;
 
-        // 4. Handle Zone Transitions (Leave/Enter)
         if (newDropZoneInstance !== me._activeDropZone) {
             if (me._activeDropZone) {
                 const oldStrategy = me._strategyRegistry.get(me._activeDropZone.dropZoneType);
@@ -529,7 +546,6 @@ export class DragDropService {
             me._activeDropZone = newDropZoneInstance;
         }
 
-        // 5. Handle Zone Over
         if (me._activeDropZone) {
             const strategy = me._strategyRegistry.get(me._activeDropZone.dropZoneType);
             if (strategy) {
@@ -546,7 +562,6 @@ export class DragDropService {
             }
         }
 
-        // 6. No zone active
         me.hidePlaceholder();
     }
 
@@ -566,13 +581,11 @@ export class DragDropService {
 
         me._removeGlobalListeners();
 
-        const clientX = event.clientX;
-        const clientY = event.clientY;
-        const targetBelow = document.elementFromPoint(clientX, clientY);
+        const coords = me._getGlobalClientCoordinates(event);
+        const targetBelow = document.elementFromPoint(coords.x, coords.y);
 
         let dropHandled = false;
 
-        // Attempt drop on active zone
         if (me._activeDropZone && targetBelow) {
             const dropZoneElement = targetBelow.closest('[data-dropzone]');
             const dropZoneInstance = dropZoneElement ? dropZoneElement.dropZoneInstance : null;
@@ -580,28 +593,64 @@ export class DragDropService {
             if (dropZoneInstance === me._activeDropZone) {
                 const strategy = me._strategyRegistry.get(dropZoneInstance.dropZoneType);
                 if (strategy) {
-                    const point = { x: clientX, y: clientY, target: targetBelow };
+                    const point = { x: coords.x, y: coords.y, target: targetBelow };
                     dropHandled = strategy.handleDrop(point, dropZoneInstance, me._dragState, me);
                 }
             }
         }
 
-        // Fallback to Undock if not handled AND if it's not a Window (Windows stay in viewport or revert)
-        // Note: ViewportDropStrategy handles free movement (floating) inside viewport as a successful drop.
-        // If dropHandled is false, it means we dropped outside any valid zone.
         if (!dropHandled) {
-            // Only undock Panels/Groups. Windows are Viewport-bound.
             if (
                 me._dragState.type === ItemType.PANEL ||
                 me._dragState.type === ItemType.PANEL_GROUP
             ) {
                 const floatingManager = FloatingPanelManagerService.getInstance();
-                floatingManager.handleUndockDrop(me._dragState, clientX, clientY);
+                floatingManager.handleUndockDrop(me._dragState, coords.x, coords.y);
             }
         }
 
         me._cleanupDrag();
         appBus.emit(EventTypes.DND_DRAG_END, { ...me._dragState });
+    }
+
+    /**
+     * Description:
+     * Calculates the client coordinates relative to the Main Window,
+     * even if the event originated in a Popout. Includes sanity checks
+     * for DevTools interference.
+     *
+     * @param {PointerEvent} event - The source event.
+     * @returns {{x: number, y: number}} The normalized coordinates.
+     * @private
+     */
+    _getGlobalClientCoordinates(event) {
+        const me = this;
+        if (me._activeWindow === window) {
+            return { x: event.clientX, y: event.clientY };
+        }
+
+        const diffW = window.outerWidth - window.innerWidth;
+        const diffH = window.outerHeight - window.innerHeight;
+
+        let borderX = diffW / 2;
+
+        let borderY = diffH - borderX;
+
+        const safeFallbackX = 30;
+        if (borderX < 0 || borderX > safeFallbackX) {
+            borderX = 0;
+        }
+
+        const safeFallbackYCheck = 150;
+        const safeFallbackY = 120;
+        if (borderY < 0 || borderY > safeFallbackYCheck) {
+            borderY = safeFallbackY;
+        }
+
+        const mainClientX = event.screenX - window.screenX - borderX;
+        const mainClientY = event.screenY - window.screenY - borderY;
+
+        return { x: mainClientX, y: mainClientY };
     }
 
     /**
@@ -641,19 +690,22 @@ export class DragDropService {
 
         me._dragState.item = null;
         me._dragState.element = null;
+        me._activeWindow = null;
     }
 
     /**
      * Description:
-     * Removes global window listeners for pointermove and pointerup/cancel.
+     * Removes global listeners from the active window.
      *
      * @private
      * @returns {void}
      */
     _removeGlobalListeners() {
         const me = this;
-        window.removeEventListener('pointermove', me._boundOnPointerMove);
-        window.removeEventListener('pointerup', me._boundOnPointerUp);
-        window.removeEventListener('pointercancel', me._boundOnPointerUp);
+        if (me._activeWindow) {
+            me._activeWindow.removeEventListener('pointermove', me._boundOnPointerMove);
+            me._activeWindow.removeEventListener('pointerup', me._boundOnPointerUp);
+            me._activeWindow.removeEventListener('pointercancel', me._boundOnPointerUp);
+        }
     }
 }

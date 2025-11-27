@@ -4,6 +4,7 @@ import { TabStrip } from '../Core/TabStrip.js';
 import { appBus } from '../../utils/EventBus.js';
 import { EventTypes } from '../../constants/EventTypes.js';
 import { DropZoneType } from '../../constants/DNDTypes.js';
+import { PopoutManagerService } from '../../services/PopoutManagerService.js';
 
 /**
  * Description:
@@ -26,14 +27,16 @@ import { DropZoneType } from '../../constants/DNDTypes.js';
  * - Composes TabStrip via the 'mount' lifecycle.
  * - Delegates DOM events to internal handlers.
  * - Updates visual state via adapter methods.
- * - Registers itself as a 'tab-container' drop zone to enable tab reordering.
+ * - Registers itself as a 'tab-container' drop zone.
  * - Handles "Simple Mode" visualization via TabStrip callbacks.
+ * - Manages Popout/Return actions via PopoutManagerService.
  *
  * Dependencies:
  * - {import('../../core/UIElement.js').UIElement}
  * - {import('../../renderers/vanilla/VanillaPanelGroupHeaderAdapter.js').VanillaPanelGroupHeaderAdapter}
  * - {import('../Core/TabStrip.js').TabStrip}
  * - {import('../../utils/EventBus.js').appBus}
+ * - {import('../../services/PopoutManagerService.js').PopoutManagerService}
  */
 export class PanelGroupHeader extends UIElement {
     /**
@@ -77,6 +80,14 @@ export class PanelGroupHeader extends UIElement {
     _boundOnClose = null;
 
     /**
+     * Bound handler for popout button click.
+     *
+     * @type {Function | null}
+     * @private
+     */
+    _boundOnPopout = null;
+
+    /**
      * Bound handler for pointer down on the move handle.
      *
      * @type {Function | null}
@@ -96,7 +107,6 @@ export class PanelGroupHeader extends UIElement {
 
         me.panelGroup = panelGroup;
 
-        // Initialize TabStrip with Simple Mode enabled
         me.tabStrip = new TabStrip(
             `${panelGroup.id}-tabs`,
             {
@@ -108,9 +118,9 @@ export class PanelGroupHeader extends UIElement {
 
         me._boundOnCollapse = me._onCollapse.bind(me);
         me._boundOnClose = me._onClose.bind(me);
+        me._boundOnPopout = me._onPopout.bind(me);
         me._boundOnGroupPointerDown = me._onGroupPointerDown.bind(me);
 
-        // Initialize DOM via UIElement lifecycle
         me.render();
     }
 
@@ -120,8 +130,7 @@ export class PanelGroupHeader extends UIElement {
      * @returns {import('./PanelGroup.js').PanelGroup | null} The parent group.
      */
     get panelGroup() {
-        const me = this;
-        return me._panelGroup;
+        return this._panelGroup;
     }
 
     /**
@@ -131,14 +140,13 @@ export class PanelGroupHeader extends UIElement {
      * @returns {void}
      */
     set panelGroup(value) {
-        const me = this;
         if (value !== null && typeof value !== 'object') {
             console.warn(
                 `[PanelGroupHeader] Invalid panelGroup assignment (${value}). Must be an object or null.`
             );
             return;
         }
-        me._panelGroup = value;
+        this._panelGroup = value;
     }
 
     /**
@@ -147,8 +155,7 @@ export class PanelGroupHeader extends UIElement {
      * @returns {string | null} The title.
      */
     get title() {
-        const me = this;
-        return me._title;
+        return this._title;
     }
 
     /**
@@ -183,6 +190,19 @@ export class PanelGroupHeader extends UIElement {
     }
 
     /**
+     * Accessor for the Popout Button element (via renderer).
+     *
+     * @returns {HTMLElement | null}
+     */
+    get popoutBtn() {
+        const me = this;
+        if (me.element) {
+            return me.renderer.getPopoutButton(me.element);
+        }
+        return null;
+    }
+
+    /**
      * Accessor for the Collapse Button element (via renderer).
      *
      * @returns {HTMLElement | null}
@@ -210,24 +230,20 @@ export class PanelGroupHeader extends UIElement {
 
     /**
      * Exposes the root element of the internal TabStrip.
-     * Used by DND strategies to locate the drop target area.
      *
      * @returns {HTMLElement} The TabStrip root element.
      */
     get tabStripElement() {
-        const me = this;
-        return me.tabStrip.element;
+        return this.tabStrip.element;
     }
 
     /**
      * Compatibility method used by DND strategies.
-     * Returns the DOM element where tabs are effectively dropped.
      *
      * @returns {HTMLElement|null} The tab container slot.
      */
     get tabContainer() {
-        const me = this;
-        return me.tabStripElement;
+        return this.tabStripElement;
     }
 
     /**
@@ -241,7 +257,6 @@ export class PanelGroupHeader extends UIElement {
         const me = this;
         const element = me.renderer.createHeaderElement(me.id);
 
-        // Link DND properties from the parent group if available
         if (me.panelGroup) {
             element.dataset.dropzone = DropZoneType.TAB_CONTAINER;
             element.dropZoneInstance = me.panelGroup;
@@ -257,7 +272,6 @@ export class PanelGroupHeader extends UIElement {
 
     /**
      * Helper to attach DOM event listeners.
-     * Called on mount to ensure interactivity is restored if element was moved.
      *
      * @private
      */
@@ -266,11 +280,15 @@ export class PanelGroupHeader extends UIElement {
         if (!me.element) return;
 
         const moveHandle = me.renderer.getMoveHandle(me.element);
+        const popoutBtn = me.renderer.getPopoutButton(me.element);
         const collapseBtn = me.renderer.getCollapseButton(me.element);
         const closeBtn = me.renderer.getCloseButton(me.element);
 
         if (moveHandle) {
             me.renderer.on(moveHandle, 'pointerdown', me._boundOnGroupPointerDown);
+        }
+        if (popoutBtn) {
+            me.renderer.on(popoutBtn, 'click', me._boundOnPopout);
         }
         if (collapseBtn) {
             me.renderer.on(collapseBtn, 'click', me._boundOnCollapse);
@@ -282,7 +300,6 @@ export class PanelGroupHeader extends UIElement {
 
     /**
      * Helper to detach DOM event listeners.
-     * Called on unmount to prevent leaks.
      *
      * @private
      */
@@ -291,17 +308,18 @@ export class PanelGroupHeader extends UIElement {
         if (!me.element) return;
 
         const moveHandle = me.renderer.getMoveHandle(me.element);
+        const popoutBtn = me.renderer.getPopoutButton(me.element);
         const collapseBtn = me.renderer.getCollapseButton(me.element);
         const closeBtn = me.renderer.getCloseButton(me.element);
 
         if (moveHandle) me.renderer.off(moveHandle, 'pointerdown', me._boundOnGroupPointerDown);
+        if (popoutBtn) me.renderer.off(popoutBtn, 'click', me._boundOnPopout);
         if (collapseBtn) me.renderer.off(collapseBtn, 'click', me._boundOnCollapse);
         if (closeBtn) me.renderer.off(closeBtn, 'click', me._boundOnClose);
     }
 
     /**
      * Implementation of mount logic.
-     * Mounts the TabStrip into the designated slot.
      *
      * @param {HTMLElement} container - The parent container.
      * @protected
@@ -317,13 +335,11 @@ export class PanelGroupHeader extends UIElement {
             me.tabStrip.mount(tabSlot);
         }
 
-        // Connect TabStrip Simple Mode changes to Header Visuals
         if (me.tabStrip.onSimpleModeChange) {
             me.tabStrip.onSimpleModeChange(isSimple => {
                 me.renderer.setSimpleMode(me.element, isSimple);
             });
 
-            // Apply initial state
             me.renderer.setSimpleMode(me.element, me.tabStrip.isSimpleModeActive);
         }
 
@@ -339,16 +355,28 @@ export class PanelGroupHeader extends UIElement {
     _syncVisibility() {
         const me = this;
         if (!me.panelGroup) return;
-        me.updateConfig({
-            closable: me.panelGroup.closable,
-            collapsible: me.panelGroup.collapsible,
-            movable: me.panelGroup.movable
-        });
+
+        const isPopout = me.panelGroup.isPopout;
+
+        if (isPopout) {
+            me.updateConfig({
+                closable: false,
+                collapsible: false,
+                movable: true
+            });
+        } else {
+            me.updateConfig({
+                closable: me.panelGroup.closable,
+                collapsible: me.panelGroup.collapsible,
+                movable: me.panelGroup.movable
+            });
+        }
+
+        me.setPopoutState(isPopout);
     }
 
     /**
      * Implementation of unmount logic.
-     * Cleans up listeners and sub-components.
      *
      * @protected
      */
@@ -357,7 +385,6 @@ export class PanelGroupHeader extends UIElement {
 
         me._detachListeners();
 
-        // Unmount TabStrip
         if (me.tabStrip && me.tabStrip.isMounted) {
             me.tabStrip.unmount();
         }
@@ -376,6 +403,25 @@ export class PanelGroupHeader extends UIElement {
             me.tabStrip.dispose();
         }
         super.dispose();
+    }
+
+    /**
+     * Handler for popout button click.
+     *
+     * @private
+     * @returns {void}
+     */
+    _onPopout() {
+        const me = this;
+        if (!me.panelGroup) return;
+
+        const popoutService = PopoutManagerService.getInstance();
+
+        if (me.panelGroup.isPopout) {
+            popoutService.returnGroup(me.panelGroup);
+        } else {
+            popoutService.popoutGroup(me.panelGroup);
+        }
     }
 
     /**
@@ -447,9 +493,22 @@ export class PanelGroupHeader extends UIElement {
      */
     updateAriaLabels() {
         const me = this;
-        const title = me.panelGroup && me.panelGroup.title ? me.panelGroup.title : 'Grupo';
+        const title = me.panelGroup && me.panelGroup.title ? me.panelGroup.title : 'Group';
         if (me.element) {
             me.renderer.updateAriaLabels(me.element, title);
+        }
+    }
+
+    /**
+     * Updates the visual state of the popout button.
+     *
+     * @param {boolean} isPopout - Whether the group is currently popped out.
+     * @returns {void}
+     */
+    setPopoutState(isPopout) {
+        const me = this;
+        if (me.element) {
+            me.renderer.setPopoutState(me.element, Boolean(isPopout));
         }
     }
 
@@ -486,6 +545,7 @@ export class PanelGroupHeader extends UIElement {
      * @param {boolean} [config.closable] - Whether to show the close button.
      * @param {boolean} [config.movable] - Whether to show the move handle.
      * @param {boolean} [config.collapsible] - Whether to show the collapse button.
+     * @param {boolean} [config.popout] - (Optional) Whether to show the popout button.
      * @returns {void}
      */
     updateConfig(config) {
@@ -500,6 +560,9 @@ export class PanelGroupHeader extends UIElement {
         }
         if (config.collapsible !== undefined) {
             me.renderer.setCollapseButtonVisibility(me.element, config.collapsible);
+        }
+        if (config.popout !== undefined) {
+            me.renderer.setPopoutButtonVisibility(me.element, config.popout);
         }
     }
 }

@@ -101,6 +101,8 @@
     border-radius: var(--border-radius-sm);
 }
 
+/* Updated selectors to include popout button */
+.panel-group__popout-btn,
 .panel-group__collapse-btn,
 .panel-group__close-btn {
     width: var(--panel-button-size);
@@ -118,14 +120,17 @@
         background-color 0.2s,
         color 0.2s;
     flex-shrink: 0;
+    font-size: 1.1em; /* Ensure consistent icon size */
 }
 
+.panel-group__popout-btn:hover,
 .panel-group__collapse-btn:hover,
 .panel-group__close-btn:hover {
     background-color: var(--color-bg-hover);
     color: var(--color-text-primary);
 }
 
+.panel-group__popout-btn:disabled,
 .panel-group__collapse-btn:disabled,
 .panel-group__close-btn:disabled {
     opacity: var(--panel-button-disabled-opacity);
@@ -145,6 +150,11 @@
     content: '×';
     font-size: 1.2em;
     line-height: 1;
+}
+
+/* Popout button specific style if active/docked state needs differentiation */
+.panel-group__popout-btn--active {
+    color: var(--color-accent-primary);
 }
 
 .panel-group__tab {

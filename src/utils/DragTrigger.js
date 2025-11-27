@@ -7,13 +7,7 @@
  * 'onDragStart' (if the threshold is exceeded) or 'onClick' (if the pointer is released beforehand).
  *
  * Properties summary:
- * - _element {HTMLElement} : The target element to listen to.
- * - _threshold {number} : The pixel distance required to trigger a drag.
- * - _callbacks {object} : Registered callbacks for drag start and click.
- * - _startState {object|null} : Stores initial pointer coordinates and ID.
- * - _boundOnPointerDown {Function} : Bound handler for pointer down.
- * - _boundOnPointerMove {Function} : Bound handler for pointer move.
- * - _boundOnPointerUp {Function} : Bound handler for pointer up.
+ * - threshold {number} : The pixel distance required to trigger a drag.
  *
  * Typical usage:
  * const trigger = new DragTrigger(myElement, {
@@ -24,13 +18,14 @@
  *
  * Events:
  * - Listens to 'pointerdown' on the element.
- * - Listens to 'pointermove', 'pointerup', 'pointercancel' on window during interaction.
+ * - Listens to 'pointermove', 'pointerup', 'pointercancel' on the window (context-aware) during interaction.
  *
  * Business rules implemented:
  * - Validates input element and callbacks.
  * - Differentiates drag vs click based on threshold.
  * - Manages pointer capture to ensure drag continuity.
  * - Cleans up global listeners automatically after interaction.
+ * - Supports elements in different window contexts (Popouts).
  *
  * Dependencies:
  * - None
@@ -67,13 +62,14 @@ export class DragTrigger {
     _callbacks;
 
     /**
-     * Stores initial pointer coordinates and ID.
+     * Stores initial pointer coordinates, ID, and the window context used.
      *
      * @type {{
      * startX: number,
      * startY: number,
      * pointerId: number,
-     * originalEvent: PointerEvent
+     * originalEvent: PointerEvent,
+     * targetWindow: Window
      * } | null}
      * @private
      */
@@ -189,6 +185,7 @@ export class DragTrigger {
 
     /**
      * Handles the initial pointer down event.
+     * Identifies the correct window context (Main vs Popout).
      *
      * @param {PointerEvent} event - The native pointer event.
      * @private
@@ -213,16 +210,19 @@ export class DragTrigger {
             target.setPointerCapture(event.pointerId);
         }
 
+        const targetWindow = me._element.ownerDocument.defaultView || window;
+
         me._startState = {
             startX: event.clientX,
             startY: event.clientY,
             pointerId: event.pointerId,
-            originalEvent: event
+            originalEvent: event,
+            targetWindow: targetWindow
         };
 
-        window.addEventListener('pointermove', me._boundOnPointerMove);
-        window.addEventListener('pointerup', me._boundOnPointerUp);
-        window.addEventListener('pointercancel', me._boundOnPointerUp);
+        targetWindow.addEventListener('pointermove', me._boundOnPointerMove);
+        targetWindow.addEventListener('pointerup', me._boundOnPointerUp);
+        targetWindow.addEventListener('pointercancel', me._boundOnPointerUp);
     }
 
     /**
@@ -276,26 +276,34 @@ export class DragTrigger {
 
     /**
      * Removes temporary global listeners used during the interaction.
+     * Uses the stored targetWindow to ensure correct removal in Popouts.
      *
      * @private
      * @returns {void}
      */
     _cleanupGlobalListeners() {
         const me = this;
-        if (me._startState && me._startState.originalEvent) {
-            const target = me._startState.originalEvent.target;
-            if (target && typeof target.releasePointerCapture === 'function') {
-                try {
-                    target.releasePointerCapture(me._startState.pointerId);
-                } catch (error) {
-                    // Ignore if pointer was already released or lost
+        if (me._startState) {
+            const { originalEvent, pointerId, targetWindow } = me._startState;
+
+            if (originalEvent) {
+                const target = originalEvent.target;
+                if (target && typeof target.releasePointerCapture === 'function') {
+                    try {
+                        target.releasePointerCapture(pointerId);
+                    } catch (error) {
+                        // Ignore if pointer was already released or lost
+                    }
                 }
+            }
+
+            if (targetWindow) {
+                targetWindow.removeEventListener('pointermove', me._boundOnPointerMove);
+                targetWindow.removeEventListener('pointerup', me._boundOnPointerUp);
+                targetWindow.removeEventListener('pointercancel', me._boundOnPointerUp);
             }
         }
 
         me._startState = null;
-        window.removeEventListener('pointermove', me._boundOnPointerMove);
-        window.removeEventListener('pointerup', me._boundOnPointerUp);
-        window.removeEventListener('pointercancel', me._boundOnPointerUp);
     }
 }
