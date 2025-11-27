@@ -31,38 +31,6 @@ import { globalState } from '../../services/GlobalStateService.js';
  */
 export class CounterPanel extends Panel {
     /**
-     * The DOM element that displays the counter value.
-     *
-     * @type {HTMLElement | null}
-     * @private
-     */
-    _valueElement = null;
-
-    /**
-     * Bound listener for the increase button.
-     *
-     * @type {Function | null}
-     * @private
-     */
-    _boundOnIncrease = null;
-
-    /**
-     * Bound listener for the decrease button.
-     *
-     * @type {Function | null}
-     * @private
-     */
-    _boundOnDecrease = null;
-
-    /**
-     * Bound listener for the reset button.
-     *
-     * @type {Function | null}
-     * @private
-     */
-    _boundOnReset = null;
-
-    /**
      * Creates a new CounterPanel instance.
      *
      * @param {string} title - The panel title.
@@ -77,14 +45,6 @@ export class CounterPanel extends Panel {
         };
 
         super(title, { ...defaults, ...config }, renderer);
-        const me = this;
-
-        me._boundOnIncrease = me._onIncrease.bind(me);
-        me._boundOnDecrease = me._onDecrease.bind(me);
-        me._boundOnReset = me._onReset.bind(me);
-
-        // No explicit call to render() or populate() here.
-        // super() calls Panel.constructor -> me.render() -> me.populate()
     }
 
     /**
@@ -114,8 +74,11 @@ export class CounterPanel extends Panel {
         const me = this;
         const contentElement = me.contentElement;
 
-        // Safety check
         if (!contentElement) return;
+
+        me._boundOnIncrease = me._onIncrease.bind(me);
+        me._boundOnDecrease = me._onDecrease.bind(me);
+        me._boundOnReset = me._onReset.bind(me);
 
         me._valueElement = document.createElement('h2');
         me._valueElement.style.fontSize = '2.5rem';
@@ -194,13 +157,13 @@ export class CounterPanel extends Panel {
             const decreaseButton = contentElement.querySelector('[data-action="decrease"]');
             const resetButton = contentElement.querySelector('[data-action="reset"]');
 
-            if (increaseButton) {
+            if (increaseButton && me._boundOnIncrease) {
                 increaseButton.removeEventListener('click', me._boundOnIncrease);
             }
-            if (decreaseButton) {
+            if (decreaseButton && me._boundOnDecrease) {
                 decreaseButton.removeEventListener('click', me._boundOnDecrease);
             }
-            if (resetButton) {
+            if (resetButton && me._boundOnReset) {
                 resetButton.removeEventListener('click', me._boundOnReset);
             }
         }
