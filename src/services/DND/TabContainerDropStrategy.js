@@ -19,7 +19,7 @@ import { ItemType } from '../../constants/DNDTypes.js';
  * - Inserts a vertical placeholder to indicate the drop position.
  * - Supports dropping into empty tab strips (though rare in PanelGroups).
  * - Updates the dropZone visual feedback (classes).
- * - Handles cleanup of Floating and Popout states upon drop.
+ * - Handles cleanup of Floating and Popout states upon drop, preserving popout if tabs remain.
  *
  * Dependencies:
  * - {import('./BaseDropStrategy.js').BaseDropStrategy}
@@ -296,14 +296,16 @@ export class TabContainerDropStrategy extends BaseDropStrategy {
             dropZone.movePanel(draggedPanel, me._dropIndex);
         } else {
             if (sourceGroup.isPopout) {
-                PopoutManagerService.getInstance().closePopout(sourceGroup);
-                sourceGroup.setPopoutMode(false);
+                if (sourceGroup.panels.length <= 1) {
+                    PopoutManagerService.getInstance().closePopout(sourceGroup);
+                    sourceGroup.setPopoutMode(false);
+                }
             } else if (sourceGroup.isFloating) {
                 FloatingPanelManagerService.getInstance().removeFloatingPanel(sourceGroup);
             }
 
-            sourceGroup.removePanel(draggedPanel, true);
-            targetGroup.addPanel(draggedPanel, me._dropIndex, true);
+            sourceGroup.removePanel(draggedPanel, true); // true = isMoving
+            targetGroup.addPanel(draggedPanel, me._dropIndex, true); // true = makeActive
         }
 
         return true;

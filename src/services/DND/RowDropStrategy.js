@@ -22,7 +22,7 @@ import { ItemType } from '../../constants/DNDTypes.js';
  * - Validates drop zone strictly: The target MUST be inside the row element.
  * - On drop: Creates a new Column, creates a new PanelGroup inside it (or adds existing),
  * and moves the dropped Panel or PanelGroup into the new Column.
- * - Handles cleanup of Floating and Popout states upon drop.
+ * - Handles cleanup of Floating and Popout states upon drop, preserving popout if tabs remain.
  *
  * Dependencies:
  * - {import('./BaseDropStrategy.js').BaseDropStrategy}
@@ -201,8 +201,10 @@ export class RowDropStrategy extends BaseDropStrategy {
         if (!sourceGroup) return false;
 
         if (sourceGroup.isPopout) {
-            PopoutManagerService.getInstance().closePopout(sourceGroup);
-            sourceGroup.setPopoutMode(false);
+            if (draggedData.type === ItemType.PANEL_GROUP || sourceGroup.panels.length <= 1) {
+                PopoutManagerService.getInstance().closePopout(sourceGroup);
+                sourceGroup.setPopoutMode(false);
+            }
         } else if (sourceGroup.isFloating) {
             if (draggedData.type === ItemType.PANEL_GROUP) {
                 FloatingPanelManagerService.getInstance().removeFloatingPanel(sourceGroup);

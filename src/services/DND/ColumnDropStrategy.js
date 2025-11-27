@@ -308,8 +308,10 @@ export class ColumnDropStrategy extends BaseDropStrategy {
      */
     _handleSourceCleanup(sourceGroup, type) {
         if (sourceGroup.isPopout) {
-            PopoutManagerService.getInstance().closePopout(sourceGroup);
-            sourceGroup.setPopoutMode(false);
+            if (type === ItemType.PANEL_GROUP || sourceGroup.panels.length <= 1) {
+                PopoutManagerService.getInstance().closePopout(sourceGroup);
+                sourceGroup.setPopoutMode(false);
+            }
         } else if (sourceGroup.isFloating) {
             if (type === ItemType.PANEL_GROUP) {
                 FloatingPanelManagerService.getInstance().removeFloatingPanel(sourceGroup);
