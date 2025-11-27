@@ -1,3 +1,6 @@
+import { UIElement } from '../../core/UIElement.js';
+import { VanillaLoaderAdapter } from '../../renderers/vanilla/VanillaLoaderAdapter.js';
+
 /**
  * Description:
  * A reusable component for displaying a loading overlay (spinner and message)
@@ -8,11 +11,9 @@
  * 2. 'inset': Uses position:absolute to cover only the targetElement.
  *
  * Properties summary:
- * - _targetElement {HTMLElement} : The DOM element this Loader is attached to.
- * - _options {object} : Configuration options (e.g., type).
- * - _loaderElement {HTMLElement} : The main DOM element (.loader__overlay).
- * - _messageElement {HTMLElement} : The DOM element for the text message.
- * - _boundOnTransitionEnd {Function} : Bound listener for auto-destroy on hide.
+ * - targetElement {HTMLElement} : The DOM element this Loader is attached to.
+ * - type {string} : The mode of the loader ('fullpage' or 'inset').
+ * - message {string} : The current loading message.
  *
  * Typical usage:
  * // For a full-page load
@@ -21,158 +22,244 @@
  * // ... later ...
  * appLoader.hide();
  *
- * // For an inset load
- * const panelLoader = new Loader(myPanelElement, { type: 'inset' });
- * panelLoader.show('Loading data...');
- * // ... later ...
- * panelLoader.hide();
+ * Events:
+ * - (Inherits events from UIElement)
+ *
+ * Business rules implemented:
+ * - Inherits from UIElement -> Disposable.
+ * - Delegates DOM creation/manipulation to VanillaLoaderAdapter.
+ * - Manages visibility transitions and auto-unmounting on hide.
+ * - Applies CSS classes to the target element for proper positioning (inset mode).
  *
  * Dependencies:
- * - (CSS): styles/services/loader.css
+ * - {import('../../core/UIElement.js').UIElement}
+ * - {import('../../renderers/vanilla/VanillaLoaderAdapter.js').VanillaLoaderAdapter}
  */
-export class Loader {
+export class Loader extends UIElement {
     /**
      * The DOM element this Loader is attached to.
-     * @type {HTMLElement}
+     *
+     * @type {HTMLElement | null}
      * @private
      */
     _targetElement = null;
 
     /**
-     * Configuration options.
-     * @type {{type: string}}
+     * The loader type ('fullpage' or 'inset').
+     *
+     * @type {string}
      * @private
      */
-    _options = {
-        type: 'fullpage'
-    };
+    _type = 'fullpage';
 
     /**
-     * The main DOM element (.loader__overlay).
-     * @type {HTMLElement | null}
+     * The current message text.
+     *
+     * @type {string}
      * @private
      */
-    _loaderElement = null;
+    _message = '';
 
     /**
-     * The DOM element for the text message.
-     * @type {HTMLElement | null}
-     * @private
-     */
-    _messageElement = null;
-
-    /**
-     * Bound listener for auto-destroy on hide.
+     * Bound listener for auto-unmount on transition end.
+     *
      * @type {Function | null}
      * @private
      */
     _boundOnTransitionEnd = null;
 
     /**
+     * Creates an instance of Loader.
+     *
      * @param {HTMLElement} targetElement - The DOM element to attach the loader to.
      * @param {object} [options={}] - Configuration options.
      * @param {string} [options.type='fullpage'] - 'fullpage' (fixed) or 'inset' (absolute).
+     * @param {import('../../core/IRenderer.js').IRenderer} [renderer=null] - Optional renderer adapter.
      */
-    constructor(targetElement, options = {}) {
+    constructor(targetElement, options = {}, renderer = null) {
+        super(null, renderer || new VanillaLoaderAdapter());
         const me = this;
-        if (!targetElement) {
-            throw new Error('Loader: constructor requires a valid targetElement.');
+
+        me.targetElement = targetElement;
+
+        if (options.type) {
+            me.type = options.type;
         }
 
-        me._targetElement = targetElement;
-        me._options = Object.assign(me._options, options);
+        me._boundOnTransitionEnd = me._onTransitionEnd.bind(me);
 
-        me._boundOnTransitionEnd = me.destroy.bind(me);
-
-        me._buildDOM();
+        me.render();
     }
 
     /**
-     * Creates the loader's DOM elements.
-     * @private
+     * Sets the target element.
+     *
+     * @param {HTMLElement} element - The target DOM element.
      * @returns {void}
      */
-    _buildDOM() {
-        const me = this;
-        me._loaderElement = document.createElement('div');
-        me._loaderElement.className = 'loader__overlay';
+    set targetElement(element) {
+        if (!(element instanceof HTMLElement)) {
+            console.warn(
+                `[Loader] invalid targetElement assignment (${element}). Must be an HTMLElement.`
+            );
+            return;
+        }
+        this._targetElement = element;
+    }
 
-        if (me._options.type === 'inset') {
-            me._loaderElement.classList.add('loader--inset');
-        } else {
-            me._loaderElement.classList.add('loader--fullpage');
+    /**
+     * Gets the target element.
+     *
+     * @returns {HTMLElement | null}
+     */
+    get targetElement() {
+        return this._targetElement;
+    }
+
+    /**
+     * Sets the loader type.
+     *
+     * @param {string} value - 'fullpage' or 'inset'.
+     * @returns {void}
+     */
+    set type(value) {
+        if (value !== 'fullpage' && value !== 'inset') {
+            console.warn(
+                `[Loader] invalid type assignment (${value}). Must be 'fullpage' or 'inset'.`
+            );
+            return;
+        }
+        this._type = value;
+    }
+
+    /**
+     * Gets the loader type.
+     *
+     * @returns {string}
+     */
+    get type() {
+        return this._type;
+    }
+
+    /**
+     * Implementation of the rendering logic.
+     *
+     * @returns {HTMLElement} The root loader element.
+     * @protected
+     */
+    _doRender() {
+        const me = this;
+        return me.renderer.createLoaderElement(me.id, me._type);
+    }
+
+    /**
+     * Implementation of mount logic.
+     *
+     * @param {HTMLElement} container - The parent container.
+     * @protected
+     */
+    _doMount(container) {
+        const me = this;
+        if (me.element && me.element.parentNode !== container) {
+            me.renderer.mount(container, me.element);
         }
 
-        const spinner = document.createElement('div');
-        spinner.className = 'loader__spinner';
+        if (me._type === 'inset' && me._targetElement) {
+            me.renderer.setTargetClass(me._targetElement, true);
+        }
+    }
 
-        me._messageElement = document.createElement('div');
-        me._messageElement.className = 'loader__message';
+    /**
+     * Implementation of unmount logic.
+     *
+     * @protected
+     */
+    _doUnmount() {
+        const me = this;
 
-        me._loaderElement.append(spinner, me._messageElement);
+        if (me._type === 'inset' && me._targetElement) {
+            me.renderer.setTargetClass(me._targetElement, false);
+        }
+
+        if (me.element) {
+            me.renderer.off(me.element, 'transitionend', me._boundOnTransitionEnd);
+
+            if (me.element.parentNode) {
+                me.renderer.unmount(me.element.parentNode, me.element);
+            }
+        }
     }
 
     /**
      * Shows the loader overlay.
+     * Automatically mounts the component if it's not already mounted.
+     *
      * @param {string} [message=''] - The message to display.
      * @returns {void}
      */
     show(message = '') {
         const me = this;
-        if (!me._loaderElement) {
+        if (!me._targetElement) {
+            console.warn('[Loader] Cannot show: targetElement is missing.');
             return;
         }
 
-        if (me._options.type === 'inset') {
-            me._targetElement.classList.add('is-loading-target');
+        me._message = message;
+
+        if (!me.element) {
+            me.render();
         }
 
-        me._messageElement.textContent = message;
-
-        if (!me._targetElement.contains(me._loaderElement)) {
-            me._targetElement.appendChild(me._loaderElement);
+        if (!me.isMounted) {
+            me.mount(me._targetElement);
         }
 
-        requestAnimationFrame(() => {
-            me._loaderElement.classList.add('is-visible');
-        });
+        me.renderer.updateMessage(me.element, message);
+        me.element.offsetHeight;
+        me.renderer.setVisible(me.element, true);
     }
 
     /**
-     * Hides the loader overlay and triggers automatic cleanup.
+     * Hides the loader overlay.
+     * Triggers an exit transition and then unmounts the component.
+     *
      * @returns {void}
      */
     hide() {
         const me = this;
-        if (!me._loaderElement) {
+        if (!me.element || !me.isMounted) {
             return;
         }
 
-        me._loaderElement.removeEventListener('transitionend', me._boundOnTransitionEnd);
-        me._loaderElement.addEventListener('transitionend', me._boundOnTransitionEnd, {
-            once: true
-        });
-
-        me._loaderElement.classList.remove('is-visible');
+        me.renderer.off(me.element, 'transitionend', me._boundOnTransitionEnd);
+        me.renderer.on(me.element, 'transitionend', me._boundOnTransitionEnd, { once: true });
+        me.renderer.setVisible(me.element, false);
     }
 
     /**
-     * Destroys and cleans up the loader DOM elements.
+     * Callback for CSS transition end.
+     * Unmounts the component to clean up the DOM.
+     *
+     * @private
      * @returns {void}
      */
-    destroy() {
+    _onTransitionEnd() {
         const me = this;
-        if (me._loaderElement) {
-            me._loaderElement.removeEventListener('transitionend', me._boundOnTransitionEnd);
-            me._loaderElement.remove();
+        if (me.isMounted) {
+            me.unmount();
         }
+    }
 
-        if (me._options.type === 'inset') {
-            me._targetElement.classList.remove('is-loading-target');
+    /**
+     * Disposes the component.
+     *
+     * @returns {void}
+     */
+    dispose() {
+        const me = this;
+        if (me.element) {
+            me.renderer.off(me.element, 'transitionend', me._boundOnTransitionEnd);
         }
-
-        me._loaderElement = null;
-        me._messageElement = null;
-        me._targetElement = null;
+        super.dispose();
     }
 }
