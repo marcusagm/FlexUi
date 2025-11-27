@@ -262,6 +262,7 @@ export class Panel extends IPanel {
 
     /**
      * Sets the minimum height.
+     * Updates the visual element via renderer if initialized.
      *
      * @param {number} value - The new minimum height.
      * @returns {void}
@@ -276,7 +277,10 @@ export class Panel extends IPanel {
             return;
         }
         me._minHeight = num;
-        me.updateHeight();
+
+        if (me.contentElement) {
+            me.renderer.updateMinSize(me.contentElement, me._minWidth, me._minHeight);
+        }
     }
 
     /**
@@ -290,6 +294,7 @@ export class Panel extends IPanel {
 
     /**
      * Sets the minimum width.
+     * Updates the visual element via renderer if initialized.
      *
      * @param {number} value - The new minimum width.
      * @returns {void}
@@ -304,7 +309,10 @@ export class Panel extends IPanel {
             return;
         }
         me._minWidth = num;
-        me.updateHeight();
+
+        if (me.contentElement) {
+            me.renderer.updateMinSize(me.contentElement, me._minWidth, me._minHeight);
+        }
     }
 
     /**
@@ -529,21 +537,6 @@ export class Panel extends IPanel {
     }
 
     /**
-     * Applies height and width constraints to the DOM element.
-     *
-     * @returns {void}
-     */
-    updateHeight() {
-        const me = this;
-        const contentEl = me.contentElement;
-        if (!contentEl) return;
-
-        contentEl.style.minHeight = `${me.getMinPanelHeight()}px`;
-        contentEl.style.height = 'auto';
-        contentEl.style.flex = '1 1 auto';
-    }
-
-    /**
      * Calculates the header height.
      *
      * @returns {number} The pixel height of the header.
@@ -607,6 +600,7 @@ export class Panel extends IPanel {
 
     /**
      * Serializes the Panel's state.
+     * Stores configuration in a nested 'config' object.
      *
      * @returns {object} The serialized data.
      */
@@ -679,6 +673,8 @@ export class Panel extends IPanel {
      * @returns {void}
      */
     onStateUpdate(key, value) {
+        key;
+        value;
         // Intentionally empty for subclasses
     }
 

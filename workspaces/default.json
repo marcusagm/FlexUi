@@ -38,12 +38,15 @@
                                 "panels": [
                                     {
                                         "type": "CounterPanel",
-                                        "title": "Counter 1"
+                                        "title": "Counter 1",
+                                        "config": {}
                                     },
                                     {
                                         "type": "TextPanel",
                                         "title": "Text panel 1",
-                                        "content": "Este é o painel de texto 1."
+                                        "config": {
+                                            "content": "Este é o painel de texto 1."
+                                        }
                                     }
                                 ]
                             },
@@ -59,7 +62,8 @@
                                 "panels": [
                                     {
                                         "type": "ToolbarPanel",
-                                        "title": "ToolBar 1"
+                                        "title": "ToolBar 1",
+                                        "config": {}
                                     }
                                 ]
                             },
@@ -73,7 +77,9 @@
                                     {
                                         "type": "TextPanel",
                                         "title": "Text panel 2",
-                                        "content": "Este é o painel de texto 2."
+                                        "config": {
+                                            "content": "Este é o painel de texto 2."
+                                        }
                                     }
                                 ]
                             }
@@ -113,7 +119,9 @@
                                     {
                                         "type": "TextPanel",
                                         "title": "Text panel 2",
-                                        "content": "Painel de texto 2 (Colapsado)."
+                                        "config": {
+                                            "content": "Painel de texto 2 (Colapsado)."
+                                        }
                                     }
                                 ]
                             }
@@ -132,7 +140,9 @@
                                     {
                                         "type": "TextPanel",
                                         "title": "Text panel 3",
-                                        "content": "Painel de texto 3 (Coluna 3)."
+                                        "config": {
+                                            "content": "Painel de texto 3 (Coluna 3)."
+                                        }
                                     }
                                 ]
                             },
@@ -145,7 +155,8 @@
                                 "panels": [
                                     {
                                         "type": "CounterPanel",
-                                        "title": "Counter 2"
+                                        "title": "Counter 2",
+                                        "config": {}
                                     }
                                 ]
                             }
@@ -168,7 +179,8 @@
                 "panels": [
                     {
                         "type": "CounterPanel",
-                        "title": "Counter 3"
+                        "title": "Counter 3",
+                        "config": {}
                     }
                 ]
             }

@@ -449,19 +449,6 @@ export class ApplicationWindow extends UIElement {
     }
 
     /**
-     * Ensures the window is rendered before mounting.
-     *
-     * @param {HTMLElement} container
-     * @returns {void}
-     */
-    mount(container) {
-        if (!this.element) {
-            this.render();
-        }
-        super.mount(container);
-    }
-
-    /**
      * Restores the header to the window DOM.
      * Useful when undocking the window from a TabStrip.
      *
@@ -561,23 +548,14 @@ export class ApplicationWindow extends UIElement {
      */
     setContent(content) {
         const me = this;
-
-        if (!me.element) {
-            me._pendingContent = content;
-            return;
-        }
-
-        const contentElement = me.contentElement;
-        if (!contentElement) return;
-
-        contentElement.innerHTML = '';
+        me.contentElement.innerHTML = '';
 
         if (typeof content === 'string') {
-            contentElement.innerHTML = content;
+            me.contentElement.innerHTML = content;
         } else if (content instanceof HTMLElement) {
-            contentElement.appendChild(content);
-        } else if (content && content.element instanceof HTMLElement) {
-            contentElement.appendChild(content.element);
+            me.contentElement.appendChild(content);
+        } else if (content && (typeof content.element) instanceof HTMLElement) {
+            me.contentElement.appendChild(content.element);
         } else {
             console.warn('ApplicationWindow: Unknown content type', content);
         }

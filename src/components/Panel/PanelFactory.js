@@ -167,7 +167,6 @@ export class PanelFactory {
     /**
      * Creates and hydrates a Panel instance based on its type and saved data.
      * Uses the default renderer factory if configured.
-     * Handles adaptation of legacy JSON structures to the new unified constructor signature.
      *
      * @param {object} panelData - The serialized data object for the panel.
      * @returns {Panel | null} An instantiated and hydrated Panel, or null if invalid.
@@ -189,15 +188,9 @@ export class PanelFactory {
             renderer = me._defaultRendererFactory();
         }
 
-        // Data Adapter Logic:
-        // Prepare a unified config object by merging existing configs
-        // with root-level properties that were previously passed positionally (height, content).
-        const config = {
-            ...(panelData.config || {}),
-            height: panelData.height, // Move root height to config
-            width: panelData.width, // Move root width to config (if exists)
-            content: panelData.content // Move root content to config (critical for TextPanel)
-        };
+        // Strict Mode: Use config directly, ensuring it exists.
+        // Legacy properties like 'content', 'height', 'width' at root are no longer merged automatically.
+        const config = panelData.config || {};
 
         // Instantiate using the standardized signature: (title, config, renderer)
         const panel = new PanelClass(panelData.title, config, renderer);
