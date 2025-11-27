@@ -328,15 +328,24 @@ export class App {
      * @returns {void}
      */
     _registerStrategies() {
-        const dds = DragDropService.getInstance();
+        const dragDropService = DragDropService.getInstance();
 
-        dds.registerStrategy(DropZoneType.COLUMN, new ColumnDropStrategy());
-        dds.registerStrategy(DropZoneType.TAB_CONTAINER, new TabContainerDropStrategy());
-        dds.registerStrategy(DropZoneType.ROW, new RowDropStrategy());
-        dds.registerStrategy(DropZoneType.CONTAINER, new ContainerDropStrategy());
-        dds.registerStrategy(DropZoneType.TOOLBAR_CONTAINER, new ToolbarContainerDropStrategy());
-        dds.registerStrategy(DropZoneType.VIEWPORT, new ViewportDropStrategy());
-        dds.registerStrategy(DropZoneType.VIEWPORT_TAB_BAR, new ViewportTabDropStrategy());
+        dragDropService.registerStrategy(DropZoneType.COLUMN, new ColumnDropStrategy());
+        dragDropService.registerStrategy(
+            DropZoneType.TAB_CONTAINER,
+            new TabContainerDropStrategy()
+        );
+        dragDropService.registerStrategy(DropZoneType.ROW, new RowDropStrategy());
+        dragDropService.registerStrategy(DropZoneType.CONTAINER, new ContainerDropStrategy());
+        dragDropService.registerStrategy(
+            DropZoneType.TOOLBAR_CONTAINER,
+            new ToolbarContainerDropStrategy()
+        );
+        dragDropService.registerStrategy(DropZoneType.VIEWPORT, new ViewportDropStrategy());
+        dragDropService.registerStrategy(
+            DropZoneType.VIEWPORT_TAB_BAR,
+            new ViewportTabDropStrategy()
+        );
 
         const panelFactory = PanelFactory.getInstance();
         panelFactory.registerPanelClasses([Panel, TextPanel, ToolbarPanel, CounterPanel]);
@@ -368,8 +377,8 @@ export class App {
         me._toolbarLeft = new ToolbarContainer('left', 'vertical');
         me._toolbarRight = new ToolbarContainer('right', 'vertical');
 
-        const fpms = FloatingPanelManagerService.getInstance();
-        fpms.registerContainer(me.container.element);
+        const floatingManager = FloatingPanelManagerService.getInstance();
+        floatingManager.registerContainer(me.container.element);
 
         me._mainWrapper = document.createElement('div');
         me._mainWrapper.className = 'app-wrapper';
@@ -513,10 +522,26 @@ export class App {
 
             if (workspaceData.popouts && Array.isArray(workspaceData.popouts)) {
                 workspaceData.popouts.forEach(popoutData => {
-                    const group = new PanelGroup();
-                    group.fromJSON(popoutData.groupData);
+                    const payload = popoutData.data || popoutData.groupData;
+                    const geometry = popoutData.geometry;
+                    const type = popoutData.type || 'PanelGroup';
 
-                    PopoutManagerService.getInstance().popoutGroup(group, popoutData.geometry);
+                    if (!payload) return;
+
+                    if (type === 'ApplicationWindow') {
+                        const factory = ViewportFactory.getInstance();
+                        const windowInstance = factory.createWindow(payload);
+                        if (windowInstance) {
+                            PopoutManagerService.getInstance().popoutWindow(
+                                windowInstance,
+                                geometry
+                            );
+                        }
+                    } else {
+                        const group = new PanelGroup();
+                        group.fromJSON(payload);
+                        PopoutManagerService.getInstance().popoutGroup(group, geometry);
+                    }
                 });
             }
         } else {
@@ -536,8 +561,8 @@ export class App {
      */
     async saveLayout() {
         const me = this;
-        const i18n = TranslationService.getInstance();
-        me._workspaceLoader.show(i18n.translate('actions.saving'));
+        const translationService = TranslationService.getInstance();
+        me._workspaceLoader.show(translationService.translate('actions.saving'));
 
         try {
             const layoutData = me.container.toJSON();
@@ -562,7 +587,7 @@ export class App {
 
             await me.stateService.saveState(me.STORAGE_KEY, me.currentWorkspace);
 
-            appNotifications.success(i18n.translate('appstate.save'));
+            appNotifications.success(translationService.translate('appstate.save'));
         } catch (err) {
             console.error('App.saveLayout: Falha ao salvar o estado.', err);
             appNotifications.danger('Falha ao salvar o workspace.');
@@ -578,15 +603,14 @@ export class App {
      */
     async restoreLayout() {
         const me = this;
-        const i18n = TranslationService.getInstance();
-        me._workspaceLoader.show(i18n.translate('actions.restoring'));
+        const translationService = TranslationService.getInstance();
+        me._workspaceLoader.show(translationService.translate('actions.restoring'));
 
         try {
             FloatingPanelManagerService.getInstance().clearAll();
             const popoutService = PopoutManagerService.getInstance();
             if (popoutService._activePopouts) {
-                popoutService._activePopouts.forEach((win, id) => {
-                    id;
+                popoutService._activePopouts.forEach(win => {
                     win.close();
                 });
                 popoutService._activePopouts.clear();
@@ -595,7 +619,7 @@ export class App {
             me.container.clear();
             await me.loadInitialLayout();
 
-            appNotifications.success(i18n.translate('appstate.restore'));
+            appNotifications.success(translationService.translate('appstate.restore'));
         } catch (err) {
             console.error('App.restoreLayout: Falha ao restaurar.', err);
             appNotifications.danger('Falha ao restaurar o workspace.');
@@ -612,15 +636,14 @@ export class App {
      */
     async resetLayout(silent = false) {
         const me = this;
-        const i18n = TranslationService.getInstance();
-        me._workspaceLoader.show(i18n.translate('actions.reseting'));
+        const translationService = TranslationService.getInstance();
+        me._workspaceLoader.show(translationService.translate('actions.reseting'));
 
         try {
             FloatingPanelManagerService.getInstance().clearAll();
             const popoutService = PopoutManagerService.getInstance();
             if (popoutService._activePopouts) {
-                popoutService._activePopouts.forEach((win, id) => {
-                    id;
+                popoutService._activePopouts.forEach(win => {
                     win.close();
                 });
                 popoutService._activePopouts.clear();
@@ -632,7 +655,10 @@ export class App {
             await me.loadInitialLayout();
 
             if (!silent) {
-                appBus.emit(EventTypes.STATUSBAR_SET_STATUS, i18n.translate('appstate.reset'));
+                appBus.emit(
+                    EventTypes.STATUSBAR_SET_STATUS,
+                    translationService.translate('appstate.reset')
+                );
             }
         } catch (err) {
             console.error('App.resetLayout: Falha ao redefinir.', err);
