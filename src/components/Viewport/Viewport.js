@@ -5,6 +5,8 @@ import { ViewportFactory } from './ViewportFactory.js';
 import { TabStrip } from '../Core/TabStrip.js';
 import { UIElement } from '../../core/UIElement.js';
 import { VanillaViewportAdapter } from '../../renderers/vanilla/VanillaViewportAdapter.js';
+import { ResizeHandleManager } from '../../utils/ResizeHandleManager.js';
+import { throttleRAF } from '../../utils/ThrottleRAF.js';
 
 /**
  * Description:
@@ -21,6 +23,7 @@ import { VanillaViewportAdapter } from '../../renderers/vanilla/VanillaViewportA
  * - dropZoneType {string} : The identifier for the DragDropService.
  * - tabBar {HTMLElement} : The DOM element representing the tab strip container.
  * - windows {Array<ApplicationWindow>} : List of managed windows.
+ * - height {number|null} : The height of the viewport (for vertical resizing in a column).
  *
  * Typical usage:
  * const viewport = new Viewport();
@@ -33,6 +36,7 @@ import { VanillaViewportAdapter } from '../../renderers/vanilla/VanillaViewportA
  * - Listens to (appBus): EventTypes.WINDOW_CLOSE_REQUEST
  * - Listens to (appBus): EventTypes.VIEWPORT_ARRANGE_CASCADE
  * - Listens to (appBus): EventTypes.VIEWPORT_ARRANGE_TILE
+ * - Emits (appBus): EventTypes.LAYOUT_PANELGROUPS_CHANGED
  *
  * Business rules implemented:
  * - Acts as a 'viewport' drop zone type.
@@ -41,6 +45,7 @@ import { VanillaViewportAdapter } from '../../renderers/vanilla/VanillaViewportA
  * - Automatically hides the TabStrip when no windows are docked.
  * - Synchronizes Window focus with Tab selection.
  * - Supports 'Fill Space' layout mode managed by LayoutService.
+ * - Supports vertical resizing when placed in a Column.
  *
  * Dependencies:
  * - {import('../Core/TabStrip.js').TabStrip}
@@ -48,6 +53,8 @@ import { VanillaViewportAdapter } from '../../renderers/vanilla/VanillaViewportA
  * - {import('../../renderers/vanilla/VanillaViewportAdapter.js').VanillaViewportAdapter}
  * - {import('../../utils/EventBus.js').appBus}
  * - {import('./ViewportFactory.js').ViewportFactory}
+ * - {import('../../utils/ResizeHandleManager.js').ResizeHandleManager}
+ * - {import('../../utils/ThrottleRAF.js').throttleRAF}
  */
 export class Viewport extends UIElement {
     /**
@@ -131,6 +138,54 @@ export class Viewport extends UIElement {
     _tabStrip;
 
     /**
+     * The height of the viewport.
+     *
+     * @type {number | null}
+     * @private
+     */
+    _height = null;
+
+    /**
+     * Minimum height constraint.
+     *
+     * @type {number}
+     * @private
+     */
+    _minHeight = 100;
+
+    /**
+     * Reference to the parent Column.
+     *
+     * @type {import('../Column/Column.js').Column | null}
+     * @private
+     */
+    _column = null;
+
+    /**
+     * The unified manager for resize handles.
+     *
+     * @type {ResizeHandleManager | null}
+     * @private
+     */
+    _resizeHandleManager = null;
+
+    /**
+     * Control flag for the visibility of the resize handle.
+     *
+     * @type {boolean}
+     * @private
+     */
+    _resizeHandleVisible = true;
+
+    /**
+     * The throttled update function for resizing.
+     *
+     * @type {Function | null}
+     * @private
+     */
+    _throttledUpdate = null;
+
+    /**
      * The drop zone type identifier.
      *
      * @type {string}
@@ -159,6 +214,10 @@ export class Viewport extends UIElement {
         me._boundOnWindowClose = me._onWindowClose.bind(me);
         me._boundOnArrangeCascade = me.cascade.bind(me);
         me._boundOnArrangeTile = me.tile.bind(me);
+
+        me._throttledUpdate = throttleRAF(() => {
+            me.updateHeight();
+        });
 
         me.render();
         me._initEventListeners();
@@ -194,6 +253,53 @@ export class Viewport extends UIElement {
             return me.renderer.getContentContainer(me.element);
         }
         return null;
+    }
+
+    /**
+     * Height getter.
+     *
+     * @returns {number|null}
+     */
+    get height() {
+        return this._height;
+    }
+
+    /**
+     * Height setter.
+     *
+     * @param {number|null} value
+     */
+    set height(value) {
+        const me = this;
+        if (value !== null) {
+            const num = Number(value);
+            if (!Number.isFinite(num) || num < 0) {
+                console.warn(`[Viewport] invalid height assignment (${value}).`);
+                return;
+            }
+            me._height = num;
+        } else {
+            me._height = null;
+        }
+        me.updateHeight();
+    }
+
+    /**
+     * Sets the parent column.
+     *
+     * @param {import('../Column/Column.js').Column} column
+     */
+    setParentColumn(column) {
+        this._column = column;
+    }
+
+    /**
+     * Gets the parent column.
+     *
+     * @returns {import('../Column/Column.js').Column | null}
+     */
+    getColumn() {
+        return this._column;
     }
 
     /**
@@ -254,6 +360,8 @@ export class Viewport extends UIElement {
             }
 
             me._updateTabBarVisibility();
+            me._updateDockedResizeHandle();
+            me.updateHeight();
         }
     }
 
@@ -264,6 +372,15 @@ export class Viewport extends UIElement {
      */
     _doUnmount() {
         const me = this;
+
+        if (me._resizeHandleManager) {
+            me._resizeHandleManager.destroy();
+            me._resizeHandleManager = null;
+        }
+
+        if (me._throttledUpdate) {
+            me._throttledUpdate.cancel();
+        }
 
         if (me._tabStrip.isMounted) {
             me._tabStrip.unmount();
@@ -303,6 +420,93 @@ export class Viewport extends UIElement {
      */
     setCollapseButtonDisabled(disabled) {
         disabled;
+    }
+
+    /**
+     * Sets whether the resize handle should be visible.
+     * Typically controlled by LayoutService (e.g., hide for last item).
+     *
+     * @param {boolean} visible
+     * @returns {void}
+     */
+    setResizeHandleVisible(visible) {
+        const me = this;
+        if (typeof visible !== 'boolean') return;
+        me._resizeHandleVisible = visible;
+        me._updateDockedResizeHandle();
+    }
+
+    /**
+     * Updates the docked resize handle state based on visibility.
+     *
+     * @private
+     * @returns {void}
+     */
+    _updateDockedResizeHandle() {
+        const me = this;
+        if (!me.element) return;
+
+        if (!me._resizeHandleVisible) {
+            if (me._resizeHandleManager) {
+                me._resizeHandleManager.destroy();
+                me._resizeHandleManager = null;
+            }
+            return;
+        }
+
+        if (!me._resizeHandleManager) {
+            me._resizeHandleManager = new ResizeHandleManager(me.element, {
+                handles: ['s'],
+                customClass: 'viewport-resize-handle',
+                getConstraints: () => ({
+                    minimumWidth: 0,
+                    maximumWidth: Infinity,
+                    minimumHeight: me._minHeight,
+                    maximumHeight: Infinity,
+                    containerRectangle: null
+                }),
+                onResize: ({ height }) => {
+                    me._height = height;
+                    if (me._throttledUpdate) me._throttledUpdate();
+                },
+                onEnd: () => me.requestLayoutUpdate()
+            });
+        }
+    }
+
+    /**
+     * Updates the height styles of the element.
+     *
+     * @returns {void}
+     */
+    updateHeight() {
+        const me = this;
+        if (!me.element) return;
+
+        if (me._height !== null) {
+            me.renderer.updateStyles(me.element, {
+                height: `${me._height}px`,
+                flex: '0 0 auto'
+            });
+        } else {
+            me.renderer.updateStyles(me.element, {
+                height: 'auto',
+                flex: '1 1 auto'
+            });
+        }
+
+        me.renderer.updateStyles(me.element, { minHeight: `${me._minHeight}px` });
+    }
+
+    /**
+     * Notifies the LayoutService that the structure has changed.
+     *
+     * @returns {void}
+     */
+    requestLayoutUpdate() {
+        if (this._column) {
+            appBus.emit(EventTypes.LAYOUT_PANELGROUPS_CHANGED, this._column);
+        }
     }
 
     /**
@@ -351,7 +555,9 @@ export class Viewport extends UIElement {
 
         if (windowInstance.isTabbed && windowInstance.header) {
             me._tabStrip.removeItem(windowInstance.header);
-            windowInstance.activeTab = false;
+            if (windowInstance.element) {
+                windowInstance.element.classList.remove('application-window--active-tab');
+            }
         }
 
         me._windows.splice(index, 1);
@@ -423,7 +629,26 @@ export class Viewport extends UIElement {
             });
         } else {
             me._updateZIndices();
-            // Floating window focused; tabs remain as they were visually
+
+            const hasActiveTab = me._windows.some(
+                w =>
+                    w.isTabbed &&
+                    w.element &&
+                    w.element.classList.contains('application-window--active-tab')
+            );
+
+            if (!hasActiveTab && me._tabStrip.items.length > 0) {
+                for (let i = me._windows.length - 1; i >= 0; i--) {
+                    const win = me._windows[i];
+                    if (win.isTabbed) {
+                        win.activeTab = true;
+                        if (win.header) {
+                            me._tabStrip.setActiveItem(win.header);
+                        }
+                        break;
+                    }
+                }
+            }
         }
     }
 
@@ -589,6 +814,7 @@ export class Viewport extends UIElement {
         const me = this;
         return {
             type: DropZoneType.VIEWPORT,
+            height: me._height,
             windows: me._windows.map(windowInstance => windowInstance.toJSON())
         };
     }
@@ -602,6 +828,10 @@ export class Viewport extends UIElement {
     fromJSON(data) {
         const me = this;
         [...me._windows].forEach(windowInstance => me.removeWindow(windowInstance));
+
+        if (data.height !== undefined) {
+            me.height = data.height;
+        }
 
         if (data.windows && Array.isArray(data.windows)) {
             const factory = ViewportFactory.getInstance();
@@ -618,7 +848,6 @@ export class Viewport extends UIElement {
             });
         }
 
-        // Force focus on the last window to ensure active state is applied
         if (me._windows.length > 0) {
             const activeWindow = me._windows[me._windows.length - 1];
             me.focusWindow(activeWindow, true);
