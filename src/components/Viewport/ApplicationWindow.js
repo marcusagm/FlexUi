@@ -812,6 +812,11 @@ export class ApplicationWindow extends UIElement {
         if (!me.element) return;
 
         if (active) {
+            if (me._isMinimized) {
+                me._isMinimized = false;
+                me._updateState();
+            }
+
             if (me._resizeHandleManager) {
                 me._resizeHandleManager.destroy();
                 me._resizeHandleManager = null;

@@ -940,6 +940,10 @@ export class PanelGroup extends UIElement {
                     me._resizeHandleManager = null;
                 }
 
+                if (me.collapsed) {
+                    me.collapsed = false;
+                }
+
                 me.renderer.updateStyles(me.element, {
                     width: '100%',
                     height: '100%',
