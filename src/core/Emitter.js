@@ -72,7 +72,6 @@ export class Emitter extends Disposable {
 
             me._listeners.add(listener);
 
-            // Debug: Monitor Leakage
             if (typeof window !== 'undefined' && window.FLEXUI_DEBUG) {
                 const trace = new Error('[LeakageMonitor] Emitter subscription').stack;
                 LeakageMonitor.getInstance().add(listener, trace);
@@ -82,7 +81,6 @@ export class Emitter extends Disposable {
                 if (!me.isDisposed) {
                     me._listeners.delete(listener);
 
-                    // Debug: Remove from Monitor
                     if (typeof window !== 'undefined' && window.FLEXUI_DEBUG) {
                         LeakageMonitor.getInstance().delete(listener);
                     }
@@ -103,7 +101,6 @@ export class Emitter extends Disposable {
             return;
         }
 
-        // Execute safely to prevent one listener from breaking the loop
         me._listeners.forEach(listener => {
             try {
                 listener.call(undefined, eventData);
@@ -121,7 +118,6 @@ export class Emitter extends Disposable {
     dispose() {
         const me = this;
         if (!me.isDisposed) {
-            // Debug: Batch cleanup for Monitor
             if (typeof window !== 'undefined' && window.FLEXUI_DEBUG) {
                 const monitor = LeakageMonitor.getInstance();
                 me._listeners.forEach(listener => monitor.delete(listener));
@@ -206,7 +202,6 @@ export class PauseableEmitter extends Emitter {
         me._isPaused = false;
 
         if (me._eventQueue.length > 0) {
-            // Flush queue
             me._eventQueue.forEach(eventData => {
                 super.fire(eventData);
             });

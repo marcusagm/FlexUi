@@ -48,6 +48,7 @@ import { VanillaRenderer } from '../renderers/vanilla/VanillaRenderer.js';
  * - Guarantees that 'Will' events fire before action and 'Did' events fire after state update.
  * - Manages internal state flags automatically.
  * - Prevents operations on disposed or invalid states.
+ * - Implements Lazy Initialization for events to optimize memory usage.
  *
  * Dependencies:
  * - {import('./Disposable.js').Disposable}
@@ -108,132 +109,12 @@ export class UIElement extends Disposable {
     _isFocused = false;
 
     /**
-     * Emitter for the 'willMount' lifecycle event.
+     * Map to store lazily initialized event emitters.
      *
-     * @type {Emitter}
+     * @type {Map<string, Emitter>}
      * @private
      */
-    _onWillMount = this._createEmitter();
-
-    /**
-     * Emitter for the 'didMount' lifecycle event.
-     *
-     * @type {Emitter}
-     * @private
-     */
-    _onDidMount = this._createEmitter();
-
-    /**
-     * Emitter for the 'willUnmount' lifecycle event.
-     *
-     * @type {Emitter}
-     * @private
-     */
-    _onWillUnmount = this._createEmitter();
-
-    /**
-     * Emitter for the 'didUnmount' lifecycle event.
-     *
-     * @type {Emitter}
-     * @private
-     */
-    _onDidUnmount = this._createEmitter();
-
-    /**
-     * Emitter for the 'willRender' lifecycle event.
-     *
-     * @type {Emitter}
-     * @private
-     */
-    _onWillRender = this._createEmitter();
-
-    /**
-     * Emitter for the 'didRender' lifecycle event.
-     *
-     * @type {Emitter}
-     * @private
-     */
-    _onDidRender = this._createEmitter();
-
-    /**
-     * Emitter for the 'willFocus' lifecycle event.
-     *
-     * @type {Emitter}
-     * @private
-     */
-    _onWillFocus = this._createEmitter();
-
-    /**
-     * Emitter for the 'didFocus' lifecycle event.
-     *
-     * @type {Emitter}
-     * @private
-     */
-    _onDidFocus = this._createEmitter();
-
-    /**
-     * Emitter for the 'willBlur' lifecycle event.
-     *
-     * @type {Emitter}
-     * @private
-     */
-    _onWillBlur = this._createEmitter();
-
-    /**
-     * Emitter for the 'didBlur' lifecycle event.
-     *
-     * @type {Emitter}
-     * @private
-     */
-    _onDidBlur = this._createEmitter();
-
-    /**
-     * Emitter for the 'willVisibilityChange' lifecycle event.
-     *
-     * @type {Emitter}
-     * @private
-     */
-    _onWillVisibilityChange = this._createEmitter();
-
-    /**
-     * Emitter for the 'didVisibilityChange' lifecycle event.
-     *
-     * @type {Emitter}
-     * @private
-     */
-    _onDidVisibilityChange = this._createEmitter();
-
-    /**
-     * Emitter for the 'willDispose' lifecycle event.
-     *
-     * @type {Emitter}
-     * @private
-     */
-    _onWillDispose = this._createEmitter();
-
-    /**
-     * Emitter for the 'didDispose' lifecycle event.
-     *
-     * @type {Emitter}
-     * @private
-     */
-    _onDidDispose = this._createEmitter();
-
-    /**
-     * Emitter for the 'willMove' lifecycle event.
-     *
-     * @type {Emitter}
-     * @private
-     */
-    _onWillMove = this._createEmitter();
-
-    /**
-     * Emitter for the 'didMove' lifecycle event.
-     *
-     * @type {Emitter}
-     * @private
-     */
-    _onDidMove = this._createEmitter();
+    _emitters = new Map();
 
     /**
      * Creates an instance of UIElement.
@@ -309,7 +190,7 @@ export class UIElement extends Disposable {
      * @returns {Function} The subscription function.
      */
     get onWillMount() {
-        return this._onWillMount.event;
+        return this._getEmitter('willMount').event;
     }
 
     /**
@@ -318,7 +199,7 @@ export class UIElement extends Disposable {
      * @returns {Function} The subscription function.
      */
     get onDidMount() {
-        return this._onDidMount.event;
+        return this._getEmitter('didMount').event;
     }
 
     /**
@@ -327,7 +208,7 @@ export class UIElement extends Disposable {
      * @returns {Function} The subscription function.
      */
     get onWillUnmount() {
-        return this._onWillUnmount.event;
+        return this._getEmitter('willUnmount').event;
     }
 
     /**
@@ -336,7 +217,7 @@ export class UIElement extends Disposable {
      * @returns {Function} The subscription function.
      */
     get onDidUnmount() {
-        return this._onDidUnmount.event;
+        return this._getEmitter('didUnmount').event;
     }
 
     /**
@@ -345,7 +226,7 @@ export class UIElement extends Disposable {
      * @returns {Function} The subscription function.
      */
     get onWillRender() {
-        return this._onWillRender.event;
+        return this._getEmitter('willRender').event;
     }
 
     /**
@@ -354,7 +235,7 @@ export class UIElement extends Disposable {
      * @returns {Function} The subscription function.
      */
     get onDidRender() {
-        return this._onDidRender.event;
+        return this._getEmitter('didRender').event;
     }
 
     /**
@@ -363,7 +244,7 @@ export class UIElement extends Disposable {
      * @returns {Function} The subscription function.
      */
     get onWillFocus() {
-        return this._onWillFocus.event;
+        return this._getEmitter('willFocus').event;
     }
 
     /**
@@ -372,7 +253,7 @@ export class UIElement extends Disposable {
      * @returns {Function} The subscription function.
      */
     get onDidFocus() {
-        return this._onDidFocus.event;
+        return this._getEmitter('didFocus').event;
     }
 
     /**
@@ -381,7 +262,7 @@ export class UIElement extends Disposable {
      * @returns {Function} The subscription function.
      */
     get onWillBlur() {
-        return this._onWillBlur.event;
+        return this._getEmitter('willBlur').event;
     }
 
     /**
@@ -390,7 +271,7 @@ export class UIElement extends Disposable {
      * @returns {Function} The subscription function.
      */
     get onDidBlur() {
-        return this._onDidBlur.event;
+        return this._getEmitter('didBlur').event;
     }
 
     /**
@@ -399,7 +280,7 @@ export class UIElement extends Disposable {
      * @returns {Function} The subscription function.
      */
     get onWillVisibilityChange() {
-        return this._onWillVisibilityChange.event;
+        return this._getEmitter('willVisibilityChange').event;
     }
 
     /**
@@ -408,7 +289,7 @@ export class UIElement extends Disposable {
      * @returns {Function} The subscription function.
      */
     get onDidVisibilityChange() {
-        return this._onDidVisibilityChange.event;
+        return this._getEmitter('didVisibilityChange').event;
     }
 
     /**
@@ -417,7 +298,7 @@ export class UIElement extends Disposable {
      * @returns {Function} The subscription function.
      */
     get onWillDispose() {
-        return this._onWillDispose.event;
+        return this._getEmitter('willDispose').event;
     }
 
     /**
@@ -426,7 +307,7 @@ export class UIElement extends Disposable {
      * @returns {Function} The subscription function.
      */
     get onDidDispose() {
-        return this._onDidDispose.event;
+        return this._getEmitter('didDispose').event;
     }
 
     /**
@@ -435,7 +316,7 @@ export class UIElement extends Disposable {
      * @returns {Function} The subscription function.
      */
     get onWillMove() {
-        return this._onWillMove.event;
+        return this._getEmitter('willMove').event;
     }
 
     /**
@@ -444,7 +325,7 @@ export class UIElement extends Disposable {
      * @returns {Function} The subscription function.
      */
     get onDidMove() {
-        return this._onDidMove.event;
+        return this._getEmitter('didMove').event;
     }
 
     /**
@@ -457,11 +338,11 @@ export class UIElement extends Disposable {
         const me = this;
         if (me.isDisposed) return;
 
-        me._onWillRender.fire(me);
+        me._fire('willRender', me);
 
         me._element = me._doRender();
 
-        me._onDidRender.fire(me);
+        me._fire('didRender', me);
     }
 
     /**
@@ -488,12 +369,12 @@ export class UIElement extends Disposable {
             me.render();
         }
 
-        me._onWillMount.fire({ component: me, container });
+        me._fire('willMount', { component: me, container });
 
         me._doMount(container);
         me._isMounted = true;
 
-        me._onDidMount.fire({ component: me, container });
+        me._fire('didMount', { component: me, container });
     }
 
     /**
@@ -507,12 +388,12 @@ export class UIElement extends Disposable {
             return;
         }
 
-        me._onWillUnmount.fire(me);
+        me._fire('willUnmount', me);
 
         me._doUnmount();
         me._isMounted = false;
 
-        me._onDidUnmount.fire(me);
+        me._fire('didUnmount', me);
     }
 
     /**
@@ -529,7 +410,7 @@ export class UIElement extends Disposable {
             return;
         }
 
-        me._onWillVisibilityChange.fire({ component: me, visible: isVisible });
+        me._fire('willVisibilityChange', { component: me, visible: isVisible });
 
         if (me._element) {
             if (isVisible) {
@@ -540,7 +421,7 @@ export class UIElement extends Disposable {
         }
         me._isVisible = isVisible;
 
-        me._onDidVisibilityChange.fire({ component: me, visible: isVisible });
+        me._fire('didVisibilityChange', { component: me, visible: isVisible });
     }
 
     /**
@@ -552,12 +433,12 @@ export class UIElement extends Disposable {
         const me = this;
         if (me.isDisposed || !me._element) return;
 
-        me._onWillFocus.fire(me);
+        me._fire('willFocus', me);
 
         me._element.focus();
         me._isFocused = true;
 
-        me._onDidFocus.fire(me);
+        me._fire('didFocus', me);
     }
 
     /**
@@ -569,12 +450,12 @@ export class UIElement extends Disposable {
         const me = this;
         if (me.isDisposed || !me._element) return;
 
-        me._onWillBlur.fire(me);
+        me._fire('willBlur', me);
 
         me._element.blur();
         me._isFocused = false;
 
-        me._onDidBlur.fire(me);
+        me._fire('didBlur', me);
     }
 
     /**
@@ -586,7 +467,7 @@ export class UIElement extends Disposable {
         const me = this;
         if (me.isDisposed) return;
 
-        me._onWillDispose.fire(me);
+        me._fire('willDispose', me);
 
         if (me._isMounted) {
             me.unmount();
@@ -596,21 +477,44 @@ export class UIElement extends Disposable {
             me._element = null;
         }
 
-        me._onDidDispose.fire(me);
+        me._fire('didDispose', me);
 
+        me._emitters.clear();
         super.dispose();
     }
 
     /**
-     * Helper to create and register an emitter.
+     * Retrieves or creates an emitter for the specified event key.
+     * Implements lazy initialization to save memory.
      *
-     * @returns {Emitter} The created emitter.
+     * @param {string} key - The unique key for the event (e.g., 'willMount').
+     * @returns {Emitter} The emitter instance.
      * @private
      */
-    _createEmitter() {
-        const emitter = new Emitter();
-        this.addDisposable(emitter);
-        return emitter;
+    _getEmitter(key) {
+        const me = this;
+        if (!me._emitters.has(key)) {
+            const emitter = new Emitter();
+            me.addDisposable(emitter);
+            me._emitters.set(key, emitter);
+        }
+        return me._emitters.get(key);
+    }
+
+    /**
+     * Safely fires an event if the emitter exists.
+     *
+     * @param {string} key - The event key.
+     * @param {*} [data] - The event data.
+     * @returns {void}
+     * @private
+     */
+    _fire(key, data) {
+        const me = this;
+        const emitter = me._emitters.get(key);
+        if (emitter) {
+            emitter.fire(data);
+        }
     }
 
     /**
