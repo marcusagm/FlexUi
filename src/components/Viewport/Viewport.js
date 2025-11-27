@@ -7,6 +7,7 @@ import { UIElement } from '../../core/UIElement.js';
 import { VanillaViewportAdapter } from '../../renderers/vanilla/VanillaViewportAdapter.js';
 import { ResizeHandleManager } from '../../utils/ResizeHandleManager.js';
 import { throttleRAF } from '../../utils/ThrottleRAF.js';
+import { PopoutManagerService } from '../../services/PopoutManagerService.js';
 
 /**
  * Description:
@@ -46,6 +47,7 @@ import { throttleRAF } from '../../utils/ThrottleRAF.js';
  * - Synchronizes Window focus with Tab selection.
  * - Supports 'Fill Space' layout mode managed by LayoutService.
  * - Supports vertical resizing when placed in a Column.
+ * - Supports Popout windows (ignores focus/layout for external windows).
  *
  * Dependencies:
  * - {import('../Core/TabStrip.js').TabStrip}
@@ -55,6 +57,7 @@ import { throttleRAF } from '../../utils/ThrottleRAF.js';
  * - {import('./ViewportFactory.js').ViewportFactory}
  * - {import('../../utils/ResizeHandleManager.js').ResizeHandleManager}
  * - {import('../../utils/ThrottleRAF.js').throttleRAF}
+ * - {import('../../services/PopoutManagerService.js').PopoutManagerService}
  */
 export class Viewport extends UIElement {
     /**
@@ -353,7 +356,7 @@ export class Viewport extends UIElement {
             const contentContainer = me.contentContainer;
             if (contentContainer) {
                 me._windows.forEach(windowInstance => {
-                    if (!windowInstance.isMounted) {
+                    if (!windowInstance.isMounted && !windowInstance.isPopout) {
                         windowInstance.mount(contentContainer);
                     }
                 });
@@ -511,6 +514,7 @@ export class Viewport extends UIElement {
 
     /**
      * Adds a window to the viewport and mounts it.
+     * Handles both new windows and windows returning from Popout.
      *
      * @param {import('./ApplicationWindow.js').ApplicationWindow} windowInstance - The window to add.
      * @param {boolean} [doFocus=true] - Whether to focus the window immediately.
@@ -523,12 +527,20 @@ export class Viewport extends UIElement {
             return;
         }
 
+        // Add to list if not already managed
         if (!me._windows.includes(windowInstance)) {
             me._windows.push(windowInstance);
+        }
 
-            if (me.isMounted && me.contentContainer) {
-                windowInstance.mount(me.contentContainer);
-            }
+        // Mount check: Ensure it is mounted in the viewport's DOM if not popped out.
+        // This is crucial for windows returning from Popout state (already in _windows but unmounted).
+        if (
+            me.isMounted &&
+            me.contentContainer &&
+            !windowInstance.isPopout &&
+            !windowInstance.isMounted
+        ) {
+            windowInstance.mount(me.contentContainer);
         }
 
         if (doFocus) {
@@ -568,8 +580,14 @@ export class Viewport extends UIElement {
         if (wasActive) {
             me._activeWindow = null;
             if (me._windows.length > 0) {
-                const nextIndex = Math.min(index, me._windows.length - 1);
-                me.focusWindow(me._windows[nextIndex], true);
+                // Find next candidate (not popped out preferrably)
+                const next =
+                    me._windows.find((w, i) => i >= index && !w.isPopout) ||
+                    me._windows.find(w => !w.isPopout);
+
+                if (next) {
+                    me.focusWindow(next, true);
+                }
             }
         } else {
             if (remainingActiveWindow) {
@@ -580,8 +598,7 @@ export class Viewport extends UIElement {
 
     /**
      * Focuses a specific window.
-     * If floating: Brings to front (Z-Index).
-     * If tabbed: Shows content via TabStrip selection.
+     * If the window is in Popout mode, delegates focus to the native window.
      *
      * @param {import('./ApplicationWindow.js').ApplicationWindow} windowInstance - The window to focus.
      * @param {boolean} [force=false] - If true, re-asserts focus even if already active.
@@ -590,6 +607,15 @@ export class Viewport extends UIElement {
     focusWindow(windowInstance, force = false) {
         const me = this;
         if (!me._windows.includes(windowInstance)) {
+            return;
+        }
+
+        // Handle Popout Focus
+        if (windowInstance.isPopout) {
+            const popout = PopoutManagerService.getInstance().getPopoutFor(windowInstance);
+            if (popout && popout.nativeWindow) {
+                popout.nativeWindow.focus();
+            }
             return;
         }
 
@@ -622,7 +648,7 @@ export class Viewport extends UIElement {
             }
 
             me._windows.forEach(win => {
-                if (win.isTabbed) {
+                if (win.isTabbed && !win.isPopout) {
                     const isActive = win === windowInstance;
                     win.activeTab = isActive;
                 }
@@ -633,6 +659,7 @@ export class Viewport extends UIElement {
             const hasActiveTab = me._windows.some(
                 w =>
                     w.isTabbed &&
+                    !w.isPopout &&
                     w.element &&
                     w.element.classList.contains('application-window--active-tab')
             );
@@ -640,7 +667,7 @@ export class Viewport extends UIElement {
             if (!hasActiveTab && me._tabStrip.items.length > 0) {
                 for (let i = me._windows.length - 1; i >= 0; i--) {
                     const win = me._windows[i];
-                    if (win.isTabbed) {
+                    if (win.isTabbed && !win.isPopout) {
                         win.activeTab = true;
                         if (win.header) {
                             me._tabStrip.setActiveItem(win.header);
@@ -709,7 +736,9 @@ export class Viewport extends UIElement {
         windowInstance.constrainToParent();
 
         if (wasActiveTab) {
-            const remainingTabs = me._windows.filter(win => win.isTabbed && win !== windowInstance);
+            const remainingTabs = me._windows.filter(
+                win => win.isTabbed && win !== windowInstance && !win.isPopout
+            );
             if (remainingTabs.length > 0) {
                 const newActive = remainingTabs[remainingTabs.length - 1];
                 newActive.activeTab = true;
@@ -725,6 +754,7 @@ export class Viewport extends UIElement {
 
     /**
      * Arranges all windows in a cascading pattern.
+     * Ignores windows currently in Popout mode.
      *
      * @returns {void}
      */
@@ -734,7 +764,7 @@ export class Viewport extends UIElement {
         let count = 0;
 
         me._windows.forEach(windowInstance => {
-            if (windowInstance.isTabbed) return;
+            if (windowInstance.isTabbed || windowInstance.isPopout) return;
             if (windowInstance.isMaximized) windowInstance.toggleMaximize();
 
             const x = count * offset;
@@ -749,17 +779,19 @@ export class Viewport extends UIElement {
 
     /**
      * Arranges all windows in a tile pattern.
+     * Ignores windows currently in Popout mode.
      *
      * @returns {void}
      */
     tile() {
         const me = this;
-        const floatingWindows = me._windows.filter(w => !w.isTabbed);
+        const floatingWindows = me._windows.filter(w => !w.isTabbed && !w.isPopout);
         const count = floatingWindows.length;
         if (count === 0) return;
 
         const dimensions = me.renderer.getDimensions(me.element);
-        const tabBarHeight = me._tabBar ? me._tabBar.offsetHeight : 0;
+        const tabBarHeight =
+            me._tabStrip.element && me._tabStrip.isVisible ? me._tabStrip.element.offsetHeight : 0;
 
         const areaWidth = dimensions.width;
         const areaHeight = dimensions.height - tabBarHeight;
@@ -807,6 +839,8 @@ export class Viewport extends UIElement {
 
     /**
      * Serializes the viewport and its windows to JSON.
+     * Includes popout windows in the serialization so they can be restored
+     * correctly (geometry is synced by PopoutManagerService).
      *
      * @returns {object}
      */
@@ -838,19 +872,32 @@ export class Viewport extends UIElement {
             data.windows.forEach(winData => {
                 const win = factory.createWindow(winData);
                 if (win) {
-                    const isTabbed = win.isTabbed;
-                    me.addWindow(win, !isTabbed);
+                    // Use state from JSON to determine initial mode
+                    const isTabbed = winData.state ? winData.state.tabbed : false;
+                    const isPopout = winData.state ? winData.state.isPopout : false;
+
+                    me.addWindow(win, !isTabbed && !isPopout);
 
                     if (isTabbed) {
                         me.dockWindow(win);
+                    }
+
+                    if (isPopout) {
+                        PopoutManagerService.getInstance().popoutWindow(win);
                     }
                 }
             });
         }
 
         if (me._windows.length > 0) {
-            const activeWindow = me._windows[me._windows.length - 1];
-            me.focusWindow(activeWindow, true);
+            // Focus the last non-popout window
+            const activeWindow = me._windows
+                .slice()
+                .reverse()
+                .find(w => !w.isPopout);
+            if (activeWindow) {
+                me.focusWindow(activeWindow, true);
+            }
         }
     }
 
@@ -904,7 +951,7 @@ export class Viewport extends UIElement {
         const pinnedElements = [];
 
         me._windows.forEach(win => {
-            if (win.isTabbed || !win.element) return;
+            if (win.isTabbed || win.isPopout || !win.element) return;
             if (win.isPinned) {
                 pinnedElements.push(win.element);
             } else {
@@ -932,6 +979,7 @@ export class Viewport extends UIElement {
 
     /**
      * Event handler for window close requests.
+     * Checks the return value of close() to respect prevention (dirty state).
      *
      * @param {import('./ApplicationWindow.js').ApplicationWindow} windowInstance
      * @private
@@ -940,11 +988,9 @@ export class Viewport extends UIElement {
     _onWindowClose(windowInstance) {
         const me = this;
         if (me._windows.includes(windowInstance)) {
-            windowInstance.close().then(() => {
-                if (
-                    !document.body.contains(windowInstance.element) &&
-                    !me.element.contains(windowInstance.element)
-                ) {
+            windowInstance.close().then(didClose => {
+                // Only remove if close was successful (true)
+                if (didClose && me._windows.includes(windowInstance)) {
                     me.removeWindow(windowInstance);
                 }
             });

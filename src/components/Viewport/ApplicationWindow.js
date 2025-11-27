@@ -26,6 +26,7 @@ import { WindowApi } from '../../api/WindowApi.js';
  * - isMinimized {boolean} : Minimized state flag.
  * - isPinned {boolean} : Pinned (always on top) state flag.
  * - isTabbed {boolean} : Tabbed (docked) state flag.
+ * - isPopout {boolean} : Popout (external window) state flag.
  * - activeTab {boolean} : Active tab state flag (controlled by Viewport).
  * - header {ApplicationWindowHeader} : The window header component.
  * - contentElement {HTMLElement|null} : The container for window content.
@@ -42,17 +43,18 @@ import { WindowApi } from '../../api/WindowApi.js';
  * - Extends UIElement -> Disposable.
  * - Delegates visual operations to VanillaWindowAdapter.
  * - Manages 8-direction resizing via ResizeHandleManager.
- * - Intercepts close requests via `preventClose` (async support).
- * - Identifies as `ItemType.APPLICATION_WINDOW` for DND.
+ * - Intercepts close requests via 'preventClose' (async support).
+ * - Identifies as 'ItemType.APPLICATION_WINDOW' for DND.
+ * - Supports Popout Mode (external window context).
  * - Exposes a WindowApi facade.
  *
  * Dependencies:
- * - UIElement
- * - VanillaWindowAdapter
- * - ApplicationWindowHeader
- * - ResizeHandleManager
- * - EventBus
- * - WindowApi
+ * - {import('../../core/UIElement.js').UIElement}
+ * - {import('../../renderers/vanilla/VanillaWindowAdapter.js').VanillaWindowAdapter}
+ * - {import('./ApplicationWindowHeader.js').ApplicationWindowHeader}
+ * - {import('../../utils/ResizeHandleManager.js').ResizeHandleManager}
+ * - {import('../../utils/EventBus.js').EventBus}
+ * - {import('../../api/WindowApi.js').WindowApi}
  */
 export class ApplicationWindow extends UIElement {
     /**
@@ -166,6 +168,14 @@ export class ApplicationWindow extends UIElement {
      * @private
      */
     _isTabbed = false;
+
+    /**
+     * Popout (external window) state flag.
+     *
+     * @type {boolean}
+     * @private
+     */
+    _isPopout = false;
 
     /**
      * Active Tab state flag.
@@ -447,6 +457,15 @@ export class ApplicationWindow extends UIElement {
     }
 
     /**
+     * Popout state getter.
+     *
+     * @returns {boolean}
+     */
+    get isPopout() {
+        return this._isPopout;
+    }
+
+    /**
      * Collapsed property for compatibility.
      * Proxies to minimized state.
      *
@@ -540,10 +559,17 @@ export class ApplicationWindow extends UIElement {
                 }
             }
 
-            me._initResizeHandles();
-            me._updateGeometryStyles();
-            me._updateState();
-            me.constrainToParent();
+            if (!me._isPopout) {
+                me._initResizeHandles();
+            }
+
+            if (me._isPopout) {
+                me.setPopoutMode(true);
+            } else {
+                me._updateGeometryStyles();
+                me._updateState();
+                me.constrainToParent();
+            }
 
             appBus.emit(EventTypes.WINDOW_MOUNT, me);
         }
@@ -621,20 +647,21 @@ export class ApplicationWindow extends UIElement {
     /**
      * Attempts to close the window, checking preventClose handler.
      *
-     * @returns {Promise<void>}
+     * @returns {Promise<boolean>} True if closed, false if cancelled.
      */
     async close() {
         const me = this;
         if (me._canCloseHandler) {
             try {
                 const canClose = await me._canCloseHandler();
-                if (!canClose) return;
+                if (!canClose) return false;
             } catch (e) {
                 console.error('ApplicationWindow: Close handler error', e);
-                return;
+                return false;
             }
         }
         me.destroy();
+        return true;
     }
 
     /**
@@ -644,7 +671,7 @@ export class ApplicationWindow extends UIElement {
      */
     constrainToParent() {
         const me = this;
-        if (me._isTabbed) return;
+        if (me._isTabbed || me._isPopout) return;
         if (!me.element) return;
 
         const parent = me.element.offsetParent;
@@ -679,6 +706,8 @@ export class ApplicationWindow extends UIElement {
      */
     toggleMaximize() {
         const me = this;
+        if (me._isPopout) return;
+
         if (me._isMaximized) {
             me._isMaximized = false;
             if (me._preMaximizeState) {
@@ -712,6 +741,8 @@ export class ApplicationWindow extends UIElement {
      */
     minimize() {
         const me = this;
+        if (me._isPopout) return;
+
         if (me._isMaximized) {
             me.toggleMaximize();
         }
@@ -763,6 +794,56 @@ export class ApplicationWindow extends UIElement {
     }
 
     /**
+     * Enables or disables the Popout Mode (external window).
+     * Adjusts styling to fill the external window and disables internal resizing/positioning.
+     *
+     * @param {boolean} active - True to enable popout mode.
+     * @returns {void}
+     */
+    setPopoutMode(active) {
+        const me = this;
+        if (me._isPopout === active) return;
+        me._isPopout = active;
+
+        if (me.header && typeof me.header.updatePopoutState === 'function') {
+            me.header.updatePopoutState(active);
+        }
+
+        if (!me.element) return;
+
+        if (active) {
+            if (me._resizeHandleManager) {
+                me._resizeHandleManager.destroy();
+                me._resizeHandleManager = null;
+            }
+
+            me.renderer.updateStyles(me.element, {
+                width: '100%',
+                height: '100%',
+                top: '0',
+                left: '0',
+                position: 'static',
+                border: 'none',
+                borderRadius: '0',
+                boxShadow: 'none'
+            });
+        } else {
+            me.renderer.updateStyles(me.element, {
+                width: `${me._width}px`,
+                height: `${me._height}px`,
+                position: 'absolute',
+                border: '',
+                borderRadius: '',
+                boxShadow: ''
+            });
+
+            me._initResizeHandles();
+            me._updateGeometryStyles();
+            me.constrainToParent();
+        }
+    }
+
+    /**
      * Destroys the window and cleans up listeners/DOM.
      *
      * @returns {void}
@@ -804,7 +885,8 @@ export class ApplicationWindow extends UIElement {
                 maximized: me._isMaximized,
                 minimized: me._isMinimized,
                 pinned: me._isPinned,
-                tabbed: me._isTabbed
+                tabbed: me._isTabbed,
+                isPopout: me._isPopout
             }
         };
     }
@@ -841,7 +923,7 @@ export class ApplicationWindow extends UIElement {
      */
     _initResizeHandles() {
         const me = this;
-        if (!me.element) return;
+        if (!me.element || me._isTabbed || me._isPopout) return;
 
         me._resizeHandleManager = new ResizeHandleManager(me.element, {
             handles: ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'],
@@ -876,7 +958,7 @@ export class ApplicationWindow extends UIElement {
      */
     _updateGeometryStyles() {
         const me = this;
-        if (me.element && !me._isTabbed) {
+        if (me.element && !me._isTabbed && !me._isPopout) {
             me.renderer.updateGeometry(me.element, me._x, me._y, me._width, me._height);
         }
     }

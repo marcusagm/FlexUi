@@ -4,7 +4,7 @@ import { VanillaRenderer } from './VanillaRenderer.js';
  * Description:
  * A specialized adapter for rendering ApplicationWindowHeader components in a Vanilla JS environment.
  * It encapsulates the DOM structure creation for the window title bar, including controls
- * for minimizing, maximizing, pinning, and closing.
+ * for minimizing, maximizing, pinning, closing, and popping out.
  *
  * Properties summary:
  * - None
@@ -13,14 +13,14 @@ import { VanillaRenderer } from './VanillaRenderer.js';
  * const adapter = new VanillaWindowHeaderAdapter();
  * const header = adapter.createHeaderElement('win-1');
  * adapter.buildStructure(header, 'My Title');
- * adapter.setTabMode(header, true);
+ * adapter.setPopoutState(header, true);
  *
  * Events:
  * - None
  *
  * Business rules implemented:
  * - Enforces BEM structure (.window-header, .window-header__title, etc.).
- * - Manages visual states for Tab Mode (docked) vs Window Mode (floating).
+ * - Manages visual states for Tab Mode (docked) vs Window Mode (floating) vs Popout Mode.
  * - Provides accessors for control buttons to attach listeners.
  *
  * Dependencies:
@@ -73,25 +73,24 @@ export class VanillaWindowHeaderAdapter extends VanillaRenderer {
             return;
         }
 
-        // 1. Title
         const titleElement = me.createElement('span', {
             className: 'window-header__title'
         });
         titleElement.textContent = title || '';
         me.mount(headerElement, titleElement);
 
-        // 2. Controls Container
         const controlsContainer = me.createElement('div', {
             className: 'window-header__controls'
         });
 
-        // 3. Buttons
+        const popoutButton = me._createButton('popout', '↗', 'Popout Window');
         const pinButton = me._createButton('pin', '📌', 'Always on Top');
         const minimizeButton = me._createButton('minimize', '−', 'Minimize');
         const maximizeButton = me._createButton('maximize', '□', 'Maximize');
         const closeButton = me._createButton('close', '×', 'Close');
         closeButton.classList.add('window-header__btn--close');
 
+        me.mount(controlsContainer, popoutButton);
         me.mount(controlsContainer, pinButton);
         me.mount(controlsContainer, minimizeButton);
         me.mount(controlsContainer, maximizeButton);
@@ -118,7 +117,7 @@ export class VanillaWindowHeaderAdapter extends VanillaRenderer {
 
     /**
      * Toggles the header display mode between Tabbed (Docked) and Window (Floating).
-     * In Tab mode, irrelevant controls (Pin, Min, Max) are hidden.
+     * In Tab mode, irrelevant controls (Pin, Min, Max, Popout) are hidden.
      *
      * @param {HTMLElement} headerElement - The root header element.
      * @param {boolean} isTabMode - True for tabbed mode, false for window mode.
@@ -131,6 +130,7 @@ export class VanillaWindowHeaderAdapter extends VanillaRenderer {
         const pinBtn = me.getPinButton(headerElement);
         const minBtn = me.getMinimizeButton(headerElement);
         const maxBtn = me.getMaximizeButton(headerElement);
+        const popoutBtn = me.getPopoutButton(headerElement);
 
         const displayStyle = isTabMode ? 'none' : '';
 
@@ -143,6 +143,46 @@ export class VanillaWindowHeaderAdapter extends VanillaRenderer {
         if (pinBtn) me.updateStyles(pinBtn, { display: displayStyle });
         if (minBtn) me.updateStyles(minBtn, { display: displayStyle });
         if (maxBtn) me.updateStyles(maxBtn, { display: displayStyle });
+        if (popoutBtn) me.updateStyles(popoutBtn, { display: displayStyle });
+    }
+
+    /**
+     * Updates the visual state for Popout Mode.
+     * Hides window management controls (Min, Max, Pin, Close) as the native window handles them.
+     * Changes the Popout button icon to indicate "Return".
+     *
+     * @param {HTMLElement} headerElement - The root header element.
+     * @param {boolean} isPopout - True if in popout mode.
+     * @returns {void}
+     */
+    setPopoutMode(headerElement, isPopout) {
+        const me = this;
+        if (!(headerElement instanceof HTMLElement)) return;
+
+        const popoutBtn = me.getPopoutButton(headerElement);
+        const pinBtn = me.getPinButton(headerElement);
+        const minBtn = me.getMinimizeButton(headerElement);
+        const maxBtn = me.getMaximizeButton(headerElement);
+        const closeBtn = me.getCloseButton(headerElement);
+
+        if (popoutBtn) {
+            if (isPopout) {
+                popoutBtn.innerHTML = '&#8601;';
+                popoutBtn.setAttribute('aria-label', 'Return to Workspace');
+                popoutBtn.title = 'Return to Workspace';
+            } else {
+                popoutBtn.innerHTML = '↗';
+                popoutBtn.setAttribute('aria-label', 'Popout Window');
+                popoutBtn.title = 'Popout Window';
+            }
+        }
+
+        const visibility = isPopout ? 'none' : '';
+
+        if (pinBtn) me.updateStyles(pinBtn, { display: visibility });
+        if (minBtn) me.updateStyles(minBtn, { display: visibility });
+        if (maxBtn) me.updateStyles(maxBtn, { display: visibility });
+        if (closeBtn) me.updateStyles(closeBtn, { display: visibility });
     }
 
     /**
@@ -209,6 +249,17 @@ export class VanillaWindowHeaderAdapter extends VanillaRenderer {
     }
 
     /**
+     * Retrieves the Popout button element.
+     *
+     * @param {HTMLElement} headerElement - The root header element.
+     * @returns {HTMLElement|null} The button element.
+     */
+    getPopoutButton(headerElement) {
+        if (!headerElement) return null;
+        return headerElement.querySelector('.window-header__btn--popout');
+    }
+
+    /**
      * Helper to create a standardized control button.
      *
      * @param {string} action - The action identifier (class suffix).
@@ -221,12 +272,12 @@ export class VanillaWindowHeaderAdapter extends VanillaRenderer {
         const me = this;
         const button = me.createElement('button', {
             className: `window-header__btn window-header__btn--${action}`,
-            type: 'button'
+            type: 'button',
+            title: ariaLabel
         });
-        button.textContent = label;
+        button.innerHTML = label;
         button.setAttribute('aria-label', ariaLabel);
 
-        // Stop propagation on pointerdown to prevent dragging the window via buttons
         me.on(button, 'pointerdown', event => event.stopPropagation());
 
         return button;
