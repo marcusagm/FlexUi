@@ -838,7 +838,18 @@ export class PanelGroup extends UIElement {
 
         if (me.element) {
             me.renderer.setFloatingMode(me.element, isFloating);
-            me.renderer.updateGeometry(me.element, x, y, me._width, me._height);
+
+            if (isFloating) {
+                me.renderer.updateGeometry(me.element, x, y, me._width, me._height);
+            } else {
+                me.renderer.updateStyles(me.element, {
+                    width: '',
+                    height: '',
+                    top: '',
+                    left: '',
+                    position: ''
+                });
+            }
         }
 
         if (isFloating) {
@@ -1386,7 +1397,6 @@ export class PanelGroup extends UIElement {
             if (data.config.closable !== undefined) me.closable = data.config.closable;
             if (data.config.collapsible !== undefined) me.collapsible = data.config.collapsible;
             if (data.config.movable !== undefined) me.movable = data.config.movable;
-
             if (data.config.minHeight !== undefined) me._minHeight = data.config.minHeight;
             if (data.config.minWidth !== undefined) me._minWidth = data.config.minWidth;
         }
