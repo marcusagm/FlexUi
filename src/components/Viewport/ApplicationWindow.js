@@ -26,6 +26,7 @@ import { WindowApi } from '../../api/WindowApi.js';
  * - isMinimized {boolean} : Minimized state flag.
  * - isPinned {boolean} : Pinned (always on top) state flag.
  * - isTabbed {boolean} : Tabbed (docked) state flag.
+ * - activeTab {boolean} : Active tab state flag (controlled by Viewport).
  * - header {ApplicationWindowHeader} : The window header component.
  * - contentElement {HTMLElement|null} : The container for window content.
  * - api {WindowApi} : The public API facade.
@@ -165,6 +166,15 @@ export class ApplicationWindow extends UIElement {
      * @private
      */
     _isTabbed = false;
+
+    /**
+     * Active Tab state flag.
+     * Controlled externally by Viewport when in tabbed mode.
+     *
+     * @type {boolean}
+     * @private
+     */
+    _isActiveTab = false;
 
     /**
      * Geometry snapshot before maximization.
@@ -376,6 +386,27 @@ export class ApplicationWindow extends UIElement {
     set isFocused(value) {
         const me = this;
         me._isFocused = !!value;
+        me._updateState();
+    }
+
+    /**
+     * ActiveTab state getter.
+     *
+     * @returns {boolean}
+     */
+    get activeTab() {
+        return this._isActiveTab;
+    }
+
+    /**
+     * ActiveTab state setter.
+     * Updates the visual class for tab content visibility.
+     *
+     * @param {boolean} value
+     */
+    set activeTab(value) {
+        const me = this;
+        me._isActiveTab = !!value;
         me._updateState();
     }
 
@@ -864,7 +895,8 @@ export class ApplicationWindow extends UIElement {
                 minimized: me._isMinimized,
                 focused: me._isFocused,
                 pinned: me._isPinned,
-                tabbed: me._isTabbed
+                tabbed: me._isTabbed,
+                activeTab: me._isActiveTab
             });
         }
     }

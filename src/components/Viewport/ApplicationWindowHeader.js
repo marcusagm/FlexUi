@@ -155,12 +155,20 @@ export class ApplicationWindowHeader extends UIElement {
         const me = this;
         const element = me.renderer.createHeaderElement(me.id);
         me.renderer.buildStructure(element, me._initialTitle);
+
+        me._dragTrigger = new DragTrigger(element, {
+            threshold: 3,
+            onDragStart: (event, startCoords) => me._startDrag(event, startCoords),
+            onClick: () => me._onHeaderClick()
+        });
+
+        me._attachListeners(element);
+
         return element;
     }
 
     /**
      * Implementation of mount logic.
-     * Initializes DragTrigger and event listeners.
      *
      * @param {HTMLElement} container - The parent container.
      * @protected
@@ -168,49 +176,34 @@ export class ApplicationWindowHeader extends UIElement {
     _doMount(container) {
         const me = this;
         super._doMount(container);
-
-        if (me.element) {
-            me._dragTrigger = new DragTrigger(me.element, {
-                threshold: 3,
-                onDragStart: (event, startCoords) => me._startDrag(event, startCoords),
-                onClick: () => me._onHeaderClick()
-            });
-
-            me._attachListeners();
-        }
+        // Logic moved to _doRender to support TabStrip usage without explicit mount
     }
 
     /**
      * Implementation of unmount logic.
-     * Cleans up DragTrigger and listeners.
      *
      * @protected
      */
     _doUnmount() {
-        const me = this;
-        if (me._dragTrigger) {
-            me._dragTrigger.destroy();
-            me._dragTrigger = null;
-        }
-
-        me._detachListeners();
+        // Logic moved to dispose/cleanup methods as unmount is unreliable in TabStrip context
         super._doUnmount();
     }
 
     /**
      * Attaches listeners to the control buttons via the adapter.
      *
+     * @param {HTMLElement} element - The header element.
      * @private
      * @returns {void}
      */
-    _attachListeners() {
+    _attachListeners(element) {
         const me = this;
-        if (!me.element) return;
+        if (!element) return;
 
-        const closeBtn = me.renderer.getCloseButton(me.element);
-        const minBtn = me.renderer.getMinimizeButton(me.element);
-        const maxBtn = me.renderer.getMaximizeButton(me.element);
-        const pinBtn = me.renderer.getPinButton(me.element);
+        const closeBtn = me.renderer.getCloseButton(element);
+        const minBtn = me.renderer.getMinimizeButton(element);
+        const maxBtn = me.renderer.getMaximizeButton(element);
+        const pinBtn = me.renderer.getPinButton(element);
 
         if (closeBtn) me.renderer.on(closeBtn, 'click', me._boundOnCloseClick);
         if (minBtn) me.renderer.on(minBtn, 'click', me._boundOnMinimizeClick);
@@ -237,6 +230,23 @@ export class ApplicationWindowHeader extends UIElement {
         if (minBtn) me.renderer.off(minBtn, 'click', me._boundOnMinimizeClick);
         if (maxBtn) me.renderer.off(maxBtn, 'click', me._boundOnMaximizeClick);
         if (pinBtn) me.renderer.off(pinBtn, 'click', me._boundOnPinClick);
+    }
+
+    /**
+     * Cleans up resources.
+     * Overrides Disposable.dispose to ensure listeners and DragTrigger are removed,
+     * as unmount() might not have been called if managed by TabStrip.
+     *
+     * @returns {void}
+     */
+    dispose() {
+        const me = this;
+        if (me._dragTrigger) {
+            me._dragTrigger.destroy();
+            me._dragTrigger = null;
+        }
+        me._detachListeners();
+        super.dispose();
     }
 
     /**

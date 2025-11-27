@@ -139,6 +139,7 @@ export class VanillaWindowAdapter extends VanillaRenderer {
      * @param {boolean} [state.focused] - Whether the window is focused.
      * @param {boolean} [state.pinned] - Whether the window is pinned (always on top).
      * @param {boolean} [state.tabbed] - Whether the window is tabbed (docked).
+     * @param {boolean} [state.activeTab] - Whether the window is the active tab (visible).
      * @returns {void}
      */
     updateStateClasses(element, state = {}) {
@@ -154,6 +155,7 @@ export class VanillaWindowAdapter extends VanillaRenderer {
         element.classList.toggle('application-window--focused', !!state.focused);
         element.classList.toggle('application-window--pinned', !!state.pinned);
         element.classList.toggle('application-window--tabbed', !!state.tabbed);
+        element.classList.toggle('application-window--active-tab', !!state.activeTab);
     }
 
     /**

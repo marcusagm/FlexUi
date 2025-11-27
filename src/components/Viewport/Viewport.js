@@ -309,9 +309,10 @@ export class Viewport extends UIElement {
      * Adds a window to the viewport and mounts it.
      *
      * @param {import('./ApplicationWindow.js').ApplicationWindow} windowInstance - The window to add.
+     * @param {boolean} [doFocus=true] - Whether to focus the window immediately.
      * @returns {void}
      */
-    addWindow(windowInstance) {
+    addWindow(windowInstance, doFocus = true) {
         const me = this;
         if (!windowInstance) {
             console.warn('Viewport: Attempted to add invalid window.');
@@ -326,7 +327,9 @@ export class Viewport extends UIElement {
             }
         }
 
-        me.focusWindow(windowInstance);
+        if (doFocus) {
+            me.focusWindow(windowInstance);
+        }
     }
 
     /**
@@ -348,9 +351,7 @@ export class Viewport extends UIElement {
 
         if (windowInstance.isTabbed && windowInstance.header) {
             me._tabStrip.removeItem(windowInstance.header);
-            if (windowInstance.element) {
-                windowInstance.element.classList.remove('application-window--active-tab');
-            }
+            windowInstance.activeTab = false;
         }
 
         me._windows.splice(index, 1);
@@ -417,35 +418,11 @@ export class Viewport extends UIElement {
             me._windows.forEach(win => {
                 if (win.isTabbed) {
                     const isActive = win === windowInstance;
-                    if (win.element) {
-                        win.element.classList.toggle('application-window--active-tab', isActive);
-                    }
+                    win.activeTab = isActive;
                 }
             });
         } else {
             me._updateZIndices();
-
-            const hasActiveTab = me._windows.some(
-                w =>
-                    w.isTabbed &&
-                    w.element &&
-                    w.element.classList.contains('application-window--active-tab')
-            );
-
-            if (!hasActiveTab && me._tabStrip.items.length > 0) {
-                for (let i = me._windows.length - 1; i >= 0; i--) {
-                    const win = me._windows[i];
-                    if (win.isTabbed) {
-                        if (win.element) {
-                            win.element.classList.add('application-window--active-tab');
-                        }
-                        if (win.header) {
-                            me._tabStrip.setActiveItem(win.header);
-                        }
-                        break;
-                    }
-                }
-            }
         }
     }
 
@@ -491,10 +468,7 @@ export class Viewport extends UIElement {
         if (!windowInstance.isTabbed) return;
 
         windowInstance.setTabbed(false);
-
-        if (windowInstance.element) {
-            windowInstance.element.classList.remove('application-window--active-tab');
-        }
+        windowInstance.activeTab = false;
 
         if (windowInstance.header) {
             me._tabStrip.removeItem(windowInstance.header);
@@ -620,12 +594,20 @@ export class Viewport extends UIElement {
             data.windows.forEach(winData => {
                 const win = factory.createWindow(winData);
                 if (win) {
-                    me.addWindow(win);
-                    if (win.isTabbed) {
+                    const isTabbed = win.isTabbed;
+                    me.addWindow(win, !isTabbed);
+
+                    if (isTabbed) {
                         me.dockWindow(win);
                     }
                 }
             });
+        }
+
+        // Force focus on the last window to ensure active state is applied
+        if (me._windows.length > 0) {
+            const activeWindow = me._windows[me._windows.length - 1];
+            me.focusWindow(activeWindow, true);
         }
     }
 
