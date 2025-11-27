@@ -128,3 +128,39 @@
     );
     cursor: nesw-resize;
 }
+
+/* --- Context Specific Overrides ---
+   Solves the Z-Index stacking issue between docked and floating elements.
+*/
+
+/* Docked Panel Handles:
+   Must be low enough to not cover floating windows (usually > 100),
+   but high enough to be clickable over the panel content.
+   Added: row and column handles to ensure consistency.
+*/
+.panel-group__resize-handle,
+.viewport-resize-handle,
+.row__resize-handle,
+.column__resize-handle {
+    z-index: 10;
+}
+
+/* Floating Window Handles:
+   Must be high enough to sit on top of the window content itself.
+   The window container manages the global z-index (stacking context),
+   so this only needs to be higher than the window's internal content.
+*/
+.window-resize-handle,
+.panel-group__resize-handle--floating {
+    z-index: 20;
+}
+
+/* --- Global DND State --- */
+
+/* Hide all resize handles when Drag and Drop is active.
+   This prevents handles from catching pointer events or showing hover states
+   while the user is dragging a panel over them.
+*/
+body.dnd-active .resize-handle {
+    display: none !important;
+}
