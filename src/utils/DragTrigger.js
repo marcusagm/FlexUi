@@ -3,33 +3,45 @@
  * A utility class that encapsulates the logic to differentiate between a simple "Click"
  * and a "Drag Start" gesture based on a movement threshold.
  *
- * It handles the `pointerdown` event, monitors movement, and either triggers
- * `onDragStart` (if the threshold is exceeded) or `onClick` (if the pointer is released beforehand).
+ * It handles the 'pointerdown' event, monitors movement, and either triggers
+ * 'onDragStart' (if the threshold is exceeded) or 'onClick' (if the pointer is released beforehand).
  *
  * Properties summary:
  * - _element {HTMLElement} : The target element to listen to.
  * - _threshold {number} : The pixel distance required to trigger a drag.
  * - _callbacks {object} : Registered callbacks for drag start and click.
  * - _startState {object|null} : Stores initial pointer coordinates and ID.
- * - _bound... {Function} : Bound event listeners for cleanup.
+ * - _boundOnPointerDown {Function} : Bound handler for pointer down.
+ * - _boundOnPointerMove {Function} : Bound handler for pointer move.
+ * - _boundOnPointerUp {Function} : Bound handler for pointer up.
  *
  * Typical usage:
  * const trigger = new DragTrigger(myElement, {
  * threshold: 5,
- * onDragStart: (e) => { console.log('Drag started!'); },
- * onClick: (e) => { console.log('Clicked!'); }
+ * onDragStart: (event, coords) => { console.log('Drag started', coords); },
+ * onClick: (event) => { console.log('Clicked'); }
  * });
  *
  * Events:
  * - Listens to 'pointerdown' on the element.
  * - Listens to 'pointermove', 'pointerup', 'pointercancel' on window during interaction.
  *
+ * Business rules implemented:
+ * - Validates input element and callbacks.
+ * - Differentiates drag vs click based on threshold.
+ * - Manages pointer capture to ensure drag continuity.
+ * - Cleans up global listeners automatically after interaction.
+ *
  * Dependencies:
  * - None
+ *
+ * Notes / Additional:
+ * - Ensure the element has 'touch-action: none' via CSS or it is applied here.
  */
 export class DragTrigger {
     /**
      * The target element to listen to.
+     *
      * @type {HTMLElement}
      * @private
      */
@@ -37,13 +49,15 @@ export class DragTrigger {
 
     /**
      * The pixel distance required to trigger a drag.
+     *
      * @type {number}
      * @private
      */
-    _threshold;
+    _threshold = 5;
 
     /**
-     * Registered callbacks.
+     * Registered callbacks for drag start and click.
+     *
      * @type {{
      * onDragStart: Function,
      * onClick?: Function
@@ -54,6 +68,7 @@ export class DragTrigger {
 
     /**
      * Stores initial pointer coordinates and ID.
+     *
      * @type {{
      * startX: number,
      * startY: number,
@@ -66,6 +81,7 @@ export class DragTrigger {
 
     /**
      * Bound handler for pointer down.
+     *
      * @type {Function}
      * @private
      */
@@ -73,6 +89,7 @@ export class DragTrigger {
 
     /**
      * Bound handler for pointer move.
+     *
      * @type {Function}
      * @private
      */
@@ -80,6 +97,7 @@ export class DragTrigger {
 
     /**
      * Bound handler for pointer up.
+     *
      * @type {Function}
      * @private
      */
@@ -97,16 +115,17 @@ export class DragTrigger {
     constructor(element, { threshold = 5, onDragStart, onClick } = {}) {
         const me = this;
 
-        if (!element) {
-            throw new Error('DragTrigger: element is required.');
+        if (!element || !(element instanceof HTMLElement)) {
+            throw new Error('[DragTrigger] element is required and must be an HTMLElement.');
         }
         if (typeof onDragStart !== 'function') {
-            throw new Error('DragTrigger: onDragStart callback is required.');
+            throw new Error('[DragTrigger] onDragStart callback is required.');
         }
 
         me._element = element;
-        me._threshold = threshold;
         me._callbacks = { onDragStart, onClick };
+
+        me.threshold = threshold;
 
         me._boundOnPointerDown = me._onPointerDown.bind(me);
         me._boundOnPointerMove = me._onPointerMove.bind(me);
@@ -116,19 +135,35 @@ export class DragTrigger {
     }
 
     /**
-     * Attaches the initial pointerdown listener.
-     * @private
+     * Sets the drag threshold distance.
+     *
+     * @param {number} value - The threshold in pixels.
      * @returns {void}
      */
-    _init() {
+    set threshold(value) {
         const me = this;
-        // Ensure touch-action is none to prevent native scrolling interference
-        me._element.style.touchAction = 'none';
-        me._element.addEventListener('pointerdown', me._boundOnPointerDown);
+        const numberValue = Number(value);
+        if (Number.isNaN(numberValue) || numberValue < 0) {
+            console.warn(
+                `[DragTrigger] invalid threshold assignment (${value}). Must be a positive number. Keeping previous value: ${me._threshold}`
+            );
+            return;
+        }
+        me._threshold = numberValue;
+    }
+
+    /**
+     * Gets the drag threshold distance.
+     *
+     * @returns {number} The threshold in pixels.
+     */
+    get threshold() {
+        return this._threshold;
     }
 
     /**
      * Cleans up listeners and destroys the instance.
+     *
      * @returns {void}
      */
     destroy() {
@@ -141,24 +176,35 @@ export class DragTrigger {
     }
 
     /**
+     * Attaches the initial pointerdown listener.
+     *
+     * @private
+     * @returns {void}
+     */
+    _init() {
+        const me = this;
+        me._element.style.touchAction = 'none';
+        me._element.addEventListener('pointerdown', me._boundOnPointerDown);
+    }
+
+    /**
      * Handles the initial pointer down event.
-     * @param {PointerEvent} event
+     *
+     * @param {PointerEvent} event - The native pointer event.
      * @private
      * @returns {void}
      */
     _onPointerDown(event) {
         const me = this;
-        // Only left mouse button or touch
+
         if (event.button !== 0) {
             return;
         }
 
-        // Ignore if draggable is explicitly disabled on the element
         if (me._element.getAttribute('draggable') === 'false') {
             return;
         }
 
-        // Prevent default to avoid text selection/scrolling
         event.preventDefault();
         event.stopPropagation();
 
@@ -181,7 +227,8 @@ export class DragTrigger {
 
     /**
      * Monitors movement to detect if the threshold is exceeded.
-     * @param {PointerEvent} event
+     *
+     * @param {PointerEvent} event - The native pointer event.
      * @private
      * @returns {void}
      */
@@ -191,12 +238,10 @@ export class DragTrigger {
             return;
         }
 
-        const dx = Math.abs(event.clientX - me._startState.startX);
-        const dy = Math.abs(event.clientY - me._startState.startY);
+        const deltaX = Math.abs(event.clientX - me._startState.startX);
+        const deltaY = Math.abs(event.clientY - me._startState.startY);
 
-        if (dx > me._threshold || dy > me._threshold) {
-            // Threshold exceeded: It is a Drag.
-            // We invoke the callback with the CURRENT event (to have up-to-date coordinates)
+        if (deltaX > me._threshold || deltaY > me._threshold) {
             if (typeof me._callbacks.onDragStart === 'function') {
                 me._callbacks.onDragStart(event, {
                     startX: me._startState.startX,
@@ -204,8 +249,6 @@ export class DragTrigger {
                 });
             }
 
-            // Once drag starts, this utility's job is done.
-            // The external handler (e.g., DragDropService) takes over tracking.
             me._cleanupGlobalListeners();
         }
     }
@@ -213,7 +256,8 @@ export class DragTrigger {
     /**
      * Handles pointer up (release) before threshold was met.
      * This counts as a Click.
-     * @param {PointerEvent} event
+     *
+     * @param {PointerEvent} event - The native pointer event.
      * @private
      * @returns {void}
      */
@@ -223,7 +267,6 @@ export class DragTrigger {
             return;
         }
 
-        // If we reached here, threshold was NOT exceeded. It is a Click.
         if (typeof me._callbacks.onClick === 'function') {
             me._callbacks.onClick(event);
         }
@@ -233,6 +276,7 @@ export class DragTrigger {
 
     /**
      * Removes temporary global listeners used during the interaction.
+     *
      * @private
      * @returns {void}
      */
@@ -243,7 +287,7 @@ export class DragTrigger {
             if (target && typeof target.releasePointerCapture === 'function') {
                 try {
                     target.releasePointerCapture(me._startState.pointerId);
-                } catch (e) {
+                } catch (error) {
                     // Ignore if pointer was already released or lost
                 }
             }
