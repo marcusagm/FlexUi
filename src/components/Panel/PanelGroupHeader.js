@@ -326,6 +326,24 @@ export class PanelGroupHeader extends UIElement {
             // Apply initial state
             me.renderer.setSimpleMode(me.element, me.tabStrip.isSimpleModeActive);
         }
+
+        me._syncVisibility();
+    }
+
+    /**
+     * Syncs the initial visibility configuration from the panel group to the header.
+     *
+     * @private
+     * @returns {void}
+     */
+    _syncVisibility() {
+        const me = this;
+        if (!me.panelGroup) return;
+        me.updateConfig({
+            closable: me.panelGroup.closable,
+            collapsible: me.panelGroup.collapsible,
+            movable: me.panelGroup.movable
+        });
     }
 
     /**
@@ -467,6 +485,7 @@ export class PanelGroupHeader extends UIElement {
      * @param {object} config - Configuration object.
      * @param {boolean} [config.closable] - Whether to show the close button.
      * @param {boolean} [config.movable] - Whether to show the move handle.
+     * @param {boolean} [config.collapsible] - Whether to show the collapse button.
      * @returns {void}
      */
     updateConfig(config) {
@@ -478,6 +497,9 @@ export class PanelGroupHeader extends UIElement {
         }
         if (config.movable !== undefined) {
             me.renderer.setMoveHandleVisibility(me.element, config.movable);
+        }
+        if (config.collapsible !== undefined) {
+            me.renderer.setCollapseButtonVisibility(me.element, config.collapsible);
         }
     }
 }

@@ -284,13 +284,13 @@ export class PanelGroup extends UIElement {
 
         me._api = new GroupApi(me);
 
+        me._header = new PanelGroupHeader(me);
+
         if (config.minHeight !== undefined) me._minHeight = config.minHeight;
         if (config.minWidth !== undefined) me._minWidth = config.minWidth;
-        if (config.closable !== undefined) me._closable = config.closable;
-        if (config.collapsible !== undefined) me._collapsible = config.collapsible;
-        if (config.movable !== undefined) me._movable = config.movable;
-
-        me._header = new PanelGroupHeader(me);
+        if (config.closable !== undefined) me.closable = config.closable;
+        if (config.collapsible !== undefined) me.collapsible = config.collapsible;
+        if (config.movable !== undefined) me.movable = config.movable;
 
         if (height !== null) {
             me.height = height;
@@ -610,6 +610,27 @@ export class PanelGroup extends UIElement {
     }
 
     /**
+     * Closable setter.
+     * Propagates config to header.
+     *
+     * @param {boolean} value
+     * @returns {void}
+     */
+    set closable(value) {
+        const me = this;
+        if (typeof value !== 'boolean') {
+            console.warn(
+                `[PanelGroup] invalid closable assignment (${value}). Must be boolean. Keeping previous value: ${me._closable}`
+            );
+            return;
+        }
+        me._closable = value;
+        if (me.header) {
+            me.header.updateConfig({ closable: value });
+        }
+    }
+
+    /**
      * Collapsible getter.
      *
      * @returns {boolean}
@@ -619,12 +640,54 @@ export class PanelGroup extends UIElement {
     }
 
     /**
+     * Collapsible setter.
+     * Propagates config to header.
+     *
+     * @param {boolean} value
+     * @returns {void}
+     */
+    set collapsible(value) {
+        const me = this;
+        if (typeof value !== 'boolean') {
+            console.warn(
+                `[PanelGroup] invalid collapsible assignment (${value}). Must be boolean. Keeping previous value: ${me._collapsible}`
+            );
+            return;
+        }
+        me._collapsible = value;
+        if (me.header) {
+            me.header.updateConfig({ collapsible: value });
+        }
+    }
+
+    /**
      * Movable getter.
      *
      * @returns {boolean}
      */
     get movable() {
         return this._movable;
+    }
+
+    /**
+     * Movable setter.
+     * Propagates config to header.
+     *
+     * @param {boolean} value
+     * @returns {void}
+     */
+    set movable(value) {
+        const me = this;
+        if (typeof value !== 'boolean') {
+            console.warn(
+                `[PanelGroup] invalid movable assignment (${value}). Must be boolean. Keeping previous value: ${me._movable}`
+            );
+            return;
+        }
+        me._movable = value;
+        if (me.header) {
+            me.header.updateConfig({ movable: value });
+        }
     }
 
     /**
@@ -827,7 +890,8 @@ export class PanelGroup extends UIElement {
         if (me.header) {
             me.header.updateConfig({
                 closable: me._closable,
-                movable: me._movable
+                movable: me._movable,
+                collapsible: me._collapsible
             });
         }
     }
@@ -1257,9 +1321,11 @@ export class PanelGroup extends UIElement {
         if (data.x !== undefined) me._x = data.x;
         if (data.y !== undefined) me._y = data.y;
         if (data.config) {
-            if (data.config.closable !== undefined) me._closable = data.config.closable;
-            if (data.config.collapsible !== undefined) me._collapsible = data.config.collapsible;
-            if (data.config.movable !== undefined) me._movable = data.config.movable;
+            // Use setters to ensure side effects (header update)
+            if (data.config.closable !== undefined) me.closable = data.config.closable;
+            if (data.config.collapsible !== undefined) me.collapsible = data.config.collapsible;
+            if (data.config.movable !== undefined) me.movable = data.config.movable;
+
             if (data.config.minHeight !== undefined) me._minHeight = data.config.minHeight;
             if (data.config.minWidth !== undefined) me._minWidth = data.config.minWidth;
         }

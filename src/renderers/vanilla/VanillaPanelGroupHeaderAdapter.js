@@ -24,6 +24,9 @@ import { VanillaRenderer } from './VanillaRenderer.js';
  *
  * Dependencies:
  * - {import('./VanillaRenderer.js').VanillaRenderer}
+ *
+ * Notes / Additional:
+ * - None
  */
 export class VanillaPanelGroupHeaderAdapter extends VanillaRenderer {
     /**
@@ -62,7 +65,6 @@ export class VanillaPanelGroupHeaderAdapter extends VanillaRenderer {
             id: `panel-group-header-${id}`
         });
 
-        // 1. Move Handle
         const moveHandle = me.createElement('div', {
             className: 'panel-group__move-handle panel__move-handle',
             style: { touchAction: 'none' }
@@ -78,11 +80,9 @@ export class VanillaPanelGroupHeaderAdapter extends VanillaRenderer {
         me.mount(moveHandle, handleIcon);
         me.mount(headerElement, moveHandle);
 
-        // 2. Tab Container Slot (Where TabStrip will be mounted)
         const tabSlot = me.createElement('div', {
             className: 'panel-group__tab-container-slot'
         });
-        // Styles to ensure it fills the space
         me.updateStyles(tabSlot, {
             flexGrow: '1',
             overflow: 'hidden',
@@ -91,20 +91,17 @@ export class VanillaPanelGroupHeaderAdapter extends VanillaRenderer {
         });
         me.mount(headerElement, tabSlot);
 
-        // 3. Controls Container (Optional wrapper for better layout control)
         const controlsContainer = me.createElement('div', {
             className: 'panel-group__controls',
             style: { display: 'flex', alignItems: 'center' }
         });
 
-        // 4. Collapse Button
         const collapseButton = me.createElement('button', {
             className: 'panel-group__collapse-btn panel__collapse-btn',
             type: 'button'
         });
         me.mount(controlsContainer, collapseButton);
 
-        // 5. Close Button
         const closeButton = me.createElement('button', {
             className: 'panel-group__close-btn panel__close-btn',
             type: 'button'
@@ -192,17 +189,17 @@ export class VanillaPanelGroupHeaderAdapter extends VanillaRenderer {
         const safeTitle = title || 'Group';
 
         const moveHandle = me.getMoveHandle(headerElement);
-        const collapseBtn = me.getCollapseButton(headerElement);
-        const closeBtn = me.getCloseButton(headerElement);
+        const collapseButton = me.getCollapseButton(headerElement);
+        const closeButton = me.getCloseButton(headerElement);
 
         if (moveHandle) {
             moveHandle.setAttribute('aria-label', `Move group ${safeTitle}`);
         }
-        if (collapseBtn) {
-            collapseBtn.setAttribute('aria-label', `Collapse group ${safeTitle}`);
+        if (collapseButton) {
+            collapseButton.setAttribute('aria-label', `Collapse group ${safeTitle}`);
         }
-        if (closeBtn) {
-            closeBtn.setAttribute('aria-label', `Close group ${safeTitle}`);
+        if (closeButton) {
+            closeButton.setAttribute('aria-label', `Close group ${safeTitle}`);
         }
     }
 
@@ -217,13 +214,13 @@ export class VanillaPanelGroupHeaderAdapter extends VanillaRenderer {
         const me = this;
         if (!headerElement) return;
 
-        const btn = me.getCollapseButton(headerElement);
-        if (btn) {
+        const button = me.getCollapseButton(headerElement);
+        if (button) {
             const collapsedClass = 'panel-group__collapse-btn--collapsed';
             if (isCollapsed) {
-                btn.classList.add(collapsedClass);
+                button.classList.add(collapsedClass);
             } else {
-                btn.classList.remove(collapsedClass);
+                button.classList.remove(collapsedClass);
             }
         }
     }
@@ -239,9 +236,24 @@ export class VanillaPanelGroupHeaderAdapter extends VanillaRenderer {
         const me = this;
         if (!headerElement) return;
 
-        const btn = me.getCollapseButton(headerElement);
-        if (btn) {
-            btn.disabled = !!isDisabled;
+        const button = me.getCollapseButton(headerElement);
+        if (button) {
+            button.disabled = !!isDisabled;
+        }
+    }
+
+    /**
+     * Sets the visibility of the collapse button.
+     *
+     * @param {HTMLElement} headerElement - The root header element.
+     * @param {boolean} visible - Whether the button should be visible.
+     * @returns {void}
+     */
+    setCollapseButtonVisibility(headerElement, visible) {
+        const me = this;
+        const button = me.getCollapseButton(headerElement);
+        if (button) {
+            me.updateStyles(button, { display: visible ? '' : 'none' });
         }
     }
 
@@ -254,9 +266,9 @@ export class VanillaPanelGroupHeaderAdapter extends VanillaRenderer {
      */
     setCloseButtonVisibility(headerElement, visible) {
         const me = this;
-        const btn = me.getCloseButton(headerElement);
-        if (btn) {
-            me.updateStyles(btn, { display: visible ? '' : 'none' });
+        const button = me.getCloseButton(headerElement);
+        if (button) {
+            me.updateStyles(button, { display: visible ? '' : 'none' });
         }
     }
 
