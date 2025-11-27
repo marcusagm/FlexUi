@@ -114,24 +114,19 @@ export class LayoutService {
         const rows = container.rows;
         if (!rows || rows.length === 0) return;
 
-        // Calculate uncollapsed rows to enforce "always one visible" rule
         const uncollapsedRows = rows.filter(r => !r.collapsed);
 
         rows.forEach((row, index) => {
             const isLast = index === rows.length - 1;
 
-            // Update resize bars availability
             if (typeof row.updateAllResizeBars === 'function') {
                 row.updateAllResizeBars();
             }
 
-            // Update height styles (last row usually fills space)
             if (typeof row.updateHeight === 'function') {
                 row.updateHeight(isLast);
             }
 
-            // Enable/Disable collapse button using public API
-            // Disable if this is the only visible row
             if (typeof row.setCollapseButtonDisabled === 'function') {
                 const isLastVisible = uncollapsedRows.length <= 1 && uncollapsedRows.includes(row);
                 row.setCollapseButtonDisabled(isLastVisible);
@@ -155,17 +150,14 @@ export class LayoutService {
         columns.forEach((column, index) => {
             const isLast = index === columns.length - 1;
 
-            // Update resize handles
             if (typeof column.addResizeBars === 'function') {
                 column.addResizeBars(isLast);
             }
 
-            // Update width styles (last column fills space)
             if (typeof column.updateWidth === 'function') {
                 column.updateWidth(isLast);
             }
 
-            // Recalculate constraints based on children
             this._updateChildrenSizes(column);
         });
     }
@@ -191,15 +183,13 @@ export class LayoutService {
     _updateChildrenSizes(column) {
         if (!column) return;
 
-        const children = column.children; // PanelGroups or Viewports
+        const children = column.children;
         if (!children || children.length === 0) return;
 
         let maxMinWidth = 0;
 
-        // 1. Calculate the maximum minimum width required by any child
         children.forEach(child => {
             let childMin = 0;
-            // Use public API to get min width constraint
             if (typeof child.getMinPanelWidth === 'function') {
                 childMin = child.getMinPanelWidth();
             } else if (child.minWidth !== undefined) {
@@ -211,24 +201,21 @@ export class LayoutService {
             }
         });
 
-        // 2. Apply this constraint to the column using public API
         if (typeof column.setComputedMinWidth === 'function') {
             column.setComputedMinWidth(maxMinWidth);
         }
 
-        // 3. Determine layout logic (Fill Space & Collapse)
         const uncollapsedChildren = children.filter(child => {
             return typeof child.collapsed !== 'boolean' || !child.collapsed;
         });
 
         const lastUncollapsed = uncollapsedChildren[uncollapsedChildren.length - 1];
 
-        children.forEach(child => {
+        children.forEach((child, index) => {
             const shouldFill = child === lastUncollapsed;
+            const isLast = index === children.length - 1;
 
-            // [API Use] Set Fill Space behavior
             if (typeof child.setFillSpace === 'function') {
-                // Ensure floating panels don't get layout classes from parent flow
                 if (child.isFloating) {
                     child.setFillSpace(false);
                 } else {
@@ -236,13 +223,14 @@ export class LayoutService {
                 }
             }
 
-            // [API Use] Set Collapse Button State
-            // Enforce "At least one visible" rule:
-            // Disable collapse if this is the ONLY visible child.
             if (typeof child.setCollapseButtonDisabled === 'function') {
                 const isLastVisible =
                     uncollapsedChildren.length <= 1 && uncollapsedChildren.includes(child);
                 child.setCollapseButtonDisabled(isLastVisible);
+            }
+
+            if (typeof child.setResizeHandleVisible === 'function') {
+                child.setResizeHandleVisible(!isLast);
             }
         });
     }

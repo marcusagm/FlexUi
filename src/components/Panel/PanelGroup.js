@@ -256,6 +256,14 @@ export class PanelGroup extends UIElement {
     _boundOnToggleCollapseRequest = null;
 
     /**
+     * Control flag for the visibility of the resize handle in docked mode.
+     *
+     * @type {boolean}
+     * @private
+     */
+    _resizeHandleVisible = true;
+
+    /**
      * The drop zone type identifier.
      *
      * @type {string}
@@ -866,25 +874,7 @@ export class PanelGroup extends UIElement {
             }
         } else {
             if (me._isMaximized) me.toggleMaximize();
-
-            if (me._collapsible && me.element) {
-                me._resizeHandleManager = new ResizeHandleManager(me.element, {
-                    handles: ['s'],
-                    customClass: 'panel-group__resize-handle',
-                    getConstraints: () => ({
-                        minimumWidth: 0,
-                        maximumWidth: Infinity,
-                        minimumHeight: me.getMinPanelHeight(),
-                        maximumHeight: Infinity,
-                        containerRectangle: null
-                    }),
-                    onResize: ({ height }) => {
-                        me._height = height;
-                        me.getThrottledUpdate()();
-                    },
-                    onEnd: () => me.requestLayoutUpdate()
-                });
-            }
+            me._updateDockedResizeHandle();
         }
 
         if (me.header) {
@@ -894,6 +884,66 @@ export class PanelGroup extends UIElement {
                 collapsible: me._collapsible
             });
         }
+    }
+
+    /**
+     * Updates the docked resize handle state based on visibility and floating status.
+     *
+     * @private
+     * @returns {void}
+     */
+    _updateDockedResizeHandle() {
+        const me = this;
+        if (me._isFloating) return;
+        if (!me.element) return;
+
+        if (!me._resizeHandleVisible) {
+            if (me._resizeHandleManager) {
+                me._resizeHandleManager.destroy();
+                me._resizeHandleManager = null;
+            }
+            return;
+        }
+
+        if (!me._resizeHandleManager) {
+            me._resizeHandleManager = new ResizeHandleManager(me.element, {
+                handles: ['s'],
+                customClass: 'panel-group__resize-handle',
+                getConstraints: () => ({
+                    minimumWidth: 0,
+                    maximumWidth: Infinity,
+                    minimumHeight: me.getMinPanelHeight(),
+                    maximumHeight: Infinity,
+                    containerRectangle: null
+                }),
+                onResize: ({ height }) => {
+                    me._height = height;
+                    me.getThrottledUpdate()();
+                },
+                onEnd: () => me.requestLayoutUpdate()
+            });
+
+            if (me.collapsed) {
+                const handles = me.element.querySelectorAll('.resize-handle');
+                handles.forEach(h => {
+                    h.style.display = 'none';
+                });
+            }
+        }
+    }
+
+    /**
+     * Sets whether the resize handle should be visible (used when not floating).
+     * Typically controlled by LayoutService (e.g., hide for last item).
+     *
+     * @param {boolean} visible
+     * @returns {void}
+     */
+    setResizeHandleVisible(visible) {
+        const me = this;
+        if (typeof visible !== 'boolean') return;
+        me._resizeHandleVisible = visible;
+        me._updateDockedResizeHandle();
     }
 
     /**
@@ -1348,6 +1398,20 @@ export class PanelGroup extends UIElement {
             me.setFloatingState(false, null, null);
         }
 
+        me._retorePanels(data);
+
+        if (data.collapsed !== undefined) me.collapsed = data.collapsed;
+        me.updateHeight();
+    }
+
+    /**
+     * Reatore panels from JSON data
+     *
+     * @param {*} data
+     * @returns {void}
+     */
+    _retorePanels(data) {
+        const me = this;
         const activePanelId = data.activePanelId;
         let activePanelInstance = null;
         const panelInstances = [];
@@ -1370,8 +1434,5 @@ export class PanelGroup extends UIElement {
             if (!activePanelInstance) activePanelInstance = panelInstances[0];
             me.activePanel = activePanelInstance;
         }
-
-        if (data.collapsed !== undefined) me.collapsed = data.collapsed;
-        me.updateHeight();
     }
 }
