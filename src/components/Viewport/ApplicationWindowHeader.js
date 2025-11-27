@@ -174,7 +174,6 @@ export class ApplicationWindowHeader extends UIElement {
      * @protected
      */
     _doMount(container) {
-        const me = this;
         super._doMount(container);
         // Logic moved to _doRender to support TabStrip usage without explicit mount
     }

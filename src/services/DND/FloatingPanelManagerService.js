@@ -173,11 +173,10 @@ export class FloatingPanelManagerService {
      */
     clearAll() {
         const me = this;
-        // Create a copy to avoid modification issues during iteration
         const panelsToClose = [...me._floatingPanels];
         panelsToClose.forEach(panelGroup => {
-            if (panelGroup && typeof panelGroup.close === 'function') {
-                panelGroup.close();
+            if (panelGroup && typeof panelGroup.destroy === 'function') {
+                panelGroup.destroy();
             }
         });
 
@@ -219,12 +218,9 @@ export class FloatingPanelManagerService {
             return;
         }
 
-        // Only mount if not already mounted to prevent "Component already mounted" errors
-        // when moving an existing floating panel.
         if (!panelGroup.isMounted) {
             panelGroup.mount(me.container);
         } else if (panelGroup.element.parentNode !== me.container) {
-            // Safety: If mounted but in wrong parent, force re-mount
             panelGroup.unmount();
             panelGroup.mount(me.container);
         }
@@ -255,20 +251,16 @@ export class FloatingPanelManagerService {
             me._floatingPanels.splice(index, 1);
         }
 
-        // Reset state on the group itself
         if (typeof panelGroup.setFloatingState === 'function') {
             panelGroup.setFloatingState(false, null, null);
         }
 
-        // Clean up styles
         if (panelGroup.element) {
             panelGroup.element.style.zIndex = '';
 
-            // Use unmount() to ensure cleanup of listeners and internal state
             if (panelGroup.isMounted) {
                 panelGroup.unmount();
             } else if (panelGroup.element.parentNode === me.container) {
-                // Fallback safety
                 panelGroup.element.remove();
             }
         }
@@ -299,7 +291,6 @@ export class FloatingPanelManagerService {
 
         let panelGroup = null;
 
-        // Determine the PanelGroup to float
         if (draggedData.type === 'PanelGroup') {
             panelGroup = draggedData.item;
         } else if (draggedData.type === 'Panel') {
@@ -307,13 +298,9 @@ export class FloatingPanelManagerService {
             const sourceGroup = panel.parentGroup;
 
             if (sourceGroup && sourceGroup.panels.length === 1) {
-                // If it's the last panel, float the whole group
                 panelGroup = sourceGroup;
             } else if (sourceGroup) {
-                // Otherwise, extract the panel into a new group
                 sourceGroup.removePanel(panel, true);
-                // Import dynamically or rely on dependency injection if needed,
-                // but here PanelGroup is imported at top.
                 panelGroup = new PanelGroup(panel);
             }
         }
@@ -322,7 +309,6 @@ export class FloatingPanelManagerService {
             return;
         }
 
-        // Ensure proper removal from Column using new API if applicable
         if (typeof panelGroup.getColumn === 'function') {
             const col = panelGroup.getColumn();
             if (col) {
@@ -351,7 +337,6 @@ export class FloatingPanelManagerService {
             return;
         }
 
-        // Move to end of array (top of stack)
         me._floatingPanels.splice(index, 1);
         me._floatingPanels.push(panelGroup);
 
@@ -491,7 +476,6 @@ export class FloatingPanelManagerService {
         if (isLastPanel) {
             panelGroupToFloat = group;
             const sourceColumn = panelGroupToFloat.getColumn();
-            // Ensure proper removal from Column
             if (sourceColumn) {
                 sourceColumn.removeChild(panelGroupToFloat, true);
             }

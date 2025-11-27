@@ -245,14 +245,6 @@ export class App {
     _boundAddNewWindow = null;
 
     /**
-     * Bound handler for resetting the layout silently.
-     *
-     * @type {Function | null}
-     * @private
-     */
-    _boundResetLayoutSilent = null;
-
-    /**
      * Bound handler for saving the layout.
      *
      * @type {Function | null}
@@ -294,7 +286,6 @@ export class App {
 
         me._boundAddNewPanel = me.addNewPanel.bind(me);
         me._boundAddNewWindow = me.addNewWindow.bind(me);
-        me._boundResetLayoutSilent = me.resetLayout.bind(me, true);
         me._boundSaveLayout = me.saveLayout.bind(me);
         me._boundRestoreLayout = me.restoreLayout.bind(me);
         me._boundResetLayout = me.resetLayout.bind(me, false);
@@ -471,7 +462,6 @@ export class App {
 
         appBus.on(EventTypes.APP_ADD_NEW_PANEL, me._boundAddNewPanel, options);
         appBus.on(EventTypes.APP_ADD_NEW_WINDOW, me._boundAddNewWindow, options);
-        appBus.on(EventTypes.APP_RESET_STATE, me._boundResetLayoutSilent, options);
         appBus.on(EventTypes.APP_SAVE_STATE, me._boundSaveLayout, options);
         appBus.on(EventTypes.APP_RESTORE_STATE, me._boundRestoreLayout, options);
         appBus.on(EventTypes.APP_RESET_STATE, me._boundResetLayout, options);
