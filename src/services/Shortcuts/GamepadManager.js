@@ -128,10 +128,6 @@ export class GamepadManager {
         }
     }
 
-    /* ----------------------
-     Getters / setters
-    ---------------------- */
-
     /**
      * <pollIntervalMs> getter.
      *
@@ -223,10 +219,6 @@ export class GamepadManager {
     get onAxis() {
         return this._onAxis;
     }
-
-    /* ----------------------
-     Concrete methods
-    ---------------------- */
 
     /**
      * Description:
@@ -352,10 +344,11 @@ export class GamepadManager {
      * Internal: handle gamepadconnected event (starts polling).
      *
      * @private
-     * @param {Event} ev
+     * @param {Event} event
      * @returns {void}
      */
-    _onConnected(ev) {
+    _onConnected(event) {
+        event;
         const me = this;
         try {
             me.start();
@@ -369,10 +362,11 @@ export class GamepadManager {
      * Internal: handle gamepaddisconnected event (stops polling if none present).
      *
      * @private
-     * @param {Event} ev
+     * @param {Event} event
      * @returns {void}
      */
-    _onDisconnected(ev) {
+    _onDisconnected(event) {
+        event;
         const me = this;
         try {
             const raw =

@@ -1,4 +1,3 @@
-import { TokenNormalizer } from './TokenNormalizer.js';
 import { ShortcutRegistry } from './ShortcutRegistry.js';
 import { GestureRecognizer } from './GestureRecognizer.js';
 import { GamepadManager } from './GamepadManager.js';
@@ -174,10 +173,6 @@ export class ShortcutService {
         return ShortcutService._instance;
     }
 
-    /* ----------------------
-     Public API
-    ---------------------- */
-
     /**
      * Description:
      * Registers a new shortcut definition.
@@ -242,12 +237,13 @@ export class ShortcutService {
      */
     disable() {
         const me = this;
+        const defaultTimeout = 800;
         me._enabled = false;
         if (me._dispatcher) {
             me._dispatcher.dispose();
             me._dispatcher = new ShortcutDispatcher({
                 registry: me._registry,
-                sequenceTimeout: me._dispatcher ? me._dispatcher.sequenceTimeout : 800
+                sequenceTimeout: me._dispatcher ? me._dispatcher.sequenceTimeout : defaultTimeout
             });
         }
     }
@@ -312,10 +308,6 @@ export class ShortcutService {
 
         ShortcutService._instance = null;
     }
-
-    /* ----------------------
-     Event Handlers
-    ---------------------- */
 
     /**
      * Description:

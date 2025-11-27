@@ -136,10 +136,6 @@ export class GestureRecognizer {
         me._boundTouchEnd = me._handleTouchEnd.bind(me);
     }
 
-    /* ----------------------
-     Getters / setters
-    ---------------------- */
-
     /**
      * <gestureThrottleMs> getter.
      *
@@ -217,10 +213,6 @@ export class GestureRecognizer {
         }
         me._eventManager = null;
     }
-
-    /* ----------------------
-     Concrete methods
-    ---------------------- */
 
     /**
      * Description:
