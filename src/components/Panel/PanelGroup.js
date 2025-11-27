@@ -424,6 +424,7 @@ export class PanelGroup extends UIElement {
         if (panel === me._activePanel && me._panels.length > 1) return;
 
         if (me._activePanel) {
+            me._activePanel.setVisible(false);
             me._activePanel.unmount();
         }
 
@@ -437,6 +438,8 @@ export class PanelGroup extends UIElement {
         if (me.isMounted && me.contentContainer) {
             panel.mount(me.contentContainer);
         }
+
+        panel.setVisible(true);
 
         if (me._header) {
             me._header.updateAriaLabels();
@@ -1116,9 +1119,7 @@ export class PanelGroup extends UIElement {
         if (makeActive || me._panels.length === 1) {
             me.activePanel = panel;
         } else {
-            if (panel.contentElement) {
-                panel.contentElement.style.display = 'none';
-            }
+            panel.setVisible(false);
             me.requestLayoutUpdate();
         }
     }
