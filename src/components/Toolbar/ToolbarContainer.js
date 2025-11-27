@@ -4,6 +4,7 @@ import { ToolbarGroup } from './ToolbarGroup.js';
 import { generateId } from '../../utils/generateId.js';
 import { VanillaToolbarContainerAdapter } from '../../renderers/vanilla/VanillaToolbarContainerAdapter.js';
 import { DropZoneType } from '../../constants/DNDTypes.js';
+import { ToolbarGroupFactory } from './ToolbarGroupFactory.js';
 
 /**
  * Description:
@@ -39,6 +40,7 @@ import { DropZoneType } from '../../constants/DNDTypes.js';
  * - {import('./ToolbarGroup.js').ToolbarGroup}
  * - {import('../../utils/generateId.js').generateId}
  * - {import('../../constants/DNDTypes.js').DropZoneType}
+ * - {import('./ToolbarGroupFactory.js').ToolbarGroupFactory}
  */
 export class ToolbarContainer extends UIElement {
     /**
@@ -273,6 +275,7 @@ export class ToolbarContainer extends UIElement {
 
     /**
      * Deserializes state from JSON data.
+     * Synchronously clears and rebuilds groups to prevent race conditions.
      *
      * @param {Array<object>} data - The array of child group data.
      * @returns {void}
@@ -285,14 +288,12 @@ export class ToolbarContainer extends UIElement {
             return;
         }
 
-        import('./ToolbarGroupFactory.js').then(({ ToolbarGroupFactory }) => {
-            const factory = ToolbarGroupFactory.getInstance();
-            data.forEach(groupData => {
-                const group = factory.createToolbarGroup(groupData);
-                if (group) {
-                    me.addGroup(group);
-                }
-            });
+        const factory = ToolbarGroupFactory.getInstance();
+        data.forEach(groupData => {
+            const group = factory.createToolbarGroup(groupData);
+            if (group) {
+                me.addGroup(group);
+            }
         });
     }
 
