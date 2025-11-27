@@ -60,6 +60,7 @@ export class RowDropStrategy extends BaseDropStrategy {
      * @returns {boolean}
      */
     onDragEnter(point, dropZone, draggedData, dds) {
+        dds;
         const me = this;
         if (
             !draggedData.item ||
@@ -86,8 +87,6 @@ export class RowDropStrategy extends BaseDropStrategy {
         const me = this;
         const placeholder = dds.getPlaceholder();
 
-        // [CORREÇÃO] Relaxed check: Allow any target INSIDE the row (handles, buttons, placeholder)
-        // as long as DragDropService identified the Row as the active dropzone.
         if (!dropZone.element.contains(point.target)) {
             dds.hidePlaceholder();
             me._dropIndex = null;
@@ -112,7 +111,6 @@ export class RowDropStrategy extends BaseDropStrategy {
         let originalColumnIndex = -1;
         let isOriginSingle = false;
 
-        // Safe check for getColumn existence (PanelGroup specific)
         const oldColumn =
             typeof effectiveItem.getColumn === 'function' ? effectiveItem.getColumn() : null;
         const columns = dropZone.getColumns();
@@ -121,7 +119,6 @@ export class RowDropStrategy extends BaseDropStrategy {
             originalColumnIndex = columns.indexOf(oldColumn);
 
             if (originalColumnIndex !== -1) {
-                // Use new Column API: getChildCount() instead of getTotalPanelGroups()
                 const childCount = oldColumn.getChildCount();
 
                 if (draggedData.type === ItemType.PANEL_GROUP && childCount === 1) {
@@ -189,6 +186,7 @@ export class RowDropStrategy extends BaseDropStrategy {
      * @returns {boolean}
      */
     onDrop(point, dropZone, draggedData, dds) {
+        dds;
         const me = this;
         const initialPanelIndex = me._dropIndex;
 
@@ -221,21 +219,7 @@ export class RowDropStrategy extends BaseDropStrategy {
             const oldColumn =
                 typeof draggedItem.getColumn === 'function' ? draggedItem.getColumn() : null;
 
-            // [CORREÇÃO] Calcular índice ajustado em caso de remoção na mesma linha
-            let correction = 0;
-            if (oldColumn && oldColumn.parentContainer === dropZone) {
-                // Se a coluna antiga for ficar vazia (será removida), e estava ANTES do índice de inserção,
-                // precisamos decrementar o índice.
-                if (oldColumn.getChildCount() === 1) {
-                    const oldIndex = dropZone.getColumns().indexOf(oldColumn);
-                    if (oldIndex !== -1 && oldIndex < initialPanelIndex) {
-                        correction = -1;
-                    }
-                }
-            }
-            const finalIndex = initialPanelIndex + correction;
-
-            const newColumn = dropZone.createColumn(null, finalIndex);
+            const newColumn = dropZone.createColumn(null, initialPanelIndex);
 
             if (oldColumn) {
                 oldColumn.removeChild(draggedItem, true);
@@ -247,23 +231,7 @@ export class RowDropStrategy extends BaseDropStrategy {
             const draggedPanel = draggedData.item;
             const sourceParentGroup = draggedPanel.parentGroup;
 
-            // Verificar se a coluna original vai desaparecer
-            let correction = 0;
-            if (sourceParentGroup) {
-                const oldColumn = sourceParentGroup.getColumn();
-                if (oldColumn && oldColumn.parentContainer === dropZone) {
-                    // Se for o único painel no grupo, E o único grupo na coluna
-                    if (sourceParentGroup.panels.length === 1 && oldColumn.getChildCount() === 1) {
-                        const oldIndex = dropZone.getColumns().indexOf(oldColumn);
-                        if (oldIndex !== -1 && oldIndex < initialPanelIndex) {
-                            correction = -1;
-                        }
-                    }
-                }
-            }
-            const finalIndex = initialPanelIndex + correction;
-
-            const newColumn = dropZone.createColumn(null, finalIndex);
+            const newColumn = dropZone.createColumn(null, initialPanelIndex);
             const newPanelGroup = new PanelGroup(null);
 
             newColumn.addChild(newPanelGroup);
