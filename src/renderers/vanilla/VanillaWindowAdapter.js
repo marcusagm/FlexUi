@@ -1,6 +1,19 @@
 import { VanillaRenderer } from './VanillaRenderer.js';
 
 /**
+ * Map of state properties to their corresponding CSS BEM modifiers.
+ * @type {Object<string, string>}
+ */
+const STATE_CLASS_MAP = {
+    maximized: 'application-window--maximized',
+    minimized: 'application-window--minimized',
+    focused: 'application-window--focused',
+    pinned: 'application-window--pinned',
+    tabbed: 'application-window--tabbed',
+    activeTab: 'application-window--active-tab'
+};
+
+/**
  * Description:
  * A specialized adapter for rendering ApplicationWindow components in a Vanilla JS environment.
  * It extends the generic VanillaRenderer to encapsulate all DOM manipulations related to
@@ -150,12 +163,9 @@ export class VanillaWindowAdapter extends VanillaRenderer {
             return;
         }
 
-        element.classList.toggle('application-window--maximized', !!state.maximized);
-        element.classList.toggle('application-window--minimized', !!state.minimized);
-        element.classList.toggle('application-window--focused', !!state.focused);
-        element.classList.toggle('application-window--pinned', !!state.pinned);
-        element.classList.toggle('application-window--tabbed', !!state.tabbed);
-        element.classList.toggle('application-window--active-tab', !!state.activeTab);
+        Object.keys(STATE_CLASS_MAP).forEach(key => {
+            element.classList.toggle(STATE_CLASS_MAP[key], !!state[key]);
+        });
     }
 
     /**
