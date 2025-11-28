@@ -13,9 +13,8 @@
     overflow: hidden;
     border-radius: var(--border-radius-base);
     background-color: var(--color-bg-viewport);
-
-    /* Ensures that clicks on the empty background don't select text elsewhere */
     user-select: none;
+    contain: layout style;
 }
 
 /*
@@ -26,15 +25,9 @@
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
-
-    /* [MASTER PARITY] Fundo da Master restaurado */
     background-color: var(--color-bg-viewport-tabbar);
-
     border-bottom: 1px solid var(--color-border-default);
-
-    /* [CORREÇÃO] Altura explícita para evitar colapso */
     height: var(--window-header-height);
-
     padding-left: 4px;
 
     /* Override TabStrip variables */
@@ -44,10 +37,9 @@
     --tab-scroll-btn-hover-bg: rgba(255, 255, 255, 0.1);
 }
 
-/* [CORREÇÃO] Forçar UI-Strip a preencher a altura e garantir que a cor de fundo do SLOT seja visível */
 .viewport__tab-bar-slot .ui-strip {
-    background-color: transparent; /* Permite que o fundo do SLOT seja visível */
-    height: 100%; /* Preenche 100% da altura definida no slot */
+    background-color: transparent;
+    height: 100%;
 }
 
 /* Alinhamento para baixo (efeito de abas) */
@@ -105,10 +97,7 @@
     display: flex;
 }
 
-/* * [MASTER PARITY] Estilização das Abas (WindowHeader)
- */
 .viewport__tab-bar-slot .window-header {
-    /* Reset de estrutura */
     min-width: 120px;
     max-width: 200px;
     min-height: 24px;
@@ -116,8 +105,6 @@
     transition:
         background-color 0.2s,
         color 0.2s;
-
-    /* Estilo Inativo (Padrão Master) */
     background-color: var(--window-header-bg-inactive);
     color: var(--color-text-secondary);
 
@@ -130,8 +117,6 @@
     border-left: none;
 
     margin-right: 2px;
-
-    /* Centralizar texto da aba */
     display: flex;
     align-items: center;
     padding: 0 8px;

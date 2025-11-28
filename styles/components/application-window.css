@@ -22,6 +22,9 @@
 
     /* Fallback Z-Index (Gerenciamento de pilha feito via JS) */
     z-index: var(--window-z-index-base);
+
+    /* Optimization: Isolate layout recalculations */
+    contain: layout style;
 }
 
 /* Estado Ativo / Focado */
