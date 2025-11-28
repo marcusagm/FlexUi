@@ -1,4 +1,5 @@
 import { BaseDropStrategy } from './BaseDropStrategy.js';
+import { FastDOM } from '../../utils/FastDOM.js';
 import { PanelGroup } from '../../components/Panel/PanelGroup.js';
 import { FloatingPanelManagerService } from './FloatingPanelManagerService.js';
 import { PopoutManagerService } from '../PopoutManagerService.js';
@@ -92,7 +93,9 @@ export class RowDropStrategy extends BaseDropStrategy {
         const placeholder = dragDropService.getPlaceholder();
 
         if (!dropZone.element.contains(point.target)) {
-            dragDropService.hidePlaceholder();
+            FastDOM.mutate(() => {
+                dragDropService.hidePlaceholder();
+            });
             me._dropIndex = null;
             return false;
         }
@@ -107,69 +110,75 @@ export class RowDropStrategy extends BaseDropStrategy {
         const effectiveItem = me._getEffectiveDraggedItem(draggedData);
         if (!effectiveItem) return false;
 
-        let originalColumnIndex = -1;
-        let isOriginSingle = false;
+        FastDOM.measure(() => {
+            let originalColumnIndex = -1;
+            let isOriginSingle = false;
 
-        const oldColumn =
-            typeof effectiveItem.getColumn === 'function' ? effectiveItem.getColumn() : null;
-        const columns = dropZone.getColumns();
+            const oldColumn =
+                typeof effectiveItem.getColumn === 'function' ? effectiveItem.getColumn() : null;
+            const columns = dropZone.getColumns();
 
-        if (oldColumn && oldColumn.parentContainer === dropZone) {
-            originalColumnIndex = columns.indexOf(oldColumn);
+            if (oldColumn && oldColumn.parentContainer === dropZone) {
+                originalColumnIndex = columns.indexOf(oldColumn);
 
-            if (originalColumnIndex !== -1) {
-                const childCount = oldColumn.getChildCount();
+                if (originalColumnIndex !== -1) {
+                    const childCount = oldColumn.getChildCount();
 
-                if (draggedData.type === ItemType.PANEL_GROUP && childCount === 1) {
-                    isOriginSingle = true;
-                } else if (
-                    draggedData.type === ItemType.PANEL &&
-                    effectiveItem.panels.length === 1 &&
-                    childCount === 1
-                ) {
-                    isOriginSingle = true;
+                    if (draggedData.type === ItemType.PANEL_GROUP && childCount === 1) {
+                        isOriginSingle = true;
+                    } else if (
+                        draggedData.type === ItemType.PANEL &&
+                        effectiveItem.panels.length === 1 &&
+                        childCount === 1
+                    ) {
+                        isOriginSingle = true;
+                    }
                 }
             }
-        }
 
-        const mouseX = point.x;
-        let targetElement = null;
-        let placed = false;
-        me._dropIndex = columns.length;
+            const mouseX = point.x;
+            let targetElement = null;
+            let placed = false;
+            let dropIndex = columns.length;
 
-        for (let index = 0; index < columns.length; index++) {
-            const column = columns[index];
-            const rectangle = column.element.getBoundingClientRect();
-            const middleX = rectangle.left + rectangle.width / 2;
+            for (let index = 0; index < columns.length; index++) {
+                const column = columns[index];
+                const rectangle = column.element.getBoundingClientRect();
+                const middleX = rectangle.left + rectangle.width / 2;
 
-            if (mouseX < middleX) {
-                me._dropIndex = index;
-                targetElement = column.element;
-                placed = true;
-                break;
+                if (mouseX < middleX) {
+                    dropIndex = index;
+                    targetElement = column.element;
+                    placed = true;
+                    break;
+                }
             }
-        }
 
-        const isLeftGap = me._dropIndex === originalColumnIndex;
-        const isRightGap = me._dropIndex === originalColumnIndex + 1;
+            const isLeftGap = dropIndex === originalColumnIndex;
+            const isRightGap = dropIndex === originalColumnIndex + 1;
 
-        if (isOriginSingle && (isLeftGap || isRightGap)) {
-            dragDropService.hidePlaceholder();
-            me._dropIndex = null;
-            return false;
-        }
+            FastDOM.mutate(() => {
+                me._dropIndex = dropIndex;
 
-        dragDropService.showPlaceholder('vertical');
+                if (isOriginSingle && (isLeftGap || isRightGap)) {
+                    dragDropService.hidePlaceholder();
+                    me._dropIndex = null;
+                    return;
+                }
 
-        if (placed && targetElement) {
-            if (dropZone.element.contains(targetElement)) {
-                dropZone.element.insertBefore(placeholder, targetElement);
-            } else {
-                dropZone.element.appendChild(placeholder);
-            }
-        } else {
-            dropZone.element.appendChild(placeholder);
-        }
+                dragDropService.showPlaceholder('vertical');
+
+                if (placed && targetElement) {
+                    if (dropZone.element.contains(targetElement)) {
+                        dropZone.element.insertBefore(placeholder, targetElement);
+                    } else {
+                        dropZone.element.appendChild(placeholder);
+                    }
+                } else {
+                    dropZone.element.appendChild(placeholder);
+                }
+            });
+        });
 
         return true;
     }
@@ -215,11 +224,13 @@ export class RowDropStrategy extends BaseDropStrategy {
             return false;
         }
 
-        if (draggedData.type === ItemType.PANEL_GROUP) {
-            me._movePanelGroup(draggedData.item, dropZone, initialPanelIndex);
-        } else if (draggedData.type === ItemType.PANEL) {
-            me._movePanelToNewGroup(draggedData.item, dropZone, initialPanelIndex);
-        }
+        FastDOM.mutate(() => {
+            if (draggedData.type === ItemType.PANEL_GROUP) {
+                me._movePanelGroup(draggedData.item, dropZone, initialPanelIndex);
+            } else if (draggedData.type === ItemType.PANEL) {
+                me._movePanelToNewGroup(draggedData.item, dropZone, initialPanelIndex);
+            }
+        });
 
         return true;
     }

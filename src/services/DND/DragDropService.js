@@ -1,4 +1,5 @@
 import { appBus } from '../../utils/EventBus.js';
+import { FastDOM } from '../../utils/FastDOM.js';
 import { FloatingPanelManagerService } from './FloatingPanelManagerService.js';
 import { throttleRAF } from '../../utils/ThrottleRAF.js';
 import { ItemType } from '../../constants/DNDTypes.js';
@@ -437,38 +438,42 @@ export class DragDropService {
         me._lastCoordinates.x = event.clientX;
         me._lastCoordinates.y = event.clientY;
 
-        document.body.classList.add('dnd-active');
-        if (type) {
-            document.body.classList.add(`dnd-type-${type.toLowerCase()}`);
-        }
-        element.classList.add('dragging');
+        FastDOM.mutate(() => {
+            document.body.classList.add('dnd-active');
+            if (type) {
+                document.body.classList.add(`dnd-type-${type.toLowerCase()}`);
+            }
+            element.classList.add('dragging');
 
-        element.style.pointerEvents = 'none';
+            element.style.pointerEvents = 'none';
 
-        const isFloatingPanel =
-            me._dragState.item && me._dragState.item._state && me._dragState.item._state.isFloating;
+            const isFloatingPanel =
+                me._dragState.item &&
+                me._dragState.item._state &&
+                me._dragState.item._state.isFloating;
 
-        const isApplicationWindow = me._dragState.type === ItemType.APPLICATION_WINDOW;
+            const isApplicationWindow = me._dragState.type === ItemType.APPLICATION_WINDOW;
 
-        if (isFloatingPanel || isApplicationWindow) {
-            element.style.opacity = '0';
-        }
+            if (isFloatingPanel || isApplicationWindow) {
+                element.style.opacity = '0';
+            }
 
-        me._ghostManager.create(
-            element,
-            event.clientX,
-            event.clientY,
-            me._dragState.offsetX,
-            me._dragState.offsetY
-        );
+            me._ghostManager.create(
+                element,
+                event.clientX,
+                event.clientY,
+                me._dragState.offsetX,
+                me._dragState.offsetY
+            );
 
-        me._clearStrategyCaches();
+            me._clearStrategyCaches();
 
-        me._activeWindow.addEventListener('pointermove', me._boundOnPointerMove, {
-            passive: false
+            me._activeWindow.addEventListener('pointermove', me._boundOnPointerMove, {
+                passive: false
+            });
+            me._activeWindow.addEventListener('pointerup', me._boundOnPointerUp);
+            me._activeWindow.addEventListener('pointercancel', me._boundOnPointerUp);
         });
-        me._activeWindow.addEventListener('pointerup', me._boundOnPointerUp);
-        me._activeWindow.addEventListener('pointercancel', me._boundOnPointerUp);
     }
 
     /**
@@ -511,58 +516,75 @@ export class DragDropService {
             return;
         }
 
-        let bounds = null;
-        const isPanel =
-            me._dragState.type === ItemType.PANEL || me._dragState.type === ItemType.PANEL_GROUP;
+        FastDOM.measure(() => {
+            let bounds = null;
+            const isPanel =
+                me._dragState.type === ItemType.PANEL ||
+                me._dragState.type === ItemType.PANEL_GROUP;
 
-        const isWindow = me._dragState.type === ItemType.APPLICATION_WINDOW;
+            const isWindow = me._dragState.type === ItemType.APPLICATION_WINDOW;
 
-        if (me._activeWindow === window) {
-            if (isPanel) {
-                const fpms = FloatingPanelManagerService.getInstance();
-                bounds = fpms.getContainerBounds();
-            } else if (isWindow && me._dragState.element) {
-                const viewport = me._dragState.element.closest('.viewport');
-                if (viewport) {
-                    bounds = viewport.getBoundingClientRect();
+            if (me._activeWindow === window) {
+                if (isPanel) {
+                    const fpms = FloatingPanelManagerService.getInstance();
+                    bounds = fpms.getContainerBounds();
+                } else if (isWindow && me._dragState.element) {
+                    const viewport = me._dragState.element.closest('.viewport');
+                    if (viewport) {
+                        bounds = viewport.getBoundingClientRect();
+                    }
                 }
             }
-        }
 
-        me._ghostManager.update(clientX, clientY, bounds);
+            const targetBelow = document.elementFromPoint(clientX, clientY);
+            const dropZoneElement = targetBelow ? targetBelow.closest('[data-dropzone]') : null;
+            const newDropZoneInstance = dropZoneElement ? dropZoneElement.dropZoneInstance : null;
 
-        const targetBelow = document.elementFromPoint(clientX, clientY);
-        const dropZoneElement = targetBelow ? targetBelow.closest('[data-dropzone]') : null;
-        const newDropZoneInstance = dropZoneElement ? dropZoneElement.dropZoneInstance : null;
+            FastDOM.mutate(() => {
+                me._ghostManager.update(clientX, clientY, bounds);
 
-        if (newDropZoneInstance !== me._activeDropZone) {
-            if (me._activeDropZone) {
-                const oldStrategy = me._strategyRegistry.get(me._activeDropZone.dropZoneType);
-                if (oldStrategy && typeof oldStrategy.handleDragLeave === 'function') {
-                    const point = { x: clientX, y: clientY, target: targetBelow };
-                    oldStrategy.handleDragLeave(point, me._activeDropZone, me._dragState, me);
+                if (newDropZoneInstance !== me._activeDropZone) {
+                    if (me._activeDropZone) {
+                        const oldStrategy = me._strategyRegistry.get(
+                            me._activeDropZone.dropZoneType
+                        );
+                        if (oldStrategy && typeof oldStrategy.handleDragLeave === 'function') {
+                            const point = { x: clientX, y: clientY, target: targetBelow };
+                            oldStrategy.handleDragLeave(
+                                point,
+                                me._activeDropZone,
+                                me._dragState,
+                                me
+                            );
+                        }
+                    }
+                    me._activeDropZone = newDropZoneInstance;
                 }
-            }
-            me._activeDropZone = newDropZoneInstance;
-        }
 
-        if (me._activeDropZone) {
-            const strategy = me._strategyRegistry.get(me._activeDropZone.dropZoneType);
-            if (strategy) {
-                const point = { x: clientX, y: clientY, target: targetBelow };
+                if (me._activeDropZone) {
+                    const strategy = me._strategyRegistry.get(me._activeDropZone.dropZoneType);
+                    if (strategy) {
+                        const point = { x: clientX, y: clientY, target: targetBelow };
 
-                if (strategy._dropZoneCache && strategy._dropZoneCache.length === 0) {
-                    if (typeof strategy.handleDragEnter === 'function') {
-                        strategy.handleDragEnter(point, me._activeDropZone, me._dragState, me);
+                        if (strategy._dropZoneCache && strategy._dropZoneCache.length === 0) {
+                            if (typeof strategy.handleDragEnter === 'function') {
+                                strategy.handleDragEnter(
+                                    point,
+                                    me._activeDropZone,
+                                    me._dragState,
+                                    me
+                                );
+                            }
+                        }
+
+                        strategy.handleDragOver(point, me._activeDropZone, me._dragState, me);
+                        return;
                     }
                 }
 
-                strategy.handleDragOver(point, me._activeDropZone, me._dragState, me);
-                return;
-            }
-        }
-
-        me.hidePlaceholder();
+                me.hidePlaceholder();
+            });
+        });
     }
 
     /**
@@ -668,23 +690,25 @@ export class DragDropService {
         me._activeDropZone = null;
         me._throttledMoveHandler.cancel();
 
-        me._ghostManager.destroy();
-        me.hidePlaceholder();
+        FastDOM.mutate(() => {
+            me._ghostManager.destroy();
+            me.hidePlaceholder();
 
-        document.body.classList.remove('dnd-active');
-        const classesToRemove = [];
-        document.body.classList.forEach(cls => {
-            if (cls.startsWith('dnd-type-')) {
-                classesToRemove.push(cls);
+            document.body.classList.remove('dnd-active');
+            const classesToRemove = [];
+            document.body.classList.forEach(cls => {
+                if (cls.startsWith('dnd-type-')) {
+                    classesToRemove.push(cls);
+                }
+            });
+            classesToRemove.forEach(cls => document.body.classList.remove(cls));
+
+            if (me._dragState.element) {
+                me._dragState.element.classList.remove('dragging');
+                me._dragState.element.style.pointerEvents = '';
+                me._dragState.element.style.opacity = '';
             }
         });
-        classesToRemove.forEach(cls => document.body.classList.remove(cls));
-
-        if (me._dragState.element) {
-            me._dragState.element.classList.remove('dragging');
-            me._dragState.element.style.pointerEvents = '';
-            me._dragState.element.style.opacity = '';
-        }
 
         me._clearStrategyCaches();
 

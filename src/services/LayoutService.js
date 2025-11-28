@@ -1,4 +1,5 @@
 import { appBus } from '../utils/EventBus.js';
+import { FastDOM } from '../utils/FastDOM.js';
 import { throttleRAF } from '../utils/ThrottleRAF.js';
 import { EventTypes } from '../constants/EventTypes.js';
 
@@ -116,21 +117,24 @@ export class LayoutService {
 
         const uncollapsedRows = rows.filter(r => !r.collapsed);
 
-        rows.forEach((row, index) => {
-            const isLast = index === rows.length - 1;
+        FastDOM.mutate(() => {
+            rows.forEach((row, index) => {
+                const isLast = index === rows.length - 1;
 
-            if (typeof row.updateAllResizeBars === 'function') {
-                row.updateAllResizeBars();
-            }
+                if (typeof row.updateAllResizeBars === 'function') {
+                    row.updateAllResizeBars();
+                }
 
-            if (typeof row.updateHeight === 'function') {
-                row.updateHeight(isLast);
-            }
+                if (typeof row.updateHeight === 'function') {
+                    row.updateHeight(isLast);
+                }
 
-            if (typeof row.setCollapseButtonDisabled === 'function') {
-                const isLastVisible = uncollapsedRows.length <= 1 && uncollapsedRows.includes(row);
-                row.setCollapseButtonDisabled(isLastVisible);
-            }
+                if (typeof row.setCollapseButtonDisabled === 'function') {
+                    const isLastVisible =
+                        uncollapsedRows.length <= 1 && uncollapsedRows.includes(row);
+                    row.setCollapseButtonDisabled(isLastVisible);
+                }
+            });
         });
     }
 
@@ -147,18 +151,20 @@ export class LayoutService {
         const columns = row.columns;
         if (!columns) return;
 
-        columns.forEach((column, index) => {
-            const isLast = index === columns.length - 1;
+        FastDOM.mutate(() => {
+            columns.forEach((column, index) => {
+                const isLast = index === columns.length - 1;
 
-            if (typeof column.addResizeBars === 'function') {
-                column.addResizeBars(isLast);
-            }
+                if (typeof column.addResizeBars === 'function') {
+                    column.addResizeBars(isLast);
+                }
 
-            if (typeof column.updateWidth === 'function') {
-                column.updateWidth(isLast);
-            }
+                if (typeof column.updateWidth === 'function') {
+                    column.updateWidth(isLast);
+                }
 
-            this._updateChildrenSizes(column);
+                this._updateChildrenSizes(column);
+            });
         });
     }
 
@@ -201,37 +207,39 @@ export class LayoutService {
             }
         });
 
-        if (typeof column.setComputedMinWidth === 'function') {
-            column.setComputedMinWidth(maxMinWidth);
-        }
-
         const uncollapsedChildren = children.filter(child => {
             return typeof child.collapsed !== 'boolean' || !child.collapsed;
         });
 
         const lastUncollapsed = uncollapsedChildren[uncollapsedChildren.length - 1];
 
-        children.forEach((child, index) => {
-            const shouldFill = child === lastUncollapsed;
-            const isLast = index === children.length - 1;
+        FastDOM.mutate(() => {
+            if (typeof column.setComputedMinWidth === 'function') {
+                column.setComputedMinWidth(maxMinWidth);
+            }
 
-            if (typeof child.setFillSpace === 'function') {
-                if (child.isFloating) {
-                    child.setFillSpace(false);
-                } else {
-                    child.setFillSpace(shouldFill);
+            children.forEach((child, index) => {
+                const shouldFill = child === lastUncollapsed;
+                const isLast = index === children.length - 1;
+
+                if (typeof child.setFillSpace === 'function') {
+                    if (child.isFloating) {
+                        child.setFillSpace(false);
+                    } else {
+                        child.setFillSpace(shouldFill);
+                    }
                 }
-            }
 
-            if (typeof child.setCollapseButtonDisabled === 'function') {
-                const isLastVisible =
-                    uncollapsedChildren.length <= 1 && uncollapsedChildren.includes(child);
-                child.setCollapseButtonDisabled(isLastVisible);
-            }
+                if (typeof child.setCollapseButtonDisabled === 'function') {
+                    const isLastVisible =
+                        uncollapsedChildren.length <= 1 && uncollapsedChildren.includes(child);
+                    child.setCollapseButtonDisabled(isLastVisible);
+                }
 
-            if (typeof child.setResizeHandleVisible === 'function') {
-                child.setResizeHandleVisible(!isLast);
-            }
+                if (typeof child.setResizeHandleVisible === 'function') {
+                    child.setResizeHandleVisible(!isLast);
+                }
+            });
         });
     }
 }

@@ -1,4 +1,5 @@
 import { BaseDropStrategy } from './BaseDropStrategy.js';
+import { FastDOM } from '../../utils/FastDOM.js';
 import { PanelGroup } from '../../components/Panel/PanelGroup.js';
 import { FloatingPanelManagerService } from './FloatingPanelManagerService.js';
 import { PopoutManagerService } from '../PopoutManagerService.js';
@@ -96,19 +97,21 @@ export class ColumnDropStrategy extends BaseDropStrategy {
         me.clearCache();
         const children = dropZone.children;
 
-        for (let index = 0; index < children.length; index++) {
-            const targetChild = children[index];
-            if (draggedItem === targetChild) continue;
+        FastDOM.measure(() => {
+            for (let index = 0; index < children.length; index++) {
+                const targetChild = children[index];
+                if (draggedItem === targetChild) continue;
 
-            const rectangle = targetChild.element.getBoundingClientRect();
-            const middleY = rectangle.top + rectangle.height / 2;
+                const rectangle = targetChild.element.getBoundingClientRect();
+                const middleY = rectangle.top + rectangle.height / 2;
 
-            me._dropZoneCache.push({
-                element: targetChild.element,
-                middleY: middleY,
-                originalIndex: index
-            });
-        }
+                me._dropZoneCache.push({
+                    element: targetChild.element,
+                    middleY: middleY,
+                    originalIndex: index
+                });
+            }
+        });
         return true;
     }
 
@@ -127,7 +130,9 @@ export class ColumnDropStrategy extends BaseDropStrategy {
         const placeholder = dragDropService.getPlaceholder();
 
         if (point.target !== dropZone.element && point.target !== placeholder) {
-            dragDropService.hidePlaceholder();
+            FastDOM.mutate(() => {
+                dragDropService.hidePlaceholder();
+            });
             me._dropIndex = null;
             return false;
         }
@@ -146,31 +151,38 @@ export class ColumnDropStrategy extends BaseDropStrategy {
             me.onDragEnter(point, dropZone, draggedData, dragDropService);
         }
 
-        const { index, targetElement } = me._calculateDropIndex(point.y, dropZone);
-        me._dropIndex = index;
+        FastDOM.measure(() => {
+            const { index, targetElement } = me._calculateDropIndex(point.y, dropZone);
 
-        if (me._isGhostPosition(effectiveItem, dropZone, me._dropIndex)) {
-            dragDropService.hidePlaceholder();
-            me._dropIndex = null;
-            return false;
-        }
+            const isGhost = me._isGhostPosition(effectiveItem, dropZone, index);
+            const draggedElement =
+                draggedData.type === ItemType.PANEL_GROUP
+                    ? draggedData.item.element
+                    : draggedData.item.parentGroup.element;
+            const offsetHeight = draggedElement.offsetHeight;
 
-        const draggedElement =
-            draggedData.type === ItemType.PANEL_GROUP
-                ? draggedData.item.element
-                : draggedData.item.parentGroup.element;
+            FastDOM.mutate(() => {
+                me._dropIndex = index;
 
-        dragDropService.showPlaceholder('horizontal', draggedElement.offsetHeight);
+                if (isGhost) {
+                    dragDropService.hidePlaceholder();
+                    me._dropIndex = null;
+                    return;
+                }
 
-        if (targetElement) {
-            if (dropZone.element.contains(targetElement)) {
-                dropZone.element.insertBefore(placeholder, targetElement);
-            } else {
-                dropZone.element.appendChild(placeholder);
-            }
-        } else {
-            dropZone.element.appendChild(placeholder);
-        }
+                dragDropService.showPlaceholder('horizontal', offsetHeight);
+
+                if (targetElement) {
+                    if (dropZone.element.contains(targetElement)) {
+                        dropZone.element.insertBefore(placeholder, targetElement);
+                    } else {
+                        dropZone.element.appendChild(placeholder);
+                    }
+                } else {
+                    dropZone.element.appendChild(placeholder);
+                }
+            });
+        });
 
         return true;
     }
@@ -209,11 +221,13 @@ export class ColumnDropStrategy extends BaseDropStrategy {
             return false;
         }
 
-        if (draggedData.type === ItemType.PANEL_GROUP) {
-            me._movePanelGroup(draggedData.item, dropZone, targetIndex);
-        } else if (draggedData.type === ItemType.PANEL) {
-            me._movePanelToNewGroup(draggedData.item, dropZone, targetIndex);
-        }
+        FastDOM.mutate(() => {
+            if (draggedData.type === ItemType.PANEL_GROUP) {
+                me._movePanelGroup(draggedData.item, dropZone, targetIndex);
+            } else if (draggedData.type === ItemType.PANEL) {
+                me._movePanelToNewGroup(draggedData.item, dropZone, targetIndex);
+            }
+        });
 
         return true;
     }

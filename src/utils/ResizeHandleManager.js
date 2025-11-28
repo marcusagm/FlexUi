@@ -1,4 +1,5 @@
 import { ResizeController } from './ResizeController.js';
+import { FastDOM } from './FastDOM.js';
 
 /**
  * Enumeration of all 8 resize directions.
@@ -210,7 +211,9 @@ export class ResizeHandleManager {
 
             const controller = new ResizeController(handleElement, 'both', {
                 onStart: () => {
-                    me._initialGeometry = me._calculateInitialGeometry();
+                    FastDOM.measure(() => {
+                        me._initialGeometry = me._calculateInitialGeometry();
+                    });
                 },
                 onUpdate: (deltaX, deltaY) => {
                     me._handleResizeUpdate(direction, deltaX, deltaY);
@@ -245,73 +248,78 @@ export class ResizeHandleManager {
             return;
         }
 
-        const initial = me._initialGeometry;
-        const { minimumWidth, maximumWidth, minimumHeight, maximumHeight, containerRectangle } =
-            me._options.getConstraints();
+        FastDOM.measure(() => {
+            const initial = me._initialGeometry;
+            // Safe read of constraints
+            const { minimumWidth, maximumWidth, minimumHeight, maximumHeight, containerRectangle } =
+                me._options.getConstraints();
 
-        let newXCoordinate = initial.xCoordinate;
-        let newYCoordinate = initial.yCoordinate;
-        let newWidth = initial.width;
-        let newHeight = initial.height;
+            let newXCoordinate = initial.xCoordinate;
+            let newYCoordinate = initial.yCoordinate;
+            let newWidth = initial.width;
+            let newHeight = initial.height;
 
-        const isNorthDirection = direction.includes(DIRECTIONS.NORTH);
-        const isSouthDirection = direction.includes(DIRECTIONS.SOUTH);
-        const isEastDirection = direction.includes(DIRECTIONS.EAST);
-        const isWestDirection = direction.includes(DIRECTIONS.WEST);
+            const isNorthDirection = direction.includes(DIRECTIONS.NORTH);
+            const isSouthDirection = direction.includes(DIRECTIONS.SOUTH);
+            const isEastDirection = direction.includes(DIRECTIONS.EAST);
+            const isWestDirection = direction.includes(DIRECTIONS.WEST);
 
-        if (isNorthDirection) {
-            newHeight = initial.height - deltaY;
-            newYCoordinate = initial.yCoordinate + deltaY;
-        } else if (isSouthDirection) {
-            newHeight = initial.height + deltaY;
-        }
+            if (isNorthDirection) {
+                newHeight = initial.height - deltaY;
+                newYCoordinate = initial.yCoordinate + deltaY;
+            } else if (isSouthDirection) {
+                newHeight = initial.height + deltaY;
+            }
 
-        if (isWestDirection) {
-            newWidth = initial.width - deltaX;
-            newXCoordinate = initial.xCoordinate + deltaX;
-        } else if (isEastDirection) {
-            newWidth = initial.width + deltaX;
-        }
+            if (isWestDirection) {
+                newWidth = initial.width - deltaX;
+                newXCoordinate = initial.xCoordinate + deltaX;
+            } else if (isEastDirection) {
+                newWidth = initial.width + deltaX;
+            }
 
-        const finalWidth = Math.max(minimumWidth, Math.min(newWidth, maximumWidth));
-        const finalHeight = Math.max(minimumHeight, Math.min(newHeight, maximumHeight));
+            const finalWidth = Math.max(minimumWidth, Math.min(newWidth, maximumWidth));
+            const finalHeight = Math.max(minimumHeight, Math.min(newHeight, maximumHeight));
 
-        if (isWestDirection) {
-            newXCoordinate = initial.xCoordinate + (initial.width - finalWidth);
-        }
+            if (isWestDirection) {
+                newXCoordinate = initial.xCoordinate + (initial.width - finalWidth);
+            }
 
-        if (isNorthDirection) {
-            newYCoordinate = initial.yCoordinate + (initial.height - finalHeight);
-        }
+            if (isNorthDirection) {
+                newYCoordinate = initial.yCoordinate + (initial.height - finalHeight);
+            }
 
-        if (containerRectangle) {
-            const containerWidth = containerRectangle.width;
-            const containerHeight = containerRectangle.height;
+            if (containerRectangle) {
+                const containerWidth = containerRectangle.width;
+                const containerHeight = containerRectangle.height;
 
-            newXCoordinate = Math.max(0, newXCoordinate);
-            newYCoordinate = Math.max(0, newYCoordinate);
+                newXCoordinate = Math.max(0, newXCoordinate);
+                newYCoordinate = Math.max(0, newYCoordinate);
 
-            const spaceRight = containerWidth - newXCoordinate;
-            const spaceBottom = containerHeight - newYCoordinate;
+                const spaceRight = containerWidth - newXCoordinate;
+                const spaceBottom = containerHeight - newYCoordinate;
 
-            newWidth = Math.min(finalWidth, spaceRight);
-            newHeight = Math.min(finalHeight, spaceBottom);
+                newWidth = Math.min(finalWidth, spaceRight);
+                newHeight = Math.min(finalHeight, spaceBottom);
 
-            const maxXCoordinate = containerWidth - newWidth;
-            const maxYCoordinate = containerHeight - newHeight;
+                const maxXCoordinate = containerWidth - newWidth;
+                const maxYCoordinate = containerHeight - newHeight;
 
-            newXCoordinate = Math.min(newXCoordinate, maxXCoordinate);
-            newYCoordinate = Math.min(newYCoordinate, maxYCoordinate);
-        } else {
-            newWidth = finalWidth;
-            newHeight = finalHeight;
-        }
+                newXCoordinate = Math.min(newXCoordinate, maxXCoordinate);
+                newYCoordinate = Math.min(newYCoordinate, maxYCoordinate);
+            } else {
+                newWidth = finalWidth;
+                newHeight = finalHeight;
+            }
 
-        me._options.onResize({
-            xCoordinate: newXCoordinate,
-            yCoordinate: newYCoordinate,
-            width: newWidth,
-            height: newHeight
+            FastDOM.mutate(() => {
+                me._options.onResize({
+                    xCoordinate: newXCoordinate,
+                    yCoordinate: newYCoordinate,
+                    width: newWidth,
+                    height: newHeight
+                });
+            });
         });
     }
 }
