@@ -1,10 +1,10 @@
-import { ApplicationWindow } from './ApplicationWindow.js';
+import { Window } from './Window.js';
 import { Viewport } from './Viewport.js'; // Novo import
 import { DropZoneType, ItemType } from '../../constants/DNDTypes.js';
 
 /**
  * Description:
- * A Singleton factory and registry for creating ApplicationWindow instances and Viewport components.
+ * A Singleton factory and registry for creating Window instances and Viewport components.
  * This class uses the Abstract Factory and Registry patterns.
  * Window types must be registered by the application before they can be created
  * from serialized data (e.g., during workspace restoration).
@@ -13,7 +13,7 @@ import { DropZoneType, ItemType } from '../../constants/DNDTypes.js';
  *
  * Properties summary:
  * - _instance {ViewportFactory | null} : The private static instance.
- * - _registry {Map<string, typeof ApplicationWindow>} : The registry mapping typeName to classes.
+ * - _registry {Map<string, typeof Window>} : The registry mapping typeName to classes.
  * - _defaultRendererFactory {Function | null} : A factory function returning an IRenderer instance.
  *
  * Typical usage:
@@ -25,7 +25,7 @@ import { DropZoneType, ItemType } from '../../constants/DNDTypes.js';
  * const viewport = ViewportFactory.getInstance().createViewport(viewportData);
  *
  * Dependencies:
- * - ./ApplicationWindow.js
+ * - ./Window.js
  * - ./Viewport.js
  * - {import('../../constants/DNDTypes.js').DropZoneType}
  */
@@ -41,7 +41,7 @@ export class ViewportFactory {
     /**
      * The registry mapping typeName to classes.
      *
-     * @type {Map<string, typeof ApplicationWindow>}
+     * @type {Map<string, typeof Window>}
      * @private
      */
     _registry;
@@ -64,7 +64,7 @@ export class ViewportFactory {
         }
         this.setRegistry(new Map());
         // Register classes
-        this.registerWindowType('ApplicationWindow', ApplicationWindow);
+        this.registerWindowType('Window', Window);
         this.registerWindowType(DropZoneType.VIEWPORT, Viewport); // NEW: Register Viewport type
         ViewportFactory._instance = this;
     }
@@ -84,7 +84,7 @@ export class ViewportFactory {
     /**
      * Registry getter.
      *
-     * @returns {Map<string, typeof ApplicationWindow>}
+     * @returns {Map<string, typeof Window>}
      */
     getRegistry() {
         return this._registry;
@@ -93,7 +93,7 @@ export class ViewportFactory {
     /**
      * Registry setter with validation.
      *
-     * @param {Map<string, typeof ApplicationWindow>} map
+     * @param {Map<string, typeof Window>} map
      * @returns {void}
      */
     setRegistry(map) {
@@ -126,7 +126,7 @@ export class ViewportFactory {
      * Registers a Window or Viewport class constructor against a string identifier.
      *
      * @param {string} typeName - The string identifier.
-     * @param {typeof ApplicationWindow | typeof Viewport} windowClass - The class constructor.
+     * @param {typeof Window | typeof Viewport} windowClass - The class constructor.
      * @returns {void}
      */
     registerWindowType(typeName, windowClass) {
@@ -184,10 +184,10 @@ export class ViewportFactory {
     }
 
     /**
-     * Creates and hydrates an ApplicationWindow instance based on its type and saved data.
+     * Creates and hydrates an Window instance based on its type and saved data.
      *
      * @param {object} windowData - The serialized data object for the window.
-     * @returns {ApplicationWindow | null} An instantiated and hydrated window, or null.
+     * @returns {Window | null} An instantiated and hydrated window, or null.
      */
     createWindow(windowData) {
         const me = this;

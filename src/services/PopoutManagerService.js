@@ -1,3 +1,4 @@
+import { ItemType } from '../constants/DNDTypes.js';
 import { PopoutWindow } from '../core/PopoutWindow.js';
 import { FloatingPanelManagerService } from './DND/FloatingPanelManagerService.js';
 import { appNotifications } from './Notification/Notification.js';
@@ -5,14 +6,14 @@ import { appNotifications } from './Notification/Notification.js';
 /**
  * Description:
  * A Singleton service responsible for managing external "popout" windows.
- * It handles the lifecycle of extracting a PanelGroup or ApplicationWindow from the main application
+ * It handles the lifecycle of extracting a PanelGroup or Window from the main application
  * into a native browser window and returning it back to the main application.
  *
  * Properties summary:
  * - _instance {PopoutManagerService|null} : The singleton instance.
  * - _activePopouts {Map<string, PopoutWindow>} : Maps IDs (group or window) to their PopoutWindow instances.
  * - _groupInstances {Map<string, PanelGroup>} : Maps IDs to PanelGroup instances.
- * - _windowInstances {Map<string, ApplicationWindow>} : Maps IDs to ApplicationWindow instances.
+ * - _windowInstances {Map<string, Window>} : Maps IDs to Window instances.
  * - _viewportReferences {Map<string, Viewport>} : Maps Window IDs to their original Viewport instances.
  * - _styleObserver {MutationObserver|null} : Observer to monitor style changes in the main document.
  *
@@ -28,7 +29,7 @@ import { appNotifications } from './Notification/Notification.js';
  * - Ensures an element is only popped out once.
  * - Manages DOM transplantation.
  * - Handles "return" logic for both Groups and Windows.
- * - Sincronizes ApplicationWindow geometry with the native window size/position.
+ * - Sincronizes Window geometry with the native window size/position.
  * - Supports serialization of external window states.
  * - Implements sequential restoration with fallback for popup blockers.
  * - Automatically closes all popouts when the main window is closed/reloaded.
@@ -66,9 +67,9 @@ export class PopoutManagerService {
     _groupInstances = new Map();
 
     /**
-     * Keeps track of the ApplicationWindow instances associated with popouts.
+     * Keeps track of the Window instances associated with popouts.
      *
-     * @type {Map<string, import('../components/Viewport/ApplicationWindow.js').ApplicationWindow>}
+     * @type {Map<string, import('../components/Viewport/Window.js').Window>}
      * @private
      */
     _windowInstances = new Map();
@@ -88,6 +89,22 @@ export class PopoutManagerService {
      * @private
      */
     _styleObserver = null;
+
+    /**
+     * Default width for popout windows.
+     *
+     * @type {number}
+     * @private
+     */
+    _defaultWidth = 400;
+
+    /**
+     * Default height for popout windows.
+     *
+     * @type {number}
+     * @private
+     */
+    _defaultHeight = 300;
 
     /**
      * Private constructor for Singleton.
@@ -134,7 +151,7 @@ export class PopoutManagerService {
             return;
         }
 
-        await me._performPopout(panelGroup, 'PanelGroup', geometry, {
+        await me._performPopout(panelGroup, ItemType.PanelGroup, geometry, {
             instanceMap: me._groupInstances,
             onPrepare: () => {
                 if (panelGroup.isFloating) {
@@ -212,9 +229,9 @@ export class PopoutManagerService {
     }
 
     /**
-     * Moves an ApplicationWindow from the Viewport to a new external window.
+     * Moves an Window from the Viewport to a new external window.
      *
-     * @param {import('../components/Viewport/ApplicationWindow.js').ApplicationWindow} appWindow - The window to pop out.
+     * @param {import('../components/Viewport/Window.js').Window} appWindow - The window to pop out.
      * @param {object} [geometry=null] - Optional geometry override.
      * @returns {Promise<void>}
      */
@@ -226,7 +243,7 @@ export class PopoutManagerService {
             return;
         }
 
-        await me._performPopout(appWindow, 'ApplicationWindow', geometry, {
+        await me._performPopout(appWindow, ItemType.Window, geometry, {
             instanceMap: me._windowInstances,
             onPrepare: () => {
                 let viewportInstance = null;
@@ -266,10 +283,10 @@ export class PopoutManagerService {
     }
 
     /**
-     * Returns a popped-out ApplicationWindow back to its original Viewport.
+     * Returns a popped-out Window back to its original Viewport.
      * Position Logic: x=0, y=0 (if no tabbar) or y=tabBarHeight (if tabbar visible).
      *
-     * @param {import('../components/Viewport/ApplicationWindow.js').ApplicationWindow} appWindow - The window to return.
+     * @param {import('../components/Viewport/Window.js').Window} appWindow - The window to return.
      * @returns {void}
      */
     returnWindow(appWindow) {
@@ -321,7 +338,7 @@ export class PopoutManagerService {
     /**
      * Generic method to handle the common logic of creating and opening a popout window.
      *
-     * @param {object} item - The component instance (PanelGroup or ApplicationWindow).
+     * @param {object} item - The component instance (PanelGroup or Window).
      * @param {string} type - The component type name (for logging/title).
      * @param {object|null} geometry - Window geometry overrides.
      * @param {object} handlers - Type-specific callbacks.
@@ -346,20 +363,7 @@ export class PopoutManagerService {
             handlers.onPrepare();
         }
 
-        const width = geometry?.width || item.width || 800;
-        const height = geometry?.height || item.height || 600;
-        const left = geometry?.x;
-        const top = geometry?.y;
-        const title = item.title || `External ${type}`;
-
-        const popout = new PopoutWindow(`popout-${item.id}`, {
-            title: title,
-            width: width,
-            height: height,
-            left: left,
-            top: top
-        });
-
+        const popout = me._createPopoutWindow(item, type, geometry);
         popout.onClose = handlers.onReturn;
 
         me._activePopouts.set(item.id, popout);
@@ -367,24 +371,60 @@ export class PopoutManagerService {
 
         try {
             await popout.open();
-
-            if (item.element) {
-                popout.appendChild(item.element);
-            }
-
-            if (typeof item.setPopoutMode === 'function') {
-                item.setPopoutMode(true);
-            }
-
-            if (popout.nativeWindow && popout.nativeWindow.document) {
-                item.mount(popout.nativeWindow.document.body);
-            }
+            me._setupPopoutContent(popout, item);
 
             if (handlers.onMount) {
                 handlers.onMount(popout);
             }
         } catch (error) {
             me._onDidOpenPopoutWindowFail(item, type, error);
+        }
+    }
+
+    /**
+     * Creates the PopoutWindow instance with calculated geometry.
+     *
+     * @param {object} item
+     * @param {string} type
+     * @param {object} geometry
+     * @returns {PopoutWindow}
+     * @private
+     */
+    _createPopoutWindow(item, type, geometry) {
+        const me = this;
+        const width = geometry?.width || item.width || me._defaultWidth;
+        const height = geometry?.height || item.height || me._defaultHeight;
+        const left = geometry?.x;
+        const top = geometry?.y;
+        const title = item.title || `External ${type}`;
+
+        return new PopoutWindow(`popout-${item.id}`, {
+            title: title,
+            width: width,
+            height: height,
+            left: left,
+            top: top
+        });
+    }
+
+    /**
+     * Sets up the content within the opened popout window.
+     *
+     * @param {PopoutWindow} popout
+     * @param {object} item
+     * @private
+     */
+    _setupPopoutContent(popout, item) {
+        if (item.element) {
+            popout.appendChild(item.element);
+        }
+
+        if (typeof item.setPopoutMode === 'function') {
+            item.setPopoutMode(true);
+        }
+
+        if (popout.nativeWindow && popout.nativeWindow.document) {
+            item.mount(popout.nativeWindow.document.body);
         }
     }
 
@@ -404,7 +444,7 @@ export class PopoutManagerService {
         for (const record of items) {
             const { item, geometry, type } = record;
 
-            if (type === 'ApplicationWindow') {
+            if (type === ItemType.Window) {
                 await me.popoutWindow(item, geometry);
             } else {
                 await me.popoutGroup(item, geometry);
@@ -510,13 +550,13 @@ export class PopoutManagerService {
             const group = me._groupInstances.get(id);
             if (group) {
                 data = typeof group.toJSON === 'function' ? group.toJSON() : null;
-                type = 'PanelGroup';
+                type = ItemType.PanelGroup;
             }
 
             const win = me._windowInstances.get(id);
             if (win) {
                 data = typeof win.toJSON === 'function' ? win.toJSON() : null;
-                type = 'ApplicationWindow';
+                type = ItemType.Window;
             }
 
             if (popout.nativeWindow && data) {
@@ -544,7 +584,7 @@ export class PopoutManagerService {
      * Reverts the item to a floating state in the main window and notifies the user.
      *
      * @param {object} item - The item that failed to pop out.
-     * @param {string} type - The type of the item ('PanelGroup' or 'ApplicationWindow').
+     * @param {string} type - The type of the item ('PanelGroup' or 'Window').
      * @param {Error} error - The error object.
      * @private
      * @returns {void}
@@ -560,7 +600,7 @@ export class PopoutManagerService {
             'Popout blocked by browser settings. The window has been docked back to the main workspace.'
         );
 
-        if (type === 'ApplicationWindow') {
+        if (type === ItemType.Window) {
             me.returnWindow(item);
         } else {
             me.returnGroup(item);

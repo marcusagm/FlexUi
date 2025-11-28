@@ -64,12 +64,12 @@ export const DropZoneType = Object.freeze({
  * PANEL: 'Panel',
  * PANEL_GROUP: 'PanelGroup',
  * TOOLBAR_GROUP: 'ToolbarGroup',
- * APPLICATION_WINDOW: 'ApplicationWindow'
+ * WINDOW: 'Window'
  * }>}
  */
 export const ItemType = Object.freeze({
     PANEL: 'Panel',
     PANEL_GROUP: 'PanelGroup',
     TOOLBAR_GROUP: 'ToolbarGroup',
-    APPLICATION_WINDOW: 'ApplicationWindow'
+    WINDOW: 'Window'
 });

@@ -5,17 +5,17 @@ import { VanillaRenderer } from './VanillaRenderer.js';
  * @type {Object<string, string>}
  */
 const STATE_CLASS_MAP = {
-    maximized: 'application-window--maximized',
-    minimized: 'application-window--minimized',
-    focused: 'application-window--focused',
-    pinned: 'application-window--pinned',
-    tabbed: 'application-window--tabbed',
-    activeTab: 'application-window--active-tab'
+    maximized: 'window--maximized',
+    minimized: 'window--minimized',
+    focused: 'window--focused',
+    pinned: 'window--pinned',
+    tabbed: 'window--tabbed',
+    activeTab: 'window--active-tab'
 };
 
 /**
  * Description:
- * A specialized adapter for rendering ApplicationWindow components in a Vanilla JS environment.
+ * A specialized adapter for rendering Window components in a Vanilla JS environment.
  * It extends the generic VanillaRenderer to encapsulate all DOM manipulations related to
  * window management, such as creation, geometry updates, state class toggling, and z-index management.
  *
@@ -32,7 +32,7 @@ const STATE_CLASS_MAP = {
  * - None
  *
  * Business rules implemented:
- * - Enforces the BEM structure for windows (.application-window, .application-window__content).
+ * - Enforces the BEM structure for windows (.window, .window__content).
  * - Validates all inputs (elements, coordinates, dimensions) before applying styles.
  * - Manages the switch between absolute positioning (floating) and static positioning (tabbed).
  *
@@ -48,8 +48,8 @@ export class VanillaWindowAdapter extends VanillaRenderer {
     }
 
     /**
-     * Creates the main DOM structure for an ApplicationWindow.
-     * Structure: <div class="application-window"> <div class="application-window__content"></div> </div>
+     * Creates the main DOM structure for an Window.
+     * Structure: <div class="window"> <div class="window__content"></div> </div>
      *
      * @param {string} id - The unique ID of the window.
      * @returns {HTMLElement} The root window element.
@@ -65,7 +65,7 @@ export class VanillaWindowAdapter extends VanillaRenderer {
 
         // Create root element
         const windowElement = me.createElement('div', {
-            className: 'application-window',
+            className: 'window',
             id: `window-${id}`
         });
 
@@ -76,7 +76,7 @@ export class VanillaWindowAdapter extends VanillaRenderer {
 
         // Create content container
         const contentElement = me.createElement('div', {
-            className: 'application-window__content'
+            className: 'window__content'
         });
 
         // Default content styles
@@ -104,7 +104,7 @@ export class VanillaWindowAdapter extends VanillaRenderer {
             );
             return null;
         }
-        return windowElement.querySelector('.application-window__content');
+        return windowElement.querySelector('.window__content');
     }
 
     /**

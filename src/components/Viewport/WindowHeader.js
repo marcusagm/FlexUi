@@ -8,17 +8,17 @@ import { PopoutManagerService } from '../../services/PopoutManagerService.js';
 
 /**
  * Description:
- * Represents the header/title bar of an ApplicationWindow.
+ * Represents the header/title bar of an Window.
  * This class is a controller that inherits from UIElement. It delegates
  * DOM rendering to an adapter and handles user interactions like clicking,
  * dragging (via DragTrigger), and window control actions.
  *
  * Properties summary:
- * - windowInstance {ApplicationWindow} : The parent window instance.
+ * - windowInstance {Window} : The parent window instance.
  * - isTabMode {boolean} : Whether the header is in "Tab" (docked) mode.
  *
  * Typical usage:
- * const header = new ApplicationWindowHeader(myWindowInstance, 'My Title');
+ * const header = new WindowHeader(myWindowInstance, 'My Title');
  * parentElement.appendChild(header.element);
  *
  * Events:
@@ -40,11 +40,11 @@ import { PopoutManagerService } from '../../services/PopoutManagerService.js';
  * - {import('../../utils/DragTrigger.js').DragTrigger}
  * - {import('../../services/PopoutManagerService.js').PopoutManagerService}
  */
-export class ApplicationWindowHeader extends UIElement {
+export class WindowHeader extends UIElement {
     /**
      * The parent window instance.
      *
-     * @type {import('./ApplicationWindow.js').ApplicationWindow}
+     * @type {import('./Window.js').Window}
      * @private
      */
     _windowInstance;
@@ -114,9 +114,9 @@ export class ApplicationWindowHeader extends UIElement {
     _boundOnPopoutClick;
 
     /**
-     * Creates an instance of ApplicationWindowHeader.
+     * Creates an instance of WindowHeader.
      *
-     * @param {import('./ApplicationWindow.js').ApplicationWindow} windowInstance - The parent ApplicationWindow instance.
+     * @param {import('./Window.js').Window} windowInstance - The parent Window instance.
      * @param {string} title - The initial title text.
      * @param {import('../../core/IRenderer.js').IRenderer} [renderer=null] - Optional renderer adapter.
      */
@@ -139,7 +139,7 @@ export class ApplicationWindowHeader extends UIElement {
     /**
      * Retrieves the parent window instance.
      *
-     * @returns {import('./ApplicationWindow.js').ApplicationWindow} The parent window.
+     * @returns {import('./Window.js').Window} The parent window.
      */
     get windowInstance() {
         return this._windowInstance;
@@ -267,9 +267,7 @@ export class ApplicationWindowHeader extends UIElement {
     setTitle(title) {
         const me = this;
         if (typeof title !== 'string') {
-            console.warn(
-                `[ApplicationWindowHeader] Invalid title assignment (${title}). Must be a string.`
-            );
+            console.warn(`[WindowHeader] Invalid title assignment (${title}). Must be a string.`);
             return;
         }
         if (me.element) {
@@ -366,7 +364,7 @@ export class ApplicationWindowHeader extends UIElement {
 
         appBus.emit(EventTypes.DND_DRAG_START, {
             item: me._windowInstance,
-            type: ItemType.APPLICATION_WINDOW,
+            type: ItemType.WINDOW,
             element: elementToDrag,
             event: event,
             offsetX: offsetX,

@@ -1,11 +1,11 @@
 /**
  * Description:
- * A Facade class that exposes a safe subset of the ApplicationWindow's functionality.
+ * A Facade class that exposes a safe subset of the Window's functionality.
  * It allows external control over the window's state (minimize, maximize, close),
  * focus, and properties (title) without exposing internal DOM or renderer logic.
  *
  * Properties summary:
- * - _window {ApplicationWindow} : The internal window instance.
+ * - _window {Window} : The internal window instance.
  *
  * Typical usage:
  * const winApi = myWindow.api;
@@ -16,17 +16,17 @@
  * - None directly.
  *
  * Business rules implemented:
- * - Wraps ApplicationWindow operations.
+ * - Wraps Window operations.
  * - Validates inputs before delegation.
  *
  * Dependencies:
- * - {import('../components/Viewport/ApplicationWindow.js').ApplicationWindow}
+ * - {import('../components/Viewport/Window.js').Window}
  */
 export class WindowApi {
     /**
      * The internal window instance.
      *
-     * @type {import('../components/Viewport/ApplicationWindow.js').ApplicationWindow}
+     * @type {import('../components/Viewport/Window.js').Window}
      * @private
      */
     _window;
@@ -34,11 +34,11 @@ export class WindowApi {
     /**
      * Creates an instance of WindowApi.
      *
-     * @param {import('../components/Viewport/ApplicationWindow.js').ApplicationWindow} windowInstance - The window instance to wrap.
+     * @param {import('../components/Viewport/Window.js').Window} windowInstance - The window instance to wrap.
      */
     constructor(windowInstance) {
         if (!windowInstance || typeof windowInstance !== 'object') {
-            throw new Error('[WindowApi] Constructor requires a valid ApplicationWindow instance.');
+            throw new Error('[WindowApi] Constructor requires a valid Window instance.');
         }
         this._window = windowInstance;
     }

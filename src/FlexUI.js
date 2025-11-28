@@ -11,7 +11,7 @@
  * - FlexUI (alias for the App singleton/class)
  * - PanelApi (Facade for Panel interaction)
  * - GroupApi (Facade for PanelGroup interaction)
- * - WindowApi (Facade for ApplicationWindow interaction)
+ * - WindowApi (Facade for Window interaction)
  */
 
 export { App as FlexUI } from './App.js';

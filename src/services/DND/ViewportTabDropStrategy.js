@@ -6,13 +6,13 @@ import { PopoutManagerService } from '../PopoutManagerService.js';
 /**
  * Description:
  * A DND strategy exclusive for the Viewport's Tab Bar.
- * It handles the reordering of docked ApplicationWindow tabs within the Viewport.
+ * It handles the reordering of docked Window tabs within the Viewport.
  *
  * Properties summary:
  * - _dropIndex {number | null} : The calculated index for the drop.
  *
  * Business rules implemented:
- * - Validates that the dragged item is strictly an ApplicationWindow.
+ * - Validates that the dragged item is strictly an Window.
  * - Calculates the insertion index by iterating over logical docked windows and measuring their headers.
  * - Inserts a vertical placeholder to indicate the drop position within the TabStrip's viewport.
  * - Maintains Tab Bar visibility during the operation.
@@ -53,7 +53,7 @@ export class ViewportTabDropStrategy extends BaseDropStrategy {
      * @returns {boolean}
      */
     onDragEnter(point, dropZone, draggedData, dds) {
-        if (draggedData.type !== ItemType.APPLICATION_WINDOW) return false;
+        if (draggedData.type !== ItemType.WINDOW) return false;
 
         // Ensure tab bar is visible and stable during drag
         if (dropZone.tabBar && dropZone.tabBar.parentElement) {
@@ -73,7 +73,7 @@ export class ViewportTabDropStrategy extends BaseDropStrategy {
      * @returns {boolean}
      */
     onDragOver(point, dropZone, draggedData, dds) {
-        if (draggedData.type !== ItemType.APPLICATION_WINDOW) {
+        if (draggedData.type !== ItemType.WINDOW) {
             dds.hidePlaceholder();
             return false;
         }
@@ -161,7 +161,7 @@ export class ViewportTabDropStrategy extends BaseDropStrategy {
         const me = this;
         this.onDragLeave(point, dropZone, draggedData, dds);
 
-        if (draggedData.type !== ItemType.APPLICATION_WINDOW || this._dropIndex === null) {
+        if (draggedData.type !== ItemType.WINDOW || this._dropIndex === null) {
             return false;
         }
 

@@ -1,9 +1,9 @@
-import { ApplicationWindow } from '../ApplicationWindow.js';
+import { Window } from '../Window.js';
 import { Modal } from '../../../services/Modal/Modal.js';
 
 /**
  * Description:
- * A concrete implementation of ApplicationWindow that provides a simple text editing interface.
+ * A concrete implementation of Window that provides a simple text editing interface.
  * It demonstrates the usage of the `renderContent` hook, custom state serialization,
  * and the `preventClose` mechanism to handle unsaved changes (dirty state).
  *
@@ -19,7 +19,7 @@ import { Modal } from '../../../services/Modal/Modal.js';
  * viewport.addWindow(notepad);
  *
  * Events:
- * - None specific, inherits ApplicationWindow events.
+ * - None specific, inherits Window events.
  *
  * Business rules implemented:
  * - Renders a full-size textarea within the window content area.
@@ -30,13 +30,13 @@ import { Modal } from '../../../services/Modal/Modal.js';
  * - Supports polymorphic constructor for flexible instantiation.
  *
  * Dependencies:
- * - {import('../ApplicationWindow.js').ApplicationWindow}
+ * - {import('../Window.js').Window}
  * - {import('../../../services/Modal/Modal.js').Modal}
  *
  * Notes / Additional:
  * - Adapts to the UIElement architecture using the injected renderer.
  */
-export class NotepadWindow extends ApplicationWindow {
+export class NotepadWindow extends Window {
     /**
      * The main text input element.
      *
@@ -146,7 +146,7 @@ export class NotepadWindow extends ApplicationWindow {
 
     /**
      * Renders the textarea into the content container.
-     * Overrides the base ApplicationWindow method.
+     * Overrides the base Window method.
      *
      * @param {HTMLElement} container - The content element of the window.
      * @returns {void}
@@ -208,7 +208,7 @@ export class NotepadWindow extends ApplicationWindow {
 
     /**
      * Checks if the window can be closed.
-     * Triggered by ApplicationWindow.close().
+     * Triggered by Window.close().
      *
      * @private
      * @returns {Promise<boolean>} True if it can close, false to cancel.

@@ -1,4 +1,4 @@
-import { ApplicationWindowHeader } from './ApplicationWindowHeader.js';
+import { WindowHeader } from './WindowHeader.js';
 import { ResizeHandleManager } from '../../utils/ResizeHandleManager.js';
 import { appBus } from '../../utils/EventBus.js';
 import { EventTypes } from '../../constants/EventTypes.js';
@@ -28,12 +28,12 @@ import { WindowApi } from '../../api/WindowApi.js';
  * - isTabbed {boolean} : Tabbed (docked) state flag.
  * - isPopout {boolean} : Popout (external window) state flag.
  * - activeTab {boolean} : Active tab state flag (controlled by Viewport).
- * - header {ApplicationWindowHeader} : The window header component.
+ * - header {WindowHeader} : The window header component.
  * - contentElement {HTMLElement|null} : The container for window content.
  * - api {WindowApi} : The public API facade.
  *
  * Typical usage:
- * const win = new ApplicationWindow('My Window', contentNode, { x: 100, y: 100 });
+ * const win = new Window('My Window', contentNode, { x: 100, y: 100 });
  * viewport.addWindow(win);
  *
  * Events:
@@ -44,19 +44,19 @@ import { WindowApi } from '../../api/WindowApi.js';
  * - Delegates visual operations to VanillaWindowAdapter.
  * - Manages 8-direction resizing via ResizeHandleManager.
  * - Intercepts close requests via 'preventClose' (async support).
- * - Identifies as 'ItemType.APPLICATION_WINDOW' for DND.
+ * - Identifies as 'ItemType.WINDOW' for DND.
  * - Supports Popout Mode (external window context).
  * - Exposes a WindowApi facade.
  *
  * Dependencies:
  * - {import('../../core/UIElement.js').UIElement}
  * - {import('../../renderers/vanilla/VanillaWindowAdapter.js').VanillaWindowAdapter}
- * - {import('./ApplicationWindowHeader.js').ApplicationWindowHeader}
+ * - {import('./WindowHeader.js').WindowHeader}
  * - {import('../../utils/ResizeHandleManager.js').ResizeHandleManager}
  * - {import('../../utils/EventBus.js').EventBus}
  * - {import('../../api/WindowApi.js').WindowApi}
  */
-export class ApplicationWindow extends UIElement {
+export class Window extends UIElement {
     /**
      * The public API facade.
      *
@@ -68,7 +68,7 @@ export class ApplicationWindow extends UIElement {
     /**
      * The window header component.
      *
-     * @type {ApplicationWindowHeader}
+     * @type {WindowHeader}
      * @public
      */
     header;
@@ -219,7 +219,7 @@ export class ApplicationWindow extends UIElement {
     _pendingContent = null;
 
     /**
-     * Creates an instance of ApplicationWindow.
+     * Creates an instance of Window.
      *
      * @param {string} [title='Window'] - The window title.
      * @param {HTMLElement|object|string|null} [content=null] - The initial content.
@@ -242,7 +242,7 @@ export class ApplicationWindow extends UIElement {
         if (config.minWidth !== undefined) me.minWidth = config.minWidth;
         if (config.minHeight !== undefined) me.minHeight = config.minHeight;
 
-        me.header = new ApplicationWindowHeader(me, me._title);
+        me.header = new WindowHeader(me, me._title);
     }
 
     /**
@@ -260,7 +260,7 @@ export class ApplicationWindow extends UIElement {
      * @returns {string} The type string.
      */
     getPanelType() {
-        return ItemType.APPLICATION_WINDOW;
+        return ItemType.WINDOW;
     }
 
     /**
@@ -614,7 +614,7 @@ export class ApplicationWindow extends UIElement {
         } else if (content && (typeof content.element) instanceof HTMLElement) {
             me.contentElement.appendChild(content.element);
         } else {
-            console.warn('ApplicationWindow: Unknown content type', content);
+            console.warn('Window: Unknown content type', content);
         }
     }
 
@@ -656,7 +656,7 @@ export class ApplicationWindow extends UIElement {
                 const canClose = await me._canCloseHandler();
                 if (!canClose) return false;
             } catch (e) {
-                console.error('ApplicationWindow: Close handler error', e);
+                console.error('Window: Close handler error', e);
                 return false;
             }
         }

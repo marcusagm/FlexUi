@@ -50,7 +50,7 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * - Delegates visual "ghost" management to GhostManager.
  * - Applies constraints to panel movement via GhostManager updates.
  * - Centralizes magic strings using DNDTypes constants.
- * - Supports ApplicationWindow constraints relative to their Viewport.
+ * - Supports Window constraints relative to their Viewport.
  * - Supports multi-window Drag and Drop (Popout).
  *
  * Dependencies:
@@ -452,9 +452,9 @@ export class DragDropService {
                 me._dragState.item._state &&
                 me._dragState.item._state.isFloating;
 
-            const isApplicationWindow = me._dragState.type === ItemType.APPLICATION_WINDOW;
+            const isWindow = me._dragState.type === ItemType.WINDOW;
 
-            if (isFloatingPanel || isApplicationWindow) {
+            if (isFloatingPanel || isWindow) {
                 element.style.opacity = '0';
             }
 
@@ -522,7 +522,7 @@ export class DragDropService {
                 me._dragState.type === ItemType.PANEL ||
                 me._dragState.type === ItemType.PANEL_GROUP;
 
-            const isWindow = me._dragState.type === ItemType.APPLICATION_WINDOW;
+            const isWindow = me._dragState.type === ItemType.WINDOW;
 
             if (me._activeWindow === window) {
                 if (isPanel) {

@@ -1,7 +1,7 @@
 @import '../theme.css';
 
 /* Container principal da janela */
-.application-window {
+.window {
     display: flex;
     flex-direction: column;
     /* Position (absolute/relative) é gerenciado pelo Adapter/Controller */
@@ -28,12 +28,12 @@
 }
 
 /* Estado Ativo / Focado */
-.application-window--focused {
+.window--focused {
     border: var(--window-border-active);
 }
 
 /* Estado Maximizado */
-.application-window--maximized {
+.window--maximized {
     border-radius: 0;
     border: none;
     box-shadow: none;
@@ -49,26 +49,26 @@
 }
 
 /* Ocultar alças de redimensionamento quando maximizado OU em modo aba */
-.application-window--maximized .window-resize-handle,
-.application-window--tabbed .window-resize-handle {
+.window--maximized .window-resize-handle,
+.window--tabbed .window-resize-handle {
     display: none !important;
 }
 
 /* Estado Minimizado (apenas header visível) */
-.application-window--minimized {
+.window--minimized {
     height: var(--window-header-height) !important;
     min-height: var(--window-header-height) !important;
     resize: none;
 }
-.application-window--minimized .application-window__content {
+.window--minimized .window__content {
     display: none;
 }
-.application-window--minimized .window-resize-handle {
+.window--minimized .window-resize-handle {
     display: none;
 }
 
 /* Estado "Always on Top" (Pin) */
-.application-window--pinned {
+.window--pinned {
     z-index: var(--viewport-z-always-on-top) !important;
     border-color: var(--color-accent-primary);
 }
@@ -91,7 +91,7 @@
     gap: 8px;
 }
 
-.application-window--focused .window-header {
+.window--focused .window-header {
     /* Active State Tokens */
     background-color: var(--window-header-bg-active);
     color: var(--window-header-color-active);
@@ -151,13 +151,13 @@
 }
 
 /* Pinned Button State */
-.application-window--pinned .window-header__btn--pin {
+.window--pinned .window-header__btn--pin {
     opacity: 1;
     background-color: rgba(255, 255, 255, 0.15);
 }
 
 /* --- Conteúdo Interno --- */
-.application-window__content {
+.window__content {
     flex: 1;
     overflow: auto;
     position: relative;

@@ -34,9 +34,9 @@
  * - MENU_ITEM_SELECTED {string} : Signals a final menu item was clicked (used to close all menus).
  * - MENU_CLOSE_SIBLINGS {string} : Signals a menu item is hovering, requesting siblings to close.
  * - CONTEXT_MENU_OPENED {string} : Signals a context menu was opened (used to close other menus).
- * - WINDOW_CLOSE_REQUEST {string} : Request to close an ApplicationWindow.
- * - WINDOW_FOCUS {string} : Request to focus an ApplicationWindow (bring to front).
- * - WINDOW_MOUNT {string} : Signals that an ApplicationWindow has been mounted.
+ * - WINDOW_CLOSE_REQUEST {string} : Request to close an Window.
+ * - WINDOW_FOCUS {string} : Request to focus an Window (bring to front).
+ * - WINDOW_MOUNT {string} : Signals that an Window has been mounted.
  * - VIEWPORT_ARRANGE_CASCADE {string} : Command to arrange windows in a cascade pattern.
  * - VIEWPORT_ARRANGE_TILE {string} : Command to arrange windows in a tile pattern.
  *

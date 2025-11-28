@@ -11,7 +11,7 @@ import { ToolbarContainer } from './components/Toolbar/ToolbarContainer.js';
 import { ToolbarGroupFactory } from './components/Toolbar/ToolbarGroupFactory.js';
 import { ApplicationGroup } from './components/Toolbar/ApplicationGroup.js';
 import { ViewportFactory } from './components/Viewport/ViewportFactory.js';
-import { ApplicationWindow } from './components/Viewport/ApplicationWindow.js';
+import { Window } from './components/Viewport/Window.js';
 import { NotepadWindow } from './components/Viewport/ConcreteWindows/NotepadWindow.js';
 import { Viewport } from './components/Viewport/Viewport.js';
 
@@ -92,7 +92,7 @@ import { EventTypes } from './constants/EventTypes.js';
  * - {import('./components/Toolbar/ToolbarGroupFactory.js').ToolbarGroupFactory}
  * - {import('./components/Toolbar/ApplicationGroup.js').ApplicationGroup}
  * - {import('./components/Viewport/ViewportFactory.js').ViewportFactory}
- * - {import('./components/Viewport/ApplicationWindow.js').ApplicationWindow}
+ * - {import('./components/Viewport/Window.js').Window}
  * - {import('./components/Viewport/ConcreteWindows/NotepadWindow.js').NotepadWindow}
  * - {import('./components/Viewport/Viewport.js').Viewport}
  * - {import('./services/ApplicationStateService.js').ApplicationStateService}
@@ -355,7 +355,7 @@ export class App {
 
         const viewportFactory = ViewportFactory.getInstance();
         viewportFactory.registerWindowType(DropZoneType.VIEWPORT, Viewport);
-        viewportFactory.registerWindowType(ItemType.APPLICATION_WINDOW, ApplicationWindow);
+        viewportFactory.registerWindowType(ItemType.WINDOW, Window);
         viewportFactory.registerWindowType('NotepadWindow', NotepadWindow);
     }
 
@@ -675,11 +675,11 @@ export class App {
         for (const popoutData of popoutsData) {
             const payload = popoutData.data || popoutData.groupData;
             const geometry = popoutData.geometry;
-            const type = popoutData.type || 'PanelGroup';
+            const type = popoutData.type || ItemType.PANEL_GROUP;
 
             if (!payload) continue;
 
-            if (type === 'ApplicationWindow') {
+            if (type === ItemType.WINDOW) {
                 const factory = ViewportFactory.getInstance();
                 const win = factory.createWindow(payload);
                 if (win && targetViewport) {

@@ -6,7 +6,7 @@ import { PopoutManagerService } from '../PopoutManagerService.js';
 /**
  * Description:
  * A DND strategy that defines drop behavior for 'viewport' type drop zones.
- * It handles the free movement of ApplicationWindows within the Viewport.
+ * It handles the free movement of Windows within the Viewport.
  * * Specific Behavior for Docking:
  * - It handles the *initial* creation of the Tab Bar.
  * - If the Viewport has NO tabs, dragging to the top edge shows a horizontal placeholder.
@@ -19,9 +19,9 @@ import { PopoutManagerService } from '../PopoutManagerService.js';
  * - _dockZoneHeight {number} : Height in pixels of the active dock area.
  *
  * Business rules implemented:
- * - Validates that the dragged item is strictly an ApplicationWindow.
+ * - Validates that the dragged item is strictly an Window.
  * - On DragOver:
- * - If item is NOT ApplicationWindow: Hides placeholder (prevents docking visual).
+ * - If item is NOT Window: Hides placeholder (prevents docking visual).
  * - If Viewport has tabs: Logic is purely floating (updates ghost, no docking).
  * - If Viewport empty of tabs: Checks top zone. If inside, shows Horizontal Placeholder.
  * - On Drop:
@@ -31,7 +31,7 @@ import { PopoutManagerService } from '../PopoutManagerService.js';
  *
  * Dependencies:
  * - {import('./BaseDropStrategy.js').BaseDropStrategy}
- * - {import('../../components/Viewport/ApplicationWindow.js').ApplicationWindow}
+ * - {import('../../components/Viewport/Window.js').Window}
  * - {import('../../constants/DNDTypes.js').ItemType}
  * - {import('../PopoutManagerService.js').PopoutManagerService}
  */
@@ -85,7 +85,7 @@ export class ViewportDropStrategy extends BaseDropStrategy {
      * @returns {boolean}
      */
     onDragOver(point, dropZone, draggedData, dds) {
-        if (draggedData.type !== ItemType.APPLICATION_WINDOW) {
+        if (draggedData.type !== ItemType.WINDOW) {
             this._isDocking = false;
             dds.hidePlaceholder();
             return true;
@@ -152,7 +152,7 @@ export class ViewportDropStrategy extends BaseDropStrategy {
     onDrop(point, dropZone, draggedData, dds) {
         const me = this;
         dds;
-        if (draggedData.type !== ItemType.APPLICATION_WINDOW) {
+        if (draggedData.type !== ItemType.WINDOW) {
             return false;
         }
 

@@ -11,7 +11,7 @@ import { PopoutManagerService } from '../../services/PopoutManagerService.js';
 
 /**
  * Description:
- * A container component that acts as a manager for ApplicationWindow instances.
+ * A container component that acts as a manager for Window instances.
  * It provides a bounded area (relative positioning context) where windows can float,
  * overlap, or be docked into tabs using a TabStrip.
  *
@@ -23,7 +23,7 @@ import { PopoutManagerService } from '../../services/PopoutManagerService.js';
  * - element {HTMLElement} : The main DOM element (.viewport).
  * - dropZoneType {string} : The identifier for the DragDropService.
  * - tabBar {HTMLElement} : The DOM element representing the tab strip container.
- * - windows {Array<ApplicationWindow>} : List of managed windows.
+ * - windows {Array<Window>} : List of managed windows.
  * - height {number|null} : The height of the viewport (for vertical resizing in a column).
  * - _resizeObserver {ResizeObserver|null} : Observer for viewport dimension changes.
  * - _boundOnViewportResize {Function|null} : Throttled handler for resize events.
@@ -31,7 +31,7 @@ import { PopoutManagerService } from '../../services/PopoutManagerService.js';
  * Typical usage:
  * const viewport = new Viewport();
  * document.body.appendChild(viewport.element);
- * viewport.addWindow(new ApplicationWindow(...));
+ * viewport.addWindow(new Window(...));
  * viewport.dockWindow(newWindow);
  *
  * Events:
@@ -66,7 +66,7 @@ export class Viewport extends UIElement {
     /**
      * List of managed windows.
      *
-     * @type {Array<import('./ApplicationWindow.js').ApplicationWindow>}
+     * @type {Array<import('./Window.js').Window>}
      * @private
      */
     _windows = [];
@@ -74,7 +74,7 @@ export class Viewport extends UIElement {
     /**
      * The currently focused window.
      *
-     * @type {import('./ApplicationWindow.js').ApplicationWindow | null}
+     * @type {import('./Window.js').Window | null}
      * @private
      */
     _activeWindow = null;
@@ -249,7 +249,7 @@ export class Viewport extends UIElement {
     /**
      * Gets the list of managed windows.
      *
-     * @returns {Array<import('./ApplicationWindow.js').ApplicationWindow>}
+     * @returns {Array<import('./Window.js').Window>}
      */
     get windows() {
         return this._windows;
@@ -555,7 +555,7 @@ export class Viewport extends UIElement {
      * Adds a window to the viewport and mounts it.
      * Handles both new windows and windows returning from Popout.
      *
-     * @param {import('./ApplicationWindow.js').ApplicationWindow} windowInstance - The window to add.
+     * @param {import('./Window.js').Window} windowInstance - The window to add.
      * @param {boolean} [doFocus=true] - Whether to focus the window immediately.
      * @returns {void}
      */
@@ -590,7 +590,7 @@ export class Viewport extends UIElement {
     /**
      * Removes a window from the viewport.
      *
-     * @param {import('./ApplicationWindow.js').ApplicationWindow} windowInstance - The window to remove.
+     * @param {import('./Window.js').Window} windowInstance - The window to remove.
      * @returns {void}
      */
     removeWindow(windowInstance) {
@@ -607,7 +607,7 @@ export class Viewport extends UIElement {
         if (windowInstance.isTabbed && windowInstance.header) {
             me._tabStrip.removeItem(windowInstance.header);
             if (windowInstance.element) {
-                windowInstance.element.classList.remove('application-window--active-tab');
+                windowInstance.element.classList.remove('window--active-tab');
             }
         }
 
@@ -639,7 +639,7 @@ export class Viewport extends UIElement {
      * Focuses a specific window.
      * If the window is in Popout mode, delegates focus to the native window.
      *
-     * @param {import('./ApplicationWindow.js').ApplicationWindow} windowInstance - The window to focus.
+     * @param {import('./Window.js').Window} windowInstance - The window to focus.
      * @param {boolean} [force=false] - If true, re-asserts focus even if already active.
      * @returns {void}
      */
@@ -649,70 +649,119 @@ export class Viewport extends UIElement {
             return;
         }
 
-        // Handle Popout Focus
         if (windowInstance.isPopout) {
-            const popout = PopoutManagerService.getInstance().getPopoutFor(windowInstance);
-            if (popout && popout.nativeWindow) {
-                popout.nativeWindow.focus();
-            }
+            me._handlePopoutFocus(windowInstance);
             return;
         }
 
         const alreadyActive = me._activeWindow === windowInstance;
-
         if (alreadyActive && !force) {
             return;
         }
 
+        me._updateActiveWindow(windowInstance);
+        me._reorderWindow(windowInstance);
+
+        if (windowInstance.isTabbed) {
+            me._handleTabbedFocus(windowInstance);
+        } else {
+            me._handleStandardFocus();
+        }
+    }
+
+    /**
+     * Handles focus for a popped out window.
+     *
+     * @param {import('./Window.js').Window} windowInstance
+     * @private
+     */
+    _handlePopoutFocus(windowInstance) {
+        const popout = PopoutManagerService.getInstance().getPopoutFor(windowInstance);
+        if (popout && popout.nativeWindow) {
+            popout.nativeWindow.focus();
+        }
+    }
+
+    /**
+     * Updates the active window state.
+     *
+     * @param {import('./Window.js').Window} windowInstance
+     * @private
+     */
+    _updateActiveWindow(windowInstance) {
+        const me = this;
         if (me._activeWindow && me._activeWindow !== windowInstance) {
             me._activeWindow.isFocused = false;
         }
-
         me._activeWindow = windowInstance;
         windowInstance.isFocused = true;
 
         if (windowInstance.element) {
             windowInstance.element.focus({ preventScroll: true });
         }
+    }
 
+    /**
+     * Moves the window to the end of the list (top of stack).
+     *
+     * @param {import('./Window.js').Window} windowInstance
+     * @private
+     */
+    _reorderWindow(windowInstance) {
+        const me = this;
         const index = me._windows.indexOf(windowInstance);
         if (index > -1) {
             me._windows.splice(index, 1);
             me._windows.push(windowInstance);
         }
+    }
 
-        if (windowInstance.isTabbed) {
-            if (windowInstance.header) {
-                me._tabStrip.setActiveItem(windowInstance.header);
+    /**
+     * Handles focus logic for tabbed windows.
+     *
+     * @param {import('./Window.js').Window} windowInstance
+     * @private
+     */
+    _handleTabbedFocus(windowInstance) {
+        const me = this;
+        if (windowInstance.header) {
+            me._tabStrip.setActiveItem(windowInstance.header);
+        }
+
+        me._windows.forEach(win => {
+            if (win.isTabbed && !win.isPopout) {
+                const isActive = win === windowInstance;
+                win.activeTab = isActive;
             }
+        });
+    }
 
-            me._windows.forEach(win => {
-                if (win.isTabbed && !win.isPopout) {
-                    const isActive = win === windowInstance;
-                    win.activeTab = isActive;
-                }
-            });
-        } else {
-            me._updateZIndices();
+    /**
+     * Handles focus logic for standard (floating) windows.
+     *
+     * @private
+     */
+    _handleStandardFocus() {
+        const me = this;
+        me._updateZIndices();
 
-            const hasActiveTab = me._windows.some(
-                w =>
-                    w.isTabbed &&
-                    !w.isPopout &&
-                    w.element &&
-                    w.element.classList.contains('application-window--active-tab')
-            );
+        const hasActiveTab = me._windows.some(
+            window =>
+                window.isTabbed &&
+                !window.isPopout &&
+                window.element &&
+                window.element.classList.contains('window--active-tab')
+        );
 
-            if (!hasActiveTab && me._tabStrip.items.length > 0) {
-                for (let i = me._windows.length - 1; i >= 0; i--) {
-                    const win = me._windows[i];
-                    if (win.isTabbed && !win.isPopout) {
-                        win.activeTab = true;
-                        if (win.header) {
-                            me._tabStrip.setActiveItem(win.header);
-                        }
-                        break;
+        if (!hasActiveTab && me._tabStrip.items.length > 0) {
+            for (let i = me._windows.length - 1; i >= 0; i--) {
+                const window = me._windows[i];
+                if (window.isTabbed && !window.isPopout) {
+                    window.activeTab = true;
+                    if (window.header) {
+                        me._tabStrip.setActiveItem(window.header);
                     }
+                    break;
                 }
             }
         }
@@ -721,7 +770,7 @@ export class Viewport extends UIElement {
     /**
      * Docks a window into the tab bar.
      *
-     * @param {import('./ApplicationWindow.js').ApplicationWindow} windowInstance - The window to dock.
+     * @param {import('./Window.js').Window} windowInstance - The window to dock.
      * @param {number|null} [index=null] - Optional index to insert tab at.
      * @returns {void}
      */
@@ -749,7 +798,7 @@ export class Viewport extends UIElement {
     /**
      * Undocks a window (makes it floating).
      *
-     * @param {import('./ApplicationWindow.js').ApplicationWindow} windowInstance - The window to undock.
+     * @param {import('./Window.js').Window} windowInstance - The window to undock.
      * @param {number} [x=50] - The new X coordinate.
      * @param {number} [y=50] - The new Y coordinate.
      * @returns {void}
@@ -1005,7 +1054,7 @@ export class Viewport extends UIElement {
     /**
      * Event handler for window focus requests.
      *
-     * @param {import('./ApplicationWindow.js').ApplicationWindow} windowInstance
+     * @param {import('./Window.js').Window} windowInstance
      * @private
      * @returns {void}
      */
@@ -1020,7 +1069,7 @@ export class Viewport extends UIElement {
      * Event handler for window close requests.
      * Checks the return value of close() to respect prevention (dirty state).
      *
-     * @param {import('./ApplicationWindow.js').ApplicationWindow} windowInstance
+     * @param {import('./Window.js').Window} windowInstance
      * @private
      * @returns {void}
      */

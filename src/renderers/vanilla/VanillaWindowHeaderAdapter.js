@@ -2,7 +2,7 @@ import { VanillaRenderer } from './VanillaRenderer.js';
 
 /**
  * Description:
- * A specialized adapter for rendering ApplicationWindowHeader components in a Vanilla JS environment.
+ * A specialized adapter for rendering WindowHeader components in a Vanilla JS environment.
  * It encapsulates the DOM structure creation for the window title bar, including controls
  * for minimizing, maximizing, pinning, closing, and popping out.
  *

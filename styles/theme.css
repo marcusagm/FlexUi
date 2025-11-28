@@ -530,7 +530,7 @@
     --resize-handle-color-active: var(--color-accent-active);
     --resize-handle-z-index: 100;
 
-    /* Component: Viewport & ApplicationWindow */
+    /* Component: Viewport & Window */
     --color-bg-viewport: var(--neutral-5);
     --color-bg-viewport-tabbar: var(--surface-level-0);
 
