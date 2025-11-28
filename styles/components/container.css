@@ -8,6 +8,8 @@
     background: var(--color-bg-app);
     overflow: auto;
     position: relative;
+    /* Optimization: Isolate layout recalculations */
+    contain: layout style;
 }
 .dnd-active .container {
     gap: var(--dnd-active-container-gap);
@@ -21,6 +23,8 @@
     padding: var(--row-padding);
     position: relative;
     min-height: 50px;
+    /* Optimization: Isolate layout recalculations */
+    contain: layout style;
 }
 .dnd-active .row {
     gap: var(--dnd-active-container-gap);

@@ -1,4 +1,3 @@
-/* styles/services/context-menu.css */
 @import '../theme.css';
 
 .context-menu {
@@ -15,6 +14,8 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    /* Optimization: Isolate layout recalculations */
+    contain: layout style;
 }
 
 .context-menu__scroll-btn {

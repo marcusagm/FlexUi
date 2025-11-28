@@ -48,6 +48,8 @@
     transition:
         opacity var(--transition-speed) ease-out,
         transform var(--transition-speed) ease-out;
+    /* Optimization: Isolate layout recalculations */
+    contain: layout style;
 }
 
 .modal--is-visible {

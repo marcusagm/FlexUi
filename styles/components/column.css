@@ -8,6 +8,8 @@
     gap: var(--container-gap);
     position: relative;
     overflow: auto;
+    /* Optimization: Isolate layout recalculations */
+    contain: layout style;
 }
 .dnd-active.dnd-type-panelgroup .column,
 .dnd-active.dnd-type-panel .column {

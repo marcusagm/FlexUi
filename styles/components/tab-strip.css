@@ -16,6 +16,8 @@
     height: var(--tab-strip-height);
     overflow: hidden;
     user-select: none;
+    /* Optimization: Isolate layout recalculations */
+    contain: layout style;
 }
 
 .ui-strip--horizontal {
