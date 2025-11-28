@@ -23,7 +23,9 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * - _activeSubmenus {Map<HTMLElement, HTMLElement>} : Tracks open <li> -> <div> submenu mappings.
  * - _submenuHideTimer {number | null} : The setTimeout ID for delayed submenu closing.
  * - _boundGlobalClick {Function} : The bound listener for closing the menu.
+ * - _boundGlobalContextMenu {Function} : The bound listener for context menu prevention.
  * - _scrollIntervals {Map<HTMLElement, number>} : Tracks active scroll intervals (setInterval IDs).
+ * - _currentContextDocument {Document | null} : The document where the menu is currently active.
  * - SCROLL_BTN_HEIGHT {number} : The pixel height of one scroll button (CSS).
  * - VIEWPORT_V_PADDING {number} : The total vertical padding of the viewport (CSS).
  * - SUBMENU_HIDE_DELAY {number} : Delay in ms before closing a submenu on mouseleave.
@@ -110,12 +112,29 @@ export class ContextMenuService {
     _boundGlobalClick = null;
 
     /**
+     * The bound listener for context menu prevention.
+     *
+     * @type {Function}
+     * @private
+     */
+    _boundGlobalContextMenu = null;
+
+    /**
      * Tracks active scroll intervals (setInterval IDs) keyed by viewport element.
      *
      * @type {Map<HTMLElement, number>}
      * @private
      */
     _scrollIntervals = new Map();
+
+    /**
+     * The document where the menu is currently active/attached.
+     * Used to remove listeners from the correct window.
+     *
+     * @type {Document | null}
+     * @private
+     */
+    _currentContextDocument = null;
 
     /**
      * Height of one scroll button + its border (20px + 1px)
@@ -157,6 +176,7 @@ export class ContextMenuService {
 
         const me = this;
         me._boundGlobalClick = me._onGlobalClick.bind(me);
+        me._boundGlobalContextMenu = me._onGlobalContextMenu.bind(me);
 
         const mainStructure = me._createMenuStructure();
         me._menuElement = mainStructure.wrapper;
@@ -167,7 +187,6 @@ export class ContextMenuService {
 
         document.body.appendChild(me._menuElement);
 
-        me._initGlobalListeners();
         me._initMenuListeners(mainStructure.viewport, mainStructure.upBtn, mainStructure.downBtn);
     }
 
@@ -221,19 +240,6 @@ export class ContextMenuService {
         wrapper.append(upBtn, viewport, downBtn);
 
         return { wrapper, list, viewport, upBtn, downBtn };
-    }
-
-    /**
-     * Description:
-     * Initializes global listeners for the service.
-     *
-     * @private
-     * @returns {void}
-     */
-    _initGlobalListeners() {
-        const me = this;
-        document.addEventListener('click', me._boundGlobalClick, true);
-        document.addEventListener('contextmenu', me._onGlobalContextMenu.bind(me), true);
     }
 
     /**
@@ -389,12 +395,18 @@ export class ContextMenuService {
 
         submenuWrapper.classList.add('context-menu__submenu');
         me._buildMenuRecursive(childrenItems, submenuList, contextData);
-        document.body.appendChild(submenuWrapper);
+
+        if (me._menuElement.ownerDocument) {
+            me._menuElement.ownerDocument.body.appendChild(submenuWrapper);
+        } else {
+            document.body.appendChild(submenuWrapper);
+        }
 
         me._initMenuListeners(subStructure.viewport, subStructure.upBtn, subStructure.downBtn);
 
         const liRect = listItem.getBoundingClientRect();
-        me._positionAndFitMenu(submenuWrapper, 0, 0, true, liRect);
+        const targetWindow = me._menuElement.ownerDocument.defaultView || window;
+        me._positionAndFitMenu(submenuWrapper, 0, 0, true, liRect, targetWindow);
 
         submenuWrapper.classList.add('context-menu__submenu--visible');
         me._activeSubmenus.set(listItem, submenuWrapper);
@@ -563,40 +575,36 @@ export class ContextMenuService {
     /**
      * Description:
      * Calculates the (x, y) position and max-height for a menu,
-     * ensuring it stays within the viewport boundaries and flipping
-     * upward or leftward if necessary.
+     * ensuring it stays within the viewport boundaries of the target window.
      *
      * @param {HTMLElement} menuWrapper - The menu element to position.
      * @param {number} x - The initial clientX (for main menu).
      * @param {number} y - The initial clientY (for main menu).
      * @param {boolean} isSubmenu - If this is a submenu.
      * @param {DOMRect | null} parentRect - The BoundingRect of the parent <li>.
+     * @param {Window} targetWindow - The window where the menu is being rendered.
      * @private
      * @returns {void}
      */
-    _positionAndFitMenu(menuWrapper, x, y, isSubmenu = false, parentRect = null) {
+    _positionAndFitMenu(menuWrapper, x, y, isSubmenu, parentRect, targetWindow) {
         const me = this;
         const listElement = menuWrapper.querySelector('.context-menu__list');
         const viewportElement = menuWrapper.querySelector('.context-menu__viewport');
 
-        // 1. Reset state before measuring
         viewportElement.scrollTop = 0;
         menuWrapper.style.maxHeight = 'none';
         menuWrapper.classList.remove('context-menu--scrollable');
 
-        // 2. Display hidden at (-9999, -9999) to measure dimensions
         menuWrapper.style.display = 'flex';
         menuWrapper.style.left = '-9999px';
         menuWrapper.style.top = '-9999px';
 
-        // 3. Measure the natural height of the list and width of the wrapper
         const listHeight = listElement.offsetHeight;
         const menuWidth = menuWrapper.offsetWidth;
 
-        // 4. Calculate available space
         const margin = 10;
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
+        const viewportWidth = targetWindow.innerWidth;
+        const viewportHeight = targetWindow.innerHeight;
 
         let availableHeightDown, availableHeightUp, targetY;
         let finalTop, finalLeft, finalMaxHeight;
@@ -612,7 +620,6 @@ export class ContextMenuService {
             availableHeightUp = y - margin;
         }
 
-        // 5. Decide Vertical position, max-height, and scroll state
         const naturalMenuHeight = listHeight + me.VIEWPORT_V_PADDING;
         const scrollMenuHeight = naturalMenuHeight + me.SCROLL_BTN_HEIGHT * 2;
         let requiredHeight = naturalMenuHeight;
@@ -639,7 +646,6 @@ export class ContextMenuService {
             }
         }
 
-        // 6. Decide Horizontal position
         if (isSubmenu) {
             const spaceRight = viewportWidth - parentRect.right - margin;
             const spaceLeft = parentRect.left - margin;
@@ -656,11 +662,9 @@ export class ContextMenuService {
             }
         }
 
-        // 7. Final bounds check
         finalLeft = Math.max(margin, Math.min(finalLeft, viewportWidth - menuWidth - margin));
         finalTop = Math.max(margin, finalTop);
 
-        // 8. Apply styles
         menuWrapper.style.maxHeight = finalMaxHeight;
         menuWrapper.classList.toggle('context-menu--scrollable', isScrollable);
         me._updateScrollButtonsState(
@@ -669,7 +673,6 @@ export class ContextMenuService {
             menuWrapper.querySelector('.context-menu__scroll-btn--down')
         );
 
-        // 9. Move to final position
         menuWrapper.style.left = `${finalLeft}px`;
         menuWrapper.style.top = `${finalTop}px`;
     }
@@ -677,6 +680,8 @@ export class ContextMenuService {
     /**
      * Description:
      * Displays the context menu at a specific position.
+     * Dynamically moves the menu to the target window (if Popout) and attaches
+     * listeners to that specific document.
      *
      * @param {MouseEvent} event - The native 'contextmenu' event.
      * @param {Array<object>} items - The array of item config objects.
@@ -689,10 +694,30 @@ export class ContextMenuService {
         event.stopPropagation();
 
         me.close();
+
+        const targetWindow = event.view || window;
+        const targetDocument = targetWindow.document;
+
+        if (me._menuElement.parentElement !== targetDocument.body) {
+            targetDocument.body.appendChild(me._menuElement);
+        }
+
+        me._currentContextDocument = targetDocument;
+
+        targetDocument.addEventListener('click', me._boundGlobalClick, true);
+        targetDocument.addEventListener('contextmenu', me._boundGlobalContextMenu, true);
+
         me._clearMenu();
         me._buildMenuRecursive(items, me._listElement, contextData);
 
-        me._positionAndFitMenu(me._menuElement, event.clientX, event.clientY, false, null);
+        me._positionAndFitMenu(
+            me._menuElement,
+            event.clientX,
+            event.clientY,
+            false,
+            null,
+            targetWindow
+        );
 
         appBus.emit(EventTypes.CONTEXT_MENU_OPENED);
     }
@@ -700,13 +725,12 @@ export class ContextMenuService {
     /**
      * Description:
      * Closes and clears the context menu.
+     * Removes listeners from the document where the menu was active.
      *
      * @returns {void}
      */
     destroy() {
         const me = this;
-        document.removeEventListener('click', me._boundGlobalClick, true);
-        document.removeEventListener('contextmenu', me._onGlobalContextMenu.bind(me), true);
         me.close();
 
         if (me._menuElement && me._menuElement.parentElement) {
@@ -723,6 +747,7 @@ export class ContextMenuService {
     /**
      * Description:
      * Closes and clears the context menu.
+     * Detaches listeners from the current context document.
      *
      * @returns {void}
      */
@@ -735,6 +760,16 @@ export class ContextMenuService {
             me._menuElement.style.display = 'none';
             me._stopScroll(me._viewportElement);
             me._clearMenu();
+        }
+
+        if (me._currentContextDocument) {
+            me._currentContextDocument.removeEventListener('click', me._boundGlobalClick, true);
+            me._currentContextDocument.removeEventListener(
+                'contextmenu',
+                me._boundGlobalContextMenu,
+                true
+            );
+            me._currentContextDocument = null;
         }
     }
 }
