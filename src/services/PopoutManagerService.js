@@ -33,6 +33,7 @@ import { appNotifications } from './Notification/Notification.js';
  * - Implements sequential restoration with fallback for popup blockers.
  * - Automatically closes all popouts when the main window is closed/reloaded.
  * - Synchronizes dynamic CSS changes (lazy loading) to all active popouts.
+ * - Centralizes popout creation logic via _performPopout to reduce duplication.
  *
  * Dependencies:
  * - {import('../core/PopoutWindow.js').PopoutWindow}
@@ -133,66 +134,25 @@ export class PopoutManagerService {
             return;
         }
 
-        if (me._activePopouts.has(panelGroup.id)) {
-            console.warn(
-                `[PopoutManagerService] Group "${panelGroup.id}" is already in a popout window.`
-            );
-            return;
-        }
-
-        me._startStyleObserver();
-
-        if (panelGroup.isFloating) {
-            FloatingPanelManagerService.getInstance().removeFloatingPanel(panelGroup);
-        } else {
-            const column = panelGroup.getColumn();
-            if (column) {
-                column.removeChild(panelGroup, true);
+        await me._performPopout(panelGroup, 'PanelGroup', geometry, {
+            instanceMap: me._groupInstances,
+            onPrepare: () => {
+                if (panelGroup.isFloating) {
+                    FloatingPanelManagerService.getInstance().removeFloatingPanel(panelGroup);
+                } else {
+                    const column = panelGroup.getColumn();
+                    if (column) {
+                        column.removeChild(panelGroup, true);
+                    }
+                }
+            },
+            onReturn: () => me.returnGroup(panelGroup),
+            onMount: () => {
+                if (typeof panelGroup.requestLayoutUpdate === 'function') {
+                    panelGroup.requestLayoutUpdate();
+                }
             }
-        }
-
-        const width = geometry?.width || panelGroup.width || 400;
-        const height = geometry?.height || panelGroup.height || 300;
-        const left = geometry?.x;
-        const top = geometry?.y;
-        const title = panelGroup.title || 'External Panel';
-
-        const popout = new PopoutWindow(`popout-${panelGroup.id}`, {
-            title: title,
-            width: width,
-            height: height,
-            left: left,
-            top: top
         });
-
-        popout.onClose = () => {
-            me.returnGroup(panelGroup);
-        };
-
-        me._activePopouts.set(panelGroup.id, popout);
-        me._groupInstances.set(panelGroup.id, panelGroup);
-
-        try {
-            await popout.open();
-
-            if (panelGroup.element) {
-                popout.appendChild(panelGroup.element);
-            }
-
-            if (typeof panelGroup.setPopoutMode === 'function') {
-                panelGroup.setPopoutMode(true);
-            }
-
-            if (popout.nativeWindow && popout.nativeWindow.document) {
-                panelGroup.mount(popout.nativeWindow.document.body);
-            }
-
-            if (typeof panelGroup.requestLayoutUpdate === 'function') {
-                panelGroup.requestLayoutUpdate();
-            }
-        } catch (error) {
-            me._onDidOpenPopoutWindowFail(panelGroup, 'PanelGroup', error);
-        }
     }
 
     /**
@@ -238,8 +198,10 @@ export class PopoutManagerService {
         let targetY = 50;
 
         if (containerBounds) {
-            targetX = (containerBounds.width - (panelGroup.width || 300)) / 2;
-            targetY = (containerBounds.height - (panelGroup.height || 200)) / 2;
+            const defaultWidth = 300;
+            const defalutHeight = 200;
+            targetX = (containerBounds.width - (panelGroup.width || defaultWidth)) / 2;
+            targetY = (containerBounds.height - (panelGroup.height || defalutHeight)) / 2;
         }
 
         fpms.addFloatingPanel(panelGroup, targetX, targetY);
@@ -264,78 +226,43 @@ export class PopoutManagerService {
             return;
         }
 
-        if (me._activePopouts.has(appWindow.id)) {
-            console.warn(`[PopoutManagerService] Window "${appWindow.id}" is already in a popout.`);
-            return;
-        }
+        await me._performPopout(appWindow, 'ApplicationWindow', geometry, {
+            instanceMap: me._windowInstances,
+            onPrepare: () => {
+                let viewportInstance = null;
+                if (appWindow.element) {
+                    const viewportElement = appWindow.element.closest('.viewport');
+                    viewportInstance = viewportElement ? viewportElement.dropZoneInstance : null;
+                }
 
-        me._startStyleObserver();
+                if (!viewportInstance) {
+                    console.warn(
+                        '[PopoutManagerService] Could not find parent Viewport for window.'
+                    );
+                }
 
-        let viewportInstance = null;
-        if (appWindow.element) {
-            const viewportElement = appWindow.element.closest('.viewport');
-            viewportInstance = viewportElement ? viewportElement.dropZoneInstance : null;
-        }
+                if (viewportInstance) {
+                    me._viewportReferences.set(appWindow.id, viewportInstance);
+                    if (appWindow.isMounted) {
+                        appWindow.unmount();
+                    }
+                }
+            },
+            onReturn: () => me.returnWindow(appWindow),
+            onMount: popout => {
+                const nativeWin = popout.nativeWindow;
+                if (!nativeWin) return;
 
-        if (!viewportInstance) {
-            console.warn('[PopoutManagerService] Could not find parent Viewport for window.');
-        }
-
-        if (viewportInstance) {
-            me._viewportReferences.set(appWindow.id, viewportInstance);
-            if (appWindow.isMounted) {
-                appWindow.unmount();
+                const syncHandler = () => {
+                    appWindow.width = nativeWin.innerWidth;
+                    appWindow.height = nativeWin.innerHeight;
+                    appWindow.x = nativeWin.screenX;
+                    appWindow.y = nativeWin.screenY;
+                };
+                nativeWin.addEventListener('resize', syncHandler);
+                nativeWin.addEventListener('move', syncHandler);
             }
-        }
-
-        const width = geometry?.width || appWindow.width || 800;
-        const height = geometry?.height || appWindow.height || 600;
-        const left = geometry?.x;
-        const top = geometry?.y;
-        const title = appWindow.title || 'Application Window';
-
-        const popout = new PopoutWindow(`popout-win-${appWindow.id}`, {
-            title: title,
-            width: width,
-            height: height,
-            left: left,
-            top: top
         });
-
-        popout.onClose = () => {
-            me.returnWindow(appWindow);
-        };
-
-        me._activePopouts.set(appWindow.id, popout);
-        me._windowInstances.set(appWindow.id, appWindow);
-
-        try {
-            await popout.open();
-
-            if (appWindow.element) {
-                popout.appendChild(appWindow.element);
-            }
-
-            if (typeof appWindow.setPopoutMode === 'function') {
-                appWindow.setPopoutMode(true);
-            }
-
-            if (popout.nativeWindow && popout.nativeWindow.document) {
-                appWindow.mount(popout.nativeWindow.document.body);
-            }
-
-            const nativeWin = popout.nativeWindow;
-            const syncHandler = () => {
-                appWindow.width = nativeWin.innerWidth;
-                appWindow.height = nativeWin.innerHeight;
-                appWindow.x = nativeWin.screenX;
-                appWindow.y = nativeWin.screenY;
-            };
-            nativeWin.addEventListener('resize', syncHandler);
-            nativeWin.addEventListener('move', syncHandler);
-        } catch (error) {
-            me._onDidOpenPopoutWindowFail(appWindow, 'ApplicationWindow', error);
-        }
     }
 
     /**
@@ -392,6 +319,76 @@ export class PopoutManagerService {
     }
 
     /**
+     * Generic method to handle the common logic of creating and opening a popout window.
+     *
+     * @param {object} item - The component instance (PanelGroup or ApplicationWindow).
+     * @param {string} type - The component type name (for logging/title).
+     * @param {object|null} geometry - Window geometry overrides.
+     * @param {object} handlers - Type-specific callbacks.
+     * @param {Map} handlers.instanceMap - The map to store the item instance reference.
+     * @param {Function} handlers.onPrepare - Called before opening to detach item from current layout.
+     * @param {Function} handlers.onReturn - Callback passed to popout.onClose.
+     * @param {Function} [handlers.onMount] - Called after content is mounted (optional).
+     * @returns {Promise<void>}
+     * @private
+     */
+    async _performPopout(item, type, geometry, handlers) {
+        const me = this;
+
+        if (me._activePopouts.has(item.id)) {
+            console.warn(`[PopoutManagerService] Item "${item.id}" is already in a popout window.`);
+            return;
+        }
+
+        me._startStyleObserver();
+
+        if (handlers.onPrepare) {
+            handlers.onPrepare();
+        }
+
+        const width = geometry?.width || item.width || 800;
+        const height = geometry?.height || item.height || 600;
+        const left = geometry?.x;
+        const top = geometry?.y;
+        const title = item.title || `External ${type}`;
+
+        const popout = new PopoutWindow(`popout-${item.id}`, {
+            title: title,
+            width: width,
+            height: height,
+            left: left,
+            top: top
+        });
+
+        popout.onClose = handlers.onReturn;
+
+        me._activePopouts.set(item.id, popout);
+        handlers.instanceMap.set(item.id, item);
+
+        try {
+            await popout.open();
+
+            if (item.element) {
+                popout.appendChild(item.element);
+            }
+
+            if (typeof item.setPopoutMode === 'function') {
+                item.setPopoutMode(true);
+            }
+
+            if (popout.nativeWindow && popout.nativeWindow.document) {
+                item.mount(popout.nativeWindow.document.body);
+            }
+
+            if (handlers.onMount) {
+                handlers.onMount(popout);
+            }
+        } catch (error) {
+            me._onDidOpenPopoutWindowFail(item, type, error);
+        }
+    }
+
+    /**
      * Restores a list of popout items sequentially to avoid browser blocking.
      * This method encapsulates the delay logic and error handling.
      *
@@ -413,7 +410,8 @@ export class PopoutManagerService {
                 await me.popoutGroup(item, geometry);
             }
 
-            await delay(300);
+            const delayTime = 300;
+            await delay(delayTime);
         }
     }
 
