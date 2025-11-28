@@ -22,7 +22,11 @@ import { ShortcutDispatcher } from './ShortcutDispatcher.js';
  * - _gesture {GestureRecognizer} : Instance of the gesture recognizer.
  * - _gamepad {GamepadManager} : Instance of the gamepad manager.
  * - _enabled {boolean} : Whether the service is actively dispatching.
- * - _bound... {Function} : Bound event handlers for robust cleanup.
+ * - _boundOnKeyDown {Function | null} : Bound handler for 'keydown'.
+ * - _boundOnKeyUp {Function | null} : Bound handler for 'keyup'.
+ * - _boundOnPointerDown {Function | null} : Bound handler for 'pointerdown'.
+ * - _boundOnWheel {Function | null} : Bound handler for 'wheel'.
+ * - _boundOnVisibilityChange {Function | null} : Bound handler for 'visibilitychange'.
  *
  * Typical usage:
  * // In App.js
@@ -30,16 +34,24 @@ import { ShortcutDispatcher } from './ShortcutDispatcher.js';
  * shortcutService.enable();
  * shortcutService.register({ keys: 'Ctrl+S', command: 'app:save' });
  *
+ * Events:
+ * - None
+ *
+ * Business rules implemented:
+ * - Singleton pattern.
+ * - Centralized management of input sources (Keyboard, Mouse, Touch, Gamepad).
+ * - Support for attaching/detaching listeners to specific windows (Popout support).
+ *
  * Dependencies:
- * - ./TokenNormalizer.js
- * - ./ShortcutRegistry.js
- * - ./GestureRecognizer.js
- * - ./GamepadManager.js
- * - ./ShortcutDispatcher.js
+ * - {import('./ShortcutRegistry.js').ShortcutRegistry}
+ * - {import('./GestureRecognizer.js').GestureRecognizer}
+ * - {import('./GamepadManager.js').GamepadManager}
+ * - {import('./ShortcutDispatcher.js').ShortcutDispatcher}
  */
 export class ShortcutService {
     /**
      * The static singleton instance.
+     *
      * @type {ShortcutService | null}
      * @private
      */
@@ -47,34 +59,39 @@ export class ShortcutService {
 
     /**
      * Instance of the shortcut registry.
-     * @type {ShortcutRegistry}
+     *
+     * @type {import('./ShortcutRegistry.js').ShortcutRegistry}
      * @private
      */
     _registry = null;
 
     /**
      * Instance of the shortcut dispatcher.
-     * @type {ShortcutDispatcher}
+     *
+     * @type {import('./ShortcutDispatcher.js').ShortcutDispatcher}
      * @private
      */
     _dispatcher = null;
 
     /**
      * Instance of the gesture recognizer.
-     * @type {GestureRecognizer}
+     *
+     * @type {import('./GestureRecognizer.js').GestureRecognizer}
      * @private
      */
     _gesture = null;
 
     /**
      * Instance of the gamepad manager.
-     * @type {GamepadManager}
+     *
+     * @type {import('./GamepadManager.js').GamepadManager}
      * @private
      */
     _gamepad = null;
 
     /**
      * Whether the service is actively dispatching.
+     *
      * @type {boolean}
      * @private
      */
@@ -82,6 +99,7 @@ export class ShortcutService {
 
     /**
      * Bound handler for 'keydown'.
+     *
      * @type {Function | null}
      * @private
      */
@@ -89,6 +107,7 @@ export class ShortcutService {
 
     /**
      * Bound handler for 'keyup'.
+     *
      * @type {Function | null}
      * @private
      */
@@ -96,6 +115,7 @@ export class ShortcutService {
 
     /**
      * Bound handler for 'pointerdown'.
+     *
      * @type {Function | null}
      * @private
      */
@@ -103,6 +123,7 @@ export class ShortcutService {
 
     /**
      * Bound handler for 'wheel'.
+     *
      * @type {Function | null}
      * @private
      */
@@ -110,25 +131,33 @@ export class ShortcutService {
 
     /**
      * Bound handler for 'visibilitychange'.
+     *
      * @type {Function | null}
      * @private
      */
     _boundOnVisibilityChange = null;
 
     /**
-     * Description:
      * Creates or retrieves the singleton instance of the ShortcutService.
      *
-     * @param {Object} [options] - Configuration options.
+     * @param {object} [options={}] - Configuration options.
      * @param {number} [options.sequenceTimeout=800] - Timeout for key sequences.
      * @param {number} [options.gamepadPollInterval=100] - Poll rate for gamepad.
      * @param {number} [options.gestureThrottleMs=50] - Throttle for gestures.
      */
-    constructor({ sequenceTimeout = 800, gamepadPollInterval = 100, gestureThrottleMs = 50 } = {}) {
+    constructor(options = {}) {
         if (ShortcutService._instance) {
             return ShortcutService._instance;
         }
         const me = this;
+
+        const sequenceTimeoutDefault = 800;
+        const gamepadPollIntervalDefault = 100;
+        const gestureThrottleMsDefault = 50;
+
+        const sequenceTimeout = options.sequenceTimeout || sequenceTimeoutDefault;
+        const gamepadPollInterval = options.gamepadPollInterval || gamepadPollIntervalDefault;
+        const gestureThrottleMs = options.gestureThrottleMs || gestureThrottleMsDefault;
 
         me._registry = new ShortcutRegistry();
         me._dispatcher = new ShortcutDispatcher({
@@ -161,7 +190,6 @@ export class ShortcutService {
     }
 
     /**
-     * Description:
      * Gets the singleton instance of the ShortcutService.
      *
      * @returns {ShortcutService} The singleton instance.
@@ -174,7 +202,6 @@ export class ShortcutService {
     }
 
     /**
-     * Description:
      * Registers a new shortcut definition.
      *
      * @param {object} definition - The shortcut definition object.
@@ -186,7 +213,6 @@ export class ShortcutService {
     }
 
     /**
-     * Description:
      * Unregisters a shortcut by its ID.
      *
      * @param {string} id - The ID returned by `register`.
@@ -197,7 +223,6 @@ export class ShortcutService {
     }
 
     /**
-     * Description:
      * Edits properties of an existing shortcut.
      *
      * @param {string} id - The ID of the shortcut to edit.
@@ -209,7 +234,6 @@ export class ShortcutService {
     }
 
     /**
-     * Description:
      * Lists (cloned) copies of all registered shortcut definitions.
      *
      * @returns {Array<object>} An array of definition objects.
@@ -219,7 +243,6 @@ export class ShortcutService {
     }
 
     /**
-     * Description:
      * Enables the service to dispatch shortcuts.
      *
      * @returns {void}
@@ -230,7 +253,6 @@ export class ShortcutService {
     }
 
     /**
-     * Description:
      * Disables the service and clears all transient state (pressed keys, sequences).
      *
      * @returns {void}
@@ -249,7 +271,6 @@ export class ShortcutService {
     }
 
     /**
-     * Description:
      * Starts the gamepad polling loop.
      *
      * @returns {void}
@@ -261,7 +282,6 @@ export class ShortcutService {
     }
 
     /**
-     * Description:
      * Stops the gamepad polling loop.
      *
      * @returns {void}
@@ -273,7 +293,47 @@ export class ShortcutService {
     }
 
     /**
-     * Description:
+     * Attaches shortcut listeners to a specific window object.
+     * Useful for Popout windows.
+     *
+     * @param {Window} targetWindow - The window to attach listeners to.
+     * @returns {void}
+     */
+    attachToWindow(targetWindow) {
+        const me = this;
+        if (!targetWindow || typeof targetWindow.addEventListener !== 'function') {
+            console.warn(
+                `[ShortcutService] invalid targetWindow assignment (${targetWindow}). Must be a Window object.`
+            );
+            return;
+        }
+        targetWindow.addEventListener('keydown', me._boundOnKeyDown, { passive: false });
+        targetWindow.addEventListener('keyup', me._boundOnKeyUp, { passive: true });
+        targetWindow.addEventListener('pointerdown', me._boundOnPointerDown, { passive: true });
+        targetWindow.addEventListener('wheel', me._boundOnWheel, { passive: false });
+    }
+
+    /**
+     * Detaches shortcut listeners from a specific window object.
+     *
+     * @param {Window} targetWindow - The window to detach listeners from.
+     * @returns {void}
+     */
+    detachFromWindow(targetWindow) {
+        const me = this;
+        if (!targetWindow || typeof targetWindow.removeEventListener !== 'function') {
+            console.warn(
+                `[ShortcutService] invalid targetWindow assignment (${targetWindow}). Must be a Window object.`
+            );
+            return;
+        }
+        targetWindow.removeEventListener('keydown', me._boundOnKeyDown);
+        targetWindow.removeEventListener('keyup', me._boundOnKeyUp);
+        targetWindow.removeEventListener('pointerdown', me._boundOnPointerDown);
+        targetWindow.removeEventListener('wheel', me._boundOnWheel);
+    }
+
+    /**
      * Cleans up all listeners and child services.
      *
      * @returns {void}
@@ -310,8 +370,7 @@ export class ShortcutService {
     }
 
     /**
-     * Description:
-     * Attaches all necessary DOM event listeners.
+     * Attaches all necessary DOM event listeners to the main window/document.
      *
      * @private
      * @returns {void}
@@ -328,8 +387,7 @@ export class ShortcutService {
     }
 
     /**
-     * Description:
-     * Removes all attached DOM event listeners.
+     * Removes all attached DOM event listeners from the main window/document.
      *
      * @private
      * @returns {void}
@@ -344,7 +402,6 @@ export class ShortcutService {
     }
 
     /**
-     * Description:
      * Handles 'keydown' events, normalizes them, and passes them to the dispatcher.
      *
      * @param {KeyboardEvent} event - The native DOM event.
@@ -357,33 +414,32 @@ export class ShortcutService {
             return;
         }
 
-        const mods = [];
+        const modifiers = [];
         if (event.ctrlKey) {
-            mods.push('Ctrl');
+            modifiers.push('Ctrl');
         }
         if (event.shiftKey) {
-            mods.push('Shift');
+            modifiers.push('Shift');
         }
         if (event.altKey) {
-            mods.push('Alt');
+            modifiers.push('Alt');
         }
         if (event.metaKey) {
-            mods.push('Meta');
+            modifiers.push('Meta');
         }
 
         const base = event.code ? event.code : `Key:${event.key}`;
-        const id = (mods.length ? mods.join('+') + '+' : '') + base;
+        const id = (modifiers.length ? modifiers.join('+') + '+' : '') + base;
         const tokenObj = {
             kind: 'keyboard',
             id: id,
             raw: id,
-            meta: { key: event.key, code: event.code, modifiers: mods }
+            meta: { key: event.key, code: event.code, modifiers: modifiers }
         };
         me._dispatcher.handleToken(tokenObj, event, { type: 'keyboard' });
     }
 
     /**
-     * Description:
      * Handles 'keyup' events to clear the dispatcher's pressed-key state.
      *
      * @param {KeyboardEvent} event - The native DOM event.
@@ -400,7 +456,6 @@ export class ShortcutService {
     }
 
     /**
-     * Description:
      * Handles 'pointerdown' events (mouse clicks) and normalizes them.
      *
      * @param {PointerEvent} event - The native DOM event.
@@ -413,21 +468,21 @@ export class ShortcutService {
             return;
         }
 
-        const mods = [];
+        const modifiers = [];
         if (event.ctrlKey) {
-            mods.push('Ctrl');
+            modifiers.push('Ctrl');
         }
         if (event.shiftKey) {
-            mods.push('Shift');
+            modifiers.push('Shift');
         }
         if (event.altKey) {
-            mods.push('Alt');
+            modifiers.push('Alt');
         }
         if (event.metaKey) {
-            mods.push('Meta');
+            modifiers.push('Meta');
         }
 
-        const modPart = mods.length ? mods.join('+') + '+' : '';
+        const modPart = modifiers.length ? modifiers.join('+') + '+' : '';
 
         let buttonName;
         switch (event.button) {
@@ -451,13 +506,12 @@ export class ShortcutService {
             kind: 'pointer',
             id: id,
             raw: id,
-            meta: { pointerType: event.pointerType, button: event.button, modifiers: mods }
+            meta: { pointerType: event.pointerType, button: event.button, modifiers: modifiers }
         };
         me._dispatcher.handleToken(tokenObj, event, { type: 'pointer' });
     }
 
     /**
-     * Description:
      * Handles 'wheel' events and normalizes them.
      *
      * @param {WheelEvent} event - The native DOM event.
@@ -470,27 +524,27 @@ export class ShortcutService {
             return;
         }
 
-        const dir = event.deltaY < 0 ? 'WheelUp' : 'WheelDown';
-        const mods = [];
+        const direction = event.deltaY < 0 ? 'WheelUp' : 'WheelDown';
+        const modifiers = [];
         if (event.ctrlKey) {
-            mods.push('Ctrl');
+            modifiers.push('Ctrl');
         }
         if (event.shiftKey) {
-            mods.push('Shift');
+            modifiers.push('Shift');
         }
         if (event.altKey) {
-            mods.push('Alt');
+            modifiers.push('Alt');
         }
         if (event.metaKey) {
-            mods.push('Meta');
+            modifiers.push('Meta');
         }
 
-        const id = (mods.length ? mods.join('+') + '+' : '') + dir;
+        const id = (modifiers.length ? modifiers.join('+') + '+' : '') + direction;
         const tokenObj = {
             kind: 'wheel',
             id: id,
             raw: id,
-            meta: { deltaY: event.deltaY, modifiers: mods }
+            meta: { deltaY: event.deltaY, modifiers: modifiers }
         };
         me._dispatcher.handleToken(tokenObj, event, {
             type: 'wheel',
@@ -499,7 +553,6 @@ export class ShortcutService {
     }
 
     /**
-     * Description:
      * Clears transient state (pressed keys) when the window becomes hidden.
      *
      * @private
@@ -514,18 +567,18 @@ export class ShortcutService {
     }
 
     /**
-     * Description:
      * Callback passed to GestureRecognizer.
      *
-     * @param {object} payload - { gesture, meta, event }
+     * @param {object} payload - The gesture payload { gesture, meta, event }.
      * @private
      * @returns {void}
      */
-    _onGesture({ gesture, meta, event }) {
+    _onGesture(payload) {
         const me = this;
         if (!me._enabled) {
             return;
         }
+        const { gesture, meta, event } = payload;
         const tokenObj = { kind: 'gesture', id: String(gesture).toLowerCase(), raw: gesture, meta };
         me._dispatcher.handleToken(
             tokenObj,
@@ -535,11 +588,10 @@ export class ShortcutService {
     }
 
     /**
-     * Description:
      * Callback passed to GamepadManager (button).
      *
-     * @param {number} gamepadIndex
-     * @param {number} buttonIndex
+     * @param {number} gamepadIndex - Index of the gamepad.
+     * @param {number} buttonIndex - Index of the button pressed.
      * @private
      * @returns {void}
      */
@@ -563,12 +615,11 @@ export class ShortcutService {
     }
 
     /**
-     * Description:
      * Callback passed to GamepadManager (axis).
      *
-     * @param {number} gamepadIndex
-     * @param {number} axisIndex
-     * @param {number} value
+     * @param {number} gamepadIndex - Index of the gamepad.
+     * @param {number} axisIndex - Index of the axis.
+     * @param {number} value - Value of the axis.
      * @private
      * @returns {void}
      */

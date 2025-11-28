@@ -1,5 +1,6 @@
 import { Disposable } from './Disposable.js';
 import { Loader } from '../services/Loader/Loader.js';
+import { appShortcuts } from '../services/Shortcuts/Shortcuts.js';
 
 /**
  * Description:
@@ -27,10 +28,12 @@ import { Loader } from '../services/Loader/Loader.js';
  * - Manages the 'beforeunload' event to handle user-initiated closing.
  * - Ensures the popout body has 100% dimensions to prevent layout collapse.
  * - Displays a loader until styles are loaded and content is appended.
+ * - Prevents accidental refreshes via ShortcutService integration (scoped to external window).
  *
  * Dependencies:
  * - {import('./Disposable.js').Disposable}
  * - {import('../services/Loader/Loader.js').Loader}
+ * - {import('../services/Shortcuts/Shortcuts.js').appShortcuts}
  */
 export class PopoutWindow extends Disposable {
     /**
@@ -156,9 +159,9 @@ export class PopoutWindow extends Disposable {
     }
 
     /**
-     * Opens the native window, injects styles, and waits for them to load.
+     * Opens the native window and injects styles.
      *
-     * @returns {Promise<void>} Resolves when the window and styles are ready.
+     * @returns {Promise<void>} Resolves when the window is ready.
      */
     async open() {
         const me = this;
@@ -201,6 +204,9 @@ export class PopoutWindow extends Disposable {
 
         me._nativeWindow.addEventListener('beforeunload', me._boundOnBeforeUnload);
         me._nativeWindow.addEventListener('resize', me._boundOnResize);
+
+        appShortcuts.attachToWindow(me._nativeWindow);
+        me._ensureProtectionShortcuts();
 
         return Promise.resolve();
     }
@@ -253,6 +259,7 @@ export class PopoutWindow extends Disposable {
             me._loader = null;
         }
         if (me._nativeWindow) {
+            appShortcuts.detachFromWindow(me._nativeWindow);
             me._nativeWindow.removeEventListener('beforeunload', me._boundOnBeforeUnload);
             me._nativeWindow.removeEventListener('resize', me._boundOnResize);
             me._nativeWindow = null;
@@ -331,5 +338,53 @@ export class PopoutWindow extends Disposable {
         });
 
         await Promise.all(loadPromises);
+    }
+
+    /**
+     * Registers high-priority shortcuts to prevent accidental refreshes.
+     * These rules are context-aware and only apply to external (popout) windows.
+     *
+     * @private
+     * @returns {void}
+     */
+    _ensureProtectionShortcuts() {
+        const existing = appShortcuts.list();
+
+        const popoutContext = (activeElement, event) => {
+            return event && event.view !== window;
+        };
+
+        const protections = [
+            {
+                keys: 'F5',
+                priority: 1000,
+                preventDefault: true,
+                handler: () => {},
+                context: popoutContext
+            },
+            {
+                keys: 'Ctrl+KeyR',
+                priority: 1000,
+                preventDefault: true,
+                handler: () => {},
+                context: popoutContext
+            },
+            {
+                keys: 'Meta+KeyR',
+                priority: 1000,
+                preventDefault: true,
+                handler: () => {},
+                context: popoutContext
+            }
+        ];
+
+        protections.forEach(rule => {
+            const hasRule = existing.some(
+                def => String(def.keys) === rule.keys && def.preventDefault === true
+            );
+            if (!hasRule) {
+                appShortcuts.register(rule);
+            }
+        });
     }
 }
