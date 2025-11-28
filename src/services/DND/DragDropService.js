@@ -690,6 +690,8 @@ export class DragDropService {
         me._activeDropZone = null;
         me._throttledMoveHandler.cancel();
 
+        const elementToReset = me._dragState.element;
+
         FastDOM.mutate(() => {
             me._ghostManager.destroy();
             me.hidePlaceholder();
@@ -703,10 +705,10 @@ export class DragDropService {
             });
             classesToRemove.forEach(cls => document.body.classList.remove(cls));
 
-            if (me._dragState.element) {
-                me._dragState.element.classList.remove('dragging');
-                me._dragState.element.style.pointerEvents = '';
-                me._dragState.element.style.opacity = '';
+            if (elementToReset) {
+                elementToReset.classList.remove('dragging');
+                elementToReset.style.pointerEvents = '';
+                elementToReset.style.opacity = '';
             }
         });
 

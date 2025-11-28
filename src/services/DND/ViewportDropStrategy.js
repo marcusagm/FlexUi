@@ -1,4 +1,5 @@
 import { BaseDropStrategy } from './BaseDropStrategy.js';
+import { FastDOM } from '../../utils/FastDOM.js';
 import { ItemType } from '../../constants/DNDTypes.js';
 import { PopoutManagerService } from '../PopoutManagerService.js';
 
@@ -149,6 +150,7 @@ export class ViewportDropStrategy extends BaseDropStrategy {
      * @returns {boolean}
      */
     onDrop(point, dropZone, draggedData, dds) {
+        const me = this;
         dds;
         if (draggedData.type !== ItemType.APPLICATION_WINDOW) {
             return false;
@@ -156,55 +158,59 @@ export class ViewportDropStrategy extends BaseDropStrategy {
 
         const windowInstance = draggedData.item;
 
-        if (windowInstance.isPopout) {
-            PopoutManagerService.getInstance().returnWindow(windowInstance);
+        const isDocking = me._isDocking;
 
-            if (!dropZone.windows.includes(windowInstance)) {
-                dropZone.addWindow(windowInstance, false);
+        FastDOM.mutate(() => {
+            if (windowInstance.isPopout) {
+                PopoutManagerService.getInstance().returnWindow(windowInstance);
+
+                if (!dropZone.windows.includes(windowInstance)) {
+                    dropZone.addWindow(windowInstance, false);
+                }
             }
-        }
 
-        if (this._isDocking) {
-            dropZone.dockWindow(windowInstance);
-            return true;
-        }
-
-        const viewportRect = dropZone.element.getBoundingClientRect();
-
-        let newX = point.x - viewportRect.left - (draggedData.offsetX || 0);
-        let newY = point.y - viewportRect.top - (draggedData.offsetY || 0);
-
-        const defaultMinWidth = 200;
-        const defaultMinHeight = 150;
-        const isMinimized = windowInstance.isMinimized;
-        const winWidth =
-            windowInstance.width ||
-            (windowInstance.element ? windowInstance.element.offsetWidth : defaultMinWidth);
-        const winHeight =
-            isMinimized && windowInstance.element
-                ? windowInstance.element.offsetHeight
-                : windowInstance.height || defaultMinHeight;
-
-        const maxX = Math.max(0, viewportRect.width - winWidth);
-        const maxY = Math.max(0, viewportRect.height - winHeight);
-
-        newX = Math.max(0, Math.min(newX, maxX));
-        newY = Math.max(0, Math.min(newY, maxY));
-
-        if (windowInstance.isTabbed) {
-            dropZone.undockWindow(windowInstance, newX, newY);
-        } else {
-            if ('x' in windowInstance) windowInstance.x = newX;
-            if ('y' in windowInstance) windowInstance.y = newY;
-
-            if (windowInstance.element) {
-                windowInstance.element.style.left = `${newX}px`;
-                windowInstance.element.style.top = `${newY}px`;
+            if (isDocking) {
+                dropZone.dockWindow(windowInstance);
+                return;
             }
-            if (typeof windowInstance.constrainToParent === 'function') {
-                windowInstance.constrainToParent();
+
+            const viewportRect = dropZone.element.getBoundingClientRect();
+
+            let newX = point.x - viewportRect.left - (draggedData.offsetX || 0);
+            let newY = point.y - viewportRect.top - (draggedData.offsetY || 0);
+
+            const defaultMinWidth = 200;
+            const defaultMinHeight = 150;
+            const isMinimized = windowInstance.isMinimized;
+            const winWidth =
+                windowInstance.width ||
+                (windowInstance.element ? windowInstance.element.offsetWidth : defaultMinWidth);
+            const winHeight =
+                isMinimized && windowInstance.element
+                    ? windowInstance.element.offsetHeight
+                    : windowInstance.height || defaultMinHeight;
+
+            const maxX = Math.max(0, viewportRect.width - winWidth);
+            const maxY = Math.max(0, viewportRect.height - winHeight);
+
+            newX = Math.max(0, Math.min(newX, maxX));
+            newY = Math.max(0, Math.min(newY, maxY));
+
+            if (windowInstance.isTabbed) {
+                dropZone.undockWindow(windowInstance, newX, newY);
+            } else {
+                if ('x' in windowInstance) windowInstance.x = newX;
+                if ('y' in windowInstance) windowInstance.y = newY;
+
+                if (windowInstance.element) {
+                    windowInstance.element.style.left = `${newX}px`;
+                    windowInstance.element.style.top = `${newY}px`;
+                }
+                if (typeof windowInstance.constrainToParent === 'function') {
+                    windowInstance.constrainToParent();
+                }
             }
-        }
+        });
 
         return true;
     }

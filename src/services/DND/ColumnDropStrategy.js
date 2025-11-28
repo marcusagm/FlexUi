@@ -221,11 +221,13 @@ export class ColumnDropStrategy extends BaseDropStrategy {
             return false;
         }
 
+        const itemToMove = draggedData.item;
+
         FastDOM.mutate(() => {
             if (draggedData.type === ItemType.PANEL_GROUP) {
-                me._movePanelGroup(draggedData.item, dropZone, targetIndex);
+                me._movePanelGroup(itemToMove, dropZone, targetIndex);
             } else if (draggedData.type === ItemType.PANEL) {
-                me._movePanelToNewGroup(draggedData.item, dropZone, targetIndex);
+                me._movePanelToNewGroup(itemToMove, dropZone, targetIndex);
             }
         });
 

@@ -1,4 +1,5 @@
 import { BaseDropStrategy } from './BaseDropStrategy.js';
+import { FastDOM } from '../../utils/FastDOM.js';
 import { ItemType } from '../../constants/DNDTypes.js';
 
 /**
@@ -223,12 +224,16 @@ export class ToolbarContainerDropStrategy extends BaseDropStrategy {
             return false;
         }
 
-        if (sourceContainer === targetContainer) {
-            targetContainer.moveGroup(draggedItem, dropIndex);
-        } else if (sourceContainer) {
-            sourceContainer.removeGroup(draggedItem);
-            targetContainer.addGroup(draggedItem, dropIndex);
-        }
+        const itemToMove = draggedData.item;
+
+        FastDOM.mutate(() => {
+            if (sourceContainer === targetContainer) {
+                targetContainer.moveGroup(itemToMove, dropIndex);
+            } else if (sourceContainer) {
+                sourceContainer.removeGroup(itemToMove);
+                targetContainer.addGroup(itemToMove, dropIndex);
+            }
+        });
 
         return true;
     }

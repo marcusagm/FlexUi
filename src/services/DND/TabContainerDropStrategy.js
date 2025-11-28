@@ -1,4 +1,5 @@
 import { FloatingPanelManagerService } from './FloatingPanelManagerService.js';
+import { FastDOM } from '../../utils/FastDOM.js';
 import { PopoutManagerService } from '../PopoutManagerService.js';
 import { BaseDropStrategy } from './BaseDropStrategy.js';
 import { ItemType } from '../../constants/DNDTypes.js';
@@ -292,21 +293,26 @@ export class TabContainerDropStrategy extends BaseDropStrategy {
 
         const { draggedPanel, sourceGroup, targetGroup } = groups;
 
-        if (me._isReordering) {
-            dropZone.movePanel(draggedPanel, me._dropIndex);
-        } else {
-            if (sourceGroup.isPopout) {
-                if (sourceGroup.panels.length <= 1) {
-                    PopoutManagerService.getInstance().closePopout(sourceGroup);
-                    sourceGroup.setPopoutMode(false);
-                }
-            } else if (sourceGroup.isFloating) {
-                FloatingPanelManagerService.getInstance().removeFloatingPanel(sourceGroup);
-            }
+        const isReordering = me._isReordering;
+        const dropIndex = me._dropIndex;
 
-            sourceGroup.removePanel(draggedPanel, true); // true = isMoving
-            targetGroup.addPanel(draggedPanel, me._dropIndex, true); // true = makeActive
-        }
+        FastDOM.mutate(() => {
+            if (isReordering) {
+                dropZone.movePanel(draggedPanel, dropIndex);
+            } else {
+                if (sourceGroup.isPopout) {
+                    if (sourceGroup.panels.length <= 1) {
+                        PopoutManagerService.getInstance().closePopout(sourceGroup);
+                        sourceGroup.setPopoutMode(false);
+                    }
+                } else if (sourceGroup.isFloating) {
+                    FloatingPanelManagerService.getInstance().removeFloatingPanel(sourceGroup);
+                }
+
+                sourceGroup.removePanel(draggedPanel, true); // true = isMoving
+                targetGroup.addPanel(draggedPanel, dropIndex, true); // true = makeActive
+            }
+        });
 
         return true;
     }

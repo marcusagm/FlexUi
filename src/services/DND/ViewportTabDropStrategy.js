@@ -1,4 +1,5 @@
 import { BaseDropStrategy } from './BaseDropStrategy.js';
+import { FastDOM } from '../../utils/FastDOM.js';
 import { ItemType } from '../../constants/DNDTypes.js';
 import { PopoutManagerService } from '../PopoutManagerService.js';
 
@@ -157,6 +158,7 @@ export class ViewportTabDropStrategy extends BaseDropStrategy {
      * @returns {boolean}
      */
     onDrop(point, dropZone, draggedData, dds) {
+        const me = this;
         this.onDragLeave(point, dropZone, draggedData, dds);
 
         if (draggedData.type !== ItemType.APPLICATION_WINDOW || this._dropIndex === null) {
@@ -165,19 +167,19 @@ export class ViewportTabDropStrategy extends BaseDropStrategy {
 
         const windowInstance = draggedData.item;
 
-        // Handle return from Popout
-        if (windowInstance.isPopout) {
-            // 1. Close native window and reset state (returns to original viewport)
-            PopoutManagerService.getInstance().returnWindow(windowInstance);
+        const dropIndex = me._dropIndex;
 
-            // 2. Ensure window is transferred to the *target* viewport if different
-            if (!dropZone.windows.includes(windowInstance)) {
-                // false = doFocus (dockWindow will handle focus)
-                dropZone.addWindow(windowInstance, false);
+        FastDOM.mutate(() => {
+            if (windowInstance.isPopout) {
+                PopoutManagerService.getInstance().returnWindow(windowInstance);
+
+                if (!dropZone.windows.includes(windowInstance)) {
+                    dropZone.addWindow(windowInstance, false);
+                }
             }
-        }
 
-        dropZone.dockWindow(windowInstance, this._dropIndex);
+            dropZone.dockWindow(windowInstance, dropIndex);
+        });
 
         return true;
     }

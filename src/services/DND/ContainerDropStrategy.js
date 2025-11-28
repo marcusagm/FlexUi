@@ -1,4 +1,5 @@
 import { BaseDropStrategy } from './BaseDropStrategy.js';
+import { FastDOM } from '../../utils/FastDOM.js';
 import { Row } from '../../components/Row/Row.js';
 import { PanelGroup } from '../../components/Panel/PanelGroup.js';
 import { FloatingPanelManagerService } from './FloatingPanelManagerService.js';
@@ -278,35 +279,39 @@ export class ContainerDropStrategy extends BaseDropStrategy {
             return false;
         }
 
-        if (draggedData.type === ItemType.PANEL_GROUP) {
-            const draggedItem = draggedData.item;
-            const oldColumn =
-                typeof draggedItem.getColumn === 'function' ? draggedItem.getColumn() : null;
+        const itemToMove = draggedData.item;
 
-            const newRow = dropZone.createRow(null, rowIndex);
-            const newColumn = newRow.createColumn();
+        FastDOM.mutate(() => {
+            if (draggedData.type === ItemType.PANEL_GROUP) {
+                const draggedItem = itemToMove;
+                const oldColumn =
+                    typeof draggedItem.getColumn === 'function' ? draggedItem.getColumn() : null;
 
-            if (oldColumn) {
-                oldColumn.removeChild(draggedItem, true);
+                const newRow = dropZone.createRow(null, rowIndex);
+                const newColumn = newRow.createColumn();
+
+                if (oldColumn) {
+                    oldColumn.removeChild(draggedItem, true);
+                }
+                draggedItem.height = null;
+                newColumn.addChild(draggedItem);
+            } else if (draggedData.type === ItemType.PANEL) {
+                const draggedPanel = itemToMove;
+                const sourceParentGroup = draggedPanel.parentGroup;
+
+                const newRow = dropZone.createRow(null, rowIndex);
+                const newColumn = newRow.createColumn();
+                const newPanelGroup = new PanelGroup(null);
+
+                newColumn.addChild(newPanelGroup);
+
+                if (sourceParentGroup) {
+                    sourceParentGroup.removePanel(draggedPanel, true);
+                }
+                draggedPanel.height = null;
+                newPanelGroup.addPanel(draggedPanel, true);
             }
-            draggedItem.height = null;
-            newColumn.addChild(draggedItem);
-        } else if (draggedData.type === ItemType.PANEL) {
-            const draggedPanel = draggedData.item;
-            const sourceParentGroup = draggedPanel.parentGroup;
-
-            const newRow = dropZone.createRow(null, rowIndex);
-            const newColumn = newRow.createColumn();
-            const newPanelGroup = new PanelGroup(null);
-
-            newColumn.addChild(newPanelGroup);
-
-            if (sourceParentGroup) {
-                sourceParentGroup.removePanel(draggedPanel, true);
-            }
-            draggedPanel.height = null;
-            newPanelGroup.addPanel(draggedPanel, true);
-        }
+        });
 
         return true;
     }
