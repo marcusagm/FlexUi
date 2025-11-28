@@ -1,6 +1,7 @@
 import { PanelGroup } from '../../components/Panel/PanelGroup.js';
 import { appBus } from '../../utils/EventBus.js';
 import { EventTypes } from '../../constants/EventTypes.js';
+import { throttleRAF } from '../../utils/ThrottleRAF.js';
 
 /**
  * Description:
@@ -16,6 +17,7 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * - _namespace {string} : Unique namespace for appBus listeners.
  * - _boundOnPanelGroupRemoved {Function | null} : Bound handler for group removal event.
  * - _boundOnUndockRequest {Function | null} : Bound handler for undock command event.
+ * - _throttledResizeHandler {Function | null} : Throttled handler for window resize events.
  *
  * Typical usage:
  * // In App.js
@@ -36,11 +38,13 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * - Manages stacking context (z-index) to ensure active panels are on top.
  * - Constrains floating panels within the boundaries of the registered container.
  * - Handles the conversion of docked panels to floating panels upon request.
+ * - Automatically adjusts floating panel positions and sizes when the window is resized.
  *
  * Dependencies:
  * - {import('../../components/Panel/PanelGroup.js').PanelGroup}
  * - {import('../../utils/EventBus.js').appBus}
  * - {import('../../constants/EventTypes.js').EventTypes}
+ * - {import('../../utils/ThrottleRAF.js').throttleRAF}
  */
 export class FloatingPanelManagerService {
     /**
@@ -108,6 +112,14 @@ export class FloatingPanelManagerService {
     _boundOnUndockRequest;
 
     /**
+     * Throttled handler for window resize events.
+     *
+     * @type {Function}
+     * @private
+     */
+    _throttledResizeHandler;
+
+    /**
      * Creates an instance of FloatingPanelManagerService.
      * Private constructor for Singleton.
      */
@@ -124,7 +136,13 @@ export class FloatingPanelManagerService {
         me._zIndexCounter = me._baseZIndex;
         me._boundOnPanelGroupRemoved = me._onPanelGroupRemoved.bind(me);
         me._boundOnUndockRequest = me._onUndockRequest.bind(me);
+        me._throttledResizeHandler = throttleRAF(me._onWindowResize.bind(me));
+
         me._initEventListeners();
+
+        if (typeof window !== 'undefined') {
+            window.addEventListener('resize', me._throttledResizeHandler);
+        }
     }
 
     /**
@@ -358,23 +376,31 @@ export class FloatingPanelManagerService {
 
     /**
      * Updates a floating panel's position, applying container constraints.
-     * Explicitly requires bounds to be passed in, making the method pure
-     * regarding DOM reads.
+     * Accepts optional override dimensions to calculate constraints based on a future size.
      *
      * @param {import('../../components/Panel/PanelGroup.js').PanelGroup} panelGroup - The panel to move.
      * @param {number} newX - The desired new X coordinate.
      * @param {number} newY - The desired new Y coordinate.
      * @param {DOMRect} containerBounds - The boundaries of the container.
+     * @param {number|null} [overrideWidth=null] - Optional width to use for constraints.
+     * @param {number|null} [overrideHeight=null] - Optional height to use for constraints.
      * @returns {{x: number, y: number}} The constrained (applied) coordinates.
      */
-    updatePanelPosition(panelGroup, newX, newY, containerBounds) {
+    updatePanelPosition(
+        panelGroup,
+        newX,
+        newY,
+        containerBounds,
+        overrideWidth = null,
+        overrideHeight = null
+    ) {
         if (!containerBounds || !panelGroup.element) {
             return { x: newX, y: newY };
         }
 
         const panelElement = panelGroup.element;
-        const panelWidth = panelElement.offsetWidth;
-        const panelHeight = panelElement.offsetHeight;
+        const panelWidth = overrideWidth !== null ? overrideWidth : panelElement.offsetWidth;
+        const panelHeight = overrideHeight !== null ? overrideHeight : panelElement.offsetHeight;
 
         const constrainedX = Math.max(0, Math.min(newX, containerBounds.width - panelWidth));
         const constrainedY = Math.max(0, Math.min(newY, containerBounds.height - panelHeight));
@@ -425,13 +451,20 @@ export class FloatingPanelManagerService {
     }
 
     /**
-     * Cleans up appBus listeners.
+     * Cleans up listeners and service.
      *
      * @returns {void}
      */
     destroy() {
         const me = this;
         appBus.offByNamespace(me._namespace);
+
+        if (me._throttledResizeHandler) {
+            me._throttledResizeHandler.cancel();
+            if (typeof window !== 'undefined') {
+                window.removeEventListener('resize', me._throttledResizeHandler);
+            }
+        }
     }
 
     /**
@@ -524,5 +557,61 @@ export class FloatingPanelManagerService {
             }
         });
         me._zIndexCounter = me._baseZIndex + me._floatingPanels.length;
+    }
+
+    /**
+     * Handles window resize events to constrain and resize all floating panels.
+     * Adjusts the position and dimensions of panels to ensure they remain
+     * entirely within the container view.
+     *
+     * @private
+     * @returns {void}
+     */
+    _onWindowResize() {
+        const me = this;
+        const containerBounds = me.getContainerBounds();
+        if (!containerBounds) return;
+
+        me._floatingPanels.forEach(panelGroup => {
+            if (panelGroup.isFloating && !panelGroup.isMaximized) {
+                let currentWidth = panelGroup.width;
+                let currentHeight = panelGroup.height;
+
+                if ((!currentWidth || !currentHeight) && panelGroup.element) {
+                    currentWidth = panelGroup.element.offsetWidth;
+                    currentHeight = panelGroup.element.offsetHeight;
+                }
+
+                currentWidth = currentWidth || 0;
+                currentHeight = currentHeight || 0;
+
+                let newWidth = currentWidth;
+                let newHeight = currentHeight;
+
+                if (newWidth > containerBounds.width) {
+                    newWidth = containerBounds.width;
+                }
+                if (newHeight > containerBounds.height) {
+                    newHeight = containerBounds.height;
+                }
+
+                panelGroup.width = newWidth;
+                panelGroup.height = newHeight;
+
+                const currentX = panelGroup.x;
+                const currentY = panelGroup.y;
+
+                const constrained = me.updatePanelPosition(
+                    panelGroup,
+                    currentX,
+                    currentY,
+                    containerBounds,
+                    newWidth,
+                    newHeight
+                );
+
+                panelGroup.setFloatingState(true, constrained.x, constrained.y);
+            }
+        });
     }
 }
