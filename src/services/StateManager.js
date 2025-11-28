@@ -8,29 +8,32 @@
  * 'activeScopes' for use by the ShortcutService.
  *
  * Properties summary:
- * - _instance {GlobalStateService | null} : The private static instance.
+ * - _instance {StateManager | null} : The private static instance.
  * - _state {object} : Private store for the state values.
  * - _subscribers {Map<string, Array<Function>>} : Map keying state keys to listener arrays.
  *
  * Typical usage:
  * // In Component A (e.g., ColorWheelPanel)
- * globalState.subscribe('activeColor', (color) => {
+ * stateManager.subscribe('activeColor', (color) => {
  * this.updateColor(color);
  * });
  *
  * // In Component B (e.g., ToolbarPanel)
- * globalState.set('activeColor', '#FF0000');
+ * stateManager.set('activeColor', '#FF0000');
  *
  * // In ModalService (Scope Management)
- * globalState.addScope('modal-open');
+ * stateManager.addScope('modal-open');
  *
  * Dependencies:
  * - None
+ *
+ * Notes / Additional:
+ * - Renamed from GlobalStateService to StateManager.
  */
-export class GlobalStateService {
+export class StateManager {
     /**
      * The private static instance.
-     * @type {GlobalStateService | null}
+     * @type {StateManager | null}
      * @private
      */
     static _instance = null;
@@ -56,11 +59,11 @@ export class GlobalStateService {
      * @private
      */
     constructor() {
-        if (GlobalStateService._instance) {
-            console.warn('GlobalStateService is a singleton. Use getInstance().');
-            return GlobalStateService._instance;
+        if (StateManager._instance) {
+            console.warn('StateManager is a singleton. Use getInstance().');
+            return StateManager._instance;
         }
-        GlobalStateService._instance = this;
+        StateManager._instance = this;
 
         const me = this;
         me._state.activeScopes = ['global'];
@@ -68,16 +71,16 @@ export class GlobalStateService {
 
     /**
      * Description:
-     * Gets the singleton instance of the GlobalStateService.
+     * Gets the singleton instance of the StateManager.
      *
-     * @returns {GlobalStateService} The singleton instance.
+     * @returns {StateManager} The singleton instance.
      * @static
      */
     static getInstance() {
-        if (!GlobalStateService._instance) {
-            GlobalStateService._instance = new GlobalStateService();
+        if (!StateManager._instance) {
+            StateManager._instance = new StateManager();
         }
-        return GlobalStateService._instance;
+        return StateManager._instance;
     }
 
     /**
@@ -123,7 +126,7 @@ export class GlobalStateService {
     addScope(scope) {
         const me = this;
         if (!scope || typeof scope !== 'string') {
-            console.warn('[GlobalStateService] addScope: scope must be a non-empty string.');
+            console.warn('[StateManager] addScope: scope must be a non-empty string.');
             return;
         }
 
@@ -147,7 +150,7 @@ export class GlobalStateService {
     removeScope(scope) {
         const me = this;
         if (!scope || typeof scope !== 'string') {
-            console.warn('[GlobalStateService] removeScope: scope must be a non-empty string.');
+            console.warn('[StateManager] removeScope: scope must be a non-empty string.');
             return;
         }
 
@@ -186,9 +189,7 @@ export class GlobalStateService {
         me._ensureKey(key);
 
         if (typeof callback !== 'function') {
-            console.warn(
-                `GlobalStateService.subscribe: callback for key "${key}" is not a function.`
-            );
+            console.warn(`StateManager.subscribe: callback for key "${key}" is not a function.`);
             return;
         }
 
@@ -247,11 +248,11 @@ export class GlobalStateService {
                 try {
                     callback(value);
                 } catch (e) {
-                    console.error(`Error in GlobalStateService subscriber for key "${key}":`, e);
+                    console.error(`Error in StateManager subscriber for key "${key}":`, e);
                 }
             });
         }
     }
 }
 
-export const globalState = GlobalStateService.getInstance();
+export const stateManager = StateManager.getInstance();

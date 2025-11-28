@@ -1,10 +1,10 @@
 import { Panel } from './Panel.js';
-import { globalState } from '../../services/GlobalStateService.js';
+import { stateManager } from '../../services/StateManager.js';
 
 /**
  * Description:
  * A reactive panel that displays a counter.
- * All instances of this panel are synchronized using the GlobalStateService.
+ * All instances of this panel are synchronized using the StateManager.
  *
  * Properties summary:
  * - _valueElement {HTMLElement|null} : The DOM element that displays the counter value.
@@ -16,8 +16,8 @@ import { globalState } from '../../services/GlobalStateService.js';
  * const counter = new CounterPanel('My Counter');
  *
  * Events:
- * - Listens to (globalState): 'counterValue'
- * - Emits to (globalState): 'counterValue'
+ * - Listens to (stateManager): 'counterValue'
+ * - Emits to (stateManager): 'counterValue'
  *
  * Business rules implemented:
  * - Updates UI immediately upon global state change.
@@ -26,7 +26,7 @@ import { globalState } from '../../services/GlobalStateService.js';
  *
  * Dependencies:
  * - {import('./Panel.js').Panel}
- * - {import('../../services/GlobalStateService.js').globalState}
+ * - {import('../../services/StateManager.js').stateManager}
  * - {import('../../core/IRenderer.js').IRenderer}
  */
 export class CounterPanel extends Panel {
@@ -84,7 +84,7 @@ export class CounterPanel extends Panel {
         me._valueElement.style.fontSize = '2.5rem';
         me._valueElement.style.textAlign = 'center';
         me._valueElement.style.margin = '1rem 0';
-        me._valueElement.textContent = globalState.get('counterValue') ?? 0;
+        me._valueElement.textContent = stateManager.get('counterValue') ?? 0;
 
         const increaseButton = document.createElement('button');
         increaseButton.type = 'button';
@@ -177,8 +177,8 @@ export class CounterPanel extends Panel {
      * @returns {void}
      */
     _onIncrease() {
-        const currentValue = globalState.get('counterValue') ?? 0;
-        globalState.set('counterValue', currentValue + 1);
+        const currentValue = stateManager.get('counterValue') ?? 0;
+        stateManager.set('counterValue', currentValue + 1);
     }
 
     /**
@@ -188,8 +188,8 @@ export class CounterPanel extends Panel {
      * @returns {void}
      */
     _onDecrease() {
-        const currentValue = globalState.get('counterValue') ?? 0;
-        globalState.set('counterValue', currentValue - 1);
+        const currentValue = stateManager.get('counterValue') ?? 0;
+        stateManager.set('counterValue', currentValue - 1);
     }
 
     /**
@@ -199,6 +199,6 @@ export class CounterPanel extends Panel {
      * @returns {void}
      */
     _onReset() {
-        globalState.set('counterValue', 0);
+        stateManager.set('counterValue', 0);
     }
 }

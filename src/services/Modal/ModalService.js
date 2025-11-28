@@ -3,7 +3,7 @@ import { throttleRAF } from '../../utils/ThrottleRAF.js';
 import { AlertView } from './presets/AlertView.js';
 import { ConfirmView } from './presets/ConfirmView.js';
 import { PromptView } from './presets/PromptView.js';
-import { globalState } from '../GlobalStateService.js';
+import { stateManager } from '../StateManager.js';
 import { appShortcuts } from '../Shortcuts/Shortcuts.js';
 
 /**
@@ -13,7 +13,7 @@ import { appShortcuts } from '../Shortcuts/Shortcuts.js';
  * async data resolution, global defaults, instance ID management, and advanced
  * UI positioning (like drawers/side-modals).
  *
- * It also manages the 'modal-open' scope for the ShortcutService via GlobalStateService.
+ * It also manages the 'modal-open' scope for the ShortcutService via StateManager.
  * All keyboard interactions (Escape, Tab) are registered via the ShortcutService.
  *
  * Properties summary:
@@ -50,7 +50,7 @@ import { appShortcuts } from '../Shortcuts/Shortcuts.js';
  * - ./presets/AlertView.js
  * - ./presets/ConfirmView.js
  * - ./presets/PromptView.js
- * - ../GlobalStateService.js
+ * - ../StateManager.js
  * - ../Shortcuts/Shortcuts.js
  *
  * Notes / Additional:
@@ -350,7 +350,7 @@ export class ModalService {
             me._previousActiveElement = document.activeElement;
             me._container.classList.add('modal-container--is-open');
             me._applyScrollLock();
-            globalState.addScope('modal-open');
+            stateManager.addScope('modal-open');
         }
 
         const currentActive = me.getActiveModal();
@@ -558,7 +558,7 @@ export class ModalService {
                 me._previousActiveElement = null;
             }
 
-            globalState.removeScope('modal-open');
+            stateManager.removeScope('modal-open');
         }
     }
 

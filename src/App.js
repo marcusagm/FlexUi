@@ -33,7 +33,7 @@ import { PopoutManagerService } from './services/PopoutManagerService.js';
 import { appShortcuts } from './services/Shortcuts/Shortcuts.js';
 import { Loader } from './services/Loader/Loader.js';
 import { appBus } from './utils/EventBus.js';
-import { globalState } from './services/GlobalStateService.js';
+import { stateManager } from './services/StateManager.js';
 import { DropZoneType, ItemType } from './constants/DNDTypes.js';
 import { EventTypes } from './constants/EventTypes.js';
 
@@ -111,7 +111,7 @@ import { EventTypes } from './constants/EventTypes.js';
  * - {import('./utils/EventBus.js').appBus}
  * - {import('./services/DND/FloatingPanelManagerService.js').FloatingPanelManagerService}
  * - {import('./services/PopoutManagerService.js').PopoutManagerService}
- * - {import('./services/GlobalStateService.js').globalState}
+ * - {import('./services/StateManager.js').stateManager}
  * - {import('./services/Shortcuts/Shortcuts.js').appShortcuts}
  * - {import('./services/Loader/Loader.js').Loader}
  * - {import('./constants/DNDTypes.js').DropZoneType}
@@ -316,9 +316,9 @@ export class App {
         FloatingPanelManagerService.getInstance();
         PopoutManagerService.getInstance();
 
-        globalState.set('counterValue', 0);
-        globalState.set('activeTool', 'pointer');
-        globalState.set('activeColor', '#FFFFFF');
+        stateManager.set('counterValue', 0);
+        stateManager.set('activeTool', 'pointer');
+        stateManager.set('activeColor', '#FFFFFF');
     }
 
     /**
@@ -514,53 +514,8 @@ export class App {
 
             me.container.fromJSON(workspaceData.layout);
 
-            if (workspaceData.layout.toolbars) {
-                me._toolbarTop.fromJSON(workspaceData.layout.toolbars.top || []);
-                me._toolbarBottom.fromJSON(workspaceData.layout.toolbars.bottom || []);
-                me._toolbarLeft.fromJSON(workspaceData.layout.toolbars.left || []);
-                me._toolbarRight.fromJSON(workspaceData.layout.toolbars.right || []);
-            }
-
-            if (workspaceData.popouts && Array.isArray(workspaceData.popouts)) {
-                let targetViewport = null;
-                const traverse = node => {
-                    if (targetViewport) return;
-                    if (node instanceof Viewport) {
-                        targetViewport = node;
-                        return;
-                    }
-                    if (node.children) node.children.forEach(traverse);
-                    else if (node.columns) node.columns.forEach(traverse);
-                    else if (node.rows) node.rows.forEach(traverse);
-                };
-                traverse(me.container);
-
-                const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-
-                for (const popoutData of workspaceData.popouts) {
-                    const payload = popoutData.data || popoutData.groupData;
-                    const geometry = popoutData.geometry;
-                    const type = popoutData.type || 'PanelGroup';
-
-                    if (!payload) continue;
-
-                    if (type === 'ApplicationWindow') {
-                        const factory = ViewportFactory.getInstance();
-                        const win = factory.createWindow(payload);
-                        if (win && targetViewport) {
-                            targetViewport.addWindow(win);
-
-                            await PopoutManagerService.getInstance().popoutWindow(win, geometry);
-                        }
-                    } else {
-                        const group = new PanelGroup();
-                        group.fromJSON(payload);
-                        await PopoutManagerService.getInstance().popoutGroup(group, geometry);
-                    }
-
-                    await delay(200);
-                }
-            }
+            me._restoreToolbars(workspaceData.layout.toolbars);
+            await me._restorePopouts(workspaceData.popouts);
         } else {
             console.error(
                 'App: Falha crítica ao carregar o layout. Nenhum dado de workspace foi encontrado.'
@@ -687,6 +642,87 @@ export class App {
     }
 
     /**
+     * Restores toolbars from the layout data.
+     *
+     * @param {object} toolbarsData - The toolbars data object.
+     * @returns {void}
+     * @private
+     */
+    _restoreToolbars(toolbarsData) {
+        const me = this;
+        if (!toolbarsData) return;
+
+        me._toolbarTop.fromJSON(toolbarsData.top || []);
+        me._toolbarBottom.fromJSON(toolbarsData.bottom || []);
+        me._toolbarLeft.fromJSON(toolbarsData.left || []);
+        me._toolbarRight.fromJSON(toolbarsData.right || []);
+    }
+
+    /**
+     * Restores popouts from the workspace data.
+     *
+     * @param {Array} popoutsData - The array of popout data.
+     * @returns {Promise<void>}
+     * @private
+     */
+    async _restorePopouts(popoutsData) {
+        const me = this;
+        if (!popoutsData || !Array.isArray(popoutsData)) return;
+
+        const targetViewport = me._findFirstViewport();
+        const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+        for (const popoutData of popoutsData) {
+            const payload = popoutData.data || popoutData.groupData;
+            const geometry = popoutData.geometry;
+            const type = popoutData.type || 'PanelGroup';
+
+            if (!payload) continue;
+
+            if (type === 'ApplicationWindow') {
+                const factory = ViewportFactory.getInstance();
+                const win = factory.createWindow(payload);
+                if (win && targetViewport) {
+                    targetViewport.addWindow(win);
+
+                    await PopoutManagerService.getInstance().popoutWindow(win, geometry);
+                }
+            } else {
+                const group = new PanelGroup();
+                group.fromJSON(payload);
+                await PopoutManagerService.getInstance().popoutGroup(group, geometry);
+            }
+
+            const defaultDelay = 200;
+            await delay(defaultDelay);
+        }
+    }
+
+    /**
+     * Helper to find the first Viewport in the container.
+     *
+     * @returns {import('./components/Viewport/Viewport.js').Viewport | null}
+     * @private
+     */
+    _findFirstViewport() {
+        const me = this;
+        let targetViewport = null;
+
+        const traverse = node => {
+            if (targetViewport) return;
+            if (node instanceof Viewport) {
+                targetViewport = node;
+                return;
+            }
+            if (node.children) node.children.forEach(traverse);
+            else if (node.columns) node.columns.forEach(traverse);
+            else if (node.rows) node.rows.forEach(traverse);
+        };
+        traverse(me.container);
+        return targetViewport;
+    }
+
+    /**
      * Handles the 'app:add-new-panel' event by creating a new default
      * TextPanel in the first available column.
      *
@@ -711,25 +747,7 @@ export class App {
      */
     addNewWindow() {
         const me = this;
-        let targetViewport = null;
-
-        const traverse = node => {
-            if (targetViewport) return;
-            if (node instanceof Viewport) {
-                targetViewport = node;
-                return;
-            }
-
-            if (node.children) {
-                node.children.forEach(traverse);
-            } else if (node.columns) {
-                node.columns.forEach(traverse);
-            } else if (node.rows) {
-                node.rows.forEach(traverse);
-            }
-        };
-
-        traverse(me.container);
+        const targetViewport = me._findFirstViewport();
 
         if (targetViewport) {
             const note = new NotepadWindow('Documento Novo', 'Digite seu texto aqui.', {

@@ -1,12 +1,12 @@
 import { TokenNormalizer } from './TokenNormalizer.js';
 import { appBus } from '../../utils/EventBus.js';
-import { globalState } from '../GlobalStateService.js';
+import { stateManager } from '../StateManager.js';
 
 /**
  * Description:
  * Receives canonical token objects and orchestrates matching against the registry.
  * It handles prioritization, sequence buffering, chord detection, scope filtering
- * (via GlobalStateService), and dispatches actions via appBus (command)
+ * (via StateManager), and dispatches actions via appBus (command)
  * or direct callback (handler).
  *
  * Properties summary:
@@ -25,7 +25,7 @@ import { globalState } from '../GlobalStateService.js';
  * Dependencies:
  * - ./TokenNormalizer.js
  * - ../../utils/EventBus.js
- * - ../GlobalStateService.js
+ * - ../StateManager.js
  */
 export class ShortcutDispatcher {
     /**
@@ -137,7 +137,7 @@ export class ShortcutDispatcher {
 
         me._pushSequence(tokenObj);
 
-        const activeScopes = globalState.get('activeScopes') || [];
+        const activeScopes = stateManager.get('activeScopes') || [];
         const activeElement = typeof document !== 'undefined' ? document.activeElement : null;
         const candidates = [];
 

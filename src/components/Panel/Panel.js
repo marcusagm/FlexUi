@@ -2,7 +2,7 @@ import { IPanel } from './IPanel.js';
 import { VanillaPanelAdapter } from '../../renderers/vanilla/VanillaPanelAdapter.js';
 import { PanelHeader } from './PanelHeader.js';
 import { appBus } from '../../utils/EventBus.js';
-import { globalState } from '../../services/GlobalStateService.js';
+import { stateManager } from '../../services/StateManager.js';
 import { EventTypes } from '../../constants/EventTypes.js';
 import { PanelApi } from '../../api/PanelApi.js';
 
@@ -44,7 +44,7 @@ import { PanelApi } from '../../api/PanelApi.js';
  * - {import('../../renderers/vanilla/VanillaPanelAdapter.js').VanillaPanelAdapter}
  * - {import('./PanelHeader.js').PanelHeader}
  * - {import('../../utils/EventBus.js').appBus}
- * - {import('../../services/GlobalStateService.js').globalState}
+ * - {import('../../services/StateManager.js').stateManager}
  * - {import('../../api/PanelApi.js').PanelApi}
  */
 export class Panel extends IPanel {
@@ -628,7 +628,7 @@ export class Panel extends IPanel {
     }
 
     /**
-     * Subscribes to keys in GlobalStateService.
+     * Subscribes to keys in StateManager.
      * Called automatically on mount.
      *
      * @private
@@ -645,12 +645,12 @@ export class Panel extends IPanel {
                 boundOnStateUpdate(key, value);
             };
             me._boundStateListeners.set(key, listener);
-            globalState.subscribe(key, listener);
+            stateManager.subscribe(key, listener);
         });
     }
 
     /**
-     * Unsubscribes from keys in GlobalStateService.
+     * Unsubscribes from keys in StateManager.
      * Called automatically on unmount.
      *
      * @private
@@ -660,7 +660,7 @@ export class Panel extends IPanel {
         const me = this;
         if (me._boundStateListeners) {
             me._boundStateListeners.forEach((listener, key) => {
-                globalState.unsubscribe(key, listener);
+                stateManager.unsubscribe(key, listener);
             });
             me._boundStateListeners.clear();
         }
