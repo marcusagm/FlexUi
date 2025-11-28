@@ -1,4 +1,5 @@
 import { Disposable } from './Disposable.js';
+import { Loader } from '../services/Loader/Loader.js';
 
 /**
  * Description:
@@ -11,6 +12,7 @@ import { Disposable } from './Disposable.js';
  * - nativeWindow {Window|null} : The native browser window object.
  * - options {object} : Configuration options (width, height, title, left, top).
  * - onClose {Function|null} : Callback triggered when the window is closed.
+ * - _loader {Loader|null} : The loader instance for the popout.
  *
  * Typical usage:
  * const popout = new PopoutWindow('popout-1', { title: 'My Popout', width: 800, height: 600 });
@@ -24,9 +26,11 @@ import { Disposable } from './Disposable.js';
  * - Injects application styles into the new window to maintain theme.
  * - Manages the 'beforeunload' event to handle user-initiated closing.
  * - Ensures the popout body has 100% dimensions to prevent layout collapse.
+ * - Displays a loader until styles are loaded and content is appended.
  *
  * Dependencies:
  * - {import('./Disposable.js').Disposable}
+ * - {import('../services/Loader/Loader.js').Loader}
  */
 export class PopoutWindow extends Disposable {
     /**
@@ -76,6 +80,14 @@ export class PopoutWindow extends Disposable {
      * @private
      */
     _boundOnResize;
+
+    /**
+     * The loader instance for the popout.
+     *
+     * @type {Loader | null}
+     * @private
+     */
+    _loader = null;
 
     /**
      * Creates an instance of PopoutWindow.
@@ -144,9 +156,9 @@ export class PopoutWindow extends Disposable {
     }
 
     /**
-     * Opens the native window and injects styles.
+     * Opens the native window, injects styles, and waits for them to load.
      *
-     * @returns {Promise<void>} Resolves when the window is ready.
+     * @returns {Promise<void>} Resolves when the window and styles are ready.
      */
     async open() {
         const me = this;
@@ -182,7 +194,10 @@ export class PopoutWindow extends Disposable {
         targetDocument.body.style.flexDirection = 'column';
         targetDocument.body.className = document.body.className;
 
-        me._copyStyles(targetDocument);
+        me._loader = new Loader(targetDocument.body, { type: 'fullpage' });
+        me._loader.show();
+
+        await me._copyStyles(targetDocument);
 
         me._nativeWindow.addEventListener('beforeunload', me._boundOnBeforeUnload);
         me._nativeWindow.addEventListener('resize', me._boundOnResize);
@@ -191,7 +206,7 @@ export class PopoutWindow extends Disposable {
     }
 
     /**
-     * Appends a DOM element to the popout's body.
+     * Appends a DOM element to the popout's body and hides the loader.
      *
      * @param {HTMLElement} element - The element to append.
      * @returns {void}
@@ -208,6 +223,10 @@ export class PopoutWindow extends Disposable {
         }
 
         me._nativeWindow.document.body.appendChild(element);
+
+        if (me._loader) {
+            me._loader.hide();
+        }
     }
 
     /**
@@ -229,6 +248,10 @@ export class PopoutWindow extends Disposable {
      */
     dispose() {
         const me = this;
+        if (me._loader) {
+            me._loader.dispose();
+            me._loader = null;
+        }
         if (me._nativeWindow) {
             me._nativeWindow.removeEventListener('beforeunload', me._boundOnBeforeUnload);
             me._nativeWindow.removeEventListener('resize', me._boundOnResize);
@@ -258,19 +281,19 @@ export class PopoutWindow extends Disposable {
      * @private
      * @returns {void}
      */
-    _onResize() {
-        // Reserved for future logic
-    }
+    _onResize() {}
 
     /**
      * Copies styles from the main window to the target document.
+     * Returns a promise that resolves when all external stylesheets are loaded.
      *
      * @param {Document} targetDocument - The target document.
      * @private
-     * @returns {void}
+     * @returns {Promise<void>}
      */
-    _copyStyles(targetDocument) {
+    async _copyStyles(targetDocument) {
         const styleSheets = Array.from(document.styleSheets);
+        const loadPromises = [];
 
         styleSheets.forEach(styleSheet => {
             try {
@@ -279,6 +302,18 @@ export class PopoutWindow extends Disposable {
                     link.rel = 'stylesheet';
                     link.type = 'text/css';
                     link.href = styleSheet.href;
+
+                    const promise = new Promise(resolve => {
+                        link.onload = () => resolve();
+                        link.onerror = () => {
+                            console.warn(
+                                `[PopoutWindow] Failed to load stylesheet: ${styleSheet.href}`
+                            );
+                            resolve();
+                        };
+                    });
+                    loadPromises.push(promise);
+
                     targetDocument.head.appendChild(link);
                 } else if (styleSheet.cssRules) {
                     const style = targetDocument.createElement('style');
@@ -294,5 +329,7 @@ export class PopoutWindow extends Disposable {
                 );
             }
         });
+
+        await Promise.all(loadPromises);
     }
 }

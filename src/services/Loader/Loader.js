@@ -30,6 +30,7 @@ import { VanillaLoaderAdapter } from '../../renderers/vanilla/VanillaLoaderAdapt
  * - Delegates DOM creation/manipulation to VanillaLoaderAdapter.
  * - Manages visibility transitions and auto-unmounting on hide.
  * - Applies CSS classes to the target element for proper positioning (inset mode).
+ * - Validates target element using nodeType for cross-window compatibility.
  *
  * Dependencies:
  * - {import('../../core/UIElement.js').UIElement}
@@ -98,13 +99,14 @@ export class Loader extends UIElement {
      * @returns {void}
      */
     set targetElement(element) {
-        if (!(element instanceof HTMLElement)) {
+        const me = this;
+        if (!element || element.nodeType !== 1) {
             console.warn(
                 `[Loader] invalid targetElement assignment (${element}). Must be an HTMLElement.`
             );
             return;
         }
-        this._targetElement = element;
+        me._targetElement = element;
     }
 
     /**
