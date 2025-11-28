@@ -1,5 +1,6 @@
 import { BaseDropStrategy } from './BaseDropStrategy.js';
 import { ItemType } from '../../constants/DNDTypes.js';
+import { PopoutManagerService } from '../PopoutManagerService.js';
 
 /**
  * Description:
@@ -23,6 +24,7 @@ import { ItemType } from '../../constants/DNDTypes.js';
  * - If Viewport has tabs: Logic is purely floating (updates ghost, no docking).
  * - If Viewport empty of tabs: Checks top zone. If inside, shows Horizontal Placeholder.
  * - On Drop:
+ * - Handles auto-return of Popout windows (Critical Fix).
  * - If docking: Calls `viewport.dockWindow()`.
  * - If floating: Updates window coordinates/state.
  *
@@ -30,6 +32,7 @@ import { ItemType } from '../../constants/DNDTypes.js';
  * - {import('./BaseDropStrategy.js').BaseDropStrategy}
  * - {import('../../components/Viewport/ApplicationWindow.js').ApplicationWindow}
  * - {import('../../constants/DNDTypes.js').ItemType}
+ * - {import('../PopoutManagerService.js').PopoutManagerService}
  */
 export class ViewportDropStrategy extends BaseDropStrategy {
     /**
@@ -153,6 +156,14 @@ export class ViewportDropStrategy extends BaseDropStrategy {
 
         const windowInstance = draggedData.item;
 
+        if (windowInstance.isPopout) {
+            PopoutManagerService.getInstance().returnWindow(windowInstance);
+
+            if (!dropZone.windows.includes(windowInstance)) {
+                dropZone.addWindow(windowInstance, false);
+            }
+        }
+
         if (this._isDocking) {
             dropZone.dockWindow(windowInstance);
             return true;
@@ -189,6 +200,9 @@ export class ViewportDropStrategy extends BaseDropStrategy {
             if (windowInstance.element) {
                 windowInstance.element.style.left = `${newX}px`;
                 windowInstance.element.style.top = `${newY}px`;
+            }
+            if (typeof windowInstance.constrainToParent === 'function') {
+                windowInstance.constrainToParent();
             }
         }
 

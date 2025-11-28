@@ -1,5 +1,6 @@
 import { BaseDropStrategy } from './BaseDropStrategy.js';
 import { ItemType } from '../../constants/DNDTypes.js';
+import { PopoutManagerService } from '../PopoutManagerService.js';
 
 /**
  * Description:
@@ -15,11 +16,13 @@ import { ItemType } from '../../constants/DNDTypes.js';
  * - Inserts a vertical placeholder to indicate the drop position within the TabStrip's viewport.
  * - Maintains Tab Bar visibility during the operation.
  * - On Drop: Calls `viewport.dockWindow(window, index)` to reorder or dock the window.
+ * - Handles auto-return of Popout windows when dropped onto the tab bar.
  *
  * Dependencies:
  * - {import('./BaseDropStrategy.js').BaseDropStrategy}
  * - {import('../../components/Viewport/Viewport.js').Viewport}
  * - {import('../../constants/DNDTypes.js').ItemType}
+ * - {import('../PopoutManagerService.js').PopoutManagerService}
  */
 export class ViewportTabDropStrategy extends BaseDropStrategy {
     /**
@@ -81,7 +84,6 @@ export class ViewportTabDropStrategy extends BaseDropStrategy {
         }
 
         // Locate the inner scrollable container where tabs actually live
-        // This depends on the structure created by VanillaStripAdapter
         const scrollContainer = stripElement.querySelector('.ui-strip__viewport') || stripElement;
         const placeholder = dds.getPlaceholder();
 
@@ -99,8 +101,6 @@ export class ViewportTabDropStrategy extends BaseDropStrategy {
             if (win === draggedData.item) continue;
 
             // Access the header UIElement (WindowHeaderWrapper or direct header element)
-            // In Viewport logic, the header is wrapped, but the window instance has the header component
-            // which acts as the UI source.
             const headerElement = win.header ? win.header.element : null;
 
             if (headerElement && document.body.contains(headerElement)) {
@@ -120,13 +120,9 @@ export class ViewportTabDropStrategy extends BaseDropStrategy {
 
         // Visual insertion
         if (placed && targetHeaderElement) {
-            // Insert placeholder before the detected target's header
-            // We need to ensure we insert into the container that holds the headers (scrollContainer)
-            // targetHeaderElement should be a child (or descendant) of scrollContainer
             if (scrollContainer.contains(targetHeaderElement)) {
                 scrollContainer.insertBefore(placeholder, targetHeaderElement);
             } else {
-                // Fallback if nesting is complex
                 scrollContainer.appendChild(placeholder);
             }
         } else {
@@ -168,6 +164,19 @@ export class ViewportTabDropStrategy extends BaseDropStrategy {
         }
 
         const windowInstance = draggedData.item;
+
+        // Handle return from Popout
+        if (windowInstance.isPopout) {
+            // 1. Close native window and reset state (returns to original viewport)
+            PopoutManagerService.getInstance().returnWindow(windowInstance);
+
+            // 2. Ensure window is transferred to the *target* viewport if different
+            if (!dropZone.windows.includes(windowInstance)) {
+                // false = doFocus (dockWindow will handle focus)
+                dropZone.addWindow(windowInstance, false);
+            }
+        }
+
         dropZone.dockWindow(windowInstance, this._dropIndex);
 
         return true;

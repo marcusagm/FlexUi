@@ -3,6 +3,7 @@ import { Row } from '../../components/Row/Row.js';
 import { PanelGroup } from '../../components/Panel/PanelGroup.js';
 import { FloatingPanelManagerService } from './FloatingPanelManagerService.js';
 import { ItemType } from '../../constants/DNDTypes.js';
+import { PopoutManagerService } from '../PopoutManagerService.js';
 
 /**
  * Description:
@@ -25,6 +26,7 @@ import { ItemType } from '../../constants/DNDTypes.js';
  * drop for the Container (allowing specific Row strategies or Undock to take over).
  * - On drop: Creates a new Row, creates a new Column inside it,
  * and moves the dropped Panel or PanelGroup into the new Column using the new `Column` API.
+ * - Handles cleanup of Floating and Popout states upon drop.
  *
  * Dependencies:
  * - {import('./BaseDropStrategy.js').BaseDropStrategy}
@@ -32,6 +34,7 @@ import { ItemType } from '../../constants/DNDTypes.js';
  * - {import('../../components/Row/Row.js').Row}
  * - {import('./FloatingPanelManagerService.js').FloatingPanelManagerService}
  * - {import('../../constants/DNDTypes.js').ItemType}
+ * - {import('../PopoutManagerService.js').PopoutManagerService}
  */
 export class ContainerDropStrategy extends BaseDropStrategy {
     /**
@@ -258,9 +261,16 @@ export class ContainerDropStrategy extends BaseDropStrategy {
             sourceGroup = draggedData.item.parentGroup;
         }
 
-        if (sourceGroup && sourceGroup.isFloating) {
-            if (draggedData.type === ItemType.PANEL_GROUP) {
-                FloatingPanelManagerService.getInstance().removeFloatingPanel(sourceGroup);
+        if (sourceGroup) {
+            if (sourceGroup.isPopout) {
+                if (draggedData.type === ItemType.PANEL_GROUP || sourceGroup.panels.length <= 1) {
+                    PopoutManagerService.getInstance().closePopout(sourceGroup);
+                    sourceGroup.setPopoutMode(false);
+                }
+            } else if (sourceGroup.isFloating) {
+                if (draggedData.type === ItemType.PANEL_GROUP) {
+                    FloatingPanelManagerService.getInstance().removeFloatingPanel(sourceGroup);
+                }
             }
         }
 
@@ -277,11 +287,9 @@ export class ContainerDropStrategy extends BaseDropStrategy {
             const newColumn = newRow.createColumn();
 
             if (oldColumn) {
-                // New API: removeChild
                 oldColumn.removeChild(draggedItem, true);
             }
             draggedItem.height = null;
-            // New API: addChild
             newColumn.addChild(draggedItem);
         } else if (draggedData.type === ItemType.PANEL) {
             const draggedPanel = draggedData.item;
@@ -291,7 +299,6 @@ export class ContainerDropStrategy extends BaseDropStrategy {
             const newColumn = newRow.createColumn();
             const newPanelGroup = new PanelGroup(null);
 
-            // New API: addChild
             newColumn.addChild(newPanelGroup);
 
             if (sourceParentGroup) {

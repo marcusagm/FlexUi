@@ -2,6 +2,7 @@ import { PanelGroup } from '../../components/Panel/PanelGroup.js';
 import { appBus } from '../../utils/EventBus.js';
 import { EventTypes } from '../../constants/EventTypes.js';
 import { throttleRAF } from '../../utils/ThrottleRAF.js';
+import { PopoutManagerService } from '../PopoutManagerService.js';
 
 /**
  * Description:
@@ -39,12 +40,14 @@ import { throttleRAF } from '../../utils/ThrottleRAF.js';
  * - Constrains floating panels within the boundaries of the registered container.
  * - Handles the conversion of docked panels to floating panels upon request.
  * - Automatically adjusts floating panel positions and sizes when the window is resized.
+ * - Handles return of Popout windows when dropped into the floating area.
  *
  * Dependencies:
  * - {import('../../components/Panel/PanelGroup.js').PanelGroup}
  * - {import('../../utils/EventBus.js').appBus}
  * - {import('../../constants/EventTypes.js').EventTypes}
  * - {import('../../utils/ThrottleRAF.js').throttleRAF}
+ * - {import('../PopoutManagerService.js').PopoutManagerService}
  */
 export class FloatingPanelManagerService {
     /**
@@ -287,6 +290,7 @@ export class FloatingPanelManagerService {
     /**
      * Handles the drop event for an item being "undocked" (dropped outside a dropzone).
      * Applies constraints to ensure the panel stays within container bounds.
+     * Supports handling items returning from Popout windows.
      *
      * @param {object} draggedData - The data from DragDropService { item, type, offsetX, offsetY }.
      * @param {number} positionX - The final clientX of the drop.
@@ -332,6 +336,11 @@ export class FloatingPanelManagerService {
             if (col) {
                 col.removeChild(panelGroup);
             }
+        }
+
+        if (panelGroup.isPopout) {
+            PopoutManagerService.getInstance().closePopout(panelGroup);
+            panelGroup.setPopoutMode(false);
         }
 
         me.addFloatingPanel(panelGroup, initialX, initialY);
