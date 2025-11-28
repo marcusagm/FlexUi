@@ -140,54 +140,98 @@ export class VanillaRenderer extends IRenderer {
         }
 
         Object.keys(properties).forEach(key => {
-            const value = properties[key];
+            me._applyProperty(element, key, properties[key]);
+        });
+    }
 
-            if (key === 'style') {
-                me.updateStyles(element, value);
-                return;
+    /**
+     * Applies a single property or attribute to an element.
+     *
+     * @param {HTMLElement} element - The target element.
+     * @param {string} key - The property key.
+     * @param {any} value - The property value.
+     * @private
+     */
+    _applyProperty(element, key, value) {
+        const me = this;
+
+        if (key === 'style') {
+            me.updateStyles(element, value);
+            return;
+        }
+
+        if (key === 'className' || key === 'class') {
+            const newClass = String(value);
+            if (element.className !== newClass) {
+                element.className = newClass;
             }
+            return;
+        }
 
-            if (key === 'className' || key === 'class') {
-                element.className = String(value);
-                return;
-            }
+        if (key === 'dataset' && typeof value === 'object') {
+            Object.keys(value).forEach(dataKey => {
+                if (element.dataset[dataKey] !== String(value[dataKey])) {
+                    element.dataset[dataKey] = value[dataKey];
+                }
+            });
+            return;
+        }
 
-            if (key === 'dataset' && typeof value === 'object') {
-                Object.assign(element.dataset, value);
-                return;
-            }
-
-            if (key === 'innerHTML') {
+        if (key === 'innerHTML') {
+            if (element.innerHTML !== String(value)) {
                 me._setInnerHTMLSecurely(element, value);
-                return;
             }
+            return;
+        }
 
-            if (key.startsWith('on') && typeof value === 'function') {
-                const eventName = key.substring(2).toLowerCase();
-                element.addEventListener(eventName, value);
-                return;
-            }
+        if (key.startsWith('on') && typeof value === 'function') {
+            const eventName = key.substring(2).toLowerCase();
+            element.addEventListener(eventName, value);
+            return;
+        }
 
-            if (value === null || value === undefined || value === false) {
+        me._applyAttribute(element, key, value);
+    }
+
+    /**
+     * Applies a generic attribute to an element.
+     *
+     * @param {HTMLElement} element - The target element.
+     * @param {string} key - The attribute key.
+     * @param {any} value - The attribute value.
+     * @private
+     */
+    _applyAttribute(element, key, value) {
+        if (value === null || value === undefined || value === false) {
+            if (element.hasAttribute(key)) {
                 element.removeAttribute(key);
-            } else if (value === true) {
+            }
+        } else if (value === true) {
+            if (!element.hasAttribute(key)) {
                 element.setAttribute(key, '');
-            } else {
-                if (key in element) {
-                    try {
+            }
+        } else {
+            const strValue = String(value);
+            if (key in element) {
+                try {
+                    if (element[key] !== value) {
                         element[key] = value;
-                    } catch (err) {
-                        console.warn(
-                            `[VanillaRenderer] Failed to set property "${key}", falling back to attribute. Error:`,
-                            err
-                        );
-                        element.setAttribute(key, String(value));
                     }
-                } else {
-                    element.setAttribute(key, String(value));
+                } catch (err) {
+                    console.warn(
+                        `[VanillaRenderer] Failed to set property "${key}", falling back to attribute. Error:`,
+                        err
+                    );
+                    if (element.getAttribute(key) !== strValue) {
+                        element.setAttribute(key, strValue);
+                    }
+                }
+            } else {
+                if (element.getAttribute(key) !== strValue) {
+                    element.setAttribute(key, strValue);
                 }
             }
-        });
+        }
     }
 
     /**
@@ -210,12 +254,19 @@ export class VanillaRenderer extends IRenderer {
         Object.keys(styles).forEach(styleKey => {
             const styleValue = styles[styleKey];
             if (styleValue === null || styleValue === undefined) {
-                element.style.removeProperty(styleKey);
+                if (element.style.getPropertyValue(styleKey)) {
+                    element.style.removeProperty(styleKey);
+                }
             } else {
+                const strValue = String(styleValue);
                 if (styleKey.startsWith('--')) {
-                    element.style.setProperty(styleKey, String(styleValue));
+                    if (element.style.getPropertyValue(styleKey) !== strValue) {
+                        element.style.setProperty(styleKey, strValue);
+                    }
                 } else {
-                    element.style[styleKey] = String(styleValue);
+                    if (element.style[styleKey] !== strValue) {
+                        element.style[styleKey] = strValue;
+                    }
                 }
             }
         });

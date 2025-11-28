@@ -122,7 +122,10 @@ export class VanillaPanelAdapter extends VanillaRenderer {
                 `[VanillaPanelAdapter] invalid minWidth assignment (${minWidth}). Must be a positive number.`
             );
         } else {
-            element.style.minWidth = `${widthNum}px`;
+            const newMinWidth = `${widthNum}px`;
+            if (element.style.minWidth !== newMinWidth) {
+                element.style.minWidth = newMinWidth;
+            }
         }
 
         if (Number.isNaN(heightNum) || heightNum < 0) {
@@ -130,7 +133,10 @@ export class VanillaPanelAdapter extends VanillaRenderer {
                 `[VanillaPanelAdapter] invalid minHeight assignment (${minHeight}). Must be a positive number.`
             );
         } else {
-            element.style.minHeight = `${heightNum}px`;
+            const newMinHeight = `${heightNum}px`;
+            if (element.style.minHeight !== newMinHeight) {
+                element.style.minHeight = newMinHeight;
+            }
         }
     }
 
@@ -151,9 +157,13 @@ export class VanillaPanelAdapter extends VanillaRenderer {
 
         const visible = Boolean(isVisible);
         if (visible) {
-            element.style.display = '';
+            if (element.style.display !== '') {
+                element.style.display = '';
+            }
         } else {
-            element.style.display = 'none';
+            if (element.style.display !== 'none') {
+                element.style.display = 'none';
+            }
         }
     }
 }
