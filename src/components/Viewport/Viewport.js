@@ -25,6 +25,8 @@ import { PopoutManagerService } from '../../services/PopoutManagerService.js';
  * - tabBar {HTMLElement} : The DOM element representing the tab strip container.
  * - windows {Array<ApplicationWindow>} : List of managed windows.
  * - height {number|null} : The height of the viewport (for vertical resizing in a column).
+ * - _resizeObserver {ResizeObserver|null} : Observer for viewport dimension changes.
+ * - _boundOnViewportResize {Function|null} : Throttled handler for resize events.
  *
  * Typical usage:
  * const viewport = new Viewport();
@@ -48,6 +50,7 @@ import { PopoutManagerService } from '../../services/PopoutManagerService.js';
  * - Supports 'Fill Space' layout mode managed by LayoutService.
  * - Supports vertical resizing when placed in a Column.
  * - Supports Popout windows (ignores focus/layout for external windows).
+ * - Constrains floating windows within bounds upon viewport resize.
  *
  * Dependencies:
  * - {import('../Core/TabStrip.js').TabStrip}
@@ -181,12 +184,28 @@ export class Viewport extends UIElement {
     _resizeHandleVisible = true;
 
     /**
-     * The throttled update function for resizing.
+     * The throttled update function for resizing (height).
      *
      * @type {Function | null}
      * @private
      */
     _throttledUpdate = null;
+
+    /**
+     * Observer for viewport dimension changes.
+     *
+     * @type {ResizeObserver | null}
+     * @private
+     */
+    _resizeObserver = null;
+
+    /**
+     * Throttled handler for resize events.
+     *
+     * @type {Function | null}
+     * @private
+     */
+    _boundOnViewportResize = null;
 
     /**
      * The drop zone type identifier.
@@ -217,6 +236,7 @@ export class Viewport extends UIElement {
         me._boundOnWindowClose = me._onWindowClose.bind(me);
         me._boundOnArrangeCascade = me.cascade.bind(me);
         me._boundOnArrangeTile = me.tile.bind(me);
+        me._boundOnViewportResize = throttleRAF(me._onViewportResize.bind(me));
 
         me._throttledUpdate = throttleRAF(() => {
             me.updateHeight();
@@ -365,6 +385,16 @@ export class Viewport extends UIElement {
             me._updateTabBarVisibility();
             me._updateDockedResizeHandle();
             me.updateHeight();
+
+            // Initialize ResizeObserver to handle viewport resizing logic
+            if (typeof ResizeObserver !== 'undefined') {
+                me._resizeObserver = new ResizeObserver(() => {
+                    if (me._boundOnViewportResize) {
+                        me._boundOnViewportResize();
+                    }
+                });
+                me._resizeObserver.observe(me.element);
+            }
         }
     }
 
@@ -375,6 +405,15 @@ export class Viewport extends UIElement {
      */
     _doUnmount() {
         const me = this;
+
+        if (me._resizeObserver) {
+            me._resizeObserver.disconnect();
+            me._resizeObserver = null;
+        }
+
+        if (me._boundOnViewportResize && typeof me._boundOnViewportResize.cancel === 'function') {
+            me._boundOnViewportResize.cancel();
+        }
 
         if (me._resizeHandleManager) {
             me._resizeHandleManager.destroy();
@@ -995,5 +1034,22 @@ export class Viewport extends UIElement {
                 }
             });
         }
+    }
+
+    /**
+     * Handles resize events on the Viewport element.
+     * Ensures all floating windows stay within the new bounds of the viewport.
+     *
+     * @private
+     * @returns {void}
+     */
+    _onViewportResize() {
+        const me = this;
+        me._windows.forEach(win => {
+            // Apply constraint logic only for floating windows (not tabbed, not popout)
+            if (!win.isTabbed && !win.isPopout && typeof win.constrainToParent === 'function') {
+                win.constrainToParent();
+            }
+        });
     }
 }
