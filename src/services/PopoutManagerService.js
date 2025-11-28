@@ -14,6 +14,7 @@ import { appNotifications } from './Notification/Notification.js';
  * - _groupInstances {Map<string, PanelGroup>} : Maps IDs to PanelGroup instances.
  * - _windowInstances {Map<string, ApplicationWindow>} : Maps IDs to ApplicationWindow instances.
  * - _viewportReferences {Map<string, Viewport>} : Maps Window IDs to their original Viewport instances.
+ * - _styleObserver {MutationObserver|null} : Observer to monitor style changes in the main document.
  *
  * Typical usage:
  * const popoutService = PopoutManagerService.getInstance();
@@ -31,6 +32,7 @@ import { appNotifications } from './Notification/Notification.js';
  * - Supports serialization of external window states.
  * - Implements sequential restoration with fallback for popup blockers.
  * - Automatically closes all popouts when the main window is closed/reloaded.
+ * - Synchronizes dynamic CSS changes (lazy loading) to all active popouts.
  *
  * Dependencies:
  * - {import('../core/PopoutWindow.js').PopoutWindow}
@@ -77,6 +79,14 @@ export class PopoutManagerService {
      * @private
      */
     _viewportReferences = new Map();
+
+    /**
+     * Observer to monitor style changes in the main document.
+     *
+     * @type {MutationObserver|null}
+     * @private
+     */
+    _styleObserver = null;
 
     /**
      * Private constructor for Singleton.
@@ -129,6 +139,8 @@ export class PopoutManagerService {
             );
             return;
         }
+
+        me._startStyleObserver();
 
         if (panelGroup.isFloating) {
             FloatingPanelManagerService.getInstance().removeFloatingPanel(panelGroup);
@@ -211,6 +223,10 @@ export class PopoutManagerService {
         me._activePopouts.delete(panelGroup.id);
         me._groupInstances.delete(panelGroup.id);
 
+        if (me._activePopouts.size === 0) {
+            me._stopStyleObserver();
+        }
+
         if (typeof panelGroup.setPopoutMode === 'function') {
             panelGroup.setPopoutMode(false);
         }
@@ -252,6 +268,8 @@ export class PopoutManagerService {
             console.warn(`[PopoutManagerService] Window "${appWindow.id}" is already in a popout.`);
             return;
         }
+
+        me._startStyleObserver();
 
         let viewportInstance = null;
         if (appWindow.element) {
@@ -351,6 +369,10 @@ export class PopoutManagerService {
         me._windowInstances.delete(appWindow.id);
         me._viewportReferences.delete(appWindow.id);
 
+        if (me._activePopouts.size === 0) {
+            me._stopStyleObserver();
+        }
+
         if (typeof appWindow.setPopoutMode === 'function') {
             appWindow.setPopoutMode(false);
         }
@@ -405,7 +427,7 @@ export class PopoutManagerService {
         const me = this;
         me._activePopouts.forEach(popout => {
             if (popout) {
-                popout.onClose = null; // Prevent return logic loop
+                popout.onClose = null;
                 popout.close();
                 popout.dispose();
             }
@@ -414,6 +436,7 @@ export class PopoutManagerService {
         me._groupInstances.clear();
         me._windowInstances.clear();
         me._viewportReferences.clear();
+        me._stopStyleObserver();
     }
 
     /**
@@ -444,6 +467,10 @@ export class PopoutManagerService {
         me._groupInstances.delete(item.id);
         me._windowInstances.delete(item.id);
         me._viewportReferences.delete(item.id);
+
+        if (me._activePopouts.size === 0) {
+            me._stopStyleObserver();
+        }
     }
 
     /**
@@ -540,5 +567,70 @@ export class PopoutManagerService {
         } else {
             me.returnGroup(item);
         }
+    }
+
+    /**
+     * Starts the MutationObserver to monitor style injections in the main document.
+     *
+     * @private
+     * @returns {void}
+     */
+    _startStyleObserver() {
+        const me = this;
+        if (me._styleObserver) {
+            return;
+        }
+
+        me._styleObserver = new MutationObserver(mutations => {
+            mutations.forEach(mutation => {
+                if (mutation.type === 'childList') {
+                    mutation.addedNodes.forEach(node => {
+                        if (
+                            node.nodeName === 'STYLE' ||
+                            (node.nodeName === 'LINK' && node.getAttribute('rel') === 'stylesheet')
+                        ) {
+                            me._syncStyleToPopouts(node);
+                        }
+                    });
+                }
+            });
+        });
+
+        me._styleObserver.observe(document.head, { childList: true });
+    }
+
+    /**
+     * Stops the MutationObserver if active.
+     *
+     * @private
+     * @returns {void}
+     */
+    _stopStyleObserver() {
+        const me = this;
+        if (me._styleObserver) {
+            me._styleObserver.disconnect();
+            me._styleObserver = null;
+        }
+    }
+
+    /**
+     * Clones and injects a style node into all active popout windows.
+     *
+     * @param {Node} node - The style or link node to sync.
+     * @private
+     * @returns {void}
+     */
+    _syncStyleToPopouts(node) {
+        const me = this;
+        me._activePopouts.forEach(popout => {
+            if (popout.nativeWindow && popout.nativeWindow.document) {
+                try {
+                    const clone = node.cloneNode(true);
+                    popout.nativeWindow.document.head.appendChild(clone);
+                } catch (e) {
+                    console.warn('[PopoutManagerService] Failed to sync style to popout.', e);
+                }
+            }
+        });
     }
 }
