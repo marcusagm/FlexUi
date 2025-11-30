@@ -294,6 +294,9 @@ export class ContainerDropStrategy extends BaseDropStrategy {
                     oldColumn.removeChild(draggedItem, true);
                 }
                 draggedItem.height = null;
+                if (draggedItem.collapsed) {
+                    draggedItem.collapsed = false;
+                }
                 newColumn.addChild(draggedItem);
             } else if (draggedData.type === ItemType.PANEL) {
                 const draggedPanel = itemToMove;

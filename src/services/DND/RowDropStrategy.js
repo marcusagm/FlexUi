@@ -291,6 +291,10 @@ export class RowDropStrategy extends BaseDropStrategy {
         }
         draggedItem.height = null;
 
+        if (draggedItem.collapsed) {
+            draggedItem.collapsed = false;
+        }
+
         newColumn.addChild(draggedItem);
     }
 
