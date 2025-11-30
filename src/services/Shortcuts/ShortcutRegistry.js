@@ -50,7 +50,7 @@ export class ShortcutRegistry {
      *
      * @param {object} definition - The shortcut definition object.
      * @param {string|Array|object} definition.keys - The key(s) or gesture.
-     * @param {string} [definition.command] - An optional command to emit on the appBus.
+     * @param {string} [definition.command] - An optional command to emit on the Event service.
      * @param {string|Array<string>} [definition.scopes] - Scopes where this shortcut is active.
      * @param {string|Function} [definition.context] - A CSS selector string or a function.
      * @param {Function} [definition.enabledWhen] - A function that must return true.

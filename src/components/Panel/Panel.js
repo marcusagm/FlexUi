@@ -1,10 +1,11 @@
 import { IPanel } from './IPanel.js';
 import { VanillaPanelAdapter } from '../../renderers/vanilla/VanillaPanelAdapter.js';
 import { PanelHeader } from './PanelHeader.js';
-import { appBus } from '../../utils/EventBus.js';
+import { Event } from '../../utils/Event.js';
 import { stateManager } from '../../services/StateManager.js';
 import { EventTypes } from '../../constants/EventTypes.js';
 import { PanelApi } from '../../api/PanelApi.js';
+import { CompositeDisposable, toDisposable } from '../../core/Disposable.js';
 
 /**
  * Description:
@@ -43,7 +44,7 @@ import { PanelApi } from '../../api/PanelApi.js';
  * - {import('./IPanel.js').IPanel}
  * - {import('../../renderers/vanilla/VanillaPanelAdapter.js').VanillaPanelAdapter}
  * - {import('./PanelHeader.js').PanelHeader}
- * - {import('../../utils/EventBus.js').appBus}
+ * - {import('../../utils/Event.js').Event}
  * - {import('../../services/StateManager.js').stateManager}
  * - {import('../../api/PanelApi.js').PanelApi}
  */
@@ -121,12 +122,12 @@ export class Panel extends IPanel {
     _parentGroup = null;
 
     /**
-     * Stores the actual listener functions for automatic unsubscribing.
+     * Stores the disposables for state listeners.
      *
-     * @type {Map<string, Function>}
+     * @type {CompositeDisposable}
      * @private
      */
-    _boundStateListeners = new Map();
+    _stateDisposables = new CompositeDisposable();
 
     /**
      * Creates a new Panel instance.
@@ -437,7 +438,7 @@ export class Panel extends IPanel {
 
     /**
      * Requests the panel to close itself.
-     * Emits an event to the parent group via appBus.
+     * Emits an event to the parent group via Event.
      *
      * @returns {void}
      */
@@ -446,7 +447,7 @@ export class Panel extends IPanel {
         if (!me._closable) return;
 
         if (me._parentGroup) {
-            appBus.emit(EventTypes.PANEL_GROUP_CHILD_CLOSE, {
+            Event.emit(EventTypes.PANEL_GROUP_CHILD_CLOSE, {
                 panel: me,
                 group: me._parentGroup
             });
@@ -637,6 +638,7 @@ export class Panel extends IPanel {
     _setupStateListeners() {
         const me = this;
         me._teardownStateListeners();
+        me._stateDisposables = new CompositeDisposable();
 
         const boundOnStateUpdate = me.onStateUpdate.bind(me);
 
@@ -644,8 +646,12 @@ export class Panel extends IPanel {
             const listener = value => {
                 boundOnStateUpdate(key, value);
             };
-            me._boundStateListeners.set(key, listener);
             stateManager.subscribe(key, listener);
+            me._stateDisposables.add(
+                toDisposable(() => {
+                    stateManager.unsubscribe(key, listener);
+                })
+            );
         });
     }
 
@@ -658,12 +664,7 @@ export class Panel extends IPanel {
      */
     _teardownStateListeners() {
         const me = this;
-        if (me._boundStateListeners) {
-            me._boundStateListeners.forEach((listener, key) => {
-                stateManager.unsubscribe(key, listener);
-            });
-            me._boundStateListeners.clear();
-        }
+        me._stateDisposables.dispose();
     }
 
     /**

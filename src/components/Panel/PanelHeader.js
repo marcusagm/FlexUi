@@ -1,6 +1,6 @@
 import { UIElement } from '../../core/UIElement.js';
 import { VanillaPanelHeaderAdapter } from '../../renderers/vanilla/VanillaPanelHeaderAdapter.js';
-import { appBus } from '../../utils/EventBus.js';
+import { Event } from '../../utils/Event.js';
 import { ContextMenuService } from '../../services/ContextMenu/ContextMenuService.js';
 import { DragTrigger } from '../../utils/DragTrigger.js';
 import { EventTypes } from '../../constants/EventTypes.js';
@@ -22,10 +22,10 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * parentElement.appendChild(header.element); // Accessed via UIElement getter
  *
  * Events:
- * - Emits (appBus): EventTypes.DND_DRAG_START
- * - Emits (appBus): EventTypes.PANEL_GROUP_CHILD_CLOSE
- * - Emits (appBus): EventTypes.APP_UNDOCK_PANEL_REQUEST
- * - Emits (appBus): EventTypes.APP_CLOSE_PANEL_REQUEST
+ * - Emits (Event): EventTypes.DND_DRAG_START
+ * - Emits (Event): EventTypes.PANEL_GROUP_CHILD_CLOSE
+ * - Emits (Event): EventTypes.APP_UNDOCK_PANEL_REQUEST
+ * - Emits (Event): EventTypes.APP_CLOSE_PANEL_REQUEST
  *
  * Business rules implemented:
  * - Distinguishes between Click (activate tab) and Drag (move panel).
@@ -37,7 +37,7 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * - {import('../../core/UIElement.js').UIElement}
  * - {import('../../renderers/vanilla/VanillaPanelHeaderAdapter.js').VanillaPanelHeaderAdapter}
  * - {import('../../utils/DragTrigger.js').DragTrigger}
- * - {import('../../utils/EventBus.js').appBus}
+ * - {import('../../utils/Event.js').Event}
  */
 export class PanelHeader extends UIElement {
     /**
@@ -260,7 +260,7 @@ export class PanelHeader extends UIElement {
         const offsetX = startCoords.startX - rect.left;
         const offsetY = startCoords.startY - rect.top;
 
-        appBus.emit(EventTypes.DND_DRAG_START, {
+        Event.emit(EventTypes.DND_DRAG_START, {
             item: me.panel,
             type: 'Panel',
             element: me.element,
@@ -283,7 +283,7 @@ export class PanelHeader extends UIElement {
         if (!me.panel || !me.panel.closable) return;
 
         if (me.parentGroup) {
-            appBus.emit(EventTypes.PANEL_GROUP_CHILD_CLOSE, {
+            Event.emit(EventTypes.PANEL_GROUP_CHILD_CLOSE, {
                 panel: me.panel,
                 group: me.parentGroup
             });

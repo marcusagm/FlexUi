@@ -1,5 +1,5 @@
 import { Row } from '../Row/Row.js';
-import { appBus } from '../../utils/EventBus.js';
+import { Event } from '../../utils/Event.js';
 import { FloatingPanelManagerService } from '../../services/DND/FloatingPanelManagerService.js';
 import { EventTypes } from '../../constants/EventTypes.js';
 import { UIElement } from '../../core/UIElement.js';
@@ -41,7 +41,7 @@ import { generateId } from '../../utils/generateId.js';
  * - {import('../../core/UIElement.js').UIElement}
  * - {import('../../renderers/vanilla/VanillaContainerAdapter.js').VanillaContainerAdapter}
  * - {import('../Row/Row.js').Row}
- * - {import('../../utils/EventBus.js').appBus}
+ * - {import('../../utils/Event.js').Event}
  * - {import('../../services/DND/FloatingPanelManagerService.js').FloatingPanelManagerService}
  */
 export class Container extends UIElement {
@@ -54,7 +54,7 @@ export class Container extends UIElement {
     _rows = [];
 
     /**
-     * Unique namespace for this component's appBus listeners.
+     * Unique namespace for this component's Event listeners.
      *
      * @type {string}
      * @private
@@ -104,13 +104,13 @@ export class Container extends UIElement {
     }
 
     /**
-     * Initializes appBus event listeners for this component.
+     * Initializes Event listeners for this component.
      *
      * @returns {void}
      */
     initEventListeners() {
         const me = this;
-        appBus.on(EventTypes.ROW_EMPTY, me._boundOnRowEmpty, { namespace: me._namespace });
+        Event.on(EventTypes.ROW_EMPTY, me._boundOnRowEmpty, { namespace: me._namespace });
     }
 
     /**
@@ -170,13 +170,13 @@ export class Container extends UIElement {
     }
 
     /**
-     * Cleans up appBus listeners and destroys all child Row components.
+     * Cleans up Event listeners and destroys all child Row components.
      *
      * @returns {void}
      */
     destroy() {
         const me = this;
-        appBus.offByNamespace(me._namespace);
+        Event.offByNamespace(me._namespace);
 
         [...me.rows].forEach(row => row.dispose());
 
@@ -189,7 +189,7 @@ export class Container extends UIElement {
      * @returns {void}
      */
     requestLayoutUpdate() {
-        appBus.emit(EventTypes.LAYOUT_ROWS_CHANGED, this);
+        Event.emit(EventTypes.LAYOUT_ROWS_CHANGED, this);
     }
 
     /**

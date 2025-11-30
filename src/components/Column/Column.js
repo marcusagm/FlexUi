@@ -1,6 +1,6 @@
 import { PanelGroup } from '../Panel/PanelGroup.js';
 import { Viewport } from '../Viewport/Viewport.js';
-import { appBus } from '../../utils/EventBus.js';
+import { Event } from '../../utils/Event.js';
 import { throttleRAF } from '../../utils/ThrottleRAF.js';
 import { generateId } from '../../utils/generateId.js';
 import { ResizeHandleManager } from '../../utils/ResizeHandleManager.js';
@@ -32,7 +32,7 @@ import { ViewportFactory } from '../Viewport/ViewportFactory.js';
  * column.addChild(new PanelGroup(...));
  *
  * Events:
- * - Listens to: EventTypes.COLUMN_EMPTY (via appBus)
+ * - Listens to: EventTypes.COLUMN_EMPTY (via Event)
  * - Emits: EventTypes.LAYOUT_PANELGROUPS_CHANGED
  * - Emits: EventTypes.COLUMN_EMPTY
  *
@@ -47,7 +47,7 @@ import { ViewportFactory } from '../Viewport/ViewportFactory.js';
  * - {import('../../core/UIElement.js').UIElement}
  * - {import('../../renderers/vanilla/VanillaColumnAdapter.js').VanillaColumnAdapter}
  * - {import('../../utils/ResizeHandleManager.js').ResizeHandleManager}
- * - {import('../../utils/EventBus.js').appBus}
+ * - {import('../../utils/Event.js').Event}
  * - {import('../Panel/PanelGroup.js').PanelGroup}
  * - {import('../Viewport/Viewport.js').Viewport}
  * - {import('../Panel/PanelFactory.js').PanelFactory}
@@ -90,7 +90,7 @@ export class Column extends UIElement {
     _minWidth = 150;
 
     /**
-     * Unique namespace for appBus listeners.
+     * Unique namespace for Event listeners.
      *
      * @type {string | null}
      * @private
@@ -386,12 +386,12 @@ export class Column extends UIElement {
     }
 
     /**
-     * Initializes appBus event listeners for this component.
+     * Initializes Event listeners for this component.
      *
      * @returns {void}
      */
     initEventListeners() {
-        appBus.on(EventTypes.PANEL_GROUP_REMOVED, this._boundOnChildRemoved, {
+        Event.on(EventTypes.PANEL_GROUP_REMOVED, this._boundOnChildRemoved, {
             namespace: this._namespace
         });
     }
@@ -411,13 +411,13 @@ export class Column extends UIElement {
     }
 
     /**
-     * Cleans up appBus listeners and destroys all children.
+     * Cleans up Event listeners and destroys all children.
      *
      * @returns {void}
      */
     dispose() {
         const me = this;
-        appBus.offByNamespace(me._namespace);
+        Event.offByNamespace(me._namespace);
 
         [...me._children].forEach(child => child.dispose());
 
@@ -601,7 +601,7 @@ export class Column extends UIElement {
         me.requestLayoutUpdate();
 
         if (emitEmpty && me.getChildCount() === 0) {
-            appBus.emit(EventTypes.COLUMN_EMPTY, me);
+            Event.emit(EventTypes.COLUMN_EMPTY, me);
         }
     }
 
@@ -612,7 +612,7 @@ export class Column extends UIElement {
      */
     requestLayoutUpdate() {
         if (this.parentContainer) {
-            appBus.emit(EventTypes.LAYOUT_PANELGROUPS_CHANGED, this);
+            Event.emit(EventTypes.LAYOUT_PANELGROUPS_CHANGED, this);
         }
     }
 

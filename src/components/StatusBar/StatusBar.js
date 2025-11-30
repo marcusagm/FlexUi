@@ -1,7 +1,8 @@
 import { UIElement } from '../../core/UIElement.js';
 import { VanillaStatusBarAdapter } from '../../renderers/vanilla/VanillaStatusBarAdapter.js';
-import { appBus } from '../../utils/EventBus.js';
+import { Event } from '../../utils/Event.js';
 import { EventTypes } from '../../constants/EventTypes.js';
+import { CompositeDisposable } from '../../core/Disposable.js';
 
 /**
  * Description:
@@ -34,7 +35,7 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * Dependencies:
  * - {import('../../core/UIElement.js').UIElement}
  * - {import('../../renderers/vanilla/VanillaStatusBarAdapter.js').VanillaStatusBarAdapter}
- * - {import('../../utils/EventBus.js').appBus}
+ * - {import('../../utils/Event.js').Event}
  */
 export class StatusBar extends UIElement {
     /**
@@ -46,7 +47,7 @@ export class StatusBar extends UIElement {
     _messageTimer = null;
 
     /**
-     * Bound handler for setting temporary messages via appBus.
+     * Bound handler for setting temporary messages via Event.
      *
      * @type {Function}
      * @private
@@ -54,12 +55,20 @@ export class StatusBar extends UIElement {
     _boundSetMessage;
 
     /**
-     * Bound handler for setting permanent messages via appBus.
+     * Bound handler for setting permanent messages via Event.
      *
      * @type {Function}
      * @private
      */
     _boundSetPermanent;
+
+    /**
+     * Disposables for event bus listeners.
+     *
+     * @type {CompositeDisposable}
+     * @private
+     */
+    _eventDisposables = new CompositeDisposable();
 
     /**
      * The initial status text.
@@ -104,7 +113,7 @@ export class StatusBar extends UIElement {
 
     /**
      * Implementation of the mounting logic.
-     * Subscribes to appBus events.
+     * Subscribes to Event listeners.
      *
      * @param {HTMLElement} container - The parent container.
      * @protected
@@ -117,21 +126,24 @@ export class StatusBar extends UIElement {
             }
         }
 
-        appBus.on(EventTypes.STATUSBAR_SET_STATUS, me._boundSetMessage);
-        appBus.on(EventTypes.STATUSBAR_SET_PERMANENT_STATUS, me._boundSetPermanent);
+        me._eventDisposables = new CompositeDisposable();
+
+        me._eventDisposables.add(
+            Event.on(EventTypes.STATUSBAR_SET_STATUS, me._boundSetMessage),
+            Event.on(EventTypes.STATUSBAR_SET_PERMANENT_STATUS, me._boundSetPermanent)
+        );
     }
 
     /**
      * Implementation of the unmounting logic.
-     * Unsubscribes from appBus events and clears timers.
+     * Unsubscribes from Event listeners and clears timers.
      *
      * @protected
      */
     _doUnmount() {
         const me = this;
 
-        appBus.off(EventTypes.STATUSBAR_SET_STATUS, me._boundSetMessage);
-        appBus.off(EventTypes.STATUSBAR_SET_PERMANENT_STATUS, me._boundSetPermanent);
+        me._eventDisposables.dispose();
 
         if (me._messageTimer) {
             clearTimeout(me._messageTimer);

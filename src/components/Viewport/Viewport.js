@@ -1,4 +1,4 @@
-import { appBus } from '../../utils/EventBus.js';
+import { Event } from '../../utils/Event.js';
 import { EventTypes } from '../../constants/EventTypes.js';
 import { DropZoneType } from '../../constants/DNDTypes.js';
 import { ViewportFactory } from './ViewportFactory.js';
@@ -35,11 +35,11 @@ import { PopoutManagerService } from '../../services/PopoutManagerService.js';
  * viewport.dockWindow(newWindow);
  *
  * Events:
- * - Listens to (appBus): EventTypes.WINDOW_FOCUS
- * - Listens to (appBus): EventTypes.WINDOW_CLOSE_REQUEST
- * - Listens to (appBus): EventTypes.VIEWPORT_ARRANGE_CASCADE
- * - Listens to (appBus): EventTypes.VIEWPORT_ARRANGE_TILE
- * - Emits (appBus): EventTypes.LAYOUT_PANELGROUPS_CHANGED
+ * - Listens to (Event): EventTypes.WINDOW_FOCUS
+ * - Listens to (Event): EventTypes.WINDOW_CLOSE_REQUEST
+ * - Listens to (Event): EventTypes.VIEWPORT_ARRANGE_CASCADE
+ * - Listens to (Event): EventTypes.VIEWPORT_ARRANGE_TILE
+ * - Emits (Event): EventTypes.LAYOUT_PANELGROUPS_CHANGED
  *
  * Business rules implemented:
  * - Acts as a 'viewport' drop zone type.
@@ -56,7 +56,7 @@ import { PopoutManagerService } from '../../services/PopoutManagerService.js';
  * - {import('../Core/TabStrip.js').TabStrip}
  * - {import('../../core/UIElement.js').UIElement}
  * - {import('../../renderers/vanilla/VanillaViewportAdapter.js').VanillaViewportAdapter}
- * - {import('../../utils/EventBus.js').appBus}
+ * - {import('../../utils/Event.js').Event}
  * - {import('./ViewportFactory.js').ViewportFactory}
  * - {import('../../utils/ResizeHandleManager.js').ResizeHandleManager}
  * - {import('../../utils/ThrottleRAF.js').throttleRAF}
@@ -547,7 +547,7 @@ export class Viewport extends UIElement {
      */
     requestLayoutUpdate() {
         if (this._column) {
-            appBus.emit(EventTypes.LAYOUT_PANELGROUPS_CHANGED, this._column);
+            Event.emit(EventTypes.LAYOUT_PANELGROUPS_CHANGED, this._column);
         }
     }
 
@@ -913,7 +913,7 @@ export class Viewport extends UIElement {
      */
     dispose() {
         const me = this;
-        appBus.offByNamespace(me._namespace);
+        Event.offByNamespace(me._namespace);
 
         [...me._windows].forEach(windowInstance => windowInstance.dispose());
         me._windows = [];
@@ -990,7 +990,7 @@ export class Viewport extends UIElement {
     }
 
     /**
-     * Initializes event listeners on the appBus.
+     * Initializes Event listeners for this component.
      *
      * @private
      * @returns {void}
@@ -999,10 +999,10 @@ export class Viewport extends UIElement {
         const me = this;
         const options = { namespace: me._namespace };
 
-        appBus.on(EventTypes.WINDOW_FOCUS, me._boundOnWindowFocus, options);
-        appBus.on(EventTypes.WINDOW_CLOSE_REQUEST, me._boundOnWindowClose, options);
-        appBus.on(EventTypes.VIEWPORT_ARRANGE_CASCADE, me._boundOnArrangeCascade, options);
-        appBus.on(EventTypes.VIEWPORT_ARRANGE_TILE, me._boundOnArrangeTile, options);
+        Event.on(EventTypes.WINDOW_FOCUS, me._boundOnWindowFocus, options);
+        Event.on(EventTypes.WINDOW_CLOSE_REQUEST, me._boundOnWindowClose, options);
+        Event.on(EventTypes.VIEWPORT_ARRANGE_CASCADE, me._boundOnArrangeCascade, options);
+        Event.on(EventTypes.VIEWPORT_ARRANGE_TILE, me._boundOnArrangeTile, options);
 
         if (me._tabStrip) {
             me._tabStrip.onSelectionChange(header => {

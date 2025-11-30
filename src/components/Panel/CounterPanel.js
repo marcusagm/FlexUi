@@ -91,21 +91,21 @@ export class CounterPanel extends Panel {
         increaseButton.className = 'btn btn--primary btn--sm';
         increaseButton.textContent = 'Aumentar';
         increaseButton.dataset.action = 'increase';
-        increaseButton.addEventListener('click', me._boundOnIncrease);
+        me.addDomListener(increaseButton, 'click', me._boundOnIncrease);
 
         const decreaseButton = document.createElement('button');
         decreaseButton.type = 'button';
         decreaseButton.className = 'btn btn--secondary btn--sm';
         decreaseButton.textContent = 'Diminuir';
         decreaseButton.dataset.action = 'decrease';
-        decreaseButton.addEventListener('click', me._boundOnDecrease);
+        me.addDomListener(decreaseButton, 'click', me._boundOnDecrease);
 
         const resetButton = document.createElement('button');
         resetButton.type = 'button';
         resetButton.className = 'btn btn--sm';
         resetButton.textContent = 'Resetar';
         resetButton.dataset.action = 'reset';
-        resetButton.addEventListener('click', me._boundOnReset);
+        me.addDomListener(resetButton, 'click', me._boundOnReset);
 
         const buttonGroup = document.createElement('div');
         buttonGroup.className = 'button-group';
@@ -149,24 +149,6 @@ export class CounterPanel extends Panel {
      * @returns {void}
      */
     destroy() {
-        const me = this;
-        const contentElement = me.contentElement;
-
-        if (contentElement) {
-            const increaseButton = contentElement.querySelector('[data-action="increase"]');
-            const decreaseButton = contentElement.querySelector('[data-action="decrease"]');
-            const resetButton = contentElement.querySelector('[data-action="reset"]');
-
-            if (increaseButton && me._boundOnIncrease) {
-                increaseButton.removeEventListener('click', me._boundOnIncrease);
-            }
-            if (decreaseButton && me._boundOnDecrease) {
-                decreaseButton.removeEventListener('click', me._boundOnDecrease);
-            }
-            if (resetButton && me._boundOnReset) {
-                resetButton.removeEventListener('click', me._boundOnReset);
-            }
-        }
         super.destroy();
     }
 

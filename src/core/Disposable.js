@@ -114,6 +114,39 @@ export class Disposable {
     }
 
     /**
+     * Helper to create a Disposable from a DOM event listener.
+     * Automatically handles addEventListener and returns a Disposable that calls removeEventListener.
+     *
+     * @param {EventTarget} target - The DOM element or EventTarget.
+     * @param {string} type - The event name.
+     * @param {Function} handler - The listener function.
+     * @param {boolean|object} [options] - Options for addEventListener.
+     * @returns {{ dispose: Function }} A Disposable object.
+     */
+    static fromEvent(target, type, handler, options) {
+        if (!target || typeof target.addEventListener !== 'function') {
+            console.warn(`[Disposable] Invalid target for event listener:`, target);
+            return { dispose: () => {} };
+        }
+        if (typeof handler !== 'function') {
+            console.warn(`[Disposable] Invalid handler for event listener.`);
+            return { dispose: () => {} };
+        }
+
+        target.addEventListener(type, handler, options);
+
+        return {
+            dispose: () => {
+                try {
+                    target.removeEventListener(type, handler, options);
+                } catch (e) {
+                    console.warn(`[Disposable] Error removing event listener:`, e);
+                }
+            }
+        };
+    }
+
+    /**
      * Disposes all registered resources and marks this object as disposed.
      *
      * @returns {void}
@@ -164,7 +197,43 @@ export class Disposable {
  * Dependencies:
  * - Disposable
  */
+/**
+ * Description:
+ * A concrete implementation of Disposable designed to hold a collection of
+ * disposable items. It is useful when you need a container for disposables
+ * without creating a new class hierarchy.
+ *
+ * Properties summary:
+ * - _disposables {Array<{ dispose: Function }>} : A collection of objects to be disposed.
+ *
+ * Typical usage:
+ * const composite = new CompositeDisposable();
+ * composite.add(disposable1);
+ * composite.add(disposable2);
+ * // ... later
+ * composite.dispose();
+ *
+ * Events:
+ * - None
+ *
+ * Business rules implemented:
+ * - Accepts multiple arguments in constructor for convenience.
+ * - Uses an Array for storage to allow adding multiple items easily.
+ * - Disposes all items in the array when dispose() is called.
+ *
+ * Dependencies:
+ * - Disposable
+ */
 export class CompositeDisposable extends Disposable {
+    /**
+     * A collection of objects to be disposed.
+     * Overrides the Set from the base class with an Array for this specific implementation.
+     *
+     * @type {Array<{ dispose: Function }>}
+     * @private
+     */
+    _disposables = [];
+
     /**
      * Creates an instance of CompositeDisposable.
      *
@@ -173,16 +242,76 @@ export class CompositeDisposable extends Disposable {
     constructor(...items) {
         super();
         const me = this;
-        items.forEach(item => me.addDisposable(item));
+        // We don't use the base class _disposables Set here, we use our own Array.
+        // But we still call super() to initialize the base class state (like _isDisposed).
+        if (items.length > 0) {
+            me.add(...items);
+        }
     }
 
     /**
-     * Alias for addDisposable to improve readability when used as a container.
+     * Adds one or more disposable items to the collection.
+     *
+     * @param {...{ dispose: Function }} items - The items to track.
+     * @returns {void}
+     */
+    add(...items) {
+        const me = this;
+        if (me.isDisposed) {
+            items.forEach(item => {
+                if (item && typeof item.dispose === 'function') {
+                    item.dispose();
+                }
+            });
+            return;
+        }
+
+        items.forEach(item => {
+            if (item && typeof item.dispose === 'function') {
+                me._disposables.push(item);
+            } else {
+                console.warn(
+                    `[CompositeDisposable] invalid item added. Must have a dispose method.`,
+                    item
+                );
+            }
+        });
+    }
+
+    /**
+     * Alias for add to maintain compatibility with Disposable interface if needed.
      *
      * @param {{ dispose: Function }} item - The item to track.
      * @returns {void}
      */
-    add(item) {
-        this.addDisposable(item);
+    addDisposable(item) {
+        this.add(item);
+    }
+
+    /**
+     * Disposes all registered resources and marks this object as disposed.
+     *
+     * @returns {void}
+     */
+    dispose() {
+        const me = this;
+        if (me.isDisposed) {
+            return;
+        }
+
+        // Manually mark as disposed since we cannot call super.dispose()
+        // because it attempts to call .clear() on _disposables which is now an Array.
+        me._isDisposed = true;
+
+        // Dispose our array items
+        me._disposables.forEach(item => {
+            try {
+                item.dispose();
+            } catch (error) {
+                console.error('[CompositeDisposable] Error while disposing item:', error);
+            }
+        });
+
+        me._disposables = [];
     }
 }

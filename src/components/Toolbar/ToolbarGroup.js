@@ -1,6 +1,6 @@
 import { UIElement } from '../../core/UIElement.js';
 import { VanillaToolbarAdapter } from '../../renderers/vanilla/VanillaToolbarAdapter.js';
-import { appBus } from '../../utils/EventBus.js';
+import { Event } from '../../utils/Event.js';
 import { EventTypes } from '../../constants/EventTypes.js';
 
 /**
@@ -25,7 +25,7 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * }
  *
  * Events:
- * - Emits: EventTypes.DND_DRAG_START (via appBus)
+ * - Emits: EventTypes.DND_DRAG_START (via Event)
  *
  * Business rules implemented:
  * - Extends UIElement -> Disposable.
@@ -36,7 +36,7 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * Dependencies:
  * - {import('../../core/UIElement.js').UIElement}
  * - {import('../../renderers/vanilla/VanillaToolbarAdapter.js').VanillaToolbarAdapter}
- * - {import('../../utils/EventBus.js').appBus}
+ * - {import('../../utils/Event.js').Event}
  */
 export class ToolbarGroup extends UIElement {
     /**
@@ -294,7 +294,7 @@ export class ToolbarGroup extends UIElement {
         }
 
         // Access public element getter from UIElement
-        appBus.emit(EventTypes.DND_DRAG_START, {
+        Event.emit(EventTypes.DND_DRAG_START, {
             item: me,
             type: 'ToolbarGroup',
             element: me.element,

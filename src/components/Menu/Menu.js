@@ -1,7 +1,7 @@
 import { UIElement } from '../../core/UIElement.js';
 import { VanillaMenuAdapter } from '../../renderers/vanilla/VanillaMenuAdapter.js';
 import { TranslationService } from '../../services/TranslationService.js';
-import { appBus } from '../../utils/EventBus.js';
+import { Event } from '../../utils/Event.js';
 import { generateId } from '../../utils/generateId.js';
 
 /**
@@ -24,7 +24,7 @@ import { generateId } from '../../utils/generateId.js';
  * document.body.appendChild(menu.element);
  *
  * Events:
- * - Emits events specified in the menu JSON configuration via appBus.
+ * - Emits events specified in the menu JSON configuration via Event.
  *
  * Business rules implemented:
  * - Inherits from UIElement -> Disposable.
@@ -40,7 +40,7 @@ import { generateId } from '../../utils/generateId.js';
  * - {import('../../core/UIElement.js').UIElement}
  * - {import('../../renderers/vanilla/VanillaMenuAdapter.js').VanillaMenuAdapter}
  * - {import('../../services/TranslationService.js').TranslationService}
- * - {import('../../utils/EventBus.js').appBus}
+ * - {import('../../utils/Event.js').Event}
  * - {import('../../utils/generateId.js').generateId}
  */
 export class Menu extends UIElement {
@@ -250,7 +250,7 @@ export class Menu extends UIElement {
 
         const eventName = itemConfig.event || itemConfig.action;
         if (eventName) {
-            appBus.emit(eventName, itemConfig.payload);
+            Event.emit(eventName, itemConfig.payload);
             me.renderer.closeAllSubmenus(me.element);
         }
 

@@ -1,7 +1,7 @@
 /**
  * Description:
  * Defines constants for all application-wide event names (event strings)
- * used with the internal EventBus (appBus).
+ * used with the internal Event service.
  *
  * Centralizing event names prevents hardcoded string literals and improves
  * maintainability, refactoring, and code discoverability across the system's
@@ -41,8 +41,8 @@
  * - VIEWPORT_ARRANGE_TILE {string} : Command to arrange windows in a tile pattern.
  *
  * Typical usage:
- * // Instead of: appBus.emit('app:save-state');
- * // Use: appBus.emit(EventTypes.APP_SAVE_STATE);
+ * // Instead of: Event.emit('app:save-state');
+ * // Use: Event.emit(EventTypes.APP_SAVE_STATE);
  *
  * Dependencies:
  * - None

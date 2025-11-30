@@ -1,11 +1,11 @@
-import { appBus } from '../../utils/EventBus.js';
+import { Event } from '../../utils/Event.js';
 import { EventTypes } from '../../constants/EventTypes.js';
 import { generateId } from '../../utils/generateId.js';
 
 /**
  * Description:
  * Provides a decoupled service for dispatching notification events (Toasts and Snackbars).
- * This class does not render the UI itself; it fires events on the internal EventBus (appBus).
+ * This class does not render the UI itself; it fires events on the internal EventBus (Event).
  * A separate UI layer must listen for EventTypes.NOTIFICATION_SHOW and EventTypes.NOTIFICATION_DISMISS
  * to handle the actual rendering and removal of notification elements.
  *
@@ -53,7 +53,7 @@ import { generateId } from '../../utils/generateId.js';
  * - Emits: EventTypes.NOTIFICATION_DISMISS (when a notification should be closed)
  *
  * Dependencies:
- * - ../../utils/EventBus.js
+ * - ../../utils/Event.js
  * - ../../constants/EventTypes.js
  */
 export class NotificationService {
@@ -182,7 +182,7 @@ export class NotificationService {
             };
         });
 
-        appBus.emit(EventTypes.NOTIFICATION_SHOW, finalOptions);
+        Event.emit(EventTypes.NOTIFICATION_SHOW, finalOptions);
 
         return notificationId;
     }
@@ -201,7 +201,7 @@ export class NotificationService {
             return;
         }
 
-        appBus.emit(EventTypes.NOTIFICATION_DISMISS, { id: id });
+        Event.emit(EventTypes.NOTIFICATION_DISMISS, { id: id });
     }
 
     /**

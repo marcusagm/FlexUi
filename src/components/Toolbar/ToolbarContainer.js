@@ -25,7 +25,7 @@ import { ToolbarGroupFactory } from './ToolbarGroupFactory.js';
  * document.body.appendChild(toolbar.element);
  *
  * Events:
- * - None (Delegates events to Strip or emits via appBus in groups)
+ * - None (Delegates events to Strip or emits via Event in groups)
  *
  * Business rules implemented:
  * - Composes UIItemStrip for scroll and item management.

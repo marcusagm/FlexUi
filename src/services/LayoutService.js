@@ -1,4 +1,4 @@
-import { appBus } from '../utils/EventBus.js';
+import { Event } from '../utils/Event.js';
 import { FastDOM } from '../utils/FastDOM.js';
 import { throttleRAF } from '../utils/ThrottleRAF.js';
 import { EventTypes } from '../constants/EventTypes.js';
@@ -29,7 +29,7 @@ import { EventTypes } from '../constants/EventTypes.js';
  * - Determines which child in a column should expand to fill available vertical space.
  *
  * Dependencies:
- * - {import('../utils/EventBus.js').appBus}
+ * - {import('../utils/Event.js').Event}
  * - {import('../utils/ThrottleRAF.js').throttleRAF}
  * - {import('../constants/EventTypes.js').EventTypes}
  */
@@ -84,11 +84,9 @@ export class LayoutService {
      */
     _initListeners() {
         const me = this;
-        appBus.on(EventTypes.LAYOUT_ROWS_CHANGED, container => me._onRowsChanged(container));
-        appBus.on(EventTypes.LAYOUT_COLUMNS_CHANGED, row => me._onColumnsChanged(row));
-        appBus.on(EventTypes.LAYOUT_PANELGROUPS_CHANGED, column =>
-            me._onPanelGroupsChanged(column)
-        );
+        Event.on(EventTypes.LAYOUT_ROWS_CHANGED, container => me._onRowsChanged(container));
+        Event.on(EventTypes.LAYOUT_COLUMNS_CHANGED, row => me._onColumnsChanged(row));
+        Event.on(EventTypes.LAYOUT_PANELGROUPS_CHANGED, column => me._onPanelGroupsChanged(column));
     }
 
     /**

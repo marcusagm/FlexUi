@@ -1,6 +1,6 @@
 import { WindowHeader } from './WindowHeader.js';
 import { ResizeHandleManager } from '../../utils/ResizeHandleManager.js';
-import { appBus } from '../../utils/EventBus.js';
+import { Event } from '../../utils/Event.js';
 import { EventTypes } from '../../constants/EventTypes.js';
 import { ItemType } from '../../constants/DNDTypes.js';
 import { UIElement } from '../../core/UIElement.js';
@@ -37,7 +37,7 @@ import { WindowApi } from '../../api/WindowApi.js';
  * viewport.addWindow(win);
  *
  * Events:
- * - Emits (appBus): EventTypes.WINDOW_FOCUS, EventTypes.WINDOW_CLOSE_REQUEST, EventTypes.WINDOW_MOUNT
+ * - Emits (Event): EventTypes.WINDOW_FOCUS, EventTypes.WINDOW_CLOSE_REQUEST, EventTypes.WINDOW_MOUNT
  *
  * Business rules implemented:
  * - Extends UIElement -> Disposable.
@@ -53,7 +53,7 @@ import { WindowApi } from '../../api/WindowApi.js';
  * - {import('../../renderers/vanilla/VanillaWindowAdapter.js').VanillaWindowAdapter}
  * - {import('./WindowHeader.js').WindowHeader}
  * - {import('../../utils/ResizeHandleManager.js').ResizeHandleManager}
- * - {import('../../utils/EventBus.js').EventBus}
+ * - {import('../../utils/Event.js').Event}
  * - {import('../../api/WindowApi.js').WindowApi}
  */
 export class Window extends UIElement {
@@ -495,7 +495,7 @@ export class Window extends UIElement {
      */
     focus() {
         super.focus();
-        appBus.emit(EventTypes.WINDOW_FOCUS, this);
+        Event.emit(EventTypes.WINDOW_FOCUS, this);
     }
 
     /**
@@ -571,7 +571,7 @@ export class Window extends UIElement {
                 me.constrainToParent();
             }
 
-            appBus.emit(EventTypes.WINDOW_MOUNT, me);
+            Event.emit(EventTypes.WINDOW_MOUNT, me);
         }
     }
 

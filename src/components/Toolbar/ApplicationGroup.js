@@ -1,5 +1,5 @@
 import { ToolbarGroup } from './ToolbarGroup.js';
-import { appBus } from '../../utils/EventBus.js';
+import { Event } from '../../utils/Event.js';
 import { EventTypes } from '../../constants/EventTypes.js';
 
 /**
@@ -26,7 +26,7 @@ import { EventTypes } from '../../constants/EventTypes.js';
  *
  * Dependencies:
  * - {import('./ToolbarGroup.js').ToolbarGroup}
- * - {import('../../utils/EventBus.js').appBus}
+ * - {import('../../utils/Event.js').Event}
  * - {import('../../constants/EventTypes.js').EventTypes}
  */
 export class ApplicationGroup extends ToolbarGroup {
@@ -118,7 +118,7 @@ export class ApplicationGroup extends ToolbarGroup {
     /**
      * Helper to create a standardized toolbar button.
      *
-     * @param {string} eventName - The appBus event to emit on click.
+     * @param {string} eventName - The Event to emit on click.
      * @param {string} iconClass - The CSS class for the icon (e.g., 'icon-save').
      * @param {string} title - The tooltip text (aria-label).
      * @returns {HTMLButtonElement} The created button element.
@@ -130,7 +130,7 @@ export class ApplicationGroup extends ToolbarGroup {
         button.className = 'toolbar-button';
         button.setAttribute('aria-label', title);
         button.title = title; // Tooltip
-        button.addEventListener('click', () => appBus.emit(eventName));
+        button.addEventListener('click', () => Event.emit(eventName));
 
         const icon = document.createElement('span');
         icon.className = `icon ${iconClass}`;

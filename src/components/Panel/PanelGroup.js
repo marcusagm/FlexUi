@@ -1,6 +1,6 @@
 import { PanelGroupHeader } from './PanelGroupHeader.js';
 import { PanelFactory } from './PanelFactory.js';
-import { appBus } from '../../utils/EventBus.js';
+import { Event } from '../../utils/Event.js';
 import { throttleRAF } from '../../utils/ThrottleRAF.js';
 import { FloatingPanelManagerService } from '../../services/DND/FloatingPanelManagerService.js';
 import { ResizeHandleManager } from '../../utils/ResizeHandleManager.js';
@@ -61,7 +61,7 @@ import { GroupApi } from '../../api/GroupApi.js';
  * - {import('./PanelGroupHeader.js').PanelGroupHeader}
  * - {import('./PanelFactory.js').PanelFactory}
  * - {import('../../utils/ResizeHandleManager.js').ResizeHandleManager}
- * - {import('../../utils/EventBus.js').appBus}
+ * - {import('../../utils/Event.js').Event}
  * - {import('../../api/GroupApi.js').GroupApi}
  */
 export class PanelGroup extends UIElement {
@@ -1093,7 +1093,7 @@ export class PanelGroup extends UIElement {
     }
 
     /**
-     * Initializes appBus event listeners.
+     * Initializes Event listeners.
      *
      * @returns {void}
      */
@@ -1101,14 +1101,14 @@ export class PanelGroup extends UIElement {
         const me = this;
         const options = { namespace: me._namespace };
 
-        appBus.on(EventTypes.PANEL_GROUP_CHILD_CLOSE, me._boundOnChildCloseRequest, options);
-        appBus.on(
+        Event.on(EventTypes.PANEL_GROUP_CHILD_CLOSE, me._boundOnChildCloseRequest, options);
+        Event.on(
             EventTypes.APP_CLOSE_PANEL_REQUEST,
             me._boundOnChildCloseRequestFromContext,
             options
         );
-        appBus.on(EventTypes.PANEL_CLOSE_REQUEST, me._boundOnCloseRequest, options);
-        appBus.on(EventTypes.PANEL_TOGGLE_COLLAPSE, me._boundOnToggleCollapseRequest, options);
+        Event.on(EventTypes.PANEL_CLOSE_REQUEST, me._boundOnCloseRequest, options);
+        Event.on(EventTypes.PANEL_TOGGLE_COLLAPSE, me._boundOnToggleCollapseRequest, options);
 
         if (me._header && me._header.tabStrip) {
             me.addDisposable(
@@ -1208,7 +1208,7 @@ export class PanelGroup extends UIElement {
      */
     destroy() {
         const me = this;
-        appBus.offByNamespace(me._namespace);
+        Event.offByNamespace(me._namespace);
 
         me.unmount();
 
@@ -1279,7 +1279,7 @@ export class PanelGroup extends UIElement {
     close() {
         const me = this;
         if (!me._closable) return;
-        appBus.emit(EventTypes.PANEL_GROUP_REMOVED, { panel: me, column: me._column });
+        Event.emit(EventTypes.PANEL_GROUP_REMOVED, me);
         me.destroy();
     }
 
@@ -1444,8 +1444,8 @@ export class PanelGroup extends UIElement {
      * @returns {void}
      */
     requestLayoutUpdate() {
-        if (this._column && !this._isFloating) {
-            appBus.emit(EventTypes.LAYOUT_PANELGROUPS_CHANGED, this._column);
+        if (this._column) {
+            Event.emit(EventTypes.LAYOUT_PANELGROUPS_CHANGED, this._column);
         }
     }
 

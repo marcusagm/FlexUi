@@ -32,7 +32,7 @@ import { FloatingPanelManagerService } from './services/DND/FloatingPanelManager
 import { PopoutManagerService } from './services/PopoutManagerService.js';
 import { appShortcuts } from './services/Shortcuts/Shortcuts.js';
 import { Loader } from './services/Loader/Loader.js';
-import { appBus } from './utils/EventBus.js';
+import { Event } from './utils/Event.js';
 import { stateManager } from './services/StateManager.js';
 import { DropZoneType, ItemType } from './constants/DNDTypes.js';
 import { EventTypes } from './constants/EventTypes.js';
@@ -48,7 +48,7 @@ import { EventTypes } from './constants/EventTypes.js';
  * Properties summary:
  * - STORAGE_KEY {string} : The key used for saving the state in localStorage.
  * - currentWorkspace {object | null} : Holds the currently loaded workspace data.
- * - namespace {string} : A unique namespace for this singleton's appBus listeners.
+ * - namespace {string} : A unique namespace for this singleton's Event listeners.
  * - menu {Menu} : The instance of the main application menu.
  * - container {Container} : The instance of the root layout container component.
  * - statusBar {StatusBar} : The instance of the application status bar.
@@ -108,7 +108,7 @@ import { EventTypes } from './constants/EventTypes.js';
  * - {import('./services/DND/ViewportDropStrategy.js').ViewportDropStrategy}
  * - {import('./services/DND/ViewportTabDropStrategy.js').ViewportTabDropStrategy}
  * - {import('./services/LayoutService.js').LayoutService}
- * - {import('./utils/EventBus.js').appBus}
+
  * - {import('./services/DND/FloatingPanelManagerService.js').FloatingPanelManagerService}
  * - {import('./services/PopoutManagerService.js').PopoutManagerService}
  * - {import('./services/StateManager.js').stateManager}
@@ -135,7 +135,7 @@ export class App {
     currentWorkspace = null;
 
     /**
-     * Unique namespace for this singleton's appBus listeners.
+     * Unique namespace for this singleton's Event listeners.
      *
      * @type {string}
      * @public
@@ -451,13 +451,12 @@ export class App {
         await me.menu.load();
         await me.loadInitialLayout();
 
-        appBus.emit(EventTypes.LAYOUT_INITIALIZED, me.container);
-
-        appBus.emit(EventTypes.STATUSBAR_SET_PERMANENT_STATUS, 'Pronto');
+        Event.emit(EventTypes.LAYOUT_INITIALIZED, me.container);
+        Event.emit(EventTypes.STATUSBAR_SET_PERMANENT_STATUS, 'Pronto');
     }
 
     /**
-     * Initializes all global appBus event listeners for this singleton.
+     * Initializes all global Event listeners for this singleton.
      * Uses namespaces for easy cleanup.
      *
      * @returns {void}
@@ -466,11 +465,11 @@ export class App {
         const me = this;
         const options = { namespace: me.namespace };
 
-        appBus.on(EventTypes.APP_ADD_NEW_PANEL, me._boundAddNewPanel, options);
-        appBus.on(EventTypes.APP_ADD_NEW_WINDOW, me._boundAddNewWindow, options);
-        appBus.on(EventTypes.APP_SAVE_STATE, me._boundSaveLayout, options);
-        appBus.on(EventTypes.APP_RESTORE_STATE, me._boundRestoreLayout, options);
-        appBus.on(EventTypes.APP_RESET_STATE, me._boundResetLayout, options);
+        Event.on(EventTypes.APP_ADD_NEW_PANEL, me._boundAddNewPanel, options);
+        Event.on(EventTypes.APP_ADD_NEW_WINDOW, me._boundAddNewWindow, options);
+        Event.on(EventTypes.APP_SAVE_STATE, me._boundSaveLayout, options);
+        Event.on(EventTypes.APP_RESTORE_STATE, me._boundRestoreLayout, options);
+        Event.on(EventTypes.APP_RESET_STATE, me._boundResetLayout, options);
     }
 
     /**
@@ -480,7 +479,7 @@ export class App {
      */
     destroy() {
         const me = this;
-        appBus.offByNamespace(me.namespace);
+        Event.offByNamespace(me.namespace);
 
         window.removeEventListener('resize', me.debouncedResize);
         me.debouncedResize?.cancel();
@@ -628,7 +627,7 @@ export class App {
             await me.loadInitialLayout();
 
             if (!silent) {
-                appBus.emit(
+                Event.emit(
                     EventTypes.STATUSBAR_SET_STATUS,
                     translationService.translate('appstate.reset')
                 );

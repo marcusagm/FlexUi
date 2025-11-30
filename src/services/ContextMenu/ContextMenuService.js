@@ -1,4 +1,4 @@
-import { appBus } from '../../utils/EventBus.js';
+import { Event } from '../../utils/Event.js';
 import { throttleRAF } from '../../utils/ThrottleRAF.js';
 import { EventTypes } from '../../constants/EventTypes.js';
 
@@ -31,10 +31,10 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * - SUBMENU_HIDE_DELAY {number} : Delay in ms before closing a submenu on mouseleave.
  *
  * Events:
- * - Emits (appBus): EventTypes.CONTEXT_MENU_OPENED
+ * - Emits (Event): EventTypes.CONTEXT_MENU_OPENED
  *
  * Dependencies:
- * - ../../utils/EventBus.js
+ * - ../../utils/Event.js
  * - ../../utils/ThrottleRAF.js
  * - ../../constants/EventTypes.js
  */
@@ -495,7 +495,7 @@ export class ContextMenuService {
         if (typeof item.callback === 'function') {
             item.callback(contextData);
         } else if (typeof item.event === 'string') {
-            appBus.emit(item.event, contextData);
+            Event.emit(item.event, contextData);
         }
 
         me.close();
@@ -719,7 +719,7 @@ export class ContextMenuService {
             targetWindow
         );
 
-        appBus.emit(EventTypes.CONTEXT_MENU_OPENED);
+        Event.emit(EventTypes.CONTEXT_MENU_OPENED);
     }
 
     /**

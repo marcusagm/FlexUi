@@ -1,7 +1,7 @@
 import { UIElement } from '../../core/UIElement.js';
 import { VanillaPanelGroupHeaderAdapter } from '../../renderers/vanilla/VanillaPanelGroupHeaderAdapter.js';
 import { TabStrip } from '../Core/TabStrip.js';
-import { appBus } from '../../utils/EventBus.js';
+import { Event } from '../../utils/Event.js';
 import { EventTypes } from '../../constants/EventTypes.js';
 import { DropZoneType } from '../../constants/DNDTypes.js';
 import { PopoutManagerService } from '../../services/PopoutManagerService.js';
@@ -19,9 +19,9 @@ import { PopoutManagerService } from '../../services/PopoutManagerService.js';
  * - tabStrip {TabStrip} : The component managing the list of tabs.
  *
  * Events:
- * - Emits (appBus): EventTypes.PANEL_TOGGLE_COLLAPSE
- * - Emits (appBus): EventTypes.PANEL_CLOSE_REQUEST
- * - Emits (appBus): EventTypes.DND_DRAG_START
+ * - Emits (Event): EventTypes.PANEL_TOGGLE_COLLAPSE
+ * - Emits (Event): EventTypes.PANEL_CLOSE_REQUEST
+ * - Emits (Event): EventTypes.DND_DRAG_START
  *
  * Business rules implemented:
  * - Composes TabStrip via the 'mount' lifecycle.
@@ -35,7 +35,7 @@ import { PopoutManagerService } from '../../services/PopoutManagerService.js';
  * - {import('../../core/UIElement.js').UIElement}
  * - {import('../../renderers/vanilla/VanillaPanelGroupHeaderAdapter.js').VanillaPanelGroupHeaderAdapter}
  * - {import('../Core/TabStrip.js').TabStrip}
- * - {import('../../utils/EventBus.js').appBus}
+ * - {import('../../utils/Event.js').Event}
  * - {import('../../services/PopoutManagerService.js').PopoutManagerService}
  */
 export class PanelGroupHeader extends UIElement {
@@ -433,7 +433,7 @@ export class PanelGroupHeader extends UIElement {
     _onCollapse() {
         const me = this;
         if (me.panelGroup) {
-            appBus.emit(EventTypes.PANEL_TOGGLE_COLLAPSE, me.panelGroup);
+            Event.emit(EventTypes.PANEL_TOGGLE_COLLAPSE, me.panelGroup);
         }
     }
 
@@ -446,7 +446,7 @@ export class PanelGroupHeader extends UIElement {
     _onClose() {
         const me = this;
         if (me.panelGroup) {
-            appBus.emit(EventTypes.PANEL_CLOSE_REQUEST, me.panelGroup);
+            Event.emit(EventTypes.PANEL_CLOSE_REQUEST, me.panelGroup);
         }
     }
 
@@ -476,7 +476,7 @@ export class PanelGroupHeader extends UIElement {
         const offsetX = event.clientX - rect.left;
         const offsetY = event.clientY - rect.top;
 
-        appBus.emit(EventTypes.DND_DRAG_START, {
+        Event.emit(EventTypes.DND_DRAG_START, {
             item: me.panelGroup,
             type: 'PanelGroup',
             element: dragElement,

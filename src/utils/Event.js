@@ -17,15 +17,16 @@ import { throttleRAF } from './ThrottleRAF.js';
  * - _emitters {Map<string, Emitter>} : Map of event names to Emitter instances.
  * - _namespaces {Map<string, CompositeDisposable>} : Map of namespaces to grouped disposables.
  *
+ *
  * Typical usage:
  * // Subscribe
- * appBus.on('my-event', (data) => console.log(data), { namespace: 'my-comp-id' });
+ * Event.on('my-event', (data) => console.log(data), { namespace: 'my-comp-id' });
  *
  * // Emit
- * appBus.emit('my-event', { value: 123 });
+ * Event.emit('my-event', { value: 123 });
  *
  * // Cleanup
- * appBus.offByNamespace('my-comp-id');
+ * Event.offByNamespace('my-comp-id');
  *
  * Dependencies:
  * - {import('../core/index.js').Emitter}
@@ -33,7 +34,7 @@ import { throttleRAF } from './ThrottleRAF.js';
  * - {import('./Debounce.js').debounce}
  * - {import('./ThrottleRAF.js').throttleRAF}
  */
-export class EventBus {
+export class EventService {
     /**
      * Map of event names to Emitter instances.
      *
@@ -170,4 +171,4 @@ export class EventBus {
     }
 }
 
-export const appBus = new EventBus();
+export const Event = new EventService();

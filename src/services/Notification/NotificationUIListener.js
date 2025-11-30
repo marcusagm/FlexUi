@@ -1,11 +1,11 @@
 import { TranslationService } from '../TranslationService.js';
-import { appBus } from '../../utils/EventBus.js';
+import { Event } from '../../utils/Event.js';
 import { EventTypes } from '../../constants/EventTypes.js';
 
 /**
  * Description:
  * Handles the rendering and DOM manipulation of notifications.
- * This class listens to notification events dispatched on the internal EventBus (appBus)
+ * This class listens to notification events dispatched on the internal EventBus (Event)
  * and translates them into visible HTML elements. It uses TranslationService for button
  * localization and assumes a BEM-style CSS structure for styling.
  *
@@ -21,11 +21,11 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * uiListener.listen(appNotifications);
  *
  * Events:
- * - Listens to (appBus): EventTypes.NOTIFICATION_SHOW, EventTypes.NOTIFICATION_DISMISS
+ * - Listens to (Event): EventTypes.NOTIFICATION_SHOW, EventTypes.NOTIFICATION_DISMISS
  *
  * Dependencies:
  * - ../TranslationService.js
- * - ../../utils/EventBus.js
+ * - ../../utils/Event.js
  * - ../../constants/EventTypes.js
  */
 export class NotificationUIListener {
@@ -132,13 +132,13 @@ export class NotificationUIListener {
         }
         me._notificationService = notificationServiceInstance;
 
-        // Listen to appBus events using constants
-        appBus.on(EventTypes.NOTIFICATION_SHOW, me._handleShow.bind(me));
-        appBus.on(EventTypes.NOTIFICATION_DISMISS, me._handleDismiss.bind(me));
+        // Listen to Event events using constants
+        Event.on(EventTypes.NOTIFICATION_SHOW, me._handleShow.bind(me));
+        Event.on(EventTypes.NOTIFICATION_DISMISS, me._handleDismiss.bind(me));
     }
 
     /**
-     * Handles the 'show-notification' event from 'appBus'.
+     * Handles the 'show-notification' event from 'Event'.
      *
      * @param {object} options - The event payload (options object).
      * @private
@@ -206,7 +206,7 @@ export class NotificationUIListener {
     }
 
     /**
-     * Handles the 'dismiss-notification' event from 'appBus'.
+     * Handles the 'dismiss-notification' event from 'Event'.
      *
      * @param {object} payload - The event payload ({ id: string }).
      * @private

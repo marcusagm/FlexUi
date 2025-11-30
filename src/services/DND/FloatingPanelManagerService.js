@@ -1,5 +1,5 @@
 import { PanelGroup } from '../../components/Panel/PanelGroup.js';
-import { appBus } from '../../utils/EventBus.js';
+import { Event } from '../../utils/Event.js';
 import { EventTypes } from '../../constants/EventTypes.js';
 import { throttleRAF } from '../../utils/ThrottleRAF.js';
 import { PopoutManagerService } from '../PopoutManagerService.js';
@@ -15,7 +15,7 @@ import { PopoutManagerService } from '../PopoutManagerService.js';
  * - _floatingPanels {Array<PanelGroup>} : Tracks all active floating panels.
  * - _baseZIndex {number} : The starting z-index for floating panels.
  * - _zIndexCounter {number} : The incrementing z-index counter.
- * - _namespace {string} : Unique namespace for appBus listeners.
+ * - _namespace {string} : Unique namespace for Event listeners.
  * - _boundOnPanelGroupRemoved {Function | null} : Bound handler for group removal event.
  * - _boundOnUndockRequest {Function | null} : Bound handler for undock command event.
  * - _throttledResizeHandler {Function | null} : Throttled handler for window resize events.
@@ -44,7 +44,7 @@ import { PopoutManagerService } from '../PopoutManagerService.js';
  *
  * Dependencies:
  * - {import('../../components/Panel/PanelGroup.js').PanelGroup}
- * - {import('../../utils/EventBus.js').appBus}
+ * - {import('../../utils/Event.js').Event}
  * - {import('../../constants/EventTypes.js').EventTypes}
  * - {import('../../utils/ThrottleRAF.js').throttleRAF}
  * - {import('../PopoutManagerService.js').PopoutManagerService}
@@ -91,7 +91,7 @@ export class FloatingPanelManagerService {
     _zIndexCounter = 50;
 
     /**
-     * Unique namespace for appBus listeners.
+     * Unique namespace for Event listeners.
      *
      * @type {string}
      * @private
@@ -466,7 +466,7 @@ export class FloatingPanelManagerService {
      */
     destroy() {
         const me = this;
-        appBus.offByNamespace(me._namespace);
+        Event.offByNamespace(me._namespace);
 
         if (me._throttledResizeHandler) {
             me._throttledResizeHandler.cancel();
@@ -477,7 +477,7 @@ export class FloatingPanelManagerService {
     }
 
     /**
-     * Initializes appBus event listeners for this component.
+     * Initializes Event listeners for this component.
      *
      * @private
      * @returns {void}
@@ -485,8 +485,8 @@ export class FloatingPanelManagerService {
     _initEventListeners() {
         const me = this;
         const options = { namespace: me._namespace };
-        appBus.on(EventTypes.PANEL_GROUP_REMOVED, me._boundOnPanelGroupRemoved, options);
-        appBus.on(EventTypes.APP_UNDOCK_PANEL_REQUEST, me._boundOnUndockRequest, options);
+        Event.on(EventTypes.PANEL_GROUP_REMOVED, me._boundOnPanelGroupRemoved, options);
+        Event.on(EventTypes.APP_UNDOCK_PANEL_REQUEST, me._boundOnUndockRequest, options);
     }
 
     /**

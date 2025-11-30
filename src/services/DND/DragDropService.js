@@ -1,4 +1,4 @@
-import { appBus } from '../../utils/EventBus.js';
+import { Event } from '../../utils/Event.js';
 import { FastDOM } from '../../utils/FastDOM.js';
 import { FloatingPanelManagerService } from './FloatingPanelManagerService.js';
 import { throttleRAF } from '../../utils/ThrottleRAF.js';
@@ -26,7 +26,7 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * - _isDragging {boolean} : Flag indicating if a drag operation is active.
  * - _placeholderMode {string | null} : Caches the current placeholder mode.
  * - _strategyRegistry {Map} : Maps dropZoneType (string) to Strategy instances.
- * - _namespace {string} : Unique namespace for appBus listeners.
+ * - _namespace {string} : Unique namespace for Event listeners.
  * - _activePointerId {number | null} : The ID of the pointer initiating the drag.
  * - _activeDropZone {object | null} : The current DropZone instance being hovered.
  * - _ghostManager {GhostManager} : Manages the visual drag proxy.
@@ -42,8 +42,8 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * dds.registerStrategy(DropZoneType.COLUMN, new ColumnDropStrategy());
  *
  * Events:
- * - Listens to (appBus): EventTypes.DND_DRAG_START
- * - Emits (appBus): EventTypes.DND_DRAG_END
+ * - Listens to (Event): EventTypes.DND_DRAG_START
+ * - Emits (Event): EventTypes.DND_DRAG_END
  *
  * Business rules implemented:
  * - Uses the "DOM Bridge" pattern with synthetic pointer events.
@@ -54,7 +54,7 @@ import { EventTypes } from '../../constants/EventTypes.js';
  * - Supports multi-window Drag and Drop (Popout).
  *
  * Dependencies:
- * - ../../utils/EventBus.js
+ * - ../../utils/Event.js
  * - ../../components/Panel/Panel.js
  * - ../../components/Panel/PanelGroup.js
  * - ../../utils/ThrottleRAF.js
@@ -134,7 +134,7 @@ export class DragDropService {
     _strategyRegistry = new Map();
 
     /**
-     * Unique namespace for appBus listeners.
+     * Unique namespace for Event listeners.
      *
      * @type {string}
      * @private
@@ -351,7 +351,7 @@ export class DragDropService {
      */
     destroy() {
         const me = this;
-        appBus.offByNamespace(me._namespace);
+        Event.offByNamespace(me._namespace);
         me._throttledMoveHandler?.cancel();
 
         me._ghostManager.destroy();
@@ -384,7 +384,7 @@ export class DragDropService {
     _initEventListeners() {
         const me = this;
         const options = { namespace: me._namespace };
-        appBus.on(EventTypes.DND_DRAG_START, me._boundOnDragStart, options);
+        Event.on(EventTypes.DND_DRAG_START, me._boundOnDragStart, options);
     }
 
     /**
@@ -632,7 +632,7 @@ export class DragDropService {
         }
 
         me._cleanupDrag();
-        appBus.emit(EventTypes.DND_DRAG_END, { ...me._dragState });
+        Event.emit(EventTypes.DND_DRAG_END, { ...me._dragState });
     }
 
     /**

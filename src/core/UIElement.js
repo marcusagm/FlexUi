@@ -484,6 +484,21 @@ export class UIElement extends Disposable {
     }
 
     /**
+     * Registers a DOM event listener that will be automatically cleaned up when the component is disposed.
+     *
+     * @param {EventTarget} target - The DOM element to listen to.
+     * @param {string} type - The event name.
+     * @param {Function} handler - The listener function.
+     * @param {boolean|object} [options] - Options for addEventListener.
+     * @returns {{ dispose: Function }} The created disposable.
+     */
+    addDomListener(target, type, handler, options) {
+        const disposable = Disposable.fromEvent(target, type, handler, options);
+        this.addDisposable(disposable);
+        return disposable;
+    }
+
+    /**
      * Retrieves or creates an emitter for the specified event key.
      * Implements lazy initialization to save memory.
      *

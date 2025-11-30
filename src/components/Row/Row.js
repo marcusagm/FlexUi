@@ -1,5 +1,5 @@
 import { Column } from '../Column/Column.js';
-import { appBus } from '../../utils/EventBus.js';
+import { Event } from '../../utils/Event.js';
 import { throttleRAF } from '../../utils/ThrottleRAF.js';
 import { generateId } from '../../utils/generateId.js';
 import { ResizeHandleManager } from '../../utils/ResizeHandleManager.js';
@@ -49,7 +49,7 @@ import { VanillaRowAdapter } from '../../renderers/vanilla/VanillaRowAdapter.js'
  * - {import('../../renderers/vanilla/VanillaRowAdapter.js').VanillaRowAdapter}
  * - {import('../Column/Column.js').Column}
  * - {import('../../utils/ResizeHandleManager.js').ResizeHandleManager}
- * - {import('../../utils/EventBus.js').appBus}
+ * - {import('../../utils/Event.js').Event}
  * - {import('../Container/Container.js').Container}
  *
  * Notes / Additional:
@@ -106,7 +106,7 @@ export class Row extends UIElement {
     _collapseButtonDisabled = false;
 
     /**
-     * Unique namespace for appBus listeners.
+     * Unique namespace for Event listeners.
      *
      * @type {string | null}
      * @private
@@ -479,12 +479,12 @@ export class Row extends UIElement {
     }
 
     /**
-     * Initializes appBus event listeners for this component.
+     * Initializes Event listeners for this component.
      *
      * @returns {void}
      */
     initEventListeners() {
-        appBus.on(EventTypes.COLUMN_EMPTY, this._boundOnColumnEmpty, {
+        Event.on(EventTypes.COLUMN_EMPTY, this._boundOnColumnEmpty, {
             namespace: this._namespace
         });
     }
@@ -495,17 +495,17 @@ export class Row extends UIElement {
      * @returns {void}
      */
     requestLayoutUpdate() {
-        appBus.emit(EventTypes.LAYOUT_COLUMNS_CHANGED, this);
+        Event.emit(EventTypes.LAYOUT_COLUMNS_CHANGED, this);
     }
 
     /**
-     * Cleans up appBus listeners and destroys all child Column components.
+     * Cleans up Event listeners and destroys all child Column components.
      *
      * @returns {void}
      */
     destroy() {
         const me = this;
-        appBus.offByNamespace(me._namespace);
+        Event.offByNamespace(me._namespace);
 
         [...me.columns].forEach(column => column.dispose());
 
@@ -523,7 +523,7 @@ export class Row extends UIElement {
         me.deleteColumn(column);
 
         if (me.getTotalColumns() === 0 && me.parentContainer) {
-            appBus.emit(EventTypes.ROW_EMPTY, me);
+            Event.emit(EventTypes.ROW_EMPTY, me);
         }
     }
 

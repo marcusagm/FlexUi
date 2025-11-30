@@ -1,12 +1,12 @@
 import { TokenNormalizer } from './TokenNormalizer.js';
-import { appBus } from '../../utils/EventBus.js';
+import { Event } from '../../utils/Event.js';
 import { stateManager } from '../StateManager.js';
 
 /**
  * Description:
  * Receives canonical token objects and orchestrates matching against the registry.
  * It handles prioritization, sequence buffering, chord detection, scope filtering
- * (via StateManager), and dispatches actions via appBus (command)
+ * (via StateManager), and dispatches actions via Event (command)
  * or direct callback (handler).
  *
  * Properties summary:
@@ -24,7 +24,7 @@ import { stateManager } from '../StateManager.js';
  *
  * Dependencies:
  * - ./TokenNormalizer.js
- * - ../../utils/EventBus.js
+ * - ../../utils/Event.js
  * - ../StateManager.js
  */
 export class ShortcutDispatcher {
@@ -271,7 +271,7 @@ export class ShortcutDispatcher {
             };
 
             if (chosen.command && typeof chosen.command === 'string') {
-                appBus.emit(chosen.command, payload);
+                Event.emit(chosen.command, payload);
             } else if (typeof chosen.handler === 'function') {
                 chosen.handler(event, payload);
             }

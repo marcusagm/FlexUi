@@ -1,6 +1,6 @@
 import { UIElement } from '../../core/UIElement.js';
 import { VanillaWindowHeaderAdapter } from '../../renderers/vanilla/VanillaWindowHeaderAdapter.js';
-import { appBus } from '../../utils/EventBus.js';
+import { Event } from '../../utils/Event.js';
 import { DragTrigger } from '../../utils/DragTrigger.js';
 import { EventTypes } from '../../constants/EventTypes.js';
 import { ItemType } from '../../constants/DNDTypes.js';
@@ -22,9 +22,9 @@ import { PopoutManagerService } from '../../services/PopoutManagerService.js';
  * parentElement.appendChild(header.element);
  *
  * Events:
- * - Emits (appBus): EventTypes.DND_DRAG_START
- * - Emits (appBus): EventTypes.WINDOW_CLOSE_REQUEST
- * - Emits (appBus): EventTypes.WINDOW_FOCUS
+ * - Emits (Event): EventTypes.DND_DRAG_START
+ * - Emits (Event): EventTypes.WINDOW_CLOSE_REQUEST
+ * - Emits (Event): EventTypes.WINDOW_FOCUS
  *
  * Business rules implemented:
  * - Inherits from UIElement -> Disposable.
@@ -36,7 +36,7 @@ import { PopoutManagerService } from '../../services/PopoutManagerService.js';
  * Dependencies:
  * - {import('../../core/UIElement.js').UIElement}
  * - {import('../../renderers/vanilla/VanillaWindowHeaderAdapter.js').VanillaWindowHeaderAdapter}
- * - {import('../../utils/EventBus.js').appBus}
+ * - {import('../../utils/Event.js').Event}
  * - {import('../../utils/DragTrigger.js').DragTrigger}
  * - {import('../../services/PopoutManagerService.js').PopoutManagerService}
  */
@@ -330,7 +330,7 @@ export class WindowHeader extends UIElement {
         const me = this;
         if (!me._windowInstance) return;
 
-        appBus.emit(EventTypes.WINDOW_FOCUS, me._windowInstance);
+        Event.emit(EventTypes.WINDOW_FOCUS, me._windowInstance);
 
         let offsetX = 0;
         let offsetY = 0;
@@ -362,7 +362,7 @@ export class WindowHeader extends UIElement {
 
         const elementToDrag = me._isTabMode ? me.element : me._windowInstance.element;
 
-        appBus.emit(EventTypes.DND_DRAG_START, {
+        Event.emit(EventTypes.DND_DRAG_START, {
             item: me._windowInstance,
             type: ItemType.WINDOW,
             element: elementToDrag,
@@ -382,7 +382,7 @@ export class WindowHeader extends UIElement {
     _onHeaderClick() {
         const me = this;
         if (me._windowInstance) {
-            appBus.emit(EventTypes.WINDOW_FOCUS, me._windowInstance);
+            Event.emit(EventTypes.WINDOW_FOCUS, me._windowInstance);
         }
     }
 
@@ -396,7 +396,7 @@ export class WindowHeader extends UIElement {
     _onCloseClick(event) {
         event.stopPropagation();
         if (this._windowInstance) {
-            appBus.emit(EventTypes.WINDOW_CLOSE_REQUEST, this._windowInstance);
+            Event.emit(EventTypes.WINDOW_CLOSE_REQUEST, this._windowInstance);
         }
     }
 
